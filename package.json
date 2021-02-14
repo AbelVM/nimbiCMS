@@ -1,0 +1,31 @@
+{
+  "name": "nimbi-cms",
+  "version": "0.0.1",
+  "description": "fast minimal static CMS, full client-side",
+  "private": true,
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbelVM/nimbiCMS_pre.git"
+  },
+  "keywords": [
+    "nimbi",
+    "cms",
+    "markdown"
+  ],
+  "author": "Abel Vázquez Montoro",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AbelVM/nimbiCMS/issues"
+  },
+  "homepage": "https://github.com/AbelVM/nimbiCMS#readme",
+  "devDependencies": {
+    "cssnano": "^4.1.10",
+    "postcss": "^8.2.2",
+    "postcss-cli": "^8.3.1",
+    "terser": "^5.5.1"
+  },
+  "scripts": {
+    "build": "mkdir dist; terser src/nimbiCMS.js -o dist/nimbiCMS.min.js -c ; terser libs/*.js -o dist/nimbiCMS.worker.min.js; cat src/skelet.css src/nimbiCMS.css | postcss > dist/nimbiCMS.min.css"
+  }
+}
