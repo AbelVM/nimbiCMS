@@ -36,7 +36,6 @@ const
       });
   },
   builder = (src, target) => {
-    //debugger;
     let c = document.querySelector(`#${src.data.id}`);
     c.innerHTML = src.data.html;
   },
@@ -78,7 +77,8 @@ const
               "id": id
             }]);
           } else {
-
+              // TODO: blog block
+              c.innerHTML = 'TO DO';
           }
           contents.appendChild(c);
         });
@@ -89,7 +89,7 @@ const
         const
           tabs = document.querySelectorAll(".tab"),
           pages = document.querySelectorAll(".page"),
-          scrollToTop = document.querySelector(".scrollToTop"),
+          scrollToTop = document.querySelector(".scrollToTop"), 
           observer = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
               if (entry.isIntersecting) {
@@ -98,11 +98,11 @@ const
                   tab.classList.remove("activeTab");
                 });
                 tabs[index].classList.add("activeTab");
-                window.location.hash = entry.target.id;
+                /* window.location.hash = entry.target.id; */
               }
             });
           }, {
-            threshold: 0.25
+            threshold: 0.2
           });
         pages.forEach(page => {
           observer.observe(page);

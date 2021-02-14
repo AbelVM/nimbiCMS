@@ -66,7 +66,8 @@ img{
 
 .page {
   width: 100%;
-  min-height: 100vh;
+  height: 101vh;
+  overflow: hidden;
   padding: var(--page-toppadding);
   padding-top: calc(var(--navbar-height) + var(--page-toppadding));
 }
