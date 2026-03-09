@@ -1,21 +1,49 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-  <link rel="icon" type="image/png" href="favicon.png" />
-
-  <title>nimbi CMS</title>
-
-  <script type="module" src="../dist/nimbiCMS.min.js"></script>
-  <link rel="stylesheet" type="text/css" href="../dist/nimbiCMS.min.css" />
-
-</head>
-
-<body>
-
-</body>
-
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>NimbiCMS</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: #000000;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 75vh 1fr;
+      }
+      #header, #footer {
+        grid-column: 1 / -1;
+        color: #ffffff;
+        padding: 0.5rem 1rem;
+      }
+      #header { grid-row: 1; background: #1e88ff; }
+      #footer { grid-row: 3; background: #e53935; }
+      #app {
+        grid-column: 2;
+        grid-row: 2;
+        width: 75vw;
+        height: 75vh;
+        justify-self: center;
+        align-self: center;
+        box-sizing: border-box;
+      }
+    </style>
+    <link rel="stylesheet" href="/dist/nimbi-cms.css">
+  </head>
+    <body>
+    <div id="header">Header</div>
+    <div id="app"></div>
+    <div id="footer">Footer</div>
+    <script src="/dist/nimbi-cms.umd.js"></script>
+    <script>
+      const { initCMS } = window.nimbiCMS || {}
+      if (!initCMS) {
+        console.error('nimbiCMS UMD bundle not found. Run `npm run build` and ensure /dist/nimbi-cms.umd.js is served.')
+      } else {
+        const contentPath = './content'
+        initCMS({ el: '#app', contentPath })
+      }
+    </script>
+  </body>
 </html>

@@ -1,0 +1,210 @@
+.nimbi-site-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 50
+}
+
+.nimbi-site-navbar {
+    width: 100%;
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+}
+
+.nimbi-site-navbar .navbar {
+    background: var(--bulma-body-background-color, white)
+}
+
+.nimbi-cms {
+    display: block;
+    padding: 0;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+.nimbi-cms .columns {
+    margin-left: 0;
+    margin-right: 0;
+}
+.nimbi-cms .column {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    box-sizing: border-box;
+}
+
+.nimbi-cms .columns {
+    align-items: flex-start;
+}
+
+.nimbi-cms {
+    background: var(--bulma-body-background-color, #fff);
+    position: relative;
+}
+
+.nimbi-nav-wrap {
+    max-width: 260px;
+    width: 100%;
+    position: sticky;
+    top: 4rem;
+    max-height: calc(100% - 4rem);
+    overflow: auto;
+    margin-right: 1rem;
+}
+
+.nimbi-cms .column.nimbi-nav-wrap {
+    align-self: flex-start;
+}
+
+.nimbi-mount .nimbi-nav-wrap,
+.nimbi-cms .nimbi-nav-wrap {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 4rem;
+}
+
+.nimbi-content {
+    flex: 1;
+    max-width: 900px;
+    padding: 2rem
+}
+
+.nimbi-toc {
+    margin-bottom: 1rem
+}
+
+.nimbi-toc-inner {
+    background: var(--bulma-card-background, #fff);
+    padding: 1rem;
+    border-radius: 6px
+}
+
+.nimbi-nav-wrap .menu-label {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nimbi-nav-wrap .menu-label.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.nimbi-article .nimbi-reading-time {
+    font-size: 0.75rem;
+    color: var(--bulma-menu-label-color, #7a7a7a);
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.nimbi-article.content {
+    background: var(--bulma-body-background-color, #fff);
+}
+
+.nimbi-toc-inner ul {
+    list-style: none;
+    margin: 0;
+    padding: 0
+}
+
+.nimbi-toc-inner li {
+    margin: 0.25rem 0
+}
+
+.nimbi-toc-inner a {
+    color: var(--bulma-link-color, #3273dc);
+    text-decoration: none
+}
+
+.nimbi-toc-inner a:hover {
+    text-decoration: underline
+}
+
+@media (max-width: 800px) {
+    .nimbi-nav-wrap {
+        display: none
+    }
+
+    .nimbi-cms {
+        padding: 0
+    }
+}
+
+.nimbi-scroll-top {
+    position: fixed;
+    right: 1rem;
+    bottom: 1.25rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--nimbi-accent, #3273dc);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    z-index: 60;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nimbi-mount {
+    position: relative;
+}
+.nimbi-mount {
+    overflow-x: hidden;
+}
+.nimbi-mount .nimbi-site-navbar,
+.nimbi-mount .nimbi-nav-wrap {
+    position: sticky;
+}
+.nimbi-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 70;
+}
+.nimbi-overlay .nimbi-scroll-top {
+    position: absolute;
+    right: 1rem;
+    bottom: 1.25rem;
+    pointer-events: auto;
+}
+
+.nimbi-scroll-top.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.nimbi-scroll-top:focus {
+    outline: 2px solid #fff;
+    outline-offset: 2px
+}
+
+.nimbi-scroll-top svg {
+    width: 18px;
+    height: 18px
+}
+
+.nimbi-cms, .nimbi-nav-wrap {
+    scrollbar-width: thin; 
+    scrollbar-color: rgba(0,0,0,0.28) transparent;
+}
+
+.nimbi-cms::-webkit-scrollbar, .nimbi-nav-wrap::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.nimbi-cms::-webkit-scrollbar-track, .nimbi-nav-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+.nimbi-cms::-webkit-scrollbar-thumb, .nimbi-nav-wrap::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.28);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.nimbi-cms::-webkit-scrollbar-thumb:hover, .nimbi-nav-wrap::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0,0,0,0.36);
+}
