@@ -3,6 +3,7 @@ import readingTime from 'reading-time/lib/reading-time'
 import { marked } from 'marked'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
 import { createNavTree, buildTocElement, preScanHtmlSlugs, prepareArticle, renderNotFound } from './htmlBuilder.js'
+import { attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { setMetaTags, setStructuredData, getSiteNameFromMeta, applyPageMeta } from './seoManager.js'
 import { parseMarkdownToHtml, detectFenceLanguages } from './markdown.js'
 import { fetchPageData } from './router.js'
@@ -347,143 +348,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
 
 
 
-  function attachTocClickHandler(toc) {
-    try {
-      toc.addEventListener('click', (ev) => {
-        const a = ev.target && ev.target.closest ? ev.target.closest('a') : null
-        if (!a) return
-        const href = a.getAttribute('href') || ''
-        try {
-          const url = new URL(href, location.href)
-          const pageParam = url.searchParams.get('page')
-          const hash = url.hash ? url.hash.replace(/^#/, '') : null
-          if (!pageParam && !hash) return
-          ev.preventDefault()
-          history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
-          try { renderByQuery() } catch (e) { }
-        } catch (e) { /* ignore non-URL hrefs */ }
-      })
-    } catch (e) { }
-  }
 
-
-
-  function scrollToAnchorOrTop(anchor) {
-    if (anchor) {
-      const el = document.getElementById(anchor)
-      if (el) {
-        try {
-          const doScroll = () => {
-            try {
-              if (container && container.scrollTo && container.contains(el)) {
-                const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
-                container.scrollTo({ top, behavior: 'smooth' })
-              } else {
-                try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (e) { el.scrollIntoView() }
-              }
-            } catch (e) {
-              try { el.scrollIntoView() } catch (ee) { }
-            }
-          }
-          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (e) { setTimeout(doScroll, 50) }
-        } catch (e) { try { el.scrollIntoView() } catch (ee) { } }
-      }
-    } else {
-      try {
-        if (container && container.scrollTo) container.scrollTo({ top: 0, behavior: 'smooth' })
-        else window.scrollTo(0, 0)
-      } catch (e) { window.scrollTo(0, 0) }
-    }
-  }
-
-  function ensureScrollTopButton(article, topH1) {
-    try {
-      const existingBtn = document.querySelector('.nimbi-scroll-top')
-      let btn = existingBtn
-      if (!btn) {
-        btn = document.createElement('button')
-        btn.className = 'nimbi-scroll-top'
-        btn.setAttribute('aria-label', t('scrollToTop'))
-        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>'
-        try {
-          if (mountOverlay && mountOverlay.appendChild) mountOverlay.appendChild(btn)
-          else if (container && container.appendChild) container.appendChild(btn)
-          else if (mountEl && mountEl.appendChild) mountEl.appendChild(btn)
-          else document.body.appendChild(btn)
-        } catch (e) {
-          try { document.body.appendChild(btn) } catch (ee) { /* give up */ }
-        }
-        try {
-          btn.style.position = 'absolute'
-          btn.style.right = '1rem'
-          btn.style.bottom = '1.25rem'
-          btn.style.zIndex = '60'
-        } catch (e) { }
-        btn.addEventListener('click', () => {
-          try {
-            if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-            else if (mountEl && mountEl.scrollTo) mountEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-            else window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-          } catch (e) {
-            try { if (container) container.scrollTop = 0 } catch (e2) { }
-            try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { }
-            try { document.documentElement.scrollTop = 0 } catch (e4) { }
-          }
-        })
-      }
-
-      const tocLabel = navWrap.querySelector('.menu-label')
-      if (!topH1) {
-        btn.classList.remove('show')
-        if (tocLabel) tocLabel.classList.remove('show')
-      } else {
-        if (!btn._nimbiObserver) {
-          const obs = new IntersectionObserver((entries) => {
-            for (const entry of entries) {
-              if (entry.target instanceof Element) {
-                if (entry.isIntersecting) {
-                  btn.classList.remove('show')
-                  if (tocLabel) tocLabel.classList.remove('show')
-                } else {
-                  btn.classList.add('show')
-                  if (tocLabel) tocLabel.classList.add('show')
-                }
-              }
-            }
-          }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
-          btn._nimbiObserver = obs
-        }
-        try { btn._nimbiObserver.disconnect() } catch (e) { }
-        btn._nimbiObserver.observe(topH1)
-        try {
-          const checkIntersect = () => {
-            try {
-              const rootRect = (container instanceof Element) ? container.getBoundingClientRect() : { top: 0, bottom: window.innerHeight }
-              const elRect = topH1.getBoundingClientRect()
-              const isIntersecting = !(elRect.bottom < rootRect.top || elRect.top > rootRect.bottom)
-              if (isIntersecting) {
-                btn.classList.remove('show')
-                if (tocLabel) tocLabel.classList.remove('show')
-              } else {
-                btn.classList.add('show')
-                if (tocLabel) tocLabel.classList.add('show')
-              }
-            } catch (e) { }
-          }
-          try {
-            checkIntersect()
-            requestAnimationFrame(checkIntersect)
-            setTimeout(checkIntersect, 50)
-            setTimeout(checkIntersect, 200)
-            setTimeout(checkIntersect, 500)
-          } catch (e) {
-            setTimeout(checkIntersect, 100)
-          }
-            } catch (e) { }
-        }
-      } catch (e) {
-      }
-    }
 
     async function renderByQuery() {
       const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
@@ -509,7 +374,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
       contentWrap.appendChild(article)
 
       scrollToAnchorOrTop(anchor)
-      ensureScrollTopButton(article, topH1)
+      ensureScrollTopButton(article, topH1, { mountOverlay, container, mountEl, navWrap, t })
 
       currentPagePath = pagePath
     }
