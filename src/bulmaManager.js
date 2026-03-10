@@ -33,7 +33,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
           document.head.appendChild(s)
           return
         }
-      } catch (e) {
+      } catch (_) {
       }
     }
     return
@@ -44,7 +44,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
     if (!theme) return
     const href = `https://unpkg.com/bulmaswatch/${encodeURIComponent(theme)}/bulmaswatch.min.css`
     injectLink(href, { 'data-bulmaswatch-theme': theme })
-  } catch (e) {
+  } catch (_) {
   }
 }
 

@@ -55,7 +55,7 @@ export async function parseMarkdownToHtml(md) {
 }
 
 // shallow TOC extraction; used in worker earlier but exported for reuse
-export function extractToc(md) {
+function extractToc(md) {
   const lines = md.split('\n')
   const toc = []
   for (const line of lines) {

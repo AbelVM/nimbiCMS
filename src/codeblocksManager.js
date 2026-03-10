@@ -3,14 +3,14 @@ import hljs from 'highlight.js/lib/core'
 export { hljs }
 
 // constants & configuration ---------------------------------------------------
-export const DEFAULT_HLJS_SUPPORTED_URL =
+const DEFAULT_HLJS_SUPPORTED_URL =
   'https://raw.githubusercontent.com/highlightjs/highlight.js/main/SUPPORTED_LANGUAGES.md'
 export const SUPPORTED_HLJS_MAP = new Map()
 
 // alias shortcuts used when translating a fence language or registration name
 // into the highlight.js module name.  Keep this in sync with any logic that
 // constructs `candidates` in `registerLanguage`.
-export const HLJS_ALIAS_MAP = {
+const HLJS_ALIAS_MAP = {
   shell: 'bash',
   sh: 'bash',
   zsh: 'bash',
@@ -81,8 +81,8 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
           }
         }
       }
-      try {
-        const cleaned = []
+        try {
+          const cleaned = []
         for (const a of aliasesList) {
           const norm = String(a || '')
             .replace(/^[:]+/, '')
@@ -91,7 +91,7 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
           else SUPPORTED_HLJS_MAP.delete(a)
         }
         aliasesList = cleaned
-      } catch (e) { }
+      } catch (_) { }
       try {
         let removed = 0
         for (const k of Array.from(SUPPORTED_HLJS_MAP.keys())) {
@@ -121,10 +121,10 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
         try {
           const sepKey = ':---------------------'
           if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
-        } catch (e) { }
+        } catch (_) { }
 
-      } catch (e) { }
-    } catch (e) {
+      } catch (_) { }
+    } catch (_) {
     }
   })()
   return loadSupportedLanguagesPromise
@@ -158,11 +158,11 @@ export async function registerLanguage(name, modulePath) {
       try {
         try {
           mod = await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
-        } catch (localErr) {
+        } catch (_localErr) {
           try {
             const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/es/languages/${candidate}.js`
             mod = await import(/* @vite-ignore */ esmUrl)
-          } catch (esmErr) {
+          } catch (_esmErr) {
             const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/languages/${candidate}.js`
             mod = await import(/* @vite-ignore */ moduleUrl)
           }
@@ -175,17 +175,17 @@ export async function registerLanguage(name, modulePath) {
             registeredLangs.add(registerName)
             if (registerName !== name) { hljs.registerLanguage(name, langDef); registeredLangs.add(name) }
             return true
-          } catch (e) {
-            lastErr = e
+          } catch (_e) {
+            lastErr = _e
           }
         }
-      } catch (e) {
-        lastErr = e
+      } catch (_e) {
+        lastErr = _e
       }
     }
     if (lastErr) throw lastErr
     return false
-  } catch (e) {
+  } catch (_) {
     return false
   }
 }
@@ -201,7 +201,7 @@ export function observeCodeBlocks(root = document) {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return
         const el = entry.target
-        try { obs.unobserve(el) } catch (e) { }
+        try { obs.unobserve(el) } catch (_) { }
         ;(async () => {
           try {
             const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''
@@ -210,12 +210,12 @@ export function observeCodeBlocks(root = document) {
               const l = (match[1] || '').toLowerCase()
               const mapped = aliasMapLocal[l] || l
               const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
-              try { await registerLanguage(canonical).catch(() => {}) } catch (e) { }
-              try { hljs.highlightElement(el) } catch (e) { }
+              try { await registerLanguage(canonical).catch(() => {}) } catch (_) { }
+              try { hljs.highlightElement(el) } catch (_) { }
             } else {
-              try { hljs.highlightElement(el) } catch (e) { }
+              try { hljs.highlightElement(el) } catch (_) { }
             }
-          } catch (e) { }
+          } catch (_) { }
         })()
       })
     }, { root: null, rootMargin: '300px', threshold: 0.1 })
@@ -234,14 +234,14 @@ export function observeCodeBlocks(root = document) {
           const l = (match[1] || '').toLowerCase()
           const mapped = aliasMapLocal[l] || l
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
-          try { await registerLanguage(canonical).catch(() => {}) } catch (e) { }
+          try { await registerLanguage(canonical).catch(() => {}) } catch (_) { }
         }
-        try { hljs.highlightElement(el) } catch (e) { }
-      } catch (e) { }
+        try { hljs.highlightElement(el) } catch (_) { }
+      } catch (_) { }
     })
     return
   }
-  blocks.forEach(b => { try { obs.observe(b) } catch (e) { } })
+  blocks.forEach(b => { try { obs.observe(b) } catch (_) { } })
 }
 
 export function setHighlightTheme(theme, { useCdn = true } = {}) {

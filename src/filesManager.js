@@ -17,7 +17,7 @@ export function slugify(s) {
 // simple in-memory cache of fetchMarkdown responses keyed by the resolved URL
 export const fetchCache = new Map()
 
-export function clearFetchCache() {
+function clearFetchCache() {
   fetchCache.clear()
 }
 
@@ -33,14 +33,14 @@ export async function fetchMarkdown(path, base) {
     const res = await fetch(url)
     if (!res.ok) {
       if (res.status === 404) {
-        try {
+          try {
           const p404 = `${baseClean}/_404.md`
           const r404 = await fetch(p404)
           if (r404.ok) {
             const raw404 = await r404.text()
             return { raw: raw404, status: 404 }
           }
-        } catch (ee) { }
+        } catch (_ee) { }
       }
       const body = await res.clone().text().catch(() => '')
       console.error('fetchMarkdown failed:', { url, status: res.status, statusText: res.statusText, body: body.slice(0, 200) })

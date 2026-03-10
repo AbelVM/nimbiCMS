@@ -16,6 +16,7 @@
     "marked": "^17.0.4"
   },
   "devDependencies": {
+    "eslint": "^10.0.3",
     "jsdom": "^28.1.0",
     "reading-time": "^1.5.0",
     "terser": "^5.17.0",

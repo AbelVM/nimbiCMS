@@ -3,7 +3,7 @@ import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths } from './
 // in-memory LRU cache to avoid repeating slug resolution logic.
 // The Map insertion order is used to evict the oldest entry when the max
 // size is exceeded.
-export const RESOLUTION_CACHE_MAX = 100
+const RESOLUTION_CACHE_MAX = 100
 const resolutionCache = new Map()
 
 function resolutionCacheGet(key) {
@@ -194,5 +194,5 @@ export async function fetchPageData(raw, contentBase) {
 }
 
 // helpers exposed for unit tests
-export { resolutionCacheGet, resolutionCacheSet, buildPageCandidates, resolutionCache };
+// internal exports removed: keep these functions internal to this module
 
