@@ -9,105 +9,122 @@ import { DEFAULT_L10N } from './utils/l10n-defaults.js'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
 import { createNavTree, buildTocElement } from './htmlBuilder.js'
 import { setMetaTags, setStructuredData } from './seoManager.js'
+import { parseMarkdownToHtml, detectFenceLanguages } from './markdown.js'
+import { fetchPageData } from './router.js'
 
 const DEFAULT_HLJS_SUPPORTED_URL = 'https://raw.githubusercontent.com/highlightjs/highlight.js/main/SUPPORTED_LANGUAGES.md'
 const SUPPORTED_HLJS_MAP = new Map()
+// alias shortcuts used when translating a fence language or registration name
+// into the highlight.js module name.  Keep this in sync with any logic that
+// constructs `candidates` in `registerLanguage`.
+const HLJS_ALIAS_MAP = {
+  shell: 'bash', sh: 'bash', zsh: 'bash',
+  js: 'javascript', ts: 'typescript', py: 'python',
+  csharp: 'cs', 'c#': 'cs'
+}
+
+
+let loadSupportedLanguagesPromise = null
 
 async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
   if (!url) return
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return
-    const txt = await res.text()
-    const lines = txt.split(/\r?\n/)
-    let headerIdx = -1
-    for (let i = 0; i < lines.length; i++) {
-      if (/\|\s*Language\s*\|/i.test(lines[i])) { headerIdx = i; break }
-    }
-    if (headerIdx === -1) return
-    const headerCols = lines[headerIdx].replace(/^\||\|$/g, '').split('|').map(c => c.trim().toLowerCase())
-    let aliasesIdx = headerCols.findIndex(h => /alias|aliases|equivalent|alt|alternates?/i.test(h))
-    if (aliasesIdx === -1) aliasesIdx = 1 // fallback to second column
-    let canonicalIdx = headerCols.findIndex(h => /file|filename|module|module name|module-name|short|slug/i.test(h))
-    if (canonicalIdx === -1) {
-      const langCol = headerCols.findIndex(h => /language/i.test(h))
-      canonicalIdx = (langCol !== -1) ? langCol : 0
-    }
-    let aliasesList = []
-    for (let i = headerIdx + 1; i < lines.length; i++) {
-      const line = lines[i].trim()
-      if (!line || !line.startsWith('|')) break
-      const colsCheck = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim())
-      if (colsCheck.every(c => /^-+$/.test(c))) continue
-      const cols = colsCheck
-      if (!cols.length) continue
-      const canonicalRaw = (cols[canonicalIdx] || cols[0] || '').toString().trim()
-      const langName = canonicalRaw.toLowerCase()
-      if (!langName || /^-+$/.test(langName)) continue
-      SUPPORTED_HLJS_MAP.set(langName, langName)
-      const aliasesCol = cols[aliasesIdx] || ''
-      if (aliasesCol) {
-        const parts = String(aliasesCol).split(',').map(a => a.replace(/`/g, '').trim()).filter(Boolean)
-        if (parts.length) {
-          const rawPrimary = parts[0].toLowerCase()
-          const primaryNorm = rawPrimary.replace(/^[:]+/, '').replace(/[^a-z0-9_-]+/ig, '')
-          if (primaryNorm && /[a-z0-9]/i.test(primaryNorm)) {
-            SUPPORTED_HLJS_MAP.set(primaryNorm, primaryNorm)
-            aliasesList.push(primaryNorm)
+  if (loadSupportedLanguagesPromise) return loadSupportedLanguagesPromise
+  loadSupportedLanguagesPromise = (async () => {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) return
+      const txt = await res.text()
+      const lines = txt.split(/\r?\n/)
+      let headerIdx = -1
+      for (let i = 0; i < lines.length; i++) {
+        if (/\|\s*Language\s*\|/i.test(lines[i])) { headerIdx = i; break }
+      }
+      if (headerIdx === -1) return
+      const headerCols = lines[headerIdx].replace(/^\||\|$/g, '').split('|').map(c => c.trim().toLowerCase())
+      let aliasesIdx = headerCols.findIndex(h => /alias|aliases|equivalent|alt|alternates?/i.test(h))
+      if (aliasesIdx === -1) aliasesIdx = 1 // fallback to second column
+      let canonicalIdx = headerCols.findIndex(h => /file|filename|module|module name|module-name|short|slug/i.test(h))
+      if (canonicalIdx === -1) {
+        const langCol = headerCols.findIndex(h => /language/i.test(h))
+        canonicalIdx = (langCol !== -1) ? langCol : 0
+      }
+      let aliasesList = []
+      for (let i = headerIdx + 1; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (!line || !line.startsWith('|')) break
+        const colsCheck = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim())
+        if (colsCheck.every(c => /^-+$/.test(c))) continue
+        const cols = colsCheck
+        if (!cols.length) continue
+        const canonicalRaw = (cols[canonicalIdx] || cols[0] || '').toString().trim()
+        const langName = canonicalRaw.toLowerCase()
+        if (!langName || /^-+$/.test(langName)) continue
+        SUPPORTED_HLJS_MAP.set(langName, langName)
+        const aliasesCol = cols[aliasesIdx] || ''
+        if (aliasesCol) {
+          const parts = String(aliasesCol).split(',').map(a => a.replace(/`/g, '').trim()).filter(Boolean)
+          if (parts.length) {
+            const rawPrimary = parts[0].toLowerCase()
+            const primaryNorm = rawPrimary.replace(/^[:]+/, '').replace(/[^a-z0-9_-]+/ig, '')
+            if (primaryNorm && /[a-z0-9]/i.test(primaryNorm)) {
+              SUPPORTED_HLJS_MAP.set(primaryNorm, primaryNorm)
+              aliasesList.push(primaryNorm)
+            }
           }
         }
       }
-    }
-    try {
-      const cleaned = []
-      for (const a of aliasesList) {
-        const norm = String(a || '').replace(/^[:]+/, '').replace(/[^a-z0-9_-]+/ig, '')
-        if (norm && /[a-z0-9]/i.test(norm)) cleaned.push(norm)
-        else SUPPORTED_HLJS_MAP.delete(a)
-      }
-      aliasesList = cleaned
-    } catch (e) { }
-    try {
-      let removed = 0
-      for (const k of Array.from(SUPPORTED_HLJS_MAP.keys())) {
-        if (!k || /^-+$/.test(k) || !/[a-z0-9]/i.test(k)) {
-          SUPPORTED_HLJS_MAP.delete(k)
-          removed++
-          continue
+      try {
+        const cleaned = []
+        for (const a of aliasesList) {
+          const norm = String(a || '').replace(/^[:]+/, '').replace(/[^a-z0-9_-]+/ig, '')
+          if (norm && /[a-z0-9]/i.test(norm)) cleaned.push(norm)
+          else SUPPORTED_HLJS_MAP.delete(a)
         }
-        if (/^[:]+/.test(k)) {
-          const nk = k.replace(/^[:]+/, '')
-          if (nk && /[a-z0-9]/i.test(nk)) {
-            const v = SUPPORTED_HLJS_MAP.get(k)
+        aliasesList = cleaned
+      } catch (e) { }
+      try {
+        let removed = 0
+        for (const k of Array.from(SUPPORTED_HLJS_MAP.keys())) {
+          if (!k || /^-+$/.test(k) || !/[a-z0-9]/i.test(k)) {
             SUPPORTED_HLJS_MAP.delete(k)
-            SUPPORTED_HLJS_MAP.set(nk, v)
-          } else {
+            removed++
+            continue
+          }
+          if (/^[:]+/.test(k)) {
+            const nk = k.replace(/^[:]+/, '')
+            if (nk && /[a-z0-9]/i.test(nk)) {
+              const v = SUPPORTED_HLJS_MAP.get(k)
+              SUPPORTED_HLJS_MAP.delete(k)
+              SUPPORTED_HLJS_MAP.set(nk, v)
+            } else {
+              SUPPORTED_HLJS_MAP.delete(k)
+              removed++
+            }
+          }
+        }
+        for (const [k, v] of Array.from(SUPPORTED_HLJS_MAP.entries())) {
+          if (!v || /^-+$/.test(v) || !/[a-z0-9]/i.test(v)) {
             SUPPORTED_HLJS_MAP.delete(k)
             removed++
           }
         }
-      }
-      for (const [k, v] of Array.from(SUPPORTED_HLJS_MAP.entries())) {
-        if (!v || /^-+$/.test(v) || !/[a-z0-9]/i.test(v)) {
-          SUPPORTED_HLJS_MAP.delete(k)
-          removed++
-        }
-      }
-      try {
-        const sepKey = ':---------------------'
-        if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
-      } catch (e) { }
+        try {
+          const sepKey = ':---------------------'
+          if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
+        } catch (e) { }
 
-    } catch (e) { }
-  } catch (e) {
-  }
+      } catch (e) { }
+    } catch (e) {
+    }
+  })()
+  return loadSupportedLanguagesPromise
 }
 const registeredLangs = new Set()
 
 export async function registerLanguage(name, modulePath) {
   if (!name) return false
   if (registeredLangs.has(name)) return true
-  const aliasMap = { shell: 'bash', sh: 'bash', zsh: 'bash', js: 'javascript', ts: 'typescript', py: 'python', csharp: 'cs', 'c#': 'cs' }
+  const aliasMap = HLJS_ALIAS_MAP
   try {
     const base = (modulePath || name || '').toString().replace(/\.js$/i, '').trim()
     const primary = aliasMap[base] || aliasMap[name] || base || name
@@ -153,7 +170,7 @@ export async function registerLanguage(name, modulePath) {
 // IntersectionObserver-based lazy highlighter for code blocks
 let __hlObserver = null
 function observeCodeBlocks(root = document) {
-  const aliasMapLocal = { js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', csharp: 'cs', 'c#': 'cs' }
+  const aliasMapLocal = HLJS_ALIAS_MAP
   const ensureObserver = () => {
     if (__hlObserver) return __hlObserver
     if (typeof IntersectionObserver === 'undefined') return null
@@ -376,153 +393,49 @@ export function setStyle(style) {
   else document.body.classList.remove('is-dark')
 }
 
-async function parseMarkdownToHtml(md) {
-  const { content, data } = parseFrontmatter(md || '')
-  marked.setOptions({
-    gfm: true,
-    mangle: false,
-    headerIds: false,
-    headerPrefix: ''
-  })
-  let html = marked.parse(content)
 
-  try {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
-    const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-    heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+export async function initCMS({ el, contentPath = '/content', /* languages (deprecated) */ defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
+      if (!el) throw new Error('el is required')
 
-    // prefer lazy-loading images to reduce initial network pressure
-    try {
-      const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
-    } catch (e) { }
-
-    // don't block: leave language-tagged blocks for the IntersectionObserver to register & highlight
-    try {
-      const codes = doc.querySelectorAll('pre code')
-      codes.forEach(codeEl => {
-        try {
-          const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
-          const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-          if (!match || !match[1]) {
-            try { hljs.highlightElement(codeEl) } catch (e) { }
-          }
-        } catch (e) { }
-      })
-    } catch (e) { }
-
-    html = doc.body.innerHTML
-    const docToc = []
-    heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
-    return { html: doc.body.innerHTML, meta: data || {}, toc: docToc }
-  } catch (e) {
-    console.warn('post-process markdown failed', e)
-  }
-
-  return { html, meta: data || {}, toc }
-}
-
-function extractToc(md) {
-  const lines = md.split('\n')
-  const toc = []
-  for (const line of lines) {
-    const m = line.match(/^(#{1,6})\s+(.*)$/)
-    if (m) toc.push({ level: m[1].length, text: m[2].trim() })
-  }
-  return toc
-}
-
-function detectFenceLanguages(md) {
-  const set = new Set()
-  const re = /```\s*([a-zA-Z0-9_\-+]+)?/g
-  const STOP = new Set([
-    'then', 'now', 'if', 'once', 'so', 'and', 'or', 'but', 'when', 'the', 'a', 'an', 'as',
-    'let', 'const', 'var', 'export', 'import', 'from', 'true', 'false', 'null', 'npm',
-    'run', 'echo', 'sudo', 'this', 'that', 'have', 'using', 'some', 'return', 'returns',
-    'function', 'console', 'log', 'error', 'warn', 'class', 'new', 'undefined',
-    // common English / SQL tokens that are frequently present after ``` and are not languages
-    'with', 'select', 'from', 'where', 'join', 'on', 'group', 'order', 'by', 'having', 'as', 'into', 'values',
-    'like', 'limit', 'offset', 'create', 'table', 'index', 'view', 'insert', 'update', 'delete', 'returning',
-    'and', 'or', 'not', 'all', 'any', 'exists', 'case', 'when', 'then', 'else', 'end', 'distance', 'geometry',
-    // conversational words that have appeared in logs
-    'you', 'which', 'would', 'why', 'cool', 'other', 'same', 'everything', 'check'
-  ])
-  const FALLBACK_KNOWN = new Set(['bash', 'sh', 'zsh', 'javascript', 'js', 'python', 'py', 'php', 'java', 'c', 'cpp', 'rust', 'go', 'ruby', 'perl', 'r', 'scala', 'swift', 'kotlin', 'cs', 'csharp', 'html', 'css', 'json', 'xml', 'yaml', 'yml', 'dockerfile', 'docker'])
-  let m
-  while ((m = re.exec(md))) {
-    if (m[1]) {
-      const name = m[1].toLowerCase()
-      if (name.length < 3 && !SUPPORTED_HLJS_MAP.has(name)) continue
-      if (SUPPORTED_HLJS_MAP.size) {
-        if (SUPPORTED_HLJS_MAP.has(name)) {
-          const canonical = SUPPORTED_HLJS_MAP.get(name)
-          if (canonical) set.add(canonical)
-          continue
-        }
+      let mountEl = el
+      if (typeof el === 'string') {
+        mountEl = document.querySelector(el)
+        if (!mountEl) throw new Error(`el selector "${el}" did not match any element`)
+      } else if (!(el instanceof Element)) {
+        throw new Error('el must be a CSS selector string or a DOM element')
       }
-      const isKnown = FALLBACK_KNOWN.has(name)
-      // Accept known fallbacks or supported map entries. For unknown tokens, require a slightly
-      // stricter minimum length and not be a common SQL/English stop token to avoid noisy CDN
-      // requests for non-language words that often appear after the fence ticks.
-      if (isKnown) set.add(name)
-      else if (
-        name.length >= 5 && name.length <= 30 &&
-        /^[a-z][a-z0-9_\-+]*$/.test(name) &&
-        !STOP.has(name)
-      ) set.add(name)
-    }
-  }
-  return set
-}
 
-// nav builder moved to src/htmlBuilder.js
+      try {
+        mountEl.classList.add('nimbi-mount')
+        mountEl.style.position = mountEl.style.position || 'relative'
+        mountEl.style.overflow = mountEl.style.overflow || 'hidden'
+      } catch (e) { }
 
+      const container = document.createElement('div')
+      container.className = 'nimbi-cms'
+      try {
+        container.style.position = container.style.position || 'relative'
+        container.style.overflow = container.style.overflow || 'auto'
+        try { if (!container.style.webkitOverflowScrolling) container.style.webkitOverflowScrolling = 'touch' } catch (e) { }
+        container.style.width = container.style.width || '100%'
+        container.style.height = container.style.height || '100%'
+        container.style.boxSizing = container.style.boxSizing || 'border-box'
+      } catch (e) { }
 
-// fetchMarkdown moved to src/filesManager.js
+      const cols = document.createElement('div')
+      cols.className = 'columns'
 
-export async function initCMS({ el, contentPath = '/content', languages = [], defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
-  if (!el) throw new Error('el is required')
+      const navCol = document.createElement('div')
+      navCol.className = 'column is-full-mobile is-3-tablet nimbi-nav-wrap'
+      cols.appendChild(navCol)
 
-  let mountEl = el
-  if (typeof el === 'string') {
-    mountEl = document.querySelector(el)
-    if (!mountEl) throw new Error(`el selector "${el}" did not match any element`)
-  } else if (!(el instanceof Element)) {
-    throw new Error('el must be a CSS selector string or a DOM element')
-  }
+      const contentCol = document.createElement('div')
+      contentCol.className = 'column nimbi-content'
+      cols.appendChild(contentCol)
 
-  try {
-    mountEl.classList.add('nimbi-mount')
-    mountEl.style.position = mountEl.style.position || 'relative'
-    mountEl.style.overflow = mountEl.style.overflow || 'hidden'
-  } catch (e) { }
+      container.appendChild(cols)
 
-  const container = document.createElement('div')
-  container.className = 'nimbi-cms'
-  try {
-    container.style.position = container.style.position || 'relative'
-    container.style.overflow = container.style.overflow || 'auto'
-    try { if (!container.style.webkitOverflowScrolling) container.style.webkitOverflowScrolling = 'touch' } catch (e) { }
-    container.style.width = container.style.width || '100%'
-    container.style.height = container.style.height || '100%'
-    container.style.boxSizing = container.style.boxSizing || 'border-box'
-  } catch (e) { }
-
-  const cols = document.createElement('div')
-  cols.className = 'columns'
-
-  const navCol = document.createElement('div')
-  navCol.className = 'column is-full-mobile is-3-tablet nimbi-nav-wrap'
-  cols.appendChild(navCol)
-
-  const contentCol = document.createElement('div')
-  contentCol.className = 'column nimbi-content'
-  cols.appendChild(contentCol)
-
-  container.appendChild(cols)
-
-  const navWrap = navCol
+    const navWrap = navCol
   const contentWrap = contentCol
 
   mountEl.appendChild(container)
@@ -816,169 +729,23 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
   async function renderByQuery() {
     const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
     const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
-    let resolved = raw
-    let anchor = null
-
-    // support legacy '::' anchor syntax in the page param
-    if (resolved && String(resolved).includes('::')) {
-      const parts = String(resolved).split('::', 2)
-      resolved = parts[0]
-      anchor = parts[1] || null
-    }
-
-    if (!String(resolved).includes('.md') && !String(resolved).includes('.html')) {
-      try {
-        const decoded = decodeURIComponent(String(resolved || ''))
-        if (slugToMd.has(decoded)) resolved = slugToMd.get(decoded)
-        else {
-          // fallback 1: try to find a nav link whose slugified text matches the decoded slug
-          try {
-            const nodes = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
-            for (const n of Array.from(nodes || [])) {
-              try {
-                const txt = (n.textContent || '').trim()
-                if (!txt) continue
-                if (slugify(txt) === decoded) {
-                  const href = n.getAttribute('href') || ''
-                  try {
-                    const u = new URL(href, location.href)
-                    const p = u.searchParams.get('page')
-                    if (p) { resolved = decodeURIComponent(p); break }
-                  } catch (e) { /* ignore */ }
-                }
-              } catch (ee) { }
-            }
-          } catch (ee) { }
-
-          // fallback 2 removed: expensive attempt to fetch every nav-linked markdown
-          // It caused mass requests when opening HTML pages (e.g., blog.md leading to many post fetches).
-          // Rely on slug maps and index discovery instead.
-        }
-        // fallback 3: dynamically discover index/list pages from nav and known maps
-        // (avoid hardcoded filenames like 'blog.md' or 'projects.md')
-        try {
-          const indexSet = new Set()
-          try {
-            const anchorsForIndex = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
-            for (const linkEl of Array.from(anchorsForIndex || [])) {
-              try {
-                const href = linkEl.getAttribute('href') || ''
-                if (!href) continue
-                try {
-                  const u = new URL(href, location.href)
-                  // skip external links when discovering index candidates
-                  if (u.origin !== location.origin) continue
-                  // collect explicit md references
-                  const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/)
-                  if (mdMatch) {
-                    let candidate = mdMatch[1].replace(/^\.\//, '')
-                    if (candidate.startsWith('/')) candidate = candidate.replace(/^\//, '')
-                    if (candidate) indexSet.add(candidate)
-                    continue
-                  }
-                  // if the link points to a directory-like path, try its index.md
-                  const p = u.pathname || ''
-                  if (p) {
-                    const contentBaseUrl = new URL(contentBase)
-                    const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
-                    if (p.indexOf(contentBasePath) !== -1) {
-                      let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
-                      rel = rel.replace(/^[\.\/]+/, '')
-                      if (rel && !rel.includes('.')) {
-                        indexSet.add(rel + '/index.md')
-                        indexSet.add(rel + '.md')
-                      }
-                    }
-                  }
-                } catch (e) { }
-              } catch (e) { }
-            }
-          } catch (e) { }
-
-          // include any known md paths from slug/md maps
-          try { for (const v of Array.from(slugToMd.values())) { if (v) indexSet.add(v) } } catch (e) { }
-          try { for (const v of Array.from(mdToSlug.keys())) { if (v) indexSet.add(v) } } catch (e) { }
-
-          // avoid fetching large numbers of index candidates which can cause mass requests
-          if (indexSet.size && indexSet.size > 6) {
-            // too many candidates; skip aggressive index discovery
-          } else {
-            for (const candidate of Array.from(indexSet)) {
-            try {
-              if (!candidate || !String(candidate).includes('.md')) continue
-              const idxMd = await fetchMarkdown(candidate, contentBase)
-              if (!idxMd || !idxMd.raw) continue
-              // Only inspect the H1 of the candidate index file itself to match slugs.
-              // Avoid fetching inner-linked markdown files which can be numerous.
-              try {
-                const m = (idxMd.raw || '').match(/^#\s+(.+)$/m)
-                if (m) {
-                  const h1 = (m[1] || '').trim()
-                  if (h1 && slugify(h1) === decoded) { resolved = candidate; break }
-                }
-              } catch (e) { }
-            } catch (e) { }
-            }
-          }
-        } catch (e) { }
-      } catch (e) { }
-    }
-
-    if (!anchor && hashAnchor) anchor = hashAnchor
-
-    // try multiple candidate paths so slugs resolve even on direct visits
-    const pageCandidates = []
-    if (String(resolved).includes('.md') || String(resolved).includes('.html')) {
-      pageCandidates.push(resolved)
-    } else {
-      try {
-        const dec = decodeURIComponent(String(resolved || ''))
-        if (slugToMd.has(dec)) {
-          pageCandidates.push(slugToMd.get(dec))
-        } else {
-          // Only try underscore/index fallbacks if we have prior knowledge
-          // (mdToSlug contains known markdown paths or slugToMd has an entry).
-          const underscore = '_' + dec + '.md'
-          const indexPath = dec + '/index.md'
-          try { if (mdToSlug.has(underscore)) pageCandidates.push(underscore) } catch (e) { }
-          try { if (mdToSlug.has(indexPath)) pageCandidates.push(indexPath) } catch (e) { }
-        }
-      } catch (e) { }
-    }
-
-    let data = null
-    let pagePath = null
-    let lastErr = null
-    for (const candidate of pageCandidates) {
-      if (!candidate) continue
-      try {
-        const norm = String(candidate).replace(/^[\.\/]+/, '')
-        // debug logging removed to avoid noisy console output in browsers
-        data = await fetchMarkdown(norm, contentBase)
-        pagePath = norm
-        break
-      } catch (e) {
-        lastErr = e
-        continue
-      }
-    }
-    if (!data) {
-      // If resolution fails, show a friendly not-found message instead of throwing
-      try {
-        contentWrap.innerHTML = ''
-        const notFound = document.createElement('article')
-        notFound.className = 'nimbi-article content nimbi-not-found'
-        const h = document.createElement('h1')
-        h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
-        const p = document.createElement('p')
-        p.textContent = lastErr && lastErr.message ? String(lastErr.message) : 'Failed to resolve the requested page.'
-        notFound.appendChild(h)
-        notFound.appendChild(p)
-        contentWrap.appendChild(notFound)
-      } catch (e) { /* ignore rendering errors */ }
-      // avoid throwing to prevent uncaught promise rejections in the app
+    let data, pagePath, anchor
+    try {
+      ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
+    } catch (e) {
+      contentWrap.innerHTML = ''
+      const notFound = document.createElement('article')
+      notFound.className = 'nimbi-article content nimbi-not-found'
+      const h = document.createElement('h1')
+      h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
+      const p = document.createElement('p')
+      p.textContent = e && e.message ? String(e.message) : 'Failed to resolve the requested page.'
+      notFound.appendChild(h)
+      notFound.appendChild(p)
+      contentWrap.appendChild(notFound)
       return
     }
+    if (!anchor && hashAnchor) anchor = hashAnchor
       contentWrap.innerHTML = ''
 
       let parsed = null
@@ -998,23 +765,18 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
 
           // collect language-tagged code blocks and schedule non-blocking registration/highlight
           const codes = doc.querySelectorAll('pre code, code[class]')
-          const langMap = new Map()
+          // highlight blocks that do _not_ already have a language class –
+          // tagged blocks are handled later by the IntersectionObserver in
+          // `observeCodeBlocks` once they enter the viewport.
           codes.forEach(codeEl => {
             try {
               const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
               const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-              if (match && match[1]) {
-                const l = match[1].toLowerCase()
-                const arr = langMap.get(l) || []
-                arr.push(codeEl)
-                langMap.set(l, arr)
-              } else {
+              if (!match || !match[1]) {
                 try { hljs.highlightElement(codeEl) } catch (e) { }
               }
             } catch (e) { }
           })
-          const aliasMapLocal = { js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', csharp: 'cs', 'c#': 'cs' }
-          // leave language-tagged blocks unprocessed; they'll be observed after insertion
 
           const docToc = []
           heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
@@ -1023,7 +785,7 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
           parsed = { html: data.raw || '', meta: {}, toc: [] }
         }
       } else {
-        const langs = detectFenceLanguages(data.raw || '')
+        const langs = detectFenceLanguages(data.raw || '', SUPPORTED_HLJS_MAP)
         for (const l of langs) {
           try {
             const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
