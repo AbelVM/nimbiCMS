@@ -1,4 +1,4 @@
-import { slugify, mdToSlug } from './filesManager.js'
+import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './filesManager.js'
 
 export function createNavTree(t, tree) {
   const nav = document.createElement('aside')
@@ -64,4 +64,49 @@ export function buildTocElement(t, toc, pagePath = '') {
   })
   aside.appendChild(ul)
   return aside
+}
+
+// given a collection of anchor elements pointing at HTML files, fetch
+// each HTML and extract a title or first H1 so we can map a friendly slug
+// without waiting until the navigation click occurs.
+export async function preScanHtmlSlugs(linkEls, base) {
+  if (!linkEls || !linkEls.length) return
+  const outs = []
+  for (const a of Array.from(linkEls || [])) {
+    try {
+      const href = a.getAttribute('href') || ''
+      if (!href) continue
+      const raw = href.replace(/^\.\//, '')
+      const parts = raw.split(/::|#/, 2)
+      const path = parts[0]
+      if (!path || (!/\.html(?:$|[?#])/.test(path) && !path.endsWith('.html'))) continue
+      const htmlPath = path
+      try {
+        if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
+      } catch (e) { }
+      outs.push((async () => {
+        try {
+          const res = await fetchMarkdown(htmlPath, base)
+          if (res && res.raw) {
+            try {
+              const parser = new DOMParser()
+              const doc = parser.parseFromString(res.raw, 'text/html')
+              const titleTag = doc.querySelector('title')
+              const h1 = doc.querySelector('h1')
+              const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
+                ? titleTag.textContent.trim()
+                : (h1 && h1.textContent ? h1.textContent.trim() : null)
+              if (titleText) {
+                const slugKey = slugify(titleText)
+                if (slugKey) {
+                  try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (e) { }
+                }
+              }
+            } catch (e) { }
+          }
+        } catch (e) { }
+      })())
+    } catch (e) { }
+  }
+  if (outs.length) await Promise.allSettled(outs)
 }

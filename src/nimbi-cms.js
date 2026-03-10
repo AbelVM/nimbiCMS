@@ -1,4 +1,3 @@
-import hljs from 'highlight.js/lib/core'
 import 'highlight.js/styles/monokai.css'
 import 'bulma/css/bulma.min.css'
 import './styles/nimbi-cms-extra.css'
@@ -6,261 +5,14 @@ import readingTime from 'reading-time/lib/reading-time'
 import { DEFAULT_L10N } from './utils/l10n-defaults.js'
 import { marked } from 'marked'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
-import { createNavTree, buildTocElement } from './htmlBuilder.js'
+import { createNavTree, buildTocElement, preScanHtmlSlugs } from './htmlBuilder.js'
 import { setMetaTags, setStructuredData } from './seoManager.js'
 import { parseMarkdownToHtml, detectFenceLanguages } from './markdown.js'
 import { fetchPageData } from './router.js'
+import { hljs, SUPPORTED_HLJS_MAP, loadSupportedLanguages, registerLanguage, observeCodeBlocks, setHighlightTheme, BAD_LANGUAGES } from './codeblocksManager.js'
 
-const DEFAULT_HLJS_SUPPORTED_URL = 'https://raw.githubusercontent.com/highlightjs/highlight.js/main/SUPPORTED_LANGUAGES.md'
-const SUPPORTED_HLJS_MAP = new Map()
-// alias shortcuts used when translating a fence language or registration name
-// into the highlight.js module name.  Keep this in sync with any logic that
-// constructs `candidates` in `registerLanguage`.
-const HLJS_ALIAS_MAP = {
-  shell: 'bash', sh: 'bash', zsh: 'bash',
-  js: 'javascript', ts: 'typescript', py: 'python',
-  csharp: 'cs', 'c#': 'cs'
-}
-
-
-let loadSupportedLanguagesPromise = null
-
-async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
-  if (!url) return
-  if (loadSupportedLanguagesPromise) return loadSupportedLanguagesPromise
-  loadSupportedLanguagesPromise = (async () => {
-    try {
-      const res = await fetch(url)
-      if (!res.ok) return
-      const txt = await res.text()
-      const lines = txt.split(/\r?\n/)
-      let headerIdx = -1
-      for (let i = 0; i < lines.length; i++) {
-        if (/\|\s*Language\s*\|/i.test(lines[i])) { headerIdx = i; break }
-      }
-      if (headerIdx === -1) return
-      const headerCols = lines[headerIdx].replace(/^\||\|$/g, '').split('|').map(c => c.trim().toLowerCase())
-      let aliasesIdx = headerCols.findIndex(h => /alias|aliases|equivalent|alt|alternates?/i.test(h))
-      if (aliasesIdx === -1) aliasesIdx = 1 // fallback to second column
-      let canonicalIdx = headerCols.findIndex(h => /file|filename|module|module name|module-name|short|slug/i.test(h))
-      if (canonicalIdx === -1) {
-        const langCol = headerCols.findIndex(h => /language/i.test(h))
-        canonicalIdx = (langCol !== -1) ? langCol : 0
-      }
-      let aliasesList = []
-      for (let i = headerIdx + 1; i < lines.length; i++) {
-        const line = lines[i].trim()
-        if (!line || !line.startsWith('|')) break
-        const colsCheck = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim())
-        if (colsCheck.every(c => /^-+$/.test(c))) continue
-        const cols = colsCheck
-        if (!cols.length) continue
-        const canonicalRaw = (cols[canonicalIdx] || cols[0] || '').toString().trim()
-        const langName = canonicalRaw.toLowerCase()
-        if (!langName || /^-+$/.test(langName)) continue
-        SUPPORTED_HLJS_MAP.set(langName, langName)
-        const aliasesCol = cols[aliasesIdx] || ''
-        if (aliasesCol) {
-          const parts = String(aliasesCol).split(',').map(a => a.replace(/`/g, '').trim()).filter(Boolean)
-          if (parts.length) {
-            const rawPrimary = parts[0].toLowerCase()
-            const primaryNorm = rawPrimary.replace(/^[:]+/, '').replace(/[^a-z0-9_-]+/ig, '')
-            if (primaryNorm && /[a-z0-9]/i.test(primaryNorm)) {
-              SUPPORTED_HLJS_MAP.set(primaryNorm, primaryNorm)
-              aliasesList.push(primaryNorm)
-            }
-          }
-        }
-      }
-      try {
-        const cleaned = []
-        for (const a of aliasesList) {
-          const norm = String(a || '').replace(/^[:]+/, '').replace(/[^a-z0-9_-]+/ig, '')
-          if (norm && /[a-z0-9]/i.test(norm)) cleaned.push(norm)
-          else SUPPORTED_HLJS_MAP.delete(a)
-        }
-        aliasesList = cleaned
-      } catch (e) { }
-      try {
-        let removed = 0
-        for (const k of Array.from(SUPPORTED_HLJS_MAP.keys())) {
-          if (!k || /^-+$/.test(k) || !/[a-z0-9]/i.test(k)) {
-            SUPPORTED_HLJS_MAP.delete(k)
-            removed++
-            continue
-          }
-          if (/^[:]+/.test(k)) {
-            const nk = k.replace(/^[:]+/, '')
-            if (nk && /[a-z0-9]/i.test(nk)) {
-              const v = SUPPORTED_HLJS_MAP.get(k)
-              SUPPORTED_HLJS_MAP.delete(k)
-              SUPPORTED_HLJS_MAP.set(nk, v)
-            } else {
-              SUPPORTED_HLJS_MAP.delete(k)
-              removed++
-            }
-          }
-        }
-        for (const [k, v] of Array.from(SUPPORTED_HLJS_MAP.entries())) {
-          if (!v || /^-+$/.test(v) || !/[a-z0-9]/i.test(v)) {
-            SUPPORTED_HLJS_MAP.delete(k)
-            removed++
-          }
-        }
-        try {
-          const sepKey = ':---------------------'
-          if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
-        } catch (e) { }
-
-      } catch (e) { }
-    } catch (e) {
-    }
-  })()
-  return loadSupportedLanguagesPromise
-}
-const registeredLangs = new Set()
-
-export async function registerLanguage(name, modulePath) {
-  if (!name) return false
-  if (registeredLangs.has(name)) return true
-  const aliasMap = HLJS_ALIAS_MAP
-  try {
-    const base = (modulePath || name || '').toString().replace(/\.js$/i, '').trim()
-    const primary = aliasMap[base] || aliasMap[name] || base || name
-    const candidates = Array.from(new Set([primary, base, name].filter(Boolean))).map(c => String(c).toLowerCase())
-    let mod = null
-    let lastErr = null
-    for (const candidate of candidates) {
-      try {
-        try {
-          mod = await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
-        } catch (localErr) {
-          try {
-            const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/es/languages/${candidate}.js`
-            mod = await import(/* @vite-ignore */ esmUrl)
-          } catch (esmErr) {
-            const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/languages/${candidate}.js`
-            mod = await import(/* @vite-ignore */ moduleUrl)
-          }
-        }
-        if (mod) {
-          const langDef = mod.default || mod
-          try {
-            const registerName = (SUPPORTED_HLJS_MAP.size && SUPPORTED_HLJS_MAP.get(name)) || candidate || name
-            hljs.registerLanguage(registerName, langDef)
-            registeredLangs.add(registerName)
-            if (registerName !== name) { hljs.registerLanguage(name, langDef); registeredLangs.add(name) }
-            return true
-          } catch (e) {
-            lastErr = e
-          }
-        }
-      } catch (e) {
-        lastErr = e
-      }
-    }
-    if (lastErr) throw lastErr
-    return false
-  } catch (e) {
-    return false
-  }
-}
-
-// IntersectionObserver-based lazy highlighter for code blocks
-let __hlObserver = null
-function observeCodeBlocks(root = document) {
-  const aliasMapLocal = HLJS_ALIAS_MAP
-  const ensureObserver = () => {
-    if (__hlObserver) return __hlObserver
-    if (typeof IntersectionObserver === 'undefined') return null
-    __hlObserver = new IntersectionObserver((entries, obs) => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return
-        const el = entry.target
-        try { obs.unobserve(el) } catch (e) { }
-        ;(async () => {
-          try {
-            const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''
-            const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-            if (match && match[1]) {
-              const l = (match[1] || '').toLowerCase()
-              const mapped = aliasMapLocal[l] || l
-              const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
-              try { await registerLanguage(canonical).catch(() => {}) } catch (e) { }
-              try { hljs.highlightElement(el) } catch (e) { }
-            } else {
-              try { hljs.highlightElement(el) } catch (e) { }
-            }
-          } catch (e) { }
-        })()
-      })
-    }, { root: null, rootMargin: '300px', threshold: 0.1 })
-    return __hlObserver
-  }
-
-  const obs = ensureObserver()
-  const blocks = (root && root.querySelectorAll) ? root.querySelectorAll('pre code') : []
-  if (!obs) {
-    // no IntersectionObserver - highlight immediately (but register languages non-blocking)
-    blocks.forEach(async (el) => {
-      try {
-        const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''
-        const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-        if (match && match[1]) {
-          const l = (match[1] || '').toLowerCase()
-          const mapped = aliasMapLocal[l] || l
-          const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
-          try { await registerLanguage(canonical).catch(() => {}) } catch (e) { }
-        }
-        try { hljs.highlightElement(el) } catch (e) { }
-      } catch (e) { }
-    })
-    return
-  }
-  blocks.forEach(b => { try { obs.observe(b) } catch (e) { } })
-}
 
 // Pre-scan nav links for HTML files and map title/H1 -> slug to avoid nav-time fetches
-async function preScanHtmlSlugs(linkEls, base) {
-  if (!linkEls || !linkEls.length) return
-  const outs = []
-  for (const a of Array.from(linkEls || [])) {
-    try {
-      const href = a.getAttribute('href') || ''
-      if (!href) continue
-      const raw = href.replace(/^\.\//, '')
-      const parts = raw.split(/::|#/, 2)
-      const path = parts[0]
-      if (!path || !/\.html(?:$|[?#])/.test(path) && !path.endsWith('.html')) continue
-      const htmlPath = path
-      try {
-        if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
-      } catch (e) { }
-      // fetch HTML and extract title/h1
-      outs.push((async () => {
-        try {
-          const res = await fetchMarkdown(htmlPath, base)
-          if (res && res.raw) {
-            try {
-              const parser = new DOMParser()
-              const doc = parser.parseFromString(res.raw, 'text/html')
-              const titleTag = doc.querySelector('title')
-              const h1 = doc.querySelector('h1')
-              const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
-              if (titleText) {
-                const slugKey = slugify(titleText)
-                if (slugKey) {
-                  try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (e) { }
-                }
-              }
-            } catch (e) { }
-          }
-        } catch (e) { }
-      })())
-    } catch (e) { }
-  }
-  if (outs.length) await Promise.allSettled(outs)
-}
 
 let currentStyle = 'light'
 let currentHighlightTheme = 'monokai'
@@ -322,25 +74,6 @@ async function loadL10nFile(path, pageDir) {
   }
 }
 
-export function setHighlightTheme(theme, { useCdn = true } = {}) {
-  const existing = document.querySelector('link[data-hl-theme]')
-  if (existing) existing.remove()
-
-  currentHighlightTheme = theme || 'monokai'
-  if (currentHighlightTheme === 'monokai') {
-    return
-  }
-  if (!useCdn) {
-    console.warn('Requested highlight theme not bundled; set useCdn=true to load from CDN')
-    return
-  }
-  const href = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/styles/${currentHighlightTheme}.css`
-  const l = document.createElement('link')
-  l.rel = 'stylesheet'
-  l.href = href
-  l.setAttribute('data-hl-theme', currentHighlightTheme)
-  document.head.appendChild(l)
-}
 
 function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return
@@ -1132,5 +865,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
 // slugify moved to src/filesManager.js
 
 // SEO helpers moved to src/seoManager.js
+
+export { registerLanguage, loadSupportedLanguages, observeCodeBlocks, setHighlightTheme, SUPPORTED_HLJS_MAP, BAD_LANGUAGES } from './codeblocksManager.js'
 
 export default initCMS

@@ -2,6 +2,7 @@
 import { parseFrontmatter } from './utils/frontmatter.js'
 import { slugify } from './filesManager.js'
 import hljs from 'highlight.js/lib/core'
+import { BAD_LANGUAGES } from './codeblocksManager.js'
 
 // parse markdown into HTML and gather TOC data
 export async function parseMarkdownToHtml(md) {
@@ -68,6 +69,7 @@ export function extractToc(md) {
 export function detectFenceLanguages(md, supportedMap) {
   const set = new Set()
   const re = /```\s*([a-zA-Z0-9_\-+]+)?/g
+  // words unlikely to be languages
   const STOP = new Set([
     'then', 'now', 'if', 'once', 'so', 'and', 'or', 'but', 'when', 'the', 'a', 'an', 'as',
     'let', 'const', 'var', 'export', 'import', 'from', 'true', 'false', 'null', 'npm',
@@ -83,7 +85,14 @@ export function detectFenceLanguages(md, supportedMap) {
   while ((m = re.exec(md))) {
     if (m[1]) {
       const name = m[1].toLowerCase()
-      if (supportedMap && name.length < 3 && !supportedMap.has(name)) continue
+      // skip anything we've explicitly banned
+      if (BAD_LANGUAGES.has(name)) continue
+      // if we were given a map of supported names, only apply the
+      // length check when the map has already been populated; this
+      // avoids dropping common two-letter names like "js" during
+      // initial page load when the asynchronous language list hasn't
+      // arrived yet.
+      if (supportedMap && supportedMap.size && name.length < 3 && !supportedMap.has(name)) continue
       if (supportedMap && supportedMap.size) {
         if (supportedMap.has(name)) {
           const canonical = supportedMap.get(name)
