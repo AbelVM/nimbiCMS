@@ -1,4 +1,6 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './filesManager.js'
+import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
+import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 
 export function createNavTree(t, tree) {
   const nav = document.createElement('aside')
@@ -110,3 +112,162 @@ export async function preScanHtmlSlugs(linkEls, base) {
   }
   if (outs.length) await Promise.allSettled(outs)
 }
+
+
+export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
+    let parsed = null
+    if (data.isHtml) {
+      try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(data.raw || '', 'text/html')
+        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+        heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+        try {
+          const imgs = doc.querySelectorAll('img')
+          imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
+        } catch (e) { }
+        const codes = doc.querySelectorAll('pre code, code[class]')
+        codes.forEach(codeEl => {
+          try {
+            const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+            const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+            if (!match || !match[1]) {
+              try { hljs.highlightElement(codeEl) } catch (e) { }
+            }
+          } catch (e) { }
+        })
+        const docToc = []
+        heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
+        parsed = { html: doc.body.innerHTML, meta: {}, toc: docToc }
+      } catch (e) {
+        parsed = { html: data.raw || '', meta: {}, toc: [] }
+      }
+    } else {
+      const langs = detectFenceLanguages(data.raw || '', SUPPORTED_HLJS_MAP)
+      for (const l of langs) {
+        try {
+          const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
+          try { registerLanguage(canonical).catch(() => {}) } catch (e) { }
+          if (String(l) !== String(canonical)) try { registerLanguage(l).catch(() => {}) } catch (e) { }
+        } catch (e) {}
+      }
+      parsed = await parseMarkdownToHtml(data.raw || '')
+    }
+
+    const article = document.createElement('article')
+    article.className = 'nimbi-article content'
+    article.innerHTML = parsed.html
+    try { observeCodeBlocks(article) } catch (e) { }
+
+    try {
+      const imgs = article.querySelectorAll('img')
+      if (imgs && imgs.length) {
+        const pageDirForImgs = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+        imgs.forEach((img) => {
+          const src = img.getAttribute('src') || ''
+          if (!src) return
+          if (/^(https?:)?\/\//.test(src) || src.startsWith('/')) return
+          try {
+            const resolved = new URL(pageDirForImgs + src, contentBase).toString()
+            img.src = resolved
+            try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { }
+          } catch (e) {}
+        })
+      }
+    } catch (e) {}
+
+    try {
+      const anchors = article.querySelectorAll('a')
+      if (anchors && anchors.length) {
+        const contentBaseUrl = new URL(contentBase)
+        const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+        for (const a of Array.from(anchors || [])) {
+          try {
+            const href = a.getAttribute('href') || ''
+            if (!href) continue
+            if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) continue
+            if (href.startsWith('/') && !href.endsWith('.md')) continue
+            const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
+            if (mdMatch) {
+              const mdPathRaw = mdMatch[1]
+              const frag = mdMatch[2]
+              try {
+                const resolved = new URL(mdPathRaw, contentBase).pathname
+                const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+                let slug = null
+                try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (e) {}
+                if (!slug) {
+                  // derive slug by fetching markdown H1 if possible
+                  try {
+                    const mdData = await fetchMarkdown(rel, contentBase)
+                    if (mdData && mdData.raw) {
+                      const m = (mdData.raw || '').match(/^#\s+(.+)$/m)
+                      if (m && m[1]) {
+                        const candidate = slugify(m[1].trim())
+                        if (candidate) {
+                          slug = candidate
+                          try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (ee) {}
+                        }
+                      }
+                    }
+                  } catch (ee) { /* ignore errors */ }
+                }
+                if (slug) {
+                  if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
+                  else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+                } else {
+                  if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
+                  else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+                }
+              } catch (e) {
+                a.setAttribute('href', '?page=' + encodeURIComponent(mdPathRaw.replace(/^\.\//, '')))
+              }
+              continue
+            }
+            try {
+              const full = new URL(href, contentBase)
+              const p = full.pathname || ''
+              if (p && p.indexOf(contentBasePath) !== -1) {
+                let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
+                rel = rel.replace(/^[\.\/]+/, '')
+                if (rel.endsWith('/')) rel = rel.slice(0, -1)
+                if (!rel) rel = '_home'
+                if (!rel.endsWith('.md')) {
+                  if (slugToMd.has(rel)) {
+                    const mapped = slugToMd.get(rel)
+                    const slug = mdToSlug.get(mapped) || rel
+                    a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+                  } else {
+                    a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+                  }
+                }
+              }
+            } catch (e) {}
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
+    // compute H1 and slug mapping before building the TOC so TOC can use the friendly slug
+    const topH1 = article.querySelector('h1')
+    const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
+    let slugKey = ''
+    try {
+      if (h1Text) slugKey = slugify(h1Text)
+      if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
+      if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
+      if (!slugKey) slugKey = '_home'
+      try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (e) { }
+      try {
+        let newUrl = '?page=' + encodeURIComponent(slugKey)
+        try {
+          const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
+          if (curHash) newUrl += '#' + encodeURIComponent(curHash)
+        } catch (e) { }
+        history.replaceState({ page: slugKey }, '', newUrl)
+      } catch (e) { }
+    } catch (e) { }
+
+    const toc = buildTocElement(t, parsed.toc, pagePath)
+    return { article, parsed, toc, topH1: article.querySelector('h1'), h1Text, slugKey }
+  }

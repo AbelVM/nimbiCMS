@@ -54,6 +54,27 @@ export function setMetaTags(data, titleOverride, imageOverride, descOverride, in
   setOgTwitter(meta, titleOverride, imageOverride, finalDesc)
 }
 
+export function getSiteNameFromMeta() {
+  try {
+    const candidates = [
+      'meta[name="site"]',
+      'meta[name="site-name"]',
+      'meta[name="siteName"]',
+      'meta[property="og:site_name"]',
+      'meta[name="twitter:site"]'
+    ]
+    for (const sel of candidates) {
+      const m = document.querySelector(sel)
+      if (m) {
+        const c = m.getAttribute('content') || ''
+        if (c && c.trim()) return c.trim()
+      }
+    }
+  } catch (e) {
+  }
+  return ''
+}
+
 export function setStructuredData(data, pagePath, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   try {
     const meta = data.meta || {}
