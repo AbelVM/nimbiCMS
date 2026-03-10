@@ -1,5 +1,4 @@
 import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths } from './filesManager.js'
-import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
 
 // in-memory LRU cache to avoid repeating slug resolution logic.
 // The Map insertion order is used to evict the oldest entry when the max

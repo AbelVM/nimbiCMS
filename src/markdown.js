@@ -1,4 +1,5 @@
 // helper utilities for working with Markdown content
+import { marked } from 'marked'
 import { parseFrontmatter } from './utils/frontmatter.js'
 import { slugify } from './filesManager.js'
 import hljs from 'highlight.js/lib/core'
@@ -8,7 +9,6 @@ import { BAD_LANGUAGES } from './codeblocksManager.js'
 export async function parseMarkdownToHtml(md) {
   const { content, data } = parseFrontmatter(md || '')
   // configure marked options here if needed
-  const marked = (await import('marked')).marked
   marked.setOptions({
     gfm: true,
     mangle: false,
