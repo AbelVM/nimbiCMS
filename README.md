@@ -57,6 +57,8 @@ Recent behaviour fixes worth knowing:
 - Lazy-loads images and defers code highlighting via `IntersectionObserver`.
 - In-memory caching of fetched markdown and slug resolutions speeds up
   repeat navigations and reduces network traffic.
+- URL slug fallback now tries both `.md` and `.html` when no extension is
+  provided, fixing direct-link 404s (e.g. `?page=dummy-html-test-page`).
 
 ## Features
 

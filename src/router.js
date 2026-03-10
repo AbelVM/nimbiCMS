@@ -73,10 +73,10 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
   try { for (const v of Array.from(slugToMd.values())) { if (v) indexSet.add(v) } } catch (e) { }
   try { for (const v of Array.from(mdToSlug.keys())) { if (v) indexSet.add(v) } } catch (e) { }
 
-  if (indexSet.size && indexSet.size > 6) {
-    return null
-  }
-
+  // iterate through every candidate we collected; for modest numbers
+  // of nav entries this is very cheap, and it ensures we can resolve
+  // slugs that differ from the link text (e.g. 'tech-experiments' →
+  // projects.md via its H1).
   for (const candidate of Array.from(indexSet)) {
     try {
       if (!candidate || !String(candidate).includes('.md')) continue
