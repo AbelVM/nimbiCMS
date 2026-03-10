@@ -30,9 +30,7 @@ export async function fetchMarkdown(path, base) {
   }
   const raw = await res.text()
   const trimmed = raw.trim().slice(0, 16).toLowerCase()
-  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
-    console.error('fetchMarkdown expected markdown but received HTML:', { url, snippet: raw.trim().slice(0, 200) })
-    throw new Error('expected markdown but received HTML — check contentPath and that the file exists')
-  }
-  return { raw }
+  // Allow HTML files in the content directory — return them as-is and mark as HTML
+  const isHtml = trimmed.startsWith('<!doctype') || trimmed.startsWith('<html') || String(path || '').toLowerCase().endsWith('.html')
+  return isHtml ? { raw, isHtml: true } : { raw }
 }

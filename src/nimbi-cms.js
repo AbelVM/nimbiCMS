@@ -105,83 +105,16 @@ async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
 const registeredLangs = new Set()
 
 export async function registerLanguage(name, modulePath) {
-
+  if (!name) return false
   if (registeredLangs.has(name)) return true
+  const aliasMap = { shell: 'bash', sh: 'bash', zsh: 'bash', js: 'javascript', ts: 'typescript', py: 'python', csharp: 'cs', 'c#': 'cs' }
   try {
-    let mod
-    const aliasMap = { shell: 'bash', sh: 'bash', zsh: 'bash' }
-    let m = (modulePath || name || '').toString().replace(/\.js$/, '')
-    if (!m) m = name
-    if (aliasMap[m]) m = aliasMap[m]
-    try {
-      if (SUPPORTED_HLJS_MAP.size && SUPPORTED_HLJS_MAP.has(name)) {
-        let canonical = SUPPORTED_HLJS_MAP.get(name)
-        if (canonical) {
-          try {
-            const s = String(canonical)
-            const jsMatches = Array.from(s.matchAll(/([a-z0-9_+-]+)(?=\.js)/ig)).map(m => m[1])
-            if (jsMatches && jsMatches.length) canonical = jsMatches[0]
-            else {
-              const tokenMatch = s.match(/([a-z0-9_+-]+)/i)
-              if (tokenMatch) canonical = tokenMatch[1]
-            }
-          } catch (e) { }
-          if (canonical) m = String(canonical).toLowerCase()
-        }
-      }
-    } catch (e) { }
-    const tryCandidates = []
-    try {
-      let rawSource = String(modulePath || name || m || '')
-      rawSource = rawSource.replace(/\.js$/i, '').trim()
-      const raw = rawSource.toLowerCase()
-
-      const add = (s) => { try { const v = String(s || '').trim(); if (v && !tryCandidates.includes(v)) tryCandidates.push(v) } catch (e) { } }
-
-      const unsafe = /[^a-z0-9_-]/.test(raw)
-      if (unsafe) {
-        const tokens = raw.split(/[^a-z0-9]+/i).map(s => s.trim()).filter(Boolean)
-        for (const t of tokens) {
-          const tt = t.toLowerCase()
-          add(tt)
-          try {
-            if (SUPPORTED_HLJS_MAP.size && SUPPORTED_HLJS_MAP.has(tt)) add(String(SUPPORTED_HLJS_MAP.get(tt)).toLowerCase())
-          } catch (e) { }
-        }
-      } else {
-        const aliasSanitized = raw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-        add(aliasSanitized || raw)
-        const aliasUnderscore = raw.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-        add(aliasUnderscore)
-        try {
-          if (SUPPORTED_HLJS_MAP.size && SUPPORTED_HLJS_MAP.has(name)) {
-            const canonical = SUPPORTED_HLJS_MAP.get(name)
-            if (canonical) add(String(canonical).toLowerCase())
-          }
-        } catch (e) { }
-      }
-
-      try {
-        const checkStr = (raw + ' ' + (SUPPORTED_HLJS_MAP.size && SUPPORTED_HLJS_MAP.has(name) ? SUPPORTED_HLJS_MAP.get(name) : '')).toLowerCase()
-        if (/(pgsql|pl\/?pgsql|postgres)/.test(checkStr)) {
-          add('pgsql')
-          add('plpgsql')
-          add('postgresql')
-        }
-      } catch (e) { }
-    } catch (e) { }
-
-    const finalCandidates = Array.from(new Set((tryCandidates || []).map(c => {
-      try {
-        return String(c || '')
-          .toLowerCase()
-          .replace(/[^a-z0-9_-]+/g, '-')
-          .replace(/^-+|-+$/g, '')
-      } catch (e) { return '' }
-    }).filter(Boolean)))
-
-    let importErr = null
-    for (const candidate of finalCandidates) {
+    const base = (modulePath || name || '').toString().replace(/\.js$/i, '').trim()
+    const primary = aliasMap[base] || aliasMap[name] || base || name
+    const candidates = Array.from(new Set([primary, base, name].filter(Boolean))).map(c => String(c).toLowerCase())
+    let mod = null
+    let lastErr = null
+    for (const candidate of candidates) {
       try {
         try {
           mod = await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
@@ -194,29 +127,24 @@ export async function registerLanguage(name, modulePath) {
             mod = await import(/* @vite-ignore */ moduleUrl)
           }
         }
-        importErr = null
-        break
-      } catch (eCandidate) {
-        importErr = eCandidate
+        if (mod) {
+          const langDef = mod.default || mod
+          try {
+            const registerName = (SUPPORTED_HLJS_MAP.size && SUPPORTED_HLJS_MAP.get(name)) || candidate || name
+            hljs.registerLanguage(registerName, langDef)
+            registeredLangs.add(registerName)
+            if (registerName !== name) { hljs.registerLanguage(name, langDef); registeredLangs.add(name) }
+            return true
+          } catch (e) {
+            lastErr = e
+          }
+        }
+      } catch (e) {
+        lastErr = e
       }
     }
-    if (!mod && importErr) throw importErr
-    const lang = mod && (mod.default || mod)
-    if (lang) {
-      let registerName = name
-      try {
-        if (SUPPORTED_HLJS_MAP.size && SUPPORTED_HLJS_MAP.has(name)) registerName = SUPPORTED_HLJS_MAP.get(name) || name
-      } catch (e) { }
-      try {
-        hljs.registerLanguage(registerName, lang)
-        registeredLangs.add(registerName)
-      } catch (e) { }
-      if (registerName !== name) {
-        try { hljs.registerLanguage(name, lang); registeredLangs.add(name) } catch (e) { }
-      }
-      return true
-    }
-    throw new Error('language module did not export a valid definition')
+    if (lastErr) throw lastErr
+    return false
   } catch (e) {
     return false
   }
@@ -533,9 +461,9 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
     const navMd = await fetchMarkdown('_navigation.md', contentBase)
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
 
-    const tmp = document.createElement('div')
-    tmp.innerHTML = parsedNav.html || ''
-    const linkEls = tmp.querySelectorAll('a')
+    const parser = new DOMParser()
+    const navDoc = parser.parseFromString(parsedNav.html || '', 'text/html')
+    const linkEls = navDoc.querySelectorAll('a')
 
     const navbar = document.createElement('nav')
     navbar.className = 'navbar'
@@ -599,12 +527,14 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
     const start = document.createElement('div')
     start.className = 'navbar-start'
 
-    linkEls.forEach((a, i) => {
-      if (i === 0) return
+    for (let i = 0; i < linkEls.length; i++) {
+      const a = linkEls[i]
+      if (i === 0) continue
       const href = a.getAttribute('href') || '#'
       const item = document.createElement('a')
       item.className = 'navbar-item'
       try {
+        // Markdown links -> keep existing behavior
         if (/^[^#]*\.md(?:$|[#?])/.test(href) || href.endsWith('.md')) {
           const mdRaw = href.replace(/^\.\//, '')
           // support legacy '::' or hash anchors in nav links
@@ -612,6 +542,41 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
           const mdPath = parts[0]
           const frag = parts[1]
           item.href = '?page=' + encodeURIComponent(mdPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+        } else if (/\.html(?:$|[#?])/.test(href) || href.endsWith('.html')) {
+          // HTML file - fetch title to produce friendly slug and map it
+          const raw = href.replace(/^\.\//, '')
+          const parts = raw.split(/::|#/, 2)
+          const htmlPath = parts[0]
+          const frag = parts[1]
+          try {
+            const res = await fetchMarkdown(htmlPath, contentBase)
+            if (res && res.raw) {
+              try {
+                const parser = new DOMParser()
+                const doc = parser.parseFromString(res.raw, 'text/html')
+                const titleTag = doc.querySelector('title')
+                const h1 = doc.querySelector('h1')
+                const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
+                if (titleText) {
+                  const slugKey = slugify(titleText)
+                  if (slugKey) {
+                    try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { }
+                    item.href = '?page=' + encodeURIComponent(slugKey) + (frag ? '#' + encodeURIComponent(frag) : '')
+                  } else {
+                    item.href = '?page=' + encodeURIComponent(htmlPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+                  }
+                } else {
+                  item.href = '?page=' + encodeURIComponent(htmlPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+                }
+              } catch (ee) {
+                item.href = '?page=' + encodeURIComponent(htmlPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+              }
+            } else {
+              item.href = href
+            }
+          } catch (ee) {
+            item.href = href
+          }
         } else {
           item.href = href
         }
@@ -640,10 +605,9 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
 
 
 
-          
-      item.textContent = a.textContent || href
-      start.appendChild(item)
-    })
+            item.textContent = a.textContent || href
+            start.appendChild(item)
+          }
 
     menu.appendChild(start)
     navbar.appendChild(brand)
@@ -714,7 +678,7 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       anchor = parts[1] || null
     }
 
-    if (!String(resolved).includes('.md')) {
+    if (!String(resolved).includes('.md') && !String(resolved).includes('.html')) {
       try {
         const decoded = decodeURIComponent(String(resolved || ''))
         if (slugToMd.has(decoded)) resolved = slugToMd.get(decoded)
@@ -851,9 +815,9 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
               const idxMd = await fetchMarkdown(candidate, contentBase)
               if (!idxMd || !idxMd.raw) continue
               const parsedIdx = await parseMarkdownToHtml(idxMd.raw || '')
-              const tmp = document.createElement('div')
-              tmp.innerHTML = parsedIdx.html || ''
-              const links = tmp.querySelectorAll('a')
+              const parser = new DOMParser()
+              const tmpDoc = parser.parseFromString(parsedIdx.html || '', 'text/html')
+              const links = tmpDoc.querySelectorAll('a')
               const triedIdx = new Set()
               for (const linkEl of Array.from(links || [])) {
                 try {
@@ -886,7 +850,7 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
 
     // try multiple candidate paths so slugs resolve even on direct visits
     const pageCandidates = []
-    if (String(resolved).includes('.md')) {
+    if (String(resolved).includes('.md') || String(resolved).includes('.html')) {
       pageCandidates.push(resolved)
     } else {
       try {
@@ -926,21 +890,66 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
     }
       contentWrap.innerHTML = ''
 
-      const langs = detectFenceLanguages(data.raw || '')
-      for (const l of langs) {
+      let parsed = null
+      if (data.isHtml) {
+        // parse HTML directly and extract TOC + code block languages
         try {
-          const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-          if (!registeredLangs.has(canonical)) {
-            await registerLanguage(canonical)
-          }
-          if (String(l) !== String(canonical) && !registeredLangs.has(l)) {
-            await registerLanguage(l)
-          }
-        } catch (e) {
-        }
-      }
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(data.raw || '', 'text/html')
+          const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+          heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
 
-      const parsed = await parseMarkdownToHtml(data.raw || '')
+          // collect languages from code block class names (e.g. language-js)
+          const codes = doc.querySelectorAll('pre code, code[class]')
+          const langSet = new Set()
+          codes.forEach(codeEl => {
+            try {
+              const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+              const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+              if (match && match[1]) {
+                langSet.add(match[1].toLowerCase())
+              }
+            } catch (e) { }
+          })
+          const aliasMapLocal = { js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', csharp: 'cs', 'c#': 'cs' }
+          for (const l of langSet) {
+            try {
+              const mapped = aliasMapLocal[l] || l
+              const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
+              if (!registeredLangs.has(canonical)) await registerLanguage(canonical)
+              if (String(mapped) !== String(canonical) && !registeredLangs.has(mapped)) await registerLanguage(mapped)
+            } catch (e) { }
+          }
+
+          // now run highlighting on code blocks
+          try {
+            const codesToHighlight = doc.querySelectorAll('pre code')
+            codesToHighlight.forEach(codeEl => { try { hljs.highlightElement(codeEl) } catch (e) { } })
+          } catch (e) { }
+
+          const docToc = []
+          heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
+          parsed = { html: doc.body.innerHTML, meta: {}, toc: docToc }
+        } catch (e) {
+          parsed = { html: data.raw || '', meta: {}, toc: [] }
+        }
+      } else {
+        const langs = detectFenceLanguages(data.raw || '')
+        for (const l of langs) {
+          try {
+            const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
+            if (!registeredLangs.has(canonical)) {
+              await registerLanguage(canonical)
+            }
+            if (String(l) !== String(canonical) && !registeredLangs.has(l)) {
+              await registerLanguage(l)
+            }
+          } catch (e) {
+          }
+        }
+
+        parsed = await parseMarkdownToHtml(data.raw || '')
+      }
       const article = document.createElement('article')
       article.className = 'nimbi-article content'
       article.innerHTML = parsed.html
@@ -1056,6 +1065,8 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       let slugKey = ''
       try {
         if (h1Text) slugKey = slugify(h1Text)
+        // prefer HTML/meta title for slug when available
+        if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
         if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
         if (!slugKey) slugKey = '_home'
         try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (e) { }
