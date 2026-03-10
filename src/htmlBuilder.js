@@ -150,15 +150,35 @@ async function rewriteAnchors(article, contentBase) {
       } catch (_) {}
     }
 
-    // perform slug lookups in parallel
+    // perform slug lookups in parallel. Prefer any existing slug->md mapping
+    // when the requested path looks like a slug filename (basename.md). This
+    // avoids fetching e.g. "an-ephemeral-status-update.md" when we already
+    // know that slug maps to `_home.md` or another canonical path.
     if (pending.size) {
       await Promise.all(Array.from(pending).map(async rel => {
         try {
+          // If the requested file looks like "basename.md" and we already
+          // have a slug->md mapping for that basename, use it instead of
+          // fetching the requested path.
+          try {
+            const m = String(rel).match(/([^\/]+)\.md$/)
+            const basename = m && m[1]
+            if (basename && slugToMd.has(basename)) {
+              try {
+                const mapped = slugToMd.get(basename)
+                if (mapped) {
+                  try { mdToSlug.set(mapped, basename) } catch (_) {}
+                }
+              } catch (_) {}
+              return
+            }
+          } catch (_) {}
+
           const mdData = await fetchMarkdown(rel, contentBase)
           if (mdData && mdData.raw) {
-            const m = (mdData.raw || '').match(/^#\s+(.+)$/m)
-            if (m && m[1]) {
-              const candidate = slugify(m[1].trim())
+            const m2 = (mdData.raw || '').match(/^#\s+(.+)$/m)
+            if (m2 && m2[1]) {
+              const candidate = slugify(m2[1].trim())
               if (candidate) {
                 try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (_) {}
               }
@@ -221,19 +241,28 @@ export async function preScanHtmlSlugs(linkEls, base) {
   // collect unique HTML paths that need titles
   const htmlPaths = new Set()
   for (const a of Array.from(linkEls || [])) {
-    try {
-      const href = a.getAttribute('href') || ''
-      if (!href) continue
-      const raw = href.replace(/^\.\//, '')
-      const parts = raw.split(/::|#/, 2)
-      const path = parts[0]
-      if (!path || (!/\.html(?:$|[?#])/.test(path) && !path.endsWith('.html'))) continue
-      const htmlPath = path
       try {
-        if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
+        const href = a.getAttribute('href') || ''
+        if (!href) continue
+        const raw = href.replace(/^\.\//, '')
+        const parts = raw.split(/::|#/, 2)
+        const path = parts[0]
+        if (!path || (!/\.html(?:$|[?#])/.test(path) && !path.endsWith('.html'))) continue
+        const htmlPath = path
+        try {
+          // skip if already mapped by mdToSlug
+          if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
+        } catch (_) { }
+        try {
+          // also skip if slugToMd already contains this path as a value
+          let already = false
+          for (const v of slugToMd.values()) {
+            if (v === htmlPath) { already = true; break }
+          }
+          if (already) continue
+        } catch (_) { }
+        htmlPaths.add(htmlPath)
       } catch (_) { }
-      htmlPaths.add(htmlPath)
-    } catch (_) { }
   }
 
   if (!htmlPaths.size) return

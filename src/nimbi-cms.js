@@ -1,5 +1,5 @@
 import 'highlight.js/styles/monokai.css'
-import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase } from './filesManager.js'
 import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { createNavTree, preScanHtmlSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
@@ -160,6 +160,10 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
   const contentBase = new URL(pageDir + cp, location.origin).toString()
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (lang) setLang(lang)
+  // Inform filesManager of the runtime content base so slug -> md mapping
+  // can be computed relative to the correct path instead of relying on
+  // hardcoded segments.
+  try { setContentBase(contentBase) } catch (_) { }
   try {
     await fetchMarkdown('_home.md', contentBase)
   } catch (e) {
