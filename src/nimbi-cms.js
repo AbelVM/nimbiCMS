@@ -548,12 +548,37 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
     const brandItem = document.createElement('a')
     brandItem.className = 'navbar-item'
     if (firstLink) {
-      const href = firstLink.getAttribute('href') || '#'
-      if (/^[^#]*\.md(?:$|[#?])/.test(href) || href.endsWith('.md')) brandItem.href = '#' + href.replace(/^\.\//, '')
-      else brandItem.href = href
+      const rawHref = firstLink.getAttribute('href') || '#'
+      try {
+        // Prefer canonical `?page=` form so SPA navigation resets page param correctly
+        const u = new URL(rawHref, location.href)
+        const p = u.searchParams.get('page')
+        if (p) {
+          brandItem.href = '?page=' + encodeURIComponent(decodeURIComponent(p))
+        } else if (u.hash && /\.md$/.test(u.hash.replace(/^#/, ''))) {
+          const h = u.hash.replace(/^#/, '')
+          brandItem.href = '?page=' + encodeURIComponent(h)
+        } else {
+          const m = (u.pathname || '').match(/([^\/]+\.md)(?:$|[?#])/) 
+          if (m) {
+            let md = m[1].replace(/^\.\//, '')
+            if (md.startsWith('/')) md = md.replace(/^\//, '')
+            brandItem.href = '?page=' + encodeURIComponent(md)
+          } else {
+            // fallback to raw href if it's an external link
+            brandItem.href = rawHref
+          }
+        }
+      } catch (e) {
+        // non-URL hrefs (hash-only or strange formats) -> handle simple cases
+        if (/^[#].*\.md$/.test(rawHref)) brandItem.href = '?page=' + encodeURIComponent(rawHref.replace(/^#/, ''))
+        else if (/\.md$/.test(rawHref)) brandItem.href = '?page=' + encodeURIComponent(rawHref.replace(/^\.\//, ''))
+        else brandItem.href = rawHref
+      }
       brandItem.textContent = firstLink.textContent || t('home')
     } else {
-      brandItem.href = '#_home.md'
+      // ensure brand goes to the explicit home page slug
+      brandItem.href = '?page=_home.md'
       brandItem.textContent = t('home')
     }
     brand.appendChild(brandItem)
