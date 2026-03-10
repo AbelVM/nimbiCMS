@@ -1,3 +1,47 @@
+# nimbiCMS_pre
+
+Lightweight client-side CMS used for local editing and testing.
+
+## Quick start
+
+Install dependencies and build the project (uses Vite):
+
+```bash
+npm install
+npm run build -- --outDir example/dist
+```
+
+Serve the `example` folder for local testing:
+
+```bash
+npx http-server example -p 5174
+# then open http://127.0.0.1:5174/
+```
+
+## Development notes
+
+- Content lives under `example/content/`.
+- The SPA uses `?page=` query parameters to navigate client-side.
+- The build output is written to `example/dist` when running the build command above.
+
+Recent fixes and behaviour you should know about:
+
+- Avoids hardcoded `.md` appends and index fallbacks; slug resolution prefers known mappings.
+- Supports raw `.html` content (parses title/H1 and maps to a slug) without forcing markdown rendering.
+- Prevents aggressive prefetching of linked markdown files (no longer fetches all `.md` files from an index page).
+- Preserves URL hash anchors when navigating and improved scroll-to-anchor handling.
+- Intercepts navbar and content links to perform SPA navigation (prevents full page reloads).
+- Lazy-loads images and defers code highlighting (IntersectionObserver) for better initial load.
+
+## Testing
+
+- To verify anchor/hash behaviour open a page with a hash, e.g.:
+
+  `http://127.0.0.1:5174/?page=dummy-html-test-page#some-anchor`
+
+- To check that mass `.md` prefetching is disabled, open an HTML page (like the dummy) and inspect the Network tab — you should not see many `.md` fetches.
+
+If you want, I can update this README with more details, add contributor notes, or open a local server and run checks for you.
 <p align="center">
   <img src="logo.png" alt="Nimbi CMS logo" width="160" />
 </p>
