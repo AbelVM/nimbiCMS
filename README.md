@@ -92,12 +92,64 @@ Recent behaviour fixes worth knowing:
 > code detection handles language registration automatically.
 
 The `initCMS` export itself is returned when you call it; additional helpers
-are exposed:
+are exposed (all are also available from the UMD bundle namespace):
 
 - `registerLanguage(name, modulePath)` – dynamically register a highlight.js
   language (path may be a CDN URL).
-- `setStyle('light'|'dark')` – switch UI theme.
+- `setStyle('light'|'dark')` – switch between light and dark modes (adds
+  `data-theme` / `is-dark` class). This is the runtime API for dark/light
+  toggling.
+- `setThemeVars(vars)` – apply a set of CSS custom properties (`--foo:bar`)
+  on the document root; handy for theming colors/fonts without rebuilding
+  Bulma.
 - `setHighlightTheme(name, { useCdn })` – change the code highlight theme.
+
+Example:
+
+```javascript
+// example
+import initCMS, { setStyle, setThemeVars } from 'nimbi-cms'
+
+setStyle('dark')                    // switch mode
+setThemeVars({ '--primary': '#06c' }) // tweak colors/fonts
+```
+
+### Plugin Hooks (new)
+
+A minimal plugin/extension API lets you run custom code at key moments. The
+following convenience functions are exported; they all accept a callback which
+is invoked with a single context object describing the current state.
+
+- `onPageLoad(fn)` – called **after** a page has been rendered and inserted
+  into the DOM. Useful for analytics, search indexing, or runtime tweaks.
+- `onNavBuild(fn)` – called after the navigation bar is constructed (before
+  it’s attached to the document), when you can mutate links or add extra
+  controls.
+- `transformHtml(fn)` – called just before an article node is appended; you can
+  manipulate the element or inspect the generated HTML string.
+
+A generic `addHook(name,fn)` is also available; supported names are
+`'onPageLoad'`, `'onNavBuild'`, and `'transformHtml'`. Errors thrown by hooks are
+caught and ignored so third‑party code can’t crash the main CMS.
+
+For example:
+
+```js
+import initCMS, { onPageLoad, onNavBuild } from 'nimbi-cms'
+
+onNavBuild(({navWrap, navbar, linkEls}) => {
+  const input = document.createElement('input')
+  input.placeholder = 'search…'
+  navWrap.querySelector('.navbar-start').prepend(input)
+})
+
+onPageLoad(({pagePath, article}) => {
+  console.log('page done', pagePath)
+})
+```
+
+These hooks give you an easy entry point for adding analytics, search,
+custom rendering, and other features without needing to fork the source.
 
 ## Theming & Customization
 

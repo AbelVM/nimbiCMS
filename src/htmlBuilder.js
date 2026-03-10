@@ -299,12 +299,18 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
         parsed = { html: data.raw || '', meta: {}, toc: [] }
       }
     } else {
-      const langs = detectFenceLanguages(data.raw || '', SUPPORTED_HLJS_MAP)
+      const langsArray = detectFenceLanguages(data.raw || '', SUPPORTED_HLJS_MAP)
+      const langs = new Set(langsArray) // dedupe
       for (const l of langs) {
         try {
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-          try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
-          if (String(l) !== String(canonical)) try { registerLanguage(l).catch(() => {}) } catch (_) { }
+          // skip languages we’ve already registered
+          if (!registeredLangs.has(canonical)) {
+            try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
+          }
+          if (String(l) !== String(canonical) && !registeredLangs.has(l)) {
+            try { registerLanguage(l).catch(() => {}) } catch (_) { }
+          }
         } catch (_) {}
       }
       parsed = await parseMarkdownToHtml(data.raw || '')

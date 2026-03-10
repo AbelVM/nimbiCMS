@@ -6,12 +6,65 @@ import { parseMarkdownToHtml } from './markdown.js'
 import { fetchPageData } from './router.js'
 import { loadSupportedLanguages } from './codeblocksManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
-import { ensureBulma, setStyle } from './bulmaManager.js'
+import { ensureBulma, setStyle, setThemeVars } from './bulmaManager.js'
 
 // Pre-scan nav links for HTML files and map title/H1 -> slug to avoid nav-time fetches
 
 let currentHighlightTheme = 'monokai'
 let initialDocumentTitle = ''
+
+// --- plugin/hook subsystem -------------------------------------------------
+
+/**
+ * Built-in hook names and their callback lists.  External code can register
+ * handlers to be invoked at key events in the CMS lifecycle.
+ */
+const hooks = {
+  onPageLoad: [],      // called after a page has been rendered
+  onNavBuild: [],      // called after the navigation DOM is constructed
+  transformHtml: []    // allow modification of the article DOM before insertion
+}
+
+/**
+ * Register a hook by name.  Throws if the name is not recognised.
+ * @param {string} name
+ * @param {Function} fn
+ */
+export function addHook(name, fn) {
+  if (!Object.prototype.hasOwnProperty.call(hooks, name)) {
+    throw new Error('Unknown hook "' + name + '"')
+  }
+  if (typeof fn !== 'function') {
+    throw new TypeError('hook callback must be a function')
+  }
+  hooks[name].push(fn)
+}
+
+/**
+ * Convenience wrappers for the most common hooks.
+ */
+export function onPageLoad(fn) { addHook('onPageLoad', fn) }
+export function onNavBuild(fn) { addHook('onNavBuild', fn) }
+export function transformHtml(fn) { addHook('transformHtml', fn) }
+
+async function runHooks(name, ctx) {
+  const list = hooks[name] || []
+  for (const fn of list) {
+    try {
+      await fn(ctx)
+    } catch (e) {
+      // swallow errors from plugin code to avoid crashing the host
+    }
+  }
+}
+
+// test helpers ---------------------------------------------------------------
+
+// reset all registered hooks (used by unit tests so each spec starts clean)
+export function _clearHooks() {
+  Object.keys(hooks).forEach(k => { hooks[k].length = 0 })
+}
+
 
 
 export async function initCMS({ el, contentPath = '/content', /* languages (deprecated) */ defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
@@ -267,6 +320,9 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
     navbar.appendChild(menu)
     navbarWrap.appendChild(navbar)
 
+    // invoke nav-build hooks so plugins can tweak the DOM or track data
+    try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { }
+
     // intercept internal query links in the navbar to perform SPA navigation
     try {
       menu.addEventListener('click', (ev) => {
@@ -366,10 +422,17 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
       navWrap.appendChild(toc)
       attachTocClickHandler(toc)
 
+      // allow plugins to modify the generated article element before it is
+      // placed in the document (e.g. for analytics, extra widgets, etc.)
+      try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { }
+
       contentWrap.appendChild(article)
 
       scrollToAnchorOrTop(anchor)
       ensureScrollTopButton(article, topH1, { mountOverlay, container, mountEl, navWrap, t })
+
+      // fire the onPageLoad hooks after everything is in place
+      try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { }
 
       currentPagePath = pagePath
     }
@@ -390,6 +453,12 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
 
 // SEO helpers moved to src/seoManager.js
 
+// export for tests only – not part of the public API
+export { runHooks }
+
 export { registerLanguage, loadSupportedLanguages, observeCodeBlocks, setHighlightTheme, SUPPORTED_HLJS_MAP, BAD_LANGUAGES } from './codeblocksManager.js'
+
+// theming helpers
+export { setStyle, setThemeVars } from './bulmaManager.js'
 
 export default initCMS

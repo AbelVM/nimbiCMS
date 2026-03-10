@@ -54,3 +54,17 @@ export function setStyle(style) {
   if (currentStyle === 'dark') document.body.classList.add('is-dark')
   else document.body.classList.remove('is-dark')
 }
+
+/**
+ * Apply an object of CSS custom properties to the document root.  This makes
+ * it easy for consumers to theme colors/fonts/etc. without touching Bulma
+ * directly.  Property names should be provided without the leading `--`.
+ *
+ * @param {Record<string,string>} vars
+ */
+export function setThemeVars(vars) {
+  const root = document.documentElement
+  for (const [k, v] of Object.entries(vars || {})) {
+    try { root.style.setProperty(`--${k}`, v) } catch (_) { }
+  }
+}
