@@ -1,77 +1,80 @@
-import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths } from './filesManager.js'
 import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
 
-// in-memory cache to avoid repeating expensive slug resolution logic;
-// maps the original `raw` page string (from the URL) to an object with the
-// normalized `resolved` path and any extracted `anchor`.  This speeds up
-// repeated navigations to the same slug (common when the user clicks around).
+// in-memory LRU cache to avoid repeating slug resolution logic.
+// The Map insertion order is used to evict the oldest entry when the max
+// size is exceeded.
+export const RESOLUTION_CACHE_MAX = 100
 const resolutionCache = new Map()
+
+function resolutionCacheGet(key) {
+  if (!resolutionCache.has(key)) return undefined
+  const val = resolutionCache.get(key)
+  // refresh order
+  resolutionCache.delete(key)
+  resolutionCache.set(key, val)
+  return val
+}
+function resolutionCacheSet(key, value) {
+  resolutionCache.delete(key)
+  resolutionCache.set(key, value)
+  if (resolutionCache.size > RESOLUTION_CACHE_MAX) {
+    const oldest = resolutionCache.keys().next().value
+    if (oldest !== undefined) resolutionCache.delete(oldest)
+  }
+}
+
+
+// re-export for testing convenience
+export { allMarkdownPaths } from './filesManager.js'
 
 // helpers scoped to this module ------------------------------------------------
 
-async function tryFindInNav(decoded) {
-  try {
-    const nodes = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
-    for (const n of Array.from(nodes || [])) {
-      try {
-        const txt = (n.textContent || '').trim()
-        if (!txt) continue
-        if (slugify(txt) === decoded) {
-          const href = n.getAttribute('href') || ''
-          try {
-            const u = new URL(href, location.href)
-            const p = u.searchParams.get('page')
-            if (p) {
-              return decodeURIComponent(p)
-            }
-          } catch (e) { /* ignore malformed href */ }
-        }
-      } catch (e) { }
-    }
-  } catch (e) { }
-  return null
-}
-
+// `tryFindInNav` removed: slugToMd map is populated when the navbar
+// is built, so scanning the DOM again is redundant.  The map will already
+// contain any navigable markdown slug.
 async function tryDiscoverFromIndex(decoded, contentBase) {
   // attempt to locate a markdown file whose H1 slugifies to `decoded`
   const indexSet = new Set()
   // gather candidates from navbar links
-  try {
-    const anchorsForIndex = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
-    for (const linkEl of Array.from(anchorsForIndex || [])) {
-      try {
-        const href = linkEl.getAttribute('href') || ''
-        if (!href) continue
-        try {
-          const u = new URL(href, location.href)
-          if (u.origin !== location.origin) continue
-          const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/)
-          if (mdMatch) {
-            let candidate = mdMatch[1].replace(/^\.\//, '')
-            if (candidate.startsWith('/')) candidate = candidate.replace(/^\//, '')
-            if (candidate) indexSet.add(candidate)
-            continue
+// gather candidates from navbar links; this is not expected to fail
+  const anchorsForIndex = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
+  for (const linkEl of Array.from(anchorsForIndex || [])) {
+    const href = linkEl.getAttribute('href') || ''
+    if (!href) continue
+    try {
+      const u = new URL(href, location.href)
+      if (u.origin !== location.origin) continue
+      const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/) 
+      if (mdMatch) {
+        let candidate = mdMatch[1].replace(/^\.\//, '')
+        if (candidate.startsWith('/')) candidate = candidate.replace(/^\//, '')
+        if (candidate) indexSet.add(candidate)
+        continue
+      }
+      const p = u.pathname || ''
+      if (p) {
+        const contentBaseUrl = new URL(contentBase)
+        const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+        if (p.indexOf(contentBasePath) !== -1) {
+          let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
+          rel = rel.replace(/^[\.\/]+/, '')
+          if (rel && !rel.includes('.')) {
+            indexSet.add(rel + '/index.md')
+            indexSet.add(rel + '.md')
           }
-          const p = u.pathname || ''
-          if (p) {
-            const contentBaseUrl = new URL(contentBase)
-            const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
-            if (p.indexOf(contentBasePath) !== -1) {
-              let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
-              rel = rel.replace(/^[\.\/]+/, '')
-              if (rel && !rel.includes('.')) {
-                indexSet.add(rel + '/index.md')
-                indexSet.add(rel + '.md')
-              }
-            }
-          }
-        } catch (e) { }
-      } catch (e) { }
+        }
+      }
+    } catch (e) {
+      // ignore malformed URLs
     }
-  } catch (e) { }
+  }
 
-  try { for (const v of Array.from(slugToMd.values())) { if (v) indexSet.add(v) } } catch (e) { }
-  try { for (const v of Array.from(mdToSlug.keys())) { if (v) indexSet.add(v) } } catch (e) { }
+  for (const v of slugToMd.values()) if (v) indexSet.add(v)
+  for (const v of mdToSlug.keys()) if (v) indexSet.add(v)
+  // also consider every markdown path in the content directory so that
+  // arbitrary slugs resolve even when the page isn't referenced in nav.
+  for (const v of allMarkdownPaths) if (v) indexSet.add(v)
 
   // iterate through every candidate we collected; for modest numbers
   // of nav entries this is very cheap, and it ensures we can resolve
@@ -147,8 +150,8 @@ export async function fetchPageData(raw, contentBase) {
     anchor = parts[1] || null
   }
 
-  if (resolutionCache.has(raw)) {
-    const cached = resolutionCache.get(raw)
+  const cached = resolutionCacheGet(raw)
+  if (cached) {
     resolved = cached.resolved
     anchor = cached.anchor || anchor
   } else {
@@ -157,15 +160,11 @@ export async function fetchPageData(raw, contentBase) {
       if (slugToMd.has(decoded)) {
         resolved = slugToMd.get(decoded)
       } else {
-        const navMatch = await tryFindInNav(decoded)
-        if (navMatch) resolved = navMatch
-        else {
-          const idx = await tryDiscoverFromIndex(decoded, contentBase)
-          if (idx) resolved = idx
-        }
+        const idx = await tryDiscoverFromIndex(decoded, contentBase)
+        if (idx) resolved = idx
       }
     }
-    resolutionCache.set(raw, { resolved, anchor })
+    resolutionCacheSet(raw, { resolved, anchor })
   }
 
   if (!anchor && hashAnchor) anchor = hashAnchor
@@ -194,4 +193,7 @@ export async function fetchPageData(raw, contentBase) {
 
   return { data, pagePath, anchor }
 }
+
+// helpers exposed for unit tests
+export { resolutionCacheGet, resolutionCacheSet, buildPageCandidates, resolutionCache };
 

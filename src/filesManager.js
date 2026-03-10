@@ -1,6 +1,12 @@
 export const slugToMd = new Map()
 export const mdToSlug = new Map()
 
+// gather all markdown file paths via Vite glob at build time; this allows slug
+// resolution to work even for files not linked from the navigation.
+// paths are relative to the content base (e.g. 'blog/foo.md').
+const _allMd = import.meta.glob('/example/content/**/*.md', { as: 'raw', eager: true })
+export const allMarkdownPaths = Object.keys(_allMd).map(p => p.replace(/^\/example\/content\//, ''))
+
 export function slugify(s) {
   return String(s || '')
     .toLowerCase()
@@ -9,7 +15,7 @@ export function slugify(s) {
 }
 
 // simple in-memory cache of fetchMarkdown responses keyed by the resolved URL
-const fetchCache = new Map()
+export const fetchCache = new Map()
 
 export function clearFetchCache() {
   fetchCache.clear()

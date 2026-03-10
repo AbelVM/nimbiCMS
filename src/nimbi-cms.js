@@ -1,11 +1,10 @@
-import { parseFrontmatter } from './utils/frontmatter.js'
-import { marked } from 'marked'
 import hljs from 'highlight.js/lib/core'
 import 'highlight.js/styles/monokai.css'
 import 'bulma/css/bulma.min.css'
 import './styles/nimbi-cms-extra.css'
 import readingTime from 'reading-time/lib/reading-time'
 import { DEFAULT_L10N } from './utils/l10n-defaults.js'
+import { marked } from 'marked'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
 import { createNavTree, buildTocElement } from './htmlBuilder.js'
 import { setMetaTags, setStructuredData } from './seoManager.js'
@@ -726,411 +725,403 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
   const siteNav = createNavTree(t, [{ path: '_home.md', name: t('home'), isIndex: true, children: [] }])
   let currentPagePath = null
 
-  async function renderByQuery() {
-    const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
-    const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
-    let data, pagePath, anchor
-    try {
-      ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
-    } catch (e) {
-      contentWrap.innerHTML = ''
-      const notFound = document.createElement('article')
-      notFound.className = 'nimbi-article content nimbi-not-found'
-      const h = document.createElement('h1')
-      h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
-      const p = document.createElement('p')
-      p.textContent = e && e.message ? String(e.message) : 'Failed to resolve the requested page.'
-      notFound.appendChild(h)
-      notFound.appendChild(p)
-      contentWrap.appendChild(notFound)
-      return
-    }
-    if (!anchor && hashAnchor) anchor = hashAnchor
-      contentWrap.innerHTML = ''
+  // render an error page for unresolved queries
+  function renderNotFound(e) {
+    contentWrap.innerHTML = ''
+    const notFound = document.createElement('article')
+    notFound.className = 'nimbi-article content nimbi-not-found'
+    const h = document.createElement('h1')
+    h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
+    const p = document.createElement('p')
+    p.textContent = e && e.message ? String(e.message) : 'Failed to resolve the requested page.'
+    notFound.appendChild(h)
+    notFound.appendChild(p)
+    contentWrap.appendChild(notFound)
+  }
 
-      let parsed = null
-      if (data.isHtml) {
-        // parse HTML directly and extract TOC + code block languages
+  // convert raw data into a DOM article, compute TOC, slug and h1 info
+  async function prepareArticle(data, pagePath, anchor) {
+    let parsed = null
+    if (data.isHtml) {
+      try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(data.raw || '', 'text/html')
+        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+        heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
         try {
-          const parser = new DOMParser()
-          const doc = parser.parseFromString(data.raw || '', 'text/html')
-          const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-          heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
-
-          // ensure images do not load immediately
-          try {
-            const imgs = doc.querySelectorAll('img')
-            imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
-          } catch (e) { }
-
-          // collect language-tagged code blocks and schedule non-blocking registration/highlight
-          const codes = doc.querySelectorAll('pre code, code[class]')
-          // highlight blocks that do _not_ already have a language class –
-          // tagged blocks are handled later by the IntersectionObserver in
-          // `observeCodeBlocks` once they enter the viewport.
-          codes.forEach(codeEl => {
-            try {
-              const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
-              const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-              if (!match || !match[1]) {
-                try { hljs.highlightElement(codeEl) } catch (e) { }
-              }
-            } catch (e) { }
-          })
-
-          const docToc = []
-          heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
-          parsed = { html: doc.body.innerHTML, meta: {}, toc: docToc }
-        } catch (e) {
-          parsed = { html: data.raw || '', meta: {}, toc: [] }
-        }
-      } else {
-        const langs = detectFenceLanguages(data.raw || '', SUPPORTED_HLJS_MAP)
-        for (const l of langs) {
-          try {
-            const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-            try { registerLanguage(canonical).catch(() => {}) } catch (e) { }
-            if (String(l) !== String(canonical)) try { registerLanguage(l).catch(() => {}) } catch (e) { }
-          } catch (e) {
-          }
-        }
-
-        parsed = await parseMarkdownToHtml(data.raw || '')
-      }
-      const article = document.createElement('article')
-      article.className = 'nimbi-article content'
-      article.innerHTML = parsed.html
-      try { observeCodeBlocks(article) } catch (e) { }
-
-      try {
-        const imgs = article.querySelectorAll('img')
-        if (imgs && imgs.length) {
-          const pageDirForImgs = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
-          imgs.forEach((img) => {
-            const src = img.getAttribute('src') || ''
-            if (!src) return
-            if (/^(https?:)?\/\//.test(src) || src.startsWith('/')) return
-            try {
-              const resolved = new URL(pageDirForImgs + src, contentBase).toString()
-                img.src = resolved
-                try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { }
-            } catch (e) {
-            }
-          })
-        }
-      } catch (e) {
-      }
-
-      try {
-        const anchors = article.querySelectorAll('a')
-        if (anchors && anchors.length) {
-          const contentBaseUrl = new URL(contentBase)
-          const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
-          for (const a of Array.from(anchors || [])) {
-            try {
-              const href = a.getAttribute('href') || ''
-              if (!href) continue
-              if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) continue
-              if (href.startsWith('/') && !href.endsWith('.md')) continue
-
-              const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
-              if (mdMatch) {
-                const mdPathRaw = mdMatch[1]
-                const frag = mdMatch[2]
-                try {
-                  // resolve to a path relative to contentBase
-                  const resolved = new URL(mdPathRaw, contentBase).pathname
-                  const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
-
-                  // prefer an existing slug mapping
-                  let slug = null
-                  try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (e) { }
-
-                  // if no mapping, attempt to fetch the target markdown and derive H1
-                    // If we already know the slug mapping, use it. Otherwise avoid fetching the target
-                    // here (it can cause many requests); fall back to using the raw relative path.
-                    if (slug) {
-                      if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
-                      else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
-                    } else {
-                      if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
-                      else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
-                    }
-                } catch (e) {
-                  a.setAttribute('href', '?page=' + encodeURIComponent(mdPathRaw.replace(/^\.\//, '')))
-                }
-                continue
-              }
-
-              // handle links that point into the content base but omit the `.md` extension
-              try {
-                const full = new URL(href, contentBase)
-                const p = full.pathname || ''
-                if (p && p.indexOf(contentBasePath) !== -1) {
-                  let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
-                  rel = rel.replace(/^[\.\/]+/, '')
-                  if (rel.endsWith('/')) rel = rel.slice(0, -1)
-                  if (!rel) rel = '_home'
-                  // if it's not already a markdown path, try to map slug -> md or assume .md
-                  if (!rel.endsWith('.md')) {
-                    if (slugToMd.has(rel)) {
-                      const mapped = slugToMd.get(rel)
-                      const slug = mdToSlug.get(mapped) || rel
-                      a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
-                    } else {
-                      // assume this is a slug-like path; prefer slug form to avoid .md fetches
-                      a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
-                    }
-                  }
-                }
-              } catch (e) {
-              }
-            } catch (e) {
-            }
-          }
-        }
-      } catch (e) {
-      }
-
-      // compute H1 and slug mapping before building the TOC so TOC can use the friendly slug
-      const topH1 = article.querySelector('h1')
-      const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
-      // compute slug from H1 (fall back to a safe slug from pagePath)
-      let slugKey = ''
-      try {
-        if (h1Text) slugKey = slugify(h1Text)
-        // prefer HTML/meta title for slug when available
-        if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
-        if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
-        if (!slugKey) slugKey = '_home'
-        try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (e) { }
-        try {
-          let newUrl = '?page=' + encodeURIComponent(slugKey)
-          try {
-            // preserve any existing hash/anchor when updating the URL
-            const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
-            if (curHash) newUrl += '#' + encodeURIComponent(curHash)
-          } catch (e) { }
-          history.replaceState({ page: slugKey }, '', newUrl)
+          const imgs = doc.querySelectorAll('img')
+          imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
         } catch (e) { }
-      } catch (e) { }
-
-      const toc = buildTocElement(t, parsed.toc, pagePath)
-      try {
-        const labelEl = toc.querySelector('.menu-label')
-        if (labelEl) {
-          labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
-        }
-        try {
-          const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
-          // find first image in the rendered article (if any) to use for social preview
-          const firstImgEl = article.querySelector('img')
-          const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
-          // pick first paragraph between H1 and first H2 (if present) to use as description
-          let descOverride = ''
+        const codes = doc.querySelectorAll('pre code, code[class]')
+        codes.forEach(codeEl => {
           try {
-            let found = ''
-            if (topH1) {
-              let sib = topH1.nextElementSibling
-              while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
-                if (sib.tagName && sib.tagName.toLowerCase() === 'p') {
-                  const txt = (sib.textContent || '').trim()
-                  if (txt) { found = txt; break }
-                }
-                sib = sib.nextElementSibling
-              }
+            const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+            const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+            if (!match || !match[1]) {
+              try { hljs.highlightElement(codeEl) } catch (e) { }
             }
-            if (!found) {
-              const existingDescTag = document.querySelector('meta[name="description"]')
-              found = existingDescTag && existingDescTag.getAttribute ? (existingDescTag.getAttribute('content') || '') : ''
-            }
-            descOverride = found
           } catch (e) { }
-
-          // update Open Graph / Twitter metadata preferring meta.title, then H1, and prefer the first page image when available
-          try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { }
-          try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride) } catch (e) { }
-          const siteName = getSiteNameFromMeta()
-          if (h1Text) {
-            if (siteName) document.title = `${siteName} - ${h1Text}`
-            else document.title = `${initialDocumentTitle || 'Site'} - ${h1Text}`
-          } else if (metaTitle) {
-            document.title = metaTitle
-          } else {
-            document.title = initialDocumentTitle || document.title
-          }
-        } catch (e) {
-        }
-        try {
-          const prev = article.querySelector('.nimbi-reading-time')
-          if (prev) prev.remove()
-          if (topH1) {
-            const rt = readingTime(data.raw || '')
-            const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
-            const p = document.createElement('p')
-            p.className = 'nimbi-reading-time'
-            p.textContent = minutes ? t('readingTime', { minutes }) : ''
-            topH1.insertAdjacentElement('afterend', p)
-          }
-        } catch (ee) {
-        }
-      } catch (e) {
-      }
-      navWrap.innerHTML = ''
-      navWrap.appendChild(toc)
-      try {
-        toc.addEventListener('click', (ev) => {
-          const a = ev.target && ev.target.closest ? ev.target.closest('a') : null
-          if (!a) return
-          const href = a.getAttribute('href') || ''
-          try {
-            const url = new URL(href, location.href)
-            const pageParam = url.searchParams.get('page')
-            const hash = url.hash ? url.hash.replace(/^#/, '') : null
-            if (!pageParam && !hash) return
-            ev.preventDefault()
-            history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
-            try { renderByQuery() } catch (e) { }
-          } catch (e) { /* ignore non-URL hrefs */ }
         })
-      } catch (e) { }
+        const docToc = []
+        heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
+        parsed = { html: doc.body.innerHTML, meta: {}, toc: docToc }
+      } catch (e) {
+        parsed = { html: data.raw || '', meta: {}, toc: [] }
+      }
+    } else {
+      const langs = detectFenceLanguages(data.raw || '', SUPPORTED_HLJS_MAP)
+      for (const l of langs) {
+        try {
+          const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
+          try { registerLanguage(canonical).catch(() => {}) } catch (e) { }
+          if (String(l) !== String(canonical)) try { registerLanguage(l).catch(() => {}) } catch (e) { }
+        } catch (e) {}
+      }
+      parsed = await parseMarkdownToHtml(data.raw || '')
+    }
 
-      contentWrap.appendChild(article)
-      if (anchor) {
-        const el = document.getElementById(anchor)
-        if (el) {
+    const article = document.createElement('article')
+    article.className = 'nimbi-article content'
+    article.innerHTML = parsed.html
+    try { observeCodeBlocks(article) } catch (e) { }
+
+    try {
+      const imgs = article.querySelectorAll('img')
+      if (imgs && imgs.length) {
+        const pageDirForImgs = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+        imgs.forEach((img) => {
+          const src = img.getAttribute('src') || ''
+          if (!src) return
+          if (/^(https?:)?\/\//.test(src) || src.startsWith('/')) return
           try {
-            const doScroll = () => {
+            const resolved = new URL(pageDirForImgs + src, contentBase).toString()
+            img.src = resolved
+            try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { }
+          } catch (e) {}
+        })
+      }
+    } catch (e) {}
+
+    try {
+      const anchors = article.querySelectorAll('a')
+      if (anchors && anchors.length) {
+        const contentBaseUrl = new URL(contentBase)
+        const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+        for (const a of Array.from(anchors || [])) {
+          try {
+            const href = a.getAttribute('href') || ''
+            if (!href) continue
+            if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) continue
+            if (href.startsWith('/') && !href.endsWith('.md')) continue
+            const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
+            if (mdMatch) {
+              const mdPathRaw = mdMatch[1]
+              const frag = mdMatch[2]
               try {
-                if (container && container.scrollTo && container.contains(el)) {
-                  const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
-                  container.scrollTo({ top, behavior: 'smooth' })
+                const resolved = new URL(mdPathRaw, contentBase).pathname
+                const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+                let slug = null
+                try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (e) {}
+                if (!slug) {
+                  // derive slug by fetching markdown H1 if possible
+                  try {
+                    const mdData = await fetchMarkdown(rel, contentBase)
+                    if (mdData && mdData.raw) {
+                      const m = (mdData.raw || '').match(/^#\s+(.+)$/m)
+                      if (m && m[1]) {
+                        const candidate = slugify(m[1].trim())
+                        if (candidate) {
+                          slug = candidate
+                          try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (ee) {}
+                        }
+                      }
+                    }
+                  } catch (ee) { /* ignore errors */ }
+                }
+                if (slug) {
+                  if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
+                  else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
                 } else {
-                  try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (e) { el.scrollIntoView() }
+                  if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
+                  else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
                 }
               } catch (e) {
-                try { el.scrollIntoView() } catch (ee) { }
+                a.setAttribute('href', '?page=' + encodeURIComponent(mdPathRaw.replace(/^\.\//, '')))
               }
+              continue
             }
-            // allow layout to settle before scrolling (handles images/fonts/layout shifts)
-            try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (e) { setTimeout(doScroll, 50) }
-          } catch (e) { try { el.scrollIntoView() } catch (ee) { } }
-        }
-      } else {
-        try {
-          if (container && container.scrollTo) container.scrollTo({ top: 0, behavior: 'smooth' })
-          else window.scrollTo(0, 0)
-        } catch (e) { window.scrollTo(0, 0) }
-      }
-      try {
-        const existingBtn = document.querySelector('.nimbi-scroll-top')
-        let btn = existingBtn
-        if (!btn) {
-          btn = document.createElement('button')
-          btn.className = 'nimbi-scroll-top'
-          btn.setAttribute('aria-label', t('scrollToTop'))
-          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>'
-          try {
-            if (mountOverlay && mountOverlay.appendChild) mountOverlay.appendChild(btn)
-            else if (container && container.appendChild) container.appendChild(btn)
-            else if (mountEl && mountEl.appendChild) mountEl.appendChild(btn)
-            else document.body.appendChild(btn)
-          } catch (e) {
-            try { document.body.appendChild(btn) } catch (ee) { /* give up */ }
-          }
-          try {
-            btn.style.position = 'absolute'
-            btn.style.right = '1rem'
-            btn.style.bottom = '1.25rem'
-            btn.style.zIndex = '60'
-          } catch (e) { }
-          btn.addEventListener('click', () => {
             try {
-              if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-              else if (mountEl && mountEl.scrollTo) mountEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-              else window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-            } catch (e) {
-              try { if (container) container.scrollTop = 0 } catch (e2) { }
-              try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { }
-              try { document.documentElement.scrollTop = 0 } catch (e4) { }
-            }
-          })
-        }
-
-        const topH1 = article.querySelector('h1')
-        const tocLabel = navWrap.querySelector('.menu-label')
-        if (!topH1) {
-          btn.classList.remove('show')
-          if (tocLabel) tocLabel.classList.remove('show')
-        } else {
-          if (!btn._nimbiObserver) {
-            const obs = new IntersectionObserver((entries) => {
-              for (const entry of entries) {
-                if (entry.target instanceof Element) {
-                  if (entry.isIntersecting) {
-                    btn.classList.remove('show')
-                    if (tocLabel) tocLabel.classList.remove('show')
+              const full = new URL(href, contentBase)
+              const p = full.pathname || ''
+              if (p && p.indexOf(contentBasePath) !== -1) {
+                let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
+                rel = rel.replace(/^[\.\/]+/, '')
+                if (rel.endsWith('/')) rel = rel.slice(0, -1)
+                if (!rel) rel = '_home'
+                if (!rel.endsWith('.md')) {
+                  if (slugToMd.has(rel)) {
+                    const mapped = slugToMd.get(rel)
+                    const slug = mdToSlug.get(mapped) || rel
+                    a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
                   } else {
-                    btn.classList.add('show')
-                    if (tocLabel) tocLabel.classList.add('show')
+                    a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
                   }
                 }
               }
-            }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
-            btn._nimbiObserver = obs
+            } catch (e) {}
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
+    // compute H1 and slug mapping before building the TOC so TOC can use the friendly slug
+    const topH1 = article.querySelector('h1')
+    const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
+    let slugKey = ''
+    try {
+      if (h1Text) slugKey = slugify(h1Text)
+      if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
+      if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
+      if (!slugKey) slugKey = '_home'
+      try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (e) { }
+      try {
+        let newUrl = '?page=' + encodeURIComponent(slugKey)
+        try {
+          const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
+          if (curHash) newUrl += '#' + encodeURIComponent(curHash)
+        } catch (e) { }
+        history.replaceState({ page: slugKey }, '', newUrl)
+      } catch (e) { }
+    } catch (e) { }
+
+    const toc = buildTocElement(t, parsed.toc, pagePath)
+    return { article, parsed, toc, topH1: article.querySelector('h1'), h1Text, slugKey }
+  }
+
+  function attachTocClickHandler(toc) {
+    try {
+      toc.addEventListener('click', (ev) => {
+        const a = ev.target && ev.target.closest ? ev.target.closest('a') : null
+        if (!a) return
+        const href = a.getAttribute('href') || ''
+        try {
+          const url = new URL(href, location.href)
+          const pageParam = url.searchParams.get('page')
+          const hash = url.hash ? url.hash.replace(/^#/, '') : null
+          if (!pageParam && !hash) return
+          ev.preventDefault()
+          history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+          try { renderByQuery() } catch (e) { }
+        } catch (e) { /* ignore non-URL hrefs */ }
+      })
+    } catch (e) { }
+  }
+
+  function applyPageMeta(parsed, toc, article, pagePath, anchor, h1Text, slugKey, data) {
+    try {
+      const labelEl = toc.querySelector('.menu-label')
+      if (labelEl) {
+        labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
+      }
+    } catch (e) {}
+
+    try {
+      const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
+      const firstImgEl = article.querySelector('img')
+      const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
+      let descOverride = ''
+      try {
+        let found = ''
+        if (h1Text) {
+          let sib = article.querySelector('h1')?.nextElementSibling
+          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
+            if (sib.tagName && sib.tagName.toLowerCase() === 'p') {
+              const txt = (sib.textContent || '').trim()
+              if (txt) { found = txt; break }
+            }
+            sib = sib.nextElementSibling
           }
-          try { btn._nimbiObserver.disconnect() } catch (e) { }
-          btn._nimbiObserver.observe(topH1)
+        }
+        if (!found) {
+          const existingDescTag = document.querySelector('meta[name="description"]')
+          found = existingDescTag && existingDescTag.getAttribute ? (existingDescTag.getAttribute('content') || '') : ''
+        }
+        descOverride = found
+      } catch (e) { }
+
+      try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { }
+      try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride) } catch (e) { }
+      const siteName = getSiteNameFromMeta()
+      if (h1Text) {
+        if (siteName) document.title = `${siteName} - ${h1Text}`
+        else document.title = `${initialDocumentTitle || 'Site'} - ${h1Text}`
+      } else if (metaTitle) {
+        document.title = metaTitle
+      } else {
+        document.title = initialDocumentTitle || document.title
+      }
+    } catch (e) { }
+
+    try {
+      const prev = article.querySelector('.nimbi-reading-time')
+      if (prev) prev.remove()
+      if (h1Text) {
+        const rt = readingTime(data.raw || '')
+        const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
+        const p = document.createElement('p')
+        p.className = 'nimbi-reading-time'
+        p.textContent = minutes ? t('readingTime', { minutes }) : ''
+        const topH1Elem = article.querySelector('h1')
+        if (topH1Elem) topH1Elem.insertAdjacentElement('afterend', p)
+      }
+    } catch (ee) { }
+  }
+
+  function scrollToAnchorOrTop(anchor) {
+    if (anchor) {
+      const el = document.getElementById(anchor)
+      if (el) {
+        try {
+          const doScroll = () => {
+            try {
+              if (container && container.scrollTo && container.contains(el)) {
+                const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+                container.scrollTo({ top, behavior: 'smooth' })
+              } else {
+                try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (e) { el.scrollIntoView() }
+              }
+            } catch (e) {
+              try { el.scrollIntoView() } catch (ee) { }
+            }
+          }
+          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (e) { setTimeout(doScroll, 50) }
+        } catch (e) { try { el.scrollIntoView() } catch (ee) { } }
+      }
+    } else {
+      try {
+        if (container && container.scrollTo) container.scrollTo({ top: 0, behavior: 'smooth' })
+        else window.scrollTo(0, 0)
+      } catch (e) { window.scrollTo(0, 0) }
+    }
+  }
+
+  function ensureScrollTopButton(article, topH1) {
+    try {
+      const existingBtn = document.querySelector('.nimbi-scroll-top')
+      let btn = existingBtn
+      if (!btn) {
+        btn = document.createElement('button')
+        btn.className = 'nimbi-scroll-top'
+        btn.setAttribute('aria-label', t('scrollToTop'))
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>'
+        try {
+          if (mountOverlay && mountOverlay.appendChild) mountOverlay.appendChild(btn)
+          else if (container && container.appendChild) container.appendChild(btn)
+          else if (mountEl && mountEl.appendChild) mountEl.appendChild(btn)
+          else document.body.appendChild(btn)
+        } catch (e) {
+          try { document.body.appendChild(btn) } catch (ee) { /* give up */ }
+        }
+        try {
+          btn.style.position = 'absolute'
+          btn.style.right = '1rem'
+          btn.style.bottom = '1.25rem'
+          btn.style.zIndex = '60'
+        } catch (e) { }
+        btn.addEventListener('click', () => {
           try {
-            const checkIntersect = () => {
-              try {
-                const rootRect = (container instanceof Element) ? container.getBoundingClientRect() : { top: 0, bottom: window.innerHeight }
-                const elRect = topH1.getBoundingClientRect()
-                const isIntersecting = !(elRect.bottom < rootRect.top || elRect.top > rootRect.bottom)
-                if (isIntersecting) {
+            if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+            else if (mountEl && mountEl.scrollTo) mountEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+            else window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          } catch (e) {
+            try { if (container) container.scrollTop = 0 } catch (e2) { }
+            try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { }
+            try { document.documentElement.scrollTop = 0 } catch (e4) { }
+          }
+        })
+      }
+
+      const tocLabel = navWrap.querySelector('.menu-label')
+      if (!topH1) {
+        btn.classList.remove('show')
+        if (tocLabel) tocLabel.classList.remove('show')
+      } else {
+        if (!btn._nimbiObserver) {
+          const obs = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+              if (entry.target instanceof Element) {
+                if (entry.isIntersecting) {
                   btn.classList.remove('show')
                   if (tocLabel) tocLabel.classList.remove('show')
                 } else {
                   btn.classList.add('show')
                   if (tocLabel) tocLabel.classList.add('show')
                 }
-              } catch (e) { }
-            }
-            try {
-              checkIntersect()
-              requestAnimationFrame(checkIntersect)
-              setTimeout(checkIntersect, 50)
-              setTimeout(checkIntersect, 200)
-              setTimeout(checkIntersect, 500)
-            } catch (e) {
-              setTimeout(checkIntersect, 100)
-            }
-            try {
-              if (btn._nimbiMutation) {
-                try { btn._nimbiMutation.disconnect() } catch (e) { }
-                btn._nimbiMutation = null
               }
-              if (typeof MutationObserver !== 'undefined') {
-                const mo = new MutationObserver(() => {
-                  try {
-                    if (!tocLabel) return
-                    if (btn.classList.contains('show')) tocLabel.classList.add('show')
-                    else tocLabel.classList.remove('show')
-                  } catch (e) { }
-                })
-                mo.observe(btn, { attributes: true, attributeFilter: ['class'] })
-                btn._nimbiMutation = mo
+            }
+          }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
+          btn._nimbiObserver = obs
+        }
+        try { btn._nimbiObserver.disconnect() } catch (e) { }
+        btn._nimbiObserver.observe(topH1)
+        try {
+          const checkIntersect = () => {
+            try {
+              const rootRect = (container instanceof Element) ? container.getBoundingClientRect() : { top: 0, bottom: window.innerHeight }
+              const elRect = topH1.getBoundingClientRect()
+              const isIntersecting = !(elRect.bottom < rootRect.top || elRect.top > rootRect.bottom)
+              if (isIntersecting) {
+                btn.classList.remove('show')
+                if (tocLabel) tocLabel.classList.remove('show')
+              } else {
+                btn.classList.add('show')
+                if (tocLabel) tocLabel.classList.add('show')
               }
             } catch (e) { }
-          } catch (e) { }
+          }
+          try {
+            checkIntersect()
+            requestAnimationFrame(checkIntersect)
+            setTimeout(checkIntersect, 50)
+            setTimeout(checkIntersect, 200)
+            setTimeout(checkIntersect, 500)
+          } catch (e) {
+            setTimeout(checkIntersect, 100)
+          }
+            } catch (e) { }
         }
       } catch (e) {
       }
-      currentPagePath = pagePath
-      return
     }
 
-  
+    async function renderByQuery() {
+      const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
+      const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+      let data, pagePath, anchor
+      try {
+        ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
+      } catch (e) {
+        renderNotFound(e)
+        return
+      }
+      if (!anchor && hashAnchor) anchor = hashAnchor
+      contentWrap.innerHTML = ''
+
+      const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(data, pagePath, anchor)
+
+      applyPageMeta(parsed, toc, article, pagePath, anchor, h1Text, slugKey, data)
+
+      navWrap.innerHTML = ''
+      navWrap.appendChild(toc)
+      attachTocClickHandler(toc)
+
+      contentWrap.appendChild(article)
+
+      scrollToAnchorOrTop(anchor)
+      ensureScrollTopButton(article, topH1)
+
+      currentPagePath = pagePath
+    }
 
   window.addEventListener('popstate', renderByQuery)
   await renderByQuery()
