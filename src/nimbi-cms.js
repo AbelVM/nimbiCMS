@@ -1,7 +1,6 @@
 import 'highlight.js/styles/monokai.css'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
-import { createNavTree,  preScanHtmlSlugs, prepareArticle, renderNotFound } from './htmlBuilder.js'
-import { attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
+import { createNavTree, preScanHtmlSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import { fetchPageData } from './router.js'
