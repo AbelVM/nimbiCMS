@@ -850,69 +850,9 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
             }
           } catch (ee) { }
 
-          // fallback 2: fetch each nav-linked md and check its H1 for a slug match
-          try {
-            const tried = new Set()
-            const anchors = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
-            for (const n of Array.from(anchors || [])) {
-              try {
-                const href = n.getAttribute('href') || ''
-                const u = new URL(href, location.href)
-                let mdCandidate = null
-                // prefer explicit ?page= param when present
-                const p = u.searchParams.get('page')
-                if (p) mdCandidate = decodeURIComponent(p)
-                // otherwise check for markdown filename in the hash (e.g. #projects.md)
-                if (!mdCandidate && u.hash) {
-                  const h = u.hash.replace(/^#/, '')
-                  if (/\.md$/.test(h)) mdCandidate = h
-                }
-                // otherwise check if the path itself references a .md file
-                if (!mdCandidate && u.pathname) {
-                  const m = (u.pathname || '').match(/([^\/]+\.md)(?:$|[?#])/) 
-                  if (m) mdCandidate = m[1]
-                }
-                if (!mdCandidate) continue
-                if (tried.has(mdCandidate)) continue
-                tried.add(mdCandidate)
-                try {
-                  // ensure we fetch a markdown path: prefer existing slug->md mapping
-                  // Do NOT blindly append '.md' to a bare slug (this causes noisy 404s).
-                  // Instead try known mappings, then underscore-prefixed and index fallbacks.
-                  let md = null
-                  let fetchPath = mdCandidate
-                  try {
-                    if (String(fetchPath).includes('.md')) {
-                      try { md = await fetchMarkdown(fetchPath, contentBase) } catch (e) { md = null }
-                    } else {
-                      const tryList = []
-                      try { if (slugToMd.has(fetchPath)) tryList.push(slugToMd.get(fetchPath)) } catch (e) { }
-                      const underscore = '_' + String(fetchPath) + '.md'
-                      const indexPath = String(fetchPath) + '/index.md'
-                      try { if (mdToSlug.has(underscore)) tryList.push(underscore) } catch (e) { }
-                      try { if (mdToSlug.has(indexPath)) tryList.push(indexPath) } catch (e) { }
-                      for (const fp of tryList) {
-                        if (!fp) continue
-                        try {
-                          md = await fetchMarkdown(fp, contentBase)
-                          fetchPath = fp
-                          break
-                        } catch (e) {
-                          md = null
-                        }
-                      }
-                    }
-                    if (!md) { /* no file found for this nav-linked candidate; skip */ continue }
-                    const m = (md.raw || '').match(/^#\s+(.+)$/m)
-                    if (m) {
-                      const h1 = (m[1] || '').trim()
-                      if (h1 && slugify(h1) === decoded) { resolved = fetchPath; break }
-                    }
-                  } catch (e) { /* ignore fetch errors */ }
-                } catch (e) { }
-              } catch (ee) { }
-            }
-          } catch (ee) { }
+          // fallback 2 removed: expensive attempt to fetch every nav-linked markdown
+          // It caused mass requests when opening HTML pages (e.g., blog.md leading to many post fetches).
+          // Rely on slug maps and index discovery instead.
         }
         // fallback 3: dynamically discover index/list pages from nav and known maps
         // (avoid hardcoded filenames like 'blog.md' or 'projects.md')
@@ -926,6 +866,8 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
                 if (!href) continue
                 try {
                   const u = new URL(href, location.href)
+                  // skip external links when discovering index candidates
+                  if (u.origin !== location.origin) continue
                   // collect explicit md references
                   const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/)
                   if (mdMatch) {
@@ -957,38 +899,26 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
           try { for (const v of Array.from(slugToMd.values())) { if (v) indexSet.add(v) } } catch (e) { }
           try { for (const v of Array.from(mdToSlug.keys())) { if (v) indexSet.add(v) } } catch (e) { }
 
-          for (const candidate of Array.from(indexSet)) {
+          // avoid fetching large numbers of index candidates which can cause mass requests
+          if (indexSet.size && indexSet.size > 6) {
+            // too many candidates; skip aggressive index discovery
+          } else {
+            for (const candidate of Array.from(indexSet)) {
             try {
               if (!candidate || !String(candidate).includes('.md')) continue
               const idxMd = await fetchMarkdown(candidate, contentBase)
               if (!idxMd || !idxMd.raw) continue
-              const parsedIdx = await parseMarkdownToHtml(idxMd.raw || '')
-              const parser = new DOMParser()
-              const tmpDoc = parser.parseFromString(parsedIdx.html || '', 'text/html')
-              const links = tmpDoc.querySelectorAll('a')
-              const triedIdx = new Set()
-              for (const linkEl of Array.from(links || [])) {
-                try {
-                  const href = linkEl.getAttribute('href') || ''
-                  const mdMatch = href.match(/([^#?]+\.md)(?:$|[?#])/) 
-                  if (!mdMatch) continue
-                  let candidateInner = mdMatch[1].replace(/^\.\//, '')
-                  if (candidateInner.startsWith('/')) candidateInner = candidateInner.replace(/^\//, '')
-                  if (triedIdx.has(candidateInner)) continue
-                  triedIdx.add(candidateInner)
-                  if (!String(candidateInner).includes('.md')) candidateInner = candidateInner + '.md'
-                  try {
-                    const md = await fetchMarkdown(candidateInner, contentBase)
-                    const m = (md.raw || '').match(/^#\s+(.+)$/m)
-                    if (m) {
-                      const h1 = (m[1] || '').trim()
-                      if (h1 && slugify(h1) === decoded) { resolved = candidateInner; break }
-                    }
-                  } catch (e) { /* ignore per-file fetch errors */ }
-                } catch (e) { }
-              }
-              if (String(resolved || '').includes('.md')) break
+              // Only inspect the H1 of the candidate index file itself to match slugs.
+              // Avoid fetching inner-linked markdown files which can be numerous.
+              try {
+                const m = (idxMd.raw || '').match(/^#\s+(.+)$/m)
+                if (m) {
+                  const h1 = (m[1] || '').trim()
+                  if (h1 && slugify(h1) === decoded) { resolved = candidate; break }
+                }
+              } catch (e) { }
             } catch (e) { }
+            }
           }
         } catch (e) { }
       } catch (e) { }
@@ -1033,8 +963,21 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       }
     }
     if (!data) {
-      // rethrow the last error to surface 404 or network failures
-      throw lastErr || new Error('failed to resolve page')
+      // If resolution fails, show a friendly not-found message instead of throwing
+      try {
+        contentWrap.innerHTML = ''
+        const notFound = document.createElement('article')
+        notFound.className = 'nimbi-article content nimbi-not-found'
+        const h = document.createElement('h1')
+        h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
+        const p = document.createElement('p')
+        p.textContent = lastErr && lastErr.message ? String(lastErr.message) : 'Failed to resolve the requested page.'
+        notFound.appendChild(h)
+        notFound.appendChild(p)
+        contentWrap.appendChild(notFound)
+      } catch (e) { /* ignore rendering errors */ }
+      // avoid throwing to prevent uncaught promise rejections in the app
+      return
     }
       contentWrap.innerHTML = ''
 
@@ -1142,30 +1085,15 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
                   try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (e) { }
 
                   // if no mapping, attempt to fetch the target markdown and derive H1
-                  if (!slug) {
-                    try {
-                      const mdData = await fetchMarkdown(rel, contentBase)
-                      const m = (mdData.raw || '').match(/^#\s+(.+)$/m)
-                      if (m) {
-                        const h1 = (m[1] || '').trim()
-                        if (h1) {
-                          slug = slugify(h1)
-                          try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (e) { }
-                        }
-                      }
-                    } catch (e) {
-                      // failed to fetch target md; fall back to raw rel
-                      slug = null
+                    // If we already know the slug mapping, use it. Otherwise avoid fetching the target
+                    // here (it can cause many requests); fall back to using the raw relative path.
+                    if (slug) {
+                      if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
+                      else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+                    } else {
+                      if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
+                      else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
                     }
-                  }
-
-                  if (slug) {
-                    if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
-                    else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
-                  } else {
-                    if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
-                    else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
-                  }
                 } catch (e) {
                   a.setAttribute('href', '?page=' + encodeURIComponent(mdPathRaw.replace(/^\.\//, '')))
                 }
