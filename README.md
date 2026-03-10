@@ -1,4 +1,8 @@
- # Nimbi CMS (Client-side library + Example)
+<p align="center">
+  <img src="logo.png" alt="Nimbi CMS logo" width="160" />
+</p>
+
+ # Nimbi CMS 
 
 A compact client-side CMS library that renders GitHub-flavored Markdown in the browser. Built with Vite and distributed as ES/CJS/UMD bundles plus a single CSS file. The UMD build is self-contained and intended for static sites.
 

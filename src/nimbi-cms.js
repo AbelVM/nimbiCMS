@@ -6,6 +6,9 @@ import 'bulma/css/bulma.min.css'
 import './styles/nimbi-cms-extra.css'
 import readingTime from 'reading-time/lib/reading-time'
 import { DEFAULT_L10N } from './utils/l10n-defaults.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
+import { createNavTree, buildTocElement } from './htmlBuilder.js'
+import { setMetaTags, setStructuredData } from './seoManager.js'
 
 const DEFAULT_HLJS_SUPPORTED_URL = 'https://raw.githubusercontent.com/highlightjs/highlight.js/main/SUPPORTED_LANGUAGES.md'
 const SUPPORTED_HLJS_MAP = new Map()
@@ -399,7 +402,18 @@ function extractToc(md) {
 function detectFenceLanguages(md) {
   const set = new Set()
   const re = /```\s*([a-zA-Z0-9_\-+]+)?/g
-  const STOP = new Set(['then', 'now', 'if', 'once', 'so', 'and', 'or', 'but', 'when', 'the', 'a', 'an', 'as', 'let', 'const', 'var', 'export', 'import', 'from', 'true', 'false', 'null', 'npm', 'run', 'echo', 'sudo'])
+  const STOP = new Set([
+    'then', 'now', 'if', 'once', 'so', 'and', 'or', 'but', 'when', 'the', 'a', 'an', 'as',
+    'let', 'const', 'var', 'export', 'import', 'from', 'true', 'false', 'null', 'npm',
+    'run', 'echo', 'sudo', 'this', 'that', 'have', 'using', 'some', 'return', 'returns',
+    'function', 'console', 'log', 'error', 'warn', 'class', 'new', 'undefined',
+    // common English / SQL tokens that are frequently present after ``` and are not languages
+    'with', 'select', 'from', 'where', 'join', 'on', 'group', 'order', 'by', 'having', 'as', 'into', 'values',
+    'like', 'limit', 'offset', 'create', 'table', 'index', 'view', 'insert', 'update', 'delete', 'returning',
+    'and', 'or', 'not', 'all', 'any', 'exists', 'case', 'when', 'then', 'else', 'end', 'distance', 'geometry',
+    // conversational words that have appeared in logs
+    'you', 'which', 'would', 'why', 'cool', 'other', 'same', 'everything', 'check'
+  ])
   const FALLBACK_KNOWN = new Set(['bash', 'sh', 'zsh', 'javascript', 'js', 'python', 'py', 'php', 'java', 'c', 'cpp', 'rust', 'go', 'ruby', 'perl', 'r', 'scala', 'swift', 'kotlin', 'cs', 'csharp', 'html', 'css', 'json', 'xml', 'yaml', 'yml', 'dockerfile', 'docker'])
   let m
   while ((m = re.exec(md))) {
@@ -414,75 +428,24 @@ function detectFenceLanguages(md) {
         }
       }
       const isKnown = FALLBACK_KNOWN.has(name)
+      // Accept known fallbacks or supported map entries. For unknown tokens, require a slightly
+      // stricter minimum length and not be a common SQL/English stop token to avoid noisy CDN
+      // requests for non-language words that often appear after the fence ticks.
       if (isKnown) set.add(name)
-      else if (name.length >= 3 && name.length <= 30 && !STOP.has(name)) set.add(name)
+      else if (
+        name.length >= 5 && name.length <= 30 &&
+        /^[a-z][a-z0-9_\-+]*$/.test(name) &&
+        !STOP.has(name)
+      ) set.add(name)
     }
   }
   return set
 }
 
-function createNavTree(tree) {
-  const nav = document.createElement('aside')
-  nav.className = 'menu nimbi-nav'
-  const label = document.createElement('p')
-  label.className = 'menu-label'
-  label.textContent = t('navigation')
-  nav.appendChild(label)
-  const ul = document.createElement('ul')
-  ul.className = 'menu-list'
-  tree.forEach((item) => {
-    const li = document.createElement('li')
-    const a = document.createElement('a')
-    a.href = '#' + item.path
-    a.textContent = item.name
-    li.appendChild(a)
-    if (item.children && item.children.length) {
-      const subul = document.createElement('ul')
-      item.children.forEach((c) => {
-        const cli = document.createElement('li')
-        const ca = document.createElement('a')
-        ca.href = '#' + c.path
-        ca.textContent = c.name
-        cli.appendChild(ca)
-        subul.appendChild(cli)
-      })
-      li.appendChild(subul)
-    }
-    ul.appendChild(li)
-  })
-  nav.appendChild(ul)
-  return nav
-}
+// nav builder moved to src/htmlBuilder.js
 
 
-async function fetchMarkdown(path, base) {
-  const baseClean = base.endsWith('/') ? base.slice(0, -1) : base
-  const url = `${baseClean}/${path}`
-  const res = await fetch(url)
-  if (!res.ok) {
-    if (res.status === 404) {
-      try {
-        const p404 = `${baseClean}/_404.md`
-        const r404 = await fetch(p404)
-        if (r404.ok) {
-          const raw404 = await r404.text()
-          return { raw: raw404, status: 404 }
-        }
-      } catch (ee) {
-      }
-    }
-    const body = await res.clone().text().catch(() => '')
-    console.error('fetchMarkdown failed:', { url, status: res.status, statusText: res.statusText, body: body.slice(0, 200) })
-    throw new Error('failed to fetch md')
-  }
-  const raw = await res.text()
-  const trimmed = raw.trim().slice(0, 16).toLowerCase()
-  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
-    console.error('fetchMarkdown expected markdown but received HTML:', { url, snippet: raw.trim().slice(0, 200) })
-    throw new Error('expected markdown but received HTML — check contentPath and that the file exists')
-  }
-  return { raw }
-}
+// fetchMarkdown moved to src/filesManager.js
 
 export async function initCMS({ el, contentPath = '/content', languages = [], defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
   if (!el) throw new Error('el is required')
@@ -616,11 +579,43 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       const href = a.getAttribute('href') || '#'
       const item = document.createElement('a')
       item.className = 'navbar-item'
-      if (/^[^#]*\.md(?:$|[#?])/.test(href) || href.endsWith('.md')) {
-        item.href = '#' + href.replace(/^\.\//, '')
-      } else {
-        item.href = href
-      }
+      try {
+        if (/^[^#]*\.md(?:$|[#?])/.test(href) || href.endsWith('.md')) {
+          const mdRaw = href.replace(/^\.\//, '')
+          // support legacy '::' or hash anchors in nav links
+          const parts = mdRaw.split(/::|#/, 2)
+          const mdPath = parts[0]
+          const frag = parts[1]
+          item.href = '?page=' + encodeURIComponent(mdPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+        } else {
+          item.href = href
+        }
+      } catch (e) { item.href = href }
+      try {
+        // populate slug <-> md mappings from navbar link text so direct slugs resolve
+        const displayName = (a.textContent && String(a.textContent).trim()) ? String(a.textContent).trim() : null
+        if (displayName) {
+          try {
+            const slugKey = slugify(displayName)
+            if (slugKey) {
+              // if this nav link refers to a markdown page, map slug->md
+              const parsedHref = (item.getAttribute && item.getAttribute('href')) ? item.getAttribute('href') : ''
+              try {
+                const url = new URL(parsedHref, location.href)
+                const p = url.searchParams.get('page')
+                if (p) {
+                  const decoded = decodeURIComponent(p)
+                  try { slugToMd.set(slugKey, decoded); mdToSlug.set(decoded, slugKey) } catch (ee) { }
+                }
+              } catch (ee) { }
+            }
+          } catch (ee) { }
+        }
+      } catch (ee) { }
+
+
+
+          
       item.textContent = a.textContent || href
       start.appendChild(item)
     })
@@ -629,6 +624,25 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
     navbar.appendChild(brand)
     navbar.appendChild(menu)
     navbarWrap.appendChild(navbar)
+
+    // intercept internal query links in the navbar to perform SPA navigation
+    try {
+      menu.addEventListener('click', (ev) => {
+        const a = ev.target && ev.target.closest ? ev.target.closest('a') : null
+        if (!a) return
+        const href = a.getAttribute('href') || ''
+        try {
+          const url = new URL(href, location.href)
+          const pageParam = url.searchParams.get('page')
+          const hash = url.hash ? url.hash.replace(/^#/, '') : null
+          if (pageParam) {
+            ev.preventDefault()
+            history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+            try { renderByQuery() } catch (e) { }
+          }
+        } catch (e) { }
+      })
+    } catch (e) { }
 
     burger.addEventListener('click', () => {
       const isActive = burger.classList.contains('is-active')
@@ -659,15 +673,232 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
   } catch (e) {
   }
 
-  const siteNav = createNavTree([{ path: '_home.md', name: t('home'), isIndex: true, children: [] }])
+  const siteNav = createNavTree(t, [{ path: '_home.md', name: t('home'), isIndex: true, children: [] }])
   let currentPagePath = null
 
-  async function renderByHash() {
-    const raw = location.hash.replace(/^#/, '') || '_home.md'
+  async function renderByQuery() {
+    const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
+    const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+    let resolved = raw
+    let anchor = null
 
-    if (raw.includes('.md')) {
-      const [pagePath, anchor] = raw.split('::', 2)
-      const data = await fetchMarkdown(pagePath, contentBase)
+    // support legacy '::' anchor syntax in the page param
+    if (resolved && String(resolved).includes('::')) {
+      const parts = String(resolved).split('::', 2)
+      resolved = parts[0]
+      anchor = parts[1] || null
+    }
+
+    if (!String(resolved).includes('.md')) {
+      try {
+        const decoded = decodeURIComponent(String(resolved || ''))
+        if (slugToMd.has(decoded)) resolved = slugToMd.get(decoded)
+        else {
+          // fallback 1: try to find a nav link whose slugified text matches the decoded slug
+          try {
+            const nodes = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
+            for (const n of Array.from(nodes || [])) {
+              try {
+                const txt = (n.textContent || '').trim()
+                if (!txt) continue
+                if (slugify(txt) === decoded) {
+                  const href = n.getAttribute('href') || ''
+                  try {
+                    const u = new URL(href, location.href)
+                    const p = u.searchParams.get('page')
+                    if (p) { resolved = decodeURIComponent(p); break }
+                  } catch (e) { /* ignore */ }
+                }
+              } catch (ee) { }
+            }
+          } catch (ee) { }
+
+          // fallback 2: fetch each nav-linked md and check its H1 for a slug match
+          try {
+            const tried = new Set()
+            const anchors = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
+            for (const n of Array.from(anchors || [])) {
+              try {
+                const href = n.getAttribute('href') || ''
+                const u = new URL(href, location.href)
+                let mdCandidate = null
+                // prefer explicit ?page= param when present
+                const p = u.searchParams.get('page')
+                if (p) mdCandidate = decodeURIComponent(p)
+                // otherwise check for markdown filename in the hash (e.g. #projects.md)
+                if (!mdCandidate && u.hash) {
+                  const h = u.hash.replace(/^#/, '')
+                  if (/\.md$/.test(h)) mdCandidate = h
+                }
+                // otherwise check if the path itself references a .md file
+                if (!mdCandidate && u.pathname) {
+                  const m = (u.pathname || '').match(/([^\/]+\.md)(?:$|[?#])/) 
+                  if (m) mdCandidate = m[1]
+                }
+                if (!mdCandidate) continue
+                if (tried.has(mdCandidate)) continue
+                tried.add(mdCandidate)
+                try {
+                  // ensure we fetch a markdown path: prefer existing slug->md mapping
+                  // Do NOT blindly append '.md' to a bare slug (this causes noisy 404s).
+                  // Instead try known mappings, then underscore-prefixed and index fallbacks.
+                  let md = null
+                  let fetchPath = mdCandidate
+                  try {
+                    if (String(fetchPath).includes('.md')) {
+                      try { md = await fetchMarkdown(fetchPath, contentBase) } catch (e) { md = null }
+                    } else {
+                      const tryList = []
+                      try { if (slugToMd.has(fetchPath)) tryList.push(slugToMd.get(fetchPath)) } catch (e) { }
+                      const underscore = '_' + String(fetchPath) + '.md'
+                      const indexPath = String(fetchPath) + '/index.md'
+                      try { if (mdToSlug.has(underscore)) tryList.push(underscore) } catch (e) { }
+                      try { if (mdToSlug.has(indexPath)) tryList.push(indexPath) } catch (e) { }
+                      for (const fp of tryList) {
+                        if (!fp) continue
+                        try {
+                          md = await fetchMarkdown(fp, contentBase)
+                          fetchPath = fp
+                          break
+                        } catch (e) {
+                          md = null
+                        }
+                      }
+                    }
+                    if (!md) { /* no file found for this nav-linked candidate; skip */ continue }
+                    const m = (md.raw || '').match(/^#\s+(.+)$/m)
+                    if (m) {
+                      const h1 = (m[1] || '').trim()
+                      if (h1 && slugify(h1) === decoded) { resolved = fetchPath; break }
+                    }
+                  } catch (e) { /* ignore fetch errors */ }
+                } catch (e) { }
+              } catch (ee) { }
+            }
+          } catch (ee) { }
+        }
+        // fallback 3: dynamically discover index/list pages from nav and known maps
+        // (avoid hardcoded filenames like 'blog.md' or 'projects.md')
+        try {
+          const indexSet = new Set()
+          try {
+            const anchorsForIndex = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
+            for (const linkEl of Array.from(anchorsForIndex || [])) {
+              try {
+                const href = linkEl.getAttribute('href') || ''
+                if (!href) continue
+                try {
+                  const u = new URL(href, location.href)
+                  // collect explicit md references
+                  const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/)
+                  if (mdMatch) {
+                    let candidate = mdMatch[1].replace(/^\.\//, '')
+                    if (candidate.startsWith('/')) candidate = candidate.replace(/^\//, '')
+                    if (candidate) indexSet.add(candidate)
+                    continue
+                  }
+                  // if the link points to a directory-like path, try its index.md
+                  const p = u.pathname || ''
+                  if (p) {
+                    const contentBaseUrl = new URL(contentBase)
+                    const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+                    if (p.indexOf(contentBasePath) !== -1) {
+                      let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
+                      rel = rel.replace(/^[\.\/]+/, '')
+                      if (rel && !rel.includes('.')) {
+                        indexSet.add(rel + '/index.md')
+                        indexSet.add(rel + '.md')
+                      }
+                    }
+                  }
+                } catch (e) { }
+              } catch (e) { }
+            }
+          } catch (e) { }
+
+          // include any known md paths from slug/md maps
+          try { for (const v of Array.from(slugToMd.values())) { if (v) indexSet.add(v) } } catch (e) { }
+          try { for (const v of Array.from(mdToSlug.keys())) { if (v) indexSet.add(v) } } catch (e) { }
+
+          for (const candidate of Array.from(indexSet)) {
+            try {
+              if (!candidate || !String(candidate).includes('.md')) continue
+              const idxMd = await fetchMarkdown(candidate, contentBase)
+              if (!idxMd || !idxMd.raw) continue
+              const parsedIdx = await parseMarkdownToHtml(idxMd.raw || '')
+              const tmp = document.createElement('div')
+              tmp.innerHTML = parsedIdx.html || ''
+              const links = tmp.querySelectorAll('a')
+              const triedIdx = new Set()
+              for (const linkEl of Array.from(links || [])) {
+                try {
+                  const href = linkEl.getAttribute('href') || ''
+                  const mdMatch = href.match(/([^#?]+\.md)(?:$|[?#])/) 
+                  if (!mdMatch) continue
+                  let candidateInner = mdMatch[1].replace(/^\.\//, '')
+                  if (candidateInner.startsWith('/')) candidateInner = candidateInner.replace(/^\//, '')
+                  if (triedIdx.has(candidateInner)) continue
+                  triedIdx.add(candidateInner)
+                  if (!String(candidateInner).includes('.md')) candidateInner = candidateInner + '.md'
+                  try {
+                    const md = await fetchMarkdown(candidateInner, contentBase)
+                    const m = (md.raw || '').match(/^#\s+(.+)$/m)
+                    if (m) {
+                      const h1 = (m[1] || '').trim()
+                      if (h1 && slugify(h1) === decoded) { resolved = candidateInner; break }
+                    }
+                  } catch (e) { /* ignore per-file fetch errors */ }
+                } catch (e) { }
+              }
+              if (String(resolved || '').includes('.md')) break
+            } catch (e) { }
+          }
+        } catch (e) { }
+      } catch (e) { }
+    }
+
+    if (!anchor && hashAnchor) anchor = hashAnchor
+
+    // try multiple candidate paths so slugs resolve even on direct visits
+    const pageCandidates = []
+    if (String(resolved).includes('.md')) {
+      pageCandidates.push(resolved)
+    } else {
+      try {
+        const dec = decodeURIComponent(String(resolved || ''))
+        if (slugToMd.has(dec)) {
+          pageCandidates.push(slugToMd.get(dec))
+        } else {
+          // Only try underscore/index fallbacks if we have prior knowledge
+          // (mdToSlug contains known markdown paths or slugToMd has an entry).
+          const underscore = '_' + dec + '.md'
+          const indexPath = dec + '/index.md'
+          try { if (mdToSlug.has(underscore)) pageCandidates.push(underscore) } catch (e) { }
+          try { if (mdToSlug.has(indexPath)) pageCandidates.push(indexPath) } catch (e) { }
+        }
+      } catch (e) { }
+    }
+
+    let data = null
+    let pagePath = null
+    let lastErr = null
+    for (const candidate of pageCandidates) {
+      if (!candidate) continue
+      try {
+        const norm = String(candidate).replace(/^[\.\/]+/, '')
+        // debug logging removed to avoid noisy console output in browsers
+        data = await fetchMarkdown(norm, contentBase)
+        pagePath = norm
+        break
+      } catch (e) {
+        lastErr = e
+        continue
+      }
+    }
+    if (!data) {
+      // rethrow the last error to surface 404 or network failures
+      throw lastErr || new Error('failed to resolve page')
+    }
       contentWrap.innerHTML = ''
 
       const langs = detectFenceLanguages(data.raw || '')
@@ -685,9 +916,6 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       }
 
       const parsed = await parseMarkdownToHtml(data.raw || '')
-
-      setMetaTags(parsed)
-
       const article = document.createElement('article')
       article.className = 'nimbi-article content'
       article.innerHTML = parsed.html
@@ -715,39 +943,135 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
         if (anchors && anchors.length) {
           const contentBaseUrl = new URL(contentBase)
           const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
-          anchors.forEach(a => {
-            const href = a.getAttribute('href') || ''
-            if (!href) return
-            if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) return
-            if (href.startsWith('/') && !href.endsWith('.md')) return
-            const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
-            if (mdMatch) {
-              const mdPath = mdMatch[1]
-              const frag = mdMatch[2]
-              try {
-                const resolved = new URL(mdPath, contentBase).pathname
-                const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
-                const hash = frag ? `${rel}::${frag}` : rel
-                a.setAttribute('href', `#${hash}`)
-              } catch (e) {
-                a.setAttribute('href', '#' + mdPath.replace(/^\.\//, ''))
+          for (const a of Array.from(anchors || [])) {
+            try {
+              const href = a.getAttribute('href') || ''
+              if (!href) continue
+              if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) continue
+              if (href.startsWith('/') && !href.endsWith('.md')) continue
+
+              const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
+              if (mdMatch) {
+                const mdPathRaw = mdMatch[1]
+                const frag = mdMatch[2]
+                try {
+                  // resolve to a path relative to contentBase
+                  const resolved = new URL(mdPathRaw, contentBase).pathname
+                  const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+
+                  // prefer an existing slug mapping
+                  let slug = null
+                  try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (e) { }
+
+                  // if no mapping, attempt to fetch the target markdown and derive H1
+                  if (!slug) {
+                    try {
+                      const mdData = await fetchMarkdown(rel, contentBase)
+                      const m = (mdData.raw || '').match(/^#\s+(.+)$/m)
+                      if (m) {
+                        const h1 = (m[1] || '').trim()
+                        if (h1) {
+                          slug = slugify(h1)
+                          try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (e) { }
+                        }
+                      }
+                    } catch (e) {
+                      // failed to fetch target md; fall back to raw rel
+                      slug = null
+                    }
+                  }
+
+                  if (slug) {
+                    if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
+                    else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+                  } else {
+                    if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
+                    else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+                  }
+                } catch (e) {
+                  a.setAttribute('href', '?page=' + encodeURIComponent(mdPathRaw.replace(/^\.\//, '')))
+                }
+                continue
               }
+
+              // handle links that point into the content base but omit the `.md` extension
+              try {
+                const full = new URL(href, contentBase)
+                const p = full.pathname || ''
+                if (p && p.indexOf(contentBasePath) !== -1) {
+                  let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
+                  rel = rel.replace(/^[\.\/]+/, '')
+                  if (rel.endsWith('/')) rel = rel.slice(0, -1)
+                  if (!rel) rel = '_home'
+                  // if it's not already a markdown path, try to map slug -> md or assume .md
+                  if (!rel.endsWith('.md')) {
+                    if (slugToMd.has(rel)) {
+                      const mapped = slugToMd.get(rel)
+                      const slug = mdToSlug.get(mapped) || rel
+                      a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+                    } else {
+                      // assume this is a slug-like path; prefer slug form to avoid .md fetches
+                      a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+                    }
+                  }
+                }
+              } catch (e) {
+              }
+            } catch (e) {
             }
-          })
+          }
         }
       } catch (e) {
       }
 
-      const toc = buildTocElement(parsed.toc, pagePath)
+      // compute H1 and slug mapping before building the TOC so TOC can use the friendly slug
+      const topH1 = article.querySelector('h1')
+      const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
+      // compute slug from H1 (fall back to a safe slug from pagePath)
+      let slugKey = ''
       try {
-        const topH1 = article.querySelector('h1')
+        if (h1Text) slugKey = slugify(h1Text)
+        if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
+        if (!slugKey) slugKey = '_home'
+        try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (e) { }
+        try { history.replaceState({ page: slugKey }, '', '?page=' + encodeURIComponent(slugKey)) } catch (e) { }
+      } catch (e) { }
+
+      const toc = buildTocElement(t, parsed.toc, pagePath)
+      try {
         const labelEl = toc.querySelector('.menu-label')
         if (labelEl) {
           labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
         }
         try {
           const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
-          const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
+          // find first image in the rendered article (if any) to use for social preview
+          const firstImgEl = article.querySelector('img')
+          const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
+          // pick first paragraph between H1 and first H2 (if present) to use as description
+          let descOverride = ''
+          try {
+            let found = ''
+            if (topH1) {
+              let sib = topH1.nextElementSibling
+              while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
+                if (sib.tagName && sib.tagName.toLowerCase() === 'p') {
+                  const txt = (sib.textContent || '').trim()
+                  if (txt) { found = txt; break }
+                }
+                sib = sib.nextElementSibling
+              }
+            }
+            if (!found) {
+              const existingDescTag = document.querySelector('meta[name="description"]')
+              found = existingDescTag && existingDescTag.getAttribute ? (existingDescTag.getAttribute('content') || '') : ''
+            }
+            descOverride = found
+          } catch (e) { }
+
+          // update Open Graph / Twitter metadata preferring meta.title, then H1, and prefer the first page image when available
+          try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { }
+          try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride) } catch (e) { }
           const siteName = getSiteNameFromMeta()
           if (h1Text) {
             if (siteName) document.title = `${siteName} - ${h1Text}`
@@ -781,19 +1105,15 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
           const a = ev.target && ev.target.closest ? ev.target.closest('a') : null
           if (!a) return
           const href = a.getAttribute('href') || ''
-          if (!href.startsWith('#')) return
-          ev.preventDefault()
-          const rawAnchor = href.replace(/^#/, '')
-          const parts = rawAnchor.split('::', 2)
-          const aid = parts[1] || parts[0]
-          if (!aid) return
-          const target = article.querySelector('#' + aid)
-          if (target) {
-            try {
-              if (container && container.scrollTo) container.scrollTo({ top: target.offsetTop, behavior: 'smooth' })
-              else target.scrollIntoView({ behavior: 'smooth' })
-            } catch (e) { try { target.scrollIntoView() } catch (ee) { } }
-          }
+          try {
+            const url = new URL(href, location.href)
+            const pageParam = url.searchParams.get('page')
+            const hash = url.hash ? url.hash.replace(/^#/, '') : null
+            if (!pageParam && !hash) return
+            ev.preventDefault()
+            history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+            try { renderByQuery() } catch (e) { }
+          } catch (e) { /* ignore non-URL hrefs */ }
         })
       } catch (e) { }
 
@@ -920,80 +1240,16 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       return
     }
 
-    const slug = raw
-    const el = document.getElementById(slug)
-    if (el) {
-      el.scrollIntoView()
-    }
-  }
+  
 
-  window.addEventListener('hashchange', renderByHash)
-  await renderByHash()
+  window.addEventListener('popstate', renderByQuery)
+  await renderByQuery()
 }
 
-function buildTocElement(toc, pagePath = '') {
-  const aside = document.createElement('aside')
-  aside.className = 'menu nimbi-toc-inner'
-  const label = document.createElement('p')
-  label.className = 'menu-label'
-  label.textContent = t('onThisPage')
-  aside.appendChild(label)
-  const ul = document.createElement('ul')
-  ul.className = 'menu-list'
-  toc.forEach(item => {
-    if (item.level === 1) return
-    const li = document.createElement('li')
-    const a = document.createElement('a')
-    const slug = item.id || slugify(item.text)
-    if (pagePath) a.href = `#${pagePath}::${slug}`
-    else a.href = `#${slug}`
-    a.textContent = item.text
-    li.appendChild(a)
-    ul.appendChild(li)
-  })
-  aside.appendChild(ul)
-  return aside
-}
+// TOC builder moved to src/htmlBuilder.js
 
-function slugify(s) {
-  return s.toLowerCase().replace(/[^a-z0-9\- ]/g, '').replace(/ /g, '-')
-}
+// slugify moved to src/filesManager.js
 
-function setMetaTags(data) {
-  const meta = data.meta || {}
-  setTag('description', meta.description || '')
-  setOgTwitter(meta)
-}
-
-function setTag(name, content) {
-  let tag = document.querySelector(`meta[name="${name}"]`)
-  if (!tag) {
-    tag = document.createElement('meta')
-    tag.setAttribute('name', name)
-    document.head.appendChild(tag)
-  }
-  tag.setAttribute('content', content)
-}
-
-function setOgTwitter(meta) {
-  upsertMeta('property', 'og:title', meta.title || initialDocumentTitle || document.title)
-  upsertMeta('property', 'og:description', meta.description || '')
-  upsertMeta('name', 'twitter:card', meta.twitter_card || 'summary_large_image')
-  if (meta.image) {
-    upsertMeta('property', 'og:image', meta.image)
-    upsertMeta('name', 'twitter:image', meta.image)
-  }
-}
-
-function upsertMeta(attrName, attrValue, content) {
-  let sel = `meta[${attrName}="${attrValue}"]`
-  let tag = document.querySelector(sel)
-  if (!tag) {
-    tag = document.createElement('meta')
-    tag.setAttribute(attrName, attrValue)
-    document.head.appendChild(tag)
-  }
-  tag.setAttribute('content', content)
-}
+// SEO helpers moved to src/seoManager.js
 
 export default initCMS
