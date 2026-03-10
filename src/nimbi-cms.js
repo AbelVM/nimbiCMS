@@ -2,7 +2,6 @@ import 'highlight.js/styles/monokai.css'
 import 'bulma/css/bulma.min.css'
 import './styles/nimbi-cms-extra.css'
 import readingTime from 'reading-time/lib/reading-time'
-import { DEFAULT_L10N } from './utils/l10n-defaults.js'
 import { marked } from 'marked'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
 import { createNavTree, buildTocElement, preScanHtmlSlugs } from './htmlBuilder.js'
@@ -10,6 +9,7 @@ import { setMetaTags, setStructuredData } from './seoManager.js'
 import { parseMarkdownToHtml, detectFenceLanguages } from './markdown.js'
 import { fetchPageData } from './router.js'
 import { hljs, SUPPORTED_HLJS_MAP, loadSupportedLanguages, registerLanguage, observeCodeBlocks, setHighlightTheme, BAD_LANGUAGES } from './codeblocksManager.js'
+import { t, loadL10nFile, setLang } from './l10nManager.js'
 
 
 // Pre-scan nav links for HTML files and map title/H1 -> slug to avoid nav-time fetches
@@ -38,41 +38,6 @@ function getSiteNameFromMeta() {
   return ''
 }
 
-const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))
-
-let detectedLang = 'en'
-if (typeof navigator !== 'undefined') {
-  const navLang = navigator.language || (navigator.languages && navigator.languages[0]) || 'en'
-  detectedLang = String(navLang).split('-')[0].toLowerCase()
-}
-if (!DEFAULT_L10N[detectedLang]) detectedLang = 'en'
-let currentLang = detectedLang
-
-function t(key, replacements = {}) {
-  const dict = L10N[currentLang] || L10N.en
-  let s = dict && dict[key] ? dict[key] : (L10N.en[key] || '')
-  for (const k of Object.keys(replacements)) {
-    s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(replacements[k]))
-  }
-  return s
-}
-
-async function loadL10nFile(path, pageDir) {
-  if (!path) return
-  let resolved = path
-  try {
-    if (!/^https?:\/\//.test(path)) {
-      resolved = new URL(path, location.origin + pageDir).toString()
-    }
-    const res = await fetch(resolved)
-    if (!res.ok) return
-    const json = await res.json()
-    for (const lang of Object.keys(json || {})) {
-      L10N[lang] = Object.assign({}, L10N[lang] || {}, json[lang])
-    }
-  } catch (e) {
-  }
-}
 
 
 function injectLink(href, attrs = {}) {
@@ -192,10 +157,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
   if (!cp.endsWith('/')) cp = cp + '/'
   const contentBase = new URL(pageDir + cp, location.origin).toString()
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
-  if (lang) {
-    const short = String(lang).split('-')[0].toLowerCase()
-    currentLang = L10N[short] ? short : 'en'
-  }
+  if (lang) setLang(lang)
   try {
     await fetchMarkdown('_home.md', contentBase)
   } catch (e) {
