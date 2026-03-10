@@ -13,6 +13,14 @@ if (!DEFAULT_L10N[detectedLang]) detectedLang = 'en'
 
 export let currentLang = detectedLang
 
+/**
+ * Translate a key using the current language.  Replacement tokens of the
+ * form `{name}` are interpolated from the `replacements` object.
+ *
+ * @param {string} key
+ * @param {Object} [replacements]
+ * @returns {string}
+ */
 export function t(key, replacements = {}) {
   const dict = L10N[currentLang] || L10N.en
   let s = dict && dict[key] ? dict[key] : (L10N.en[key] || '')
@@ -22,6 +30,14 @@ export function t(key, replacements = {}) {
   return s
 }
 
+/**
+ * Load a JSON localization file and merge its contents into the runtime
+ * dictionary.
+ *
+ * @param {string} path
+ * @param {string} pageDir
+ * @returns {Promise<void>}
+ */
 export async function loadL10nFile(path, pageDir) {
   if (!path) return
   let resolved = path
@@ -40,6 +56,12 @@ export async function loadL10nFile(path, pageDir) {
   }
 }
 
+/**
+ * Switch the current UI language.  Falls back to English if the requested
+ * language is not available.
+ *
+ * @param {string} lang
+ */
 export function setLang(lang) {
   const short = String(lang).split('-')[0].toLowerCase()
   currentLang = L10N[short] ? short : 'en'

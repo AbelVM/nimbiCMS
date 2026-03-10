@@ -1,5 +1,6 @@
 import 'highlight.js/styles/monokai.css'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
+import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { createNavTree, preScanHtmlSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
 import { parseMarkdownToHtml } from './markdown.js'
@@ -43,8 +44,21 @@ export function addHook(name, fn) {
 /**
  * Convenience wrappers for the most common hooks.
  */
+/**
+ * Register a callback to be invoked after each page is rendered.
+ * @param {Function} fn
+ */
 export function onPageLoad(fn) { addHook('onPageLoad', fn) }
+/**
+ * Register a callback once the navigation DOM has been built.
+ * @param {Function} fn
+ */
 export function onNavBuild(fn) { addHook('onNavBuild', fn) }
+/**
+ * Register a callback that can mutate the article element before it is
+ * appended to the document.
+ * @param {Function} fn
+ */
 export function transformHtml(fn) { addHook('transformHtml', fn) }
 
 async function runHooks(name, ctx) {
@@ -67,6 +81,18 @@ export function _clearHooks() {
 
 
 
+/**
+ * Initialize the CMS in a host page.
+ *
+ * @param {Object} options
+ * @param {string|Element} options.el - mount point selector or element
+ * @param {string} [options.contentPath='/content'] - URL path to content
+ * @param {ThemeStyle} [options.defaultStyle='light'] - initial light/dark mode
+ * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
+ * @param {string} [options.lang] - UI language code
+ * @param {string|null} [options.l10nFile] - path to localization file
+ * @returns {Promise<void>} resolves once the initial page has rendered
+ */
 export async function initCMS({ el, contentPath = '/content', /* languages (deprecated) */ defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
       if (!el) throw new Error('el is required')
 
@@ -153,7 +179,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
     const parser = new DOMParser()
     const navDoc = parser.parseFromString(parsedNav.html || '', 'text/html')
     const linkEls = navDoc.querySelectorAll('a')
-    try { await preScanHtmlSlugs(linkEls, contentBase) } catch (e) { }
+await safe(() => preScanHtmlSlugs(linkEls, contentBase))
 
     const navbar = document.createElement('nav')
     navbar.className = 'navbar'
@@ -350,7 +376,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
         const href = a.getAttribute('href') || ''
         if (!href) return
         // ignore external/mailto/tel links
-        if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) return
+        if (isExternalLink(href)) return
         try {
           const url = new URL(href, location.href)
           const pageParam = url.searchParams.get('page')

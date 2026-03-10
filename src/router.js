@@ -24,7 +24,12 @@ function resolutionCacheSet(key, value) {
 }
 
 
-// re-export for testing convenience
+// re-export for testing convenience and user access
+/**
+ * List of all markdown file paths collected at build time.  Useful for
+ * programs that need to enumerate available pages.
+ * @type {string[]}
+ */
 export { allMarkdownPaths } from './filesManager.js'
 
 // helpers scoped to this module ------------------------------------------------
@@ -32,6 +37,15 @@ export { allMarkdownPaths } from './filesManager.js'
 // `tryFindInNav` removed: slugToMd map is populated when the navbar
 // is built, so scanning the DOM again is redundant.  The map will already
 // contain any navigable markdown slug.
+/**
+ * Search the navigation and site index for a page whose H1 slugifies to the
+ * provided value.  This is a fallback when a slug doesn't directly map via
+ * `slugToMd`.
+ *
+ * @param {string} decoded - decoded slug value
+ * @param {string} contentBase - content base URL for fetching markdown
+ * @returns {Promise<string|null>} path of the discovered markdown or null
+ */
 async function tryDiscoverFromIndex(decoded, contentBase) {
   // attempt to locate a markdown file whose H1 slugifies to `decoded`
   const indexSet = new Set()
@@ -96,6 +110,13 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
   return null
 }
 
+/**
+ * Given a resolved identifier (possibly slug, path, or HTML), produce an
+ * ordered list of candidate markdown/html filenames to attempt fetching.
+ *
+ * @param {string} resolved
+ * @returns {string[]}
+ */
 function buildPageCandidates(resolved) {
   const pageCandidates = []
   if (String(resolved).includes('.md') || String(resolved).includes('.html')) {

@@ -1,3 +1,9 @@
+/**
+ * Set or update a single meta tag or property in the document head.
+ *
+ * @param {string} name
+ * @param {string} content
+ */
 export function setTag(name, content) {
   let tag = document.querySelector(`meta[name="${name}"]`)
   if (!tag) {
@@ -45,6 +51,17 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
   }
 }
 
+/**
+ * Populate standard meta tags (title, description, og:image, etc.) using
+ * the provided page metadata.  Overrides allow caller to supply alternate
+ * values.
+ *
+ * @param {object} data
+ * @param {string} [titleOverride]
+ * @param {string} [imageOverride]
+ * @param {string} [descOverride]
+ * @param {string} [initialDocumentTitle]
+ */
 export function setMetaTags(data, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   const meta = data.meta || {}
   const existingHtmlDesc = (document && document.querySelector) ? (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '' : ''
@@ -54,6 +71,10 @@ export function setMetaTags(data, titleOverride, imageOverride, descOverride, in
   setOgTwitter(meta, titleOverride, imageOverride, finalDesc)
 }
 
+/**
+ * Read the site name from existing meta tags, if present.
+ * @returns {string|null}
+ */
 export function getSiteNameFromMeta() {
   try {
     const candidates = [
@@ -75,6 +96,16 @@ export function getSiteNameFromMeta() {
   return ''
 }
 
+/**
+ * Inject JSON-LD structured data based on page metadata and defaults.
+ *
+ * @param {object} data
+ * @param {string} pagePath
+ * @param {string} [titleOverride]
+ * @param {string} [imageOverride]
+ * @param {string} [descOverride]
+ * @param {string} [initialDocumentTitle]
+ */
 export function setStructuredData(data, pagePath, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   try {
     const meta = data.meta || {}
@@ -125,6 +156,23 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
 
 import readingTime from 'reading-time/lib/reading-time'
 
+/**
+ * High-level helper invoked by the main renderer to update all SEO-related
+ * metadata (meta tags, structured data, document title, etc.) based on the
+ * freshly parsed page.
+ *
+ * @param {Function} t - localization function
+ * @param {string} initialDocumentTitle
+ * @param {object} parsed
+ * @param {Array} toc
+ * @param {HTMLElement} article
+ * @param {string} pagePath
+ * @param {string|null} anchor
+ * @param {HTMLElement|null} topH1
+ * @param {string|null} h1Text
+ * @param {string|null} slugKey
+ * @param {object} data
+ */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
     try {
       const labelEl = toc.querySelector('.menu-label')

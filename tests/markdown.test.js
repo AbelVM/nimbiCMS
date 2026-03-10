@@ -12,27 +12,29 @@ function makeMap(entries) {
 
 describe('markdown utilities', () => {
   it('detects common fence languages including two-letter ones', () => {
-    const md = `
-
-date: 2020
----
-
-```js
-console.log('hello')
-```
-
-```python
-print('hi')
-```
-
-```magic
-not really
-```
-
-```undefined
-? ? ?
-```
-`;
+    const md = []
+      .concat(
+        '\n',
+        'date: 2020',
+        '---',
+        '',
+        '```js',
+        "console.log('hello')", 
+        '```',
+        '',
+        '```python',
+        "print('hi')", 
+        '```',
+        '',
+        '```magic',
+        'not really',
+        '```',
+        '',
+        '```undefined',
+        '? ? ?',
+        '```'
+      )
+      .join('\n')
     const langs = detectFenceLanguages(md, makeMap(['javascript', 'python']))
     // 'js' should map to javascript via alias rule
     expect(langs.has('javascript') || langs.has('js')).toBe(true)
@@ -43,13 +45,13 @@ not really
   })
 
   it('does not filter two-letter names when supportedMap is empty', () => {
-    const md = '```js\nfoo\n```'
+    const md = ['```js','foo','```'].join('\n')
     const langs = detectFenceLanguages(md, new Map())
     expect(langs.has('js')).toBe(true)
   })
 
   it('filters by supportedMap when provided and populated', () => {
-    const md = '```rb\nfoo\n```'
+    const md = ['```rb','foo','```'].join('\n')
     const langs = detectFenceLanguages(md, makeMap(['ruby']))
     // 'rb' is not in map so should be skipped
     expect(langs.size).toBe(0)

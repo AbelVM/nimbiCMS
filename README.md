@@ -92,7 +92,11 @@ Recent behaviour fixes worth knowing:
 > code detection handles language registration automatically.
 
 The `initCMS` export itself is returned when you call it; additional helpers
-are exposed (all are also available from the UMD bundle namespace):
+are exposed (all are also available from the UMD bundle namespace).
+
+> **TypeScript users:**  a `src/index.d.ts` declaration file is shipped with
+> the package that describes the public API.
+
 
 - `registerLanguage(name, modulePath)` – dynamically register a highlight.js
   language (path may be a CDN URL).

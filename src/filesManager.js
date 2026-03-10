@@ -1,12 +1,37 @@
+/**
+ * mapping from a slug (generated from title/H1) to a markdown path.
+ * Populated during nav construction and anchor rewriting.
+ * @type {Map<string,string>}
+ */
 export const slugToMd = new Map()
+/**
+ * reverse mapping of `slugToMd` (markdown path -> slug).
+ * @type {Map<string,string>}
+ */
 export const mdToSlug = new Map()
 
 // gather all markdown file paths via Vite glob at build time; this allows slug
 // resolution to work even for files not linked from the navigation.
 // paths are relative to the content base (e.g. 'blog/foo.md').
-const _allMd = import.meta.glob('/example/content/**/*.md', { as: 'raw', eager: true })
+let _allMd = {}
+try {
+  if (import.meta && typeof import.meta.glob === 'function') {
+    _allMd = import.meta.glob('/example/content/**/*.md', { as: 'raw', eager: true })
+  }
+} catch (_) {
+  // fall back to empty object in non-Vite environments (tests)
+}
+/**
+ * List of all markdown file paths gathered at build time by Vite globbing.
+ * @type {string[]}
+ */
 export const allMarkdownPaths = Object.keys(_allMd).map(p => p.replace(/^\/example\/content\//, ''))
 
+/**
+ * Convert a string to a URL-friendly slug (lowercase, dashes).
+ * @param {any} s
+ * @returns {string}
+ */
 export function slugify(s) {
   return String(s || '')
     .toLowerCase()
@@ -21,6 +46,13 @@ function clearFetchCache() {
   fetchCache.clear()
 }
 
+/**
+ * Fetch a markdown (or HTML) file from the content base, caching the
+ * promise.  Returns an object `{ raw, isHtml? }`.
+ * @param {string} path
+ * @param {string} base
+ * @returns {Promise<{raw:string,isHtml?:boolean,status?:number}>}
+ */
 export async function fetchMarkdown(path, base) {
   if (!path) throw new Error('path required')
   const baseClean = base.endsWith('/') ? base.slice(0, -1) : base

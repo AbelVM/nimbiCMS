@@ -1,6 +1,7 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './filesManager.js'
 import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
+import { isExternalLink, normalizePath, setLazyload, safe } from './utils/helpers.js'
 
 export function createNavTree(t, tree) {
   const nav = document.createElement('aside')
@@ -110,7 +111,7 @@ async function rewriteAnchors(article, contentBase) {
       try {
         const href = a.getAttribute('href') || ''
         if (!href) continue
-        if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) continue
+        if (isExternalLink(href)) continue
         if (href.startsWith('/') && !href.endsWith('.md')) continue
         const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
         if (mdMatch) {
@@ -205,9 +206,15 @@ function computeSlug(parsed, article, pagePath, anchor) {
   return { topH1, h1Text, slugKey }
 }
 
-// given a collection of anchor elements pointing at HTML files, fetch
-// each HTML and extract a title or first H1 so we can map a friendly slug
-// without waiting until the navigation click occurs.
+/**
+ * Given a collection of anchor elements pointing at HTML files, fetch each
+ * document and extract a title or first H1.  This allows us to create
+ * slug-to-path mappings up front so clicks on HTML links behave like
+ * Markdown URLs.
+ *
+ * @param {NodeListOf<HTMLAnchorElement>} linkEls
+ * @param {string} base - base URL for fetchMarkdown
+ */
 export async function preScanHtmlSlugs(linkEls, base) {
   if (!linkEls || !linkEls.length) return
 
@@ -274,6 +281,9 @@ export async function preScanHtmlSlugs(linkEls, base) {
 /**
  * Parse raw HTML input and return the normalized "parsed" object used by the
  * rendering pipeline.
+ *
+ * @param {string} raw - HTML string to parse
+ * @returns {{html:string,meta:Object,toc:Array<{level:number,text:string,id:string}>}}
  */
 function parseHtml(raw) {
   try {
@@ -307,6 +317,10 @@ function parseHtml(raw) {
 
 /**
  * Ensure highlight.js languages referenced in the markdown are registered.
+ * This inspects fences, looks up the canonical mapping and invokes
+ * `registerLanguage` as needed.  Errors are swallowed.
+ *
+ * @param {string} raw - markdown text to scan
  */
 function ensureLanguages(raw) {
   const langsArray = detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP)
@@ -327,12 +341,26 @@ function ensureLanguages(raw) {
 /**
  * Convert markdown raw text to the normalized parsed object, registering
  * any required languages along the way.
+ *
+ * @param {string} raw - markdown source
+ * @returns {Promise<{html:string,meta:Object,toc:Array}>}
  */
 async function parseMarkdown(raw) {
   ensureLanguages(raw)
   return await parseMarkdownToHtml(raw || '')
 }
 
+/**
+ * Given a page's fetched data, produce an <article> element, a TOC,
+ * and slug calculations.  Handles HTML vs Markdown transparently.
+ *
+ * @param {Function} t - localization function
+ * @param {{raw:string,isHtml?:boolean}} data - data returned by fetchMarkdown
+ * @param {string} pagePath - normalized path of the page (for link rewriting)
+ * @param {string|null} anchor - optional anchor to scroll to
+ * @param {string} contentBase - base URL for resolving links and images
+ * @returns {Promise<{article:HTMLElement,parsed:Object,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}>}
+ */
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     // parse or convert the input into HTML + metadata
     let parsed = null
@@ -422,6 +450,15 @@ export function scrollToAnchorOrTop(anchor) {
     }
   }
 
+/**
+ * Create or update a scroll-to-top button and toggle the TOC/menu label
+ * visibility.  Observes the supplied `topH1` element if present; on pages
+ * without a top heading we fall back to a simple scroll-position listener.
+ *
+ * @param {HTMLElement} article
+ * @param {HTMLElement|null} topH1
+ * @param {object} opts
+ */
 export function ensureScrollTopButton(article, topH1, { mountOverlay = null, container = null, mountEl = null, navWrap = null, t = null } = {}) {
     try {
       const tFn = t || (k => (typeof k === 'string' ? k : ''))
@@ -465,8 +502,25 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
 
       const tocLabel = (navWrapEl && navWrapEl.querySelector) ? navWrapEl.querySelector('.menu-label') : null
       if (!topH1) {
+        // no heading available: toggle label based on scroll position
         btn.classList.remove('show')
         if (tocLabel) tocLabel.classList.remove('show')
+        const root = (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : window)
+        const onScroll = () => {
+          try {
+            const scrollTop = (root === window) ? window.scrollY : (root.scrollTop || 0)
+            const shouldShow = scrollTop > 10
+            if (shouldShow) {
+              btn.classList.add('show')
+              if (tocLabel) tocLabel.classList.add('show')
+            } else {
+              btn.classList.remove('show')
+              if (tocLabel) tocLabel.classList.remove('show')
+            }
+          } catch (_) {}
+        }
+        safe(() => root.addEventListener('scroll', onScroll))
+        onScroll()
       } else {
         if (!btn._nimbiObserver) {
           const obs = new IntersectionObserver((entries) => {

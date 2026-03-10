@@ -56,8 +56,50 @@ describe('htmlBuilder utilities', () => {
   })
 
   it('parseMarkdown runs markdown conversion and registers languages', async () => {
-    const md = '```js\nconsole.log(1)\n```'
+    // use string concatenation to avoid closing the template early
+    const md = [
+      '```js',
+      'console.log(1)',
+      '```'
+    ].join('\n')
     const parsed = await _parseMarkdown(md)
     expect(parsed.html).toContain('<code')
+  })
+
+  it('ensureScrollTopButton toggles label without a heading', () => {
+    // set up simple DOM elements
+    const article = document.createElement('article')
+    const navWrap = document.createElement('div')
+    navWrap.className = 'nimbi-nav-wrap'
+    const toc = document.createElement('aside')
+    toc.className = 'menu nimbi-toc-inner'
+    const label = document.createElement('p')
+    label.className = 'menu-label'
+    toc.appendChild(label)
+    navWrap.appendChild(toc)
+    document.body.appendChild(navWrap)
+    const container = document.createElement('div')
+    container.className = 'nimbi-cms'
+    container.style.height = '50px'
+    container.style.overflow = 'auto'
+    const filler = document.createElement('div')
+    filler.style.height = '200px'
+    container.appendChild(filler)
+    document.body.appendChild(container)
+
+    // call ensureScrollTopButton with no topH1
+    const { ensureScrollTopButton } = require('../src/htmlBuilder.js')
+    ensureScrollTopButton(article, null, { container, navWrap })
+
+    // simulate scroll down
+    container.scrollTop = 20
+    container.dispatchEvent(new Event('scroll'))
+
+    expect(label.classList.contains('show')).toBe(true)
+
+    // scroll back up should hide
+    container.scrollTop = 0
+    container.dispatchEvent(new Event('scroll'))
+    expect(label.classList.contains('show')).toBe(false)
   })
 })

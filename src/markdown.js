@@ -6,6 +6,13 @@ import hljs from 'highlight.js/lib/core'
 import { BAD_LANGUAGES } from './codeblocksManager.js'
 
 // parse markdown into HTML and gather TOC data
+/**
+ * Convert markdown string to HTML and extract a table-of-contents list.
+ * Preserves frontmatter metadata.
+ *
+ * @param {string} md
+ * @returns {Promise<{html:string,meta:Object,toc:Array<{level:number,text:string,id:string}>}>}
+ */
 export async function parseMarkdownToHtml(md) {
   const { content, data } = parseFrontmatter(md || '')
   // configure marked options here if needed
@@ -66,6 +73,15 @@ function extractToc(md) {
 }
 
 // identify fenced-code languages in raw markdown
+/**
+ * Scan markdown text for fenced code blocks and return a set of language
+ * identifiers.  Uses heuristics to discard false positives and can consult
+ * a map of supported languages to be stricter.
+ *
+ * @param {string} md
+ * @param {Map<string,string>} [supportedMap]
+ * @returns {Set<string>}
+ */
 export function detectFenceLanguages(md, supportedMap) {
   const set = new Set()
   const re = /```\s*([a-zA-Z0-9_\-+]+)?/g

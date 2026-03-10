@@ -14,6 +14,14 @@ function injectLink(href, attrs = {}) {
   document.head.appendChild(l)
 }
 
+/**
+ * Ensure that Bulma or a Bulmaswatch theme is loaded.  Supports local
+ * overrides or named themes fetched from unpkg.
+ *
+ * @param {string} bulmaCustomize
+ * @param {string} pageDir
+ * @returns {Promise<void>}
+ */
 export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
   if (!bulmaCustomize || bulmaCustomize === 'none') return
 
@@ -48,6 +56,11 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
   }
 }
 
+/**
+ * Toggle light/dark styling by setting `data-theme` and `is-dark`.
+ *
+ * @param {'light'|'dark'} style
+ */
 export function setStyle(style) {
   currentStyle = style === 'dark' ? 'dark' : 'light'
   document.documentElement.setAttribute('data-theme', currentStyle)
@@ -59,6 +72,11 @@ export function setStyle(style) {
  * Apply an object of CSS custom properties to the document root.  This makes
  * it easy for consumers to theme colors/fonts/etc. without touching Bulma
  * directly.  Property names should be provided without the leading `--`.
+ *
+ * @param {Record<string,string>} vars
+ */
+/**
+ * Apply custom CSS variables on :root for theming.
  *
  * @param {Record<string,string>} vars
  */

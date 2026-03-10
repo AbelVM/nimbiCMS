@@ -26,6 +26,14 @@ export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
 
+/**
+ * Load the list of supported highlight.js languages from the canonical
+ * GitHub markdown file and populate `SUPPORTED_HLJS_MAP`.  This is called
+ * once at startup and caches the promise.
+ *
+ * @param {string} [url]
+ * @returns {Promise<void>}
+ */
 export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
   if (!url) return
   if (loadSupportedLanguagesPromise) return loadSupportedLanguagesPromise
@@ -132,6 +140,15 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
 
 const registeredLangs = new Set()
 
+/**
+ * Dynamically import and register a highlight.js language definition.
+ * Safe to call multiple times; returns `true` if the language is loaded or
+ * already registered.
+ *
+ * @param {string} name
+ * @param {string} [modulePath]
+ * @returns {Promise<boolean>}
+ */
 export async function registerLanguage(name, modulePath) {
   if (!name || typeof name !== 'string') return false
   const low = name.toLowerCase()
@@ -192,6 +209,12 @@ export async function registerLanguage(name, modulePath) {
 
 // IntersectionObserver-based lazy highlighter for code blocks
 let __hlObserver = null
+/**
+ * Lazy-highlight `<pre><code>` blocks using IntersectionObserver.  The
+ * observer will register necessary languages as elements become visible.
+ *
+ * @param {ParentNode} [root=document]
+ */
 export function observeCodeBlocks(root = document) {
   const aliasMapLocal = HLJS_ALIAS_MAP
   const ensureObserver = () => {
@@ -244,6 +267,14 @@ export function observeCodeBlocks(root = document) {
   blocks.forEach(b => { try { obs.observe(b) } catch (_) { } })
 }
 
+/**
+ * Change the highlight.js CSS theme by injecting a <link>.  If `theme` is
+ * `'monokai'` nothing happens (it's the default bundle).  When `useCdn` is
+ * true the stylesheet is fetched from jsdelivr.
+ *
+ * @param {string} theme
+ * @param {{useCdn?:boolean}} [opts]
+ */
 export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = document.querySelector('link[data-hl-theme]')
   if (existing) existing.remove()
