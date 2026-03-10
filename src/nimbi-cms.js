@@ -2,8 +2,8 @@ import 'highlight.js/styles/monokai.css'
 import readingTime from 'reading-time/lib/reading-time'
 import { marked } from 'marked'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown } from './filesManager.js'
-import { createNavTree, buildTocElement, preScanHtmlSlugs, prepareArticle } from './htmlBuilder.js'
-import { setMetaTags, setStructuredData, getSiteNameFromMeta } from './seoManager.js'
+import { createNavTree, buildTocElement, preScanHtmlSlugs, prepareArticle, renderNotFound } from './htmlBuilder.js'
+import { setMetaTags, setStructuredData, getSiteNameFromMeta, applyPageMeta } from './seoManager.js'
 import { parseMarkdownToHtml, detectFenceLanguages } from './markdown.js'
 import { fetchPageData } from './router.js'
 import { hljs, SUPPORTED_HLJS_MAP, loadSupportedLanguages, registerLanguage, observeCodeBlocks, setHighlightTheme, BAD_LANGUAGES } from './codeblocksManager.js'
@@ -345,21 +345,6 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
   const siteNav = createNavTree(t, [{ path: '_home.md', name: t('home'), isIndex: true, children: [] }])
   let currentPagePath = null
 
-  // render an error page for unresolved queries
-  function renderNotFound(e) {
-    contentWrap.innerHTML = ''
-    const notFound = document.createElement('article')
-    notFound.className = 'nimbi-article content nimbi-not-found'
-    const h = document.createElement('h1')
-    h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
-    const p = document.createElement('p')
-    p.textContent = e && e.message ? String(e.message) : 'Failed to resolve the requested page.'
-    notFound.appendChild(h)
-    notFound.appendChild(p)
-    contentWrap.appendChild(notFound)
-  }
-
-  // convert raw data into a DOM article, compute TOC, slug and h1 info
 
 
   function attachTocClickHandler(toc) {
@@ -381,65 +366,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
     } catch (e) { }
   }
 
-  function applyPageMeta(parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
-    try {
-      const labelEl = toc.querySelector('.menu-label')
-      if (labelEl) {
-        labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
-      }
-    } catch (e) {}
 
-    try {
-      const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
-      const firstImgEl = article.querySelector('img')
-      const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
-      let descOverride = ''
-      try {
-        let found = ''
-        if (h1Text) {
-          let sib = article.querySelector('h1')?.nextElementSibling
-          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
-            if (sib.tagName && sib.tagName.toLowerCase() === 'p') {
-              const txt = (sib.textContent || '').trim()
-              if (txt) { found = txt; break }
-            }
-            sib = sib.nextElementSibling
-          }
-        }
-        if (!found) {
-          const existingDescTag = document.querySelector('meta[name="description"]')
-          found = existingDescTag && existingDescTag.getAttribute ? (existingDescTag.getAttribute('content') || '') : ''
-        }
-        descOverride = found
-      } catch (e) { }
-
-      try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { }
-      try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride) } catch (e) { }
-      const siteName = getSiteNameFromMeta()
-      if (h1Text) {
-        if (siteName) document.title = `${siteName} - ${h1Text}`
-        else document.title = `${initialDocumentTitle || 'Site'} - ${h1Text}`
-      } else if (metaTitle) {
-        document.title = metaTitle
-      } else {
-        document.title = initialDocumentTitle || document.title
-      }
-    } catch (e) { }
-
-    try {
-      const prev = article.querySelector('.nimbi-reading-time')
-      if (prev) prev.remove()
-      if (h1Text) {
-        const rt = readingTime(data.raw || '')
-        const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
-        const p = document.createElement('p')
-        p.className = 'nimbi-reading-time'
-        p.textContent = minutes ? t('readingTime', { minutes }) : ''
-        const topH1Elem = article.querySelector('h1')
-        if (topH1Elem) topH1Elem.insertAdjacentElement('afterend', p)
-      }
-    } catch (ee) { }
-  }
 
   function scrollToAnchorOrTop(anchor) {
     if (anchor) {
@@ -563,17 +490,17 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
       const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
       let data, pagePath, anchor
       try {
-        ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
-      } catch (e) {
-        renderNotFound(e)
-        return
-      }
+          ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
+        } catch (e) {
+          renderNotFound(contentWrap, t, e)
+          return
+        }
       if (!anchor && hashAnchor) anchor = hashAnchor
       contentWrap.innerHTML = ''
 
       const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
 
-      applyPageMeta(parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
+      applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
 
       navWrap.innerHTML = ''
       navWrap.appendChild(toc)

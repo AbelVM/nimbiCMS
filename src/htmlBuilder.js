@@ -271,3 +271,17 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const toc = buildTocElement(t, parsed.toc, pagePath)
     return { article, parsed, toc, topH1: article.querySelector('h1'), h1Text, slugKey }
   }
+
+    // render an error page for unresolved queries
+export function renderNotFound(contentWrap, t, e) {
+    if (contentWrap) contentWrap.innerHTML = ''
+    const notFound = document.createElement('article')
+    notFound.className = 'nimbi-article content nimbi-not-found'
+    const h = document.createElement('h1')
+    h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
+    const p = document.createElement('p')
+    p.textContent = e && e.message ? String(e.message) : 'Failed to resolve the requested page.'
+    notFound.appendChild(h)
+    notFound.appendChild(p)
+    if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(notFound)
+  }

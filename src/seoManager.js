@@ -122,3 +122,65 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
     el.textContent = JSON.stringify(json, null, 2)
   } catch (e) { }
 }
+
+import readingTime from 'reading-time/lib/reading-time'
+
+export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
+    try {
+      const labelEl = toc.querySelector('.menu-label')
+      if (labelEl) {
+        labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
+      }
+    } catch (e) {}
+
+    try {
+      const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
+      const firstImgEl = article.querySelector('img')
+      const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
+      let descOverride = ''
+      try {
+        let found = ''
+        if (h1Text) {
+          let sib = article.querySelector('h1')?.nextElementSibling
+          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
+            if (sib.tagName && sib.tagName.toLowerCase() === 'p') {
+              const txt = (sib.textContent || '').trim()
+              if (txt) { found = txt; break }
+            }
+            sib = sib.nextElementSibling
+          }
+        }
+        if (!found) {
+          const existingDescTag = document.querySelector('meta[name="description"]')
+          found = existingDescTag && existingDescTag.getAttribute ? (existingDescTag.getAttribute('content') || '') : ''
+        }
+        descOverride = found
+      } catch (e) { }
+
+      try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { }
+      try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { }
+      const siteName = getSiteNameFromMeta()
+      if (h1Text) {
+        if (siteName) document.title = `${siteName} - ${h1Text}`
+        else document.title = `${initialDocumentTitle || 'Site'} - ${h1Text}`
+      } else if (metaTitle) {
+        document.title = metaTitle
+      } else {
+        document.title = initialDocumentTitle || document.title
+      }
+    } catch (e) { }
+
+    try {
+      const prev = article.querySelector('.nimbi-reading-time')
+      if (prev) prev.remove()
+      if (h1Text) {
+        const rt = readingTime(data.raw || '')
+        const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
+        const p = document.createElement('p')
+        p.className = 'nimbi-reading-time'
+        p.textContent = minutes ? t('readingTime', { minutes }) : ''
+        const topH1Elem = article.querySelector('h1')
+        if (topH1Elem) topH1Elem.insertAdjacentElement('afterend', p)
+      }
+    } catch (ee) { }
+  }
