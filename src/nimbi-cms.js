@@ -150,6 +150,102 @@ export async function registerLanguage(name, modulePath) {
   }
 }
 
+// IntersectionObserver-based lazy highlighter for code blocks
+let __hlObserver = null
+function observeCodeBlocks(root = document) {
+  const aliasMapLocal = { js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', csharp: 'cs', 'c#': 'cs' }
+  const ensureObserver = () => {
+    if (__hlObserver) return __hlObserver
+    if (typeof IntersectionObserver === 'undefined') return null
+    __hlObserver = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return
+        const el = entry.target
+        try { obs.unobserve(el) } catch (e) { }
+        ;(async () => {
+          try {
+            const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''
+            const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+            if (match && match[1]) {
+              const l = (match[1] || '').toLowerCase()
+              const mapped = aliasMapLocal[l] || l
+              const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
+              try { await registerLanguage(canonical).catch(() => {}) } catch (e) { }
+              try { hljs.highlightElement(el) } catch (e) { }
+            } else {
+              try { hljs.highlightElement(el) } catch (e) { }
+            }
+          } catch (e) { }
+        })()
+      })
+    }, { root: null, rootMargin: '300px', threshold: 0.1 })
+    return __hlObserver
+  }
+
+  const obs = ensureObserver()
+  const blocks = (root && root.querySelectorAll) ? root.querySelectorAll('pre code') : []
+  if (!obs) {
+    // no IntersectionObserver - highlight immediately (but register languages non-blocking)
+    blocks.forEach(async (el) => {
+      try {
+        const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''
+        const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+        if (match && match[1]) {
+          const l = (match[1] || '').toLowerCase()
+          const mapped = aliasMapLocal[l] || l
+          const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
+          try { await registerLanguage(canonical).catch(() => {}) } catch (e) { }
+        }
+        try { hljs.highlightElement(el) } catch (e) { }
+      } catch (e) { }
+    })
+    return
+  }
+  blocks.forEach(b => { try { obs.observe(b) } catch (e) { } })
+}
+
+// Pre-scan nav links for HTML files and map title/H1 -> slug to avoid nav-time fetches
+async function preScanHtmlSlugs(linkEls, base) {
+  if (!linkEls || !linkEls.length) return
+  const outs = []
+  for (const a of Array.from(linkEls || [])) {
+    try {
+      const href = a.getAttribute('href') || ''
+      if (!href) continue
+      const raw = href.replace(/^\.\//, '')
+      const parts = raw.split(/::|#/, 2)
+      const path = parts[0]
+      if (!path || !/\.html(?:$|[?#])/.test(path) && !path.endsWith('.html')) continue
+      const htmlPath = path
+      try {
+        if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
+      } catch (e) { }
+      // fetch HTML and extract title/h1
+      outs.push((async () => {
+        try {
+          const res = await fetchMarkdown(htmlPath, base)
+          if (res && res.raw) {
+            try {
+              const parser = new DOMParser()
+              const doc = parser.parseFromString(res.raw, 'text/html')
+              const titleTag = doc.querySelector('title')
+              const h1 = doc.querySelector('h1')
+              const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
+              if (titleText) {
+                const slugKey = slugify(titleText)
+                if (slugKey) {
+                  try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (e) { }
+                }
+              }
+            } catch (e) { }
+          }
+        } catch (e) { }
+      })())
+    } catch (e) { }
+  }
+  if (outs.length) await Promise.allSettled(outs)
+}
+
 let currentStyle = 'light'
 let currentHighlightTheme = 'monokai'
 let initialDocumentTitle = ''
@@ -234,7 +330,7 @@ function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return
   const l = document.createElement('link')
   l.rel = 'stylesheet'
-  l.href = href
+  l.href = href 
   Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v))
   document.head.appendChild(l)
 }
@@ -294,21 +390,31 @@ async function parseMarkdownToHtml(md) {
     const parser = new DOMParser()
     const doc = parser.parseFromString(html, 'text/html')
     const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-    heads.forEach(h => {
-      if (!h.id) h.id = slugify(h.textContent || '')
-    })
-    const codes = doc.querySelectorAll('pre code')
-    codes.forEach(codeEl => {
-      try {
-        hljs.highlightElement(codeEl)
-      } catch (e) {
-      }
-    })
+    heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+
+    // prefer lazy-loading images to reduce initial network pressure
+    try {
+      const imgs = doc.querySelectorAll('img')
+      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
+    } catch (e) { }
+
+    // don't block: leave language-tagged blocks for the IntersectionObserver to register & highlight
+    try {
+      const codes = doc.querySelectorAll('pre code')
+      codes.forEach(codeEl => {
+        try {
+          const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+          const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+          if (!match || !match[1]) {
+            try { hljs.highlightElement(codeEl) } catch (e) { }
+          }
+        } catch (e) { }
+      })
+    } catch (e) { }
+
     html = doc.body.innerHTML
     const docToc = []
-    heads.forEach(h => {
-      docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id })
-    })
+    heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
     return { html: doc.body.innerHTML, meta: data || {}, toc: docToc }
   } catch (e) {
     console.warn('post-process markdown failed', e)
@@ -464,6 +570,7 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
     const parser = new DOMParser()
     const navDoc = parser.parseFromString(parsedNav.html || '', 'text/html')
     const linkEls = navDoc.querySelectorAll('a')
+    try { await preScanHtmlSlugs(linkEls, contentBase) } catch (e) { }
 
     const navbar = document.createElement('nav')
     navbar.className = 'navbar'
@@ -658,7 +765,8 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
   }
 
   try {
-    await loadSupportedLanguages()
+    // start loading supported languages in background; do not block render
+    try { loadSupportedLanguages().catch(() => {}) } catch (e) { }
   } catch (e) {
   }
 
@@ -899,33 +1007,31 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
           const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
           heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
 
-          // collect languages from code block class names (e.g. language-js)
+          // ensure images do not load immediately
+          try {
+            const imgs = doc.querySelectorAll('img')
+            imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
+          } catch (e) { }
+
+          // collect language-tagged code blocks and schedule non-blocking registration/highlight
           const codes = doc.querySelectorAll('pre code, code[class]')
-          const langSet = new Set()
+          const langMap = new Map()
           codes.forEach(codeEl => {
             try {
               const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
               const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
               if (match && match[1]) {
-                langSet.add(match[1].toLowerCase())
+                const l = match[1].toLowerCase()
+                const arr = langMap.get(l) || []
+                arr.push(codeEl)
+                langMap.set(l, arr)
+              } else {
+                try { hljs.highlightElement(codeEl) } catch (e) { }
               }
             } catch (e) { }
           })
           const aliasMapLocal = { js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', csharp: 'cs', 'c#': 'cs' }
-          for (const l of langSet) {
-            try {
-              const mapped = aliasMapLocal[l] || l
-              const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
-              if (!registeredLangs.has(canonical)) await registerLanguage(canonical)
-              if (String(mapped) !== String(canonical) && !registeredLangs.has(mapped)) await registerLanguage(mapped)
-            } catch (e) { }
-          }
-
-          // now run highlighting on code blocks
-          try {
-            const codesToHighlight = doc.querySelectorAll('pre code')
-            codesToHighlight.forEach(codeEl => { try { hljs.highlightElement(codeEl) } catch (e) { } })
-          } catch (e) { }
+          // leave language-tagged blocks unprocessed; they'll be observed after insertion
 
           const docToc = []
           heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
@@ -938,12 +1044,8 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
         for (const l of langs) {
           try {
             const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-            if (!registeredLangs.has(canonical)) {
-              await registerLanguage(canonical)
-            }
-            if (String(l) !== String(canonical) && !registeredLangs.has(l)) {
-              await registerLanguage(l)
-            }
+            try { registerLanguage(canonical).catch(() => {}) } catch (e) { }
+            if (String(l) !== String(canonical)) try { registerLanguage(l).catch(() => {}) } catch (e) { }
           } catch (e) {
           }
         }
@@ -953,6 +1055,7 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       const article = document.createElement('article')
       article.className = 'nimbi-article content'
       article.innerHTML = parsed.html
+      try { observeCodeBlocks(article) } catch (e) { }
 
       try {
         const imgs = article.querySelectorAll('img')
@@ -964,7 +1067,8 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
             if (/^(https?:)?\/\//.test(src) || src.startsWith('/')) return
             try {
               const resolved = new URL(pageDirForImgs + src, contentBase).toString()
-              img.src = resolved
+                img.src = resolved
+                try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { }
             } catch (e) {
             }
           })
