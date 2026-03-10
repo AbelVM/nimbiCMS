@@ -1174,7 +1174,15 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
         if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
         if (!slugKey) slugKey = '_home'
         try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (e) { }
-        try { history.replaceState({ page: slugKey }, '', '?page=' + encodeURIComponent(slugKey)) } catch (e) { }
+        try {
+          let newUrl = '?page=' + encodeURIComponent(slugKey)
+          try {
+            // preserve any existing hash/anchor when updating the URL
+            const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
+            if (curHash) newUrl += '#' + encodeURIComponent(curHash)
+          } catch (e) { }
+          history.replaceState({ page: slugKey }, '', newUrl)
+        } catch (e) { }
       } catch (e) { }
 
       const toc = buildTocElement(t, parsed.toc, pagePath)
@@ -1262,8 +1270,20 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
         const el = document.getElementById(anchor)
         if (el) {
           try {
-            if (container && container.scrollTo) container.scrollTo({ top: el.offsetTop, behavior: 'smooth' })
-            else el.scrollIntoView()
+            const doScroll = () => {
+              try {
+                if (container && container.scrollTo && container.contains(el)) {
+                  const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+                  container.scrollTo({ top, behavior: 'smooth' })
+                } else {
+                  try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (e) { el.scrollIntoView() }
+                }
+              } catch (e) {
+                try { el.scrollIntoView() } catch (ee) { }
+              }
+            }
+            // allow layout to settle before scrolling (handles images/fonts/layout shifts)
+            try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (e) { setTimeout(doScroll, 50) }
           } catch (e) { try { el.scrollIntoView() } catch (ee) { } }
         }
       } else {
