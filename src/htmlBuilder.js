@@ -54,7 +54,7 @@ export function buildTocElement(t, toc, pagePath = '') {
       const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
       if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
       else a.href = `?page=${encodeURIComponent(slug)}`
-    } catch (e) {
+    } catch (_) {
       const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
       const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
       if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
@@ -68,12 +68,151 @@ export function buildTocElement(t, toc, pagePath = '') {
   return aside
 }
 
+// helpers used by prepareArticle ------------------------------------------------
+
+function addHeadingIds(doc) {
+  const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+  heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+}
+
+function lazyLoadImages(el, pagePath, contentBase) {
+  try {
+    const imgs = el.querySelectorAll('img')
+    if (imgs && imgs.length) {
+      const pageDirForImgs = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+      imgs.forEach((img) => {
+        const src = img.getAttribute('src') || ''
+        if (!src) return
+        if (/^(https?:)?\/\//.test(src) || src.startsWith('/')) return
+        try {
+          const resolved = new URL(pageDirForImgs + src, contentBase).toString()
+          img.src = resolved
+          try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (_) { }
+        } catch (_) {}
+      })
+    }
+  } catch (_) {}
+}
+
+async function rewriteAnchors(article, contentBase) {
+  try {
+    const anchors = article.querySelectorAll('a')
+    if (!anchors || !anchors.length) return
+
+    const contentBaseUrl = new URL(contentBase)
+    const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+
+    // collect MD paths that require slug lookup
+    const pending = new Set()
+    const anchorInfo = [] // { node, mdPathRaw, frag, rel }
+
+    for (const a of Array.from(anchors)) {
+      try {
+        const href = a.getAttribute('href') || ''
+        if (!href) continue
+        if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) continue
+        if (href.startsWith('/') && !href.endsWith('.md')) continue
+        const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
+        if (mdMatch) {
+          const mdPathRaw = mdMatch[1]
+          const frag = mdMatch[2]
+          try {
+            const resolved = new URL(mdPathRaw, contentBase).pathname
+            const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+            anchorInfo.push({ node: a, mdPathRaw, frag, rel })
+            if (!mdToSlug.has(rel)) pending.add(rel)
+          } catch (_) {
+            // swallow malformed url
+          }
+          continue
+        }
+        // non-md link: treat as absolute or slug lookup by path without MD
+        try {
+          const full = new URL(href, contentBase)
+          const p = full.pathname || ''
+          if (p && p.indexOf(contentBasePath) !== -1) {
+            let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
+            rel = rel.replace(/^[\.\/]+/, '')
+            if (rel.endsWith('/')) rel = rel.slice(0, -1)
+            if (!rel) rel = '_home'
+            if (!rel.endsWith('.md')) {
+              if (slugToMd.has(rel)) {
+                const mapped = slugToMd.get(rel)
+                const slug = mdToSlug.get(mapped) || rel
+                a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+              } else {
+                a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+              }
+            }
+          }
+        } catch (_) {}
+      } catch (_) {}
+    }
+
+    // perform slug lookups in parallel
+    if (pending.size) {
+      await Promise.all(Array.from(pending).map(async rel => {
+        try {
+          const mdData = await fetchMarkdown(rel, contentBase)
+          if (mdData && mdData.raw) {
+            const m = (mdData.raw || '').match(/^#\s+(.+)$/m)
+            if (m && m[1]) {
+              const candidate = slugify(m[1].trim())
+              if (candidate) {
+                try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
+      }))
+    }
+
+    // apply href transformations for MD links now that lookup map is populated
+    for (const info of anchorInfo) {
+      const { node: a, frag, rel } = info
+      let slug = null
+      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (_) {}
+      if (slug) {
+        if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
+        else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+      } else {
+        if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
+        else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+      }
+    }
+  } catch (_) {}
+}
+
+function computeSlug(parsed, article, pagePath, anchor) {
+  const topH1 = article.querySelector('h1')
+  const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
+  let slugKey = ''
+  try {
+    if (h1Text) slugKey = slugify(h1Text)
+    if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
+    if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
+    if (!slugKey) slugKey = '_home'
+    try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (_) { }
+    try {
+      let newUrl = '?page=' + encodeURIComponent(slugKey)
+      try {
+        const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
+        if (curHash) newUrl += '#' + encodeURIComponent(curHash)
+      } catch (_) { }
+      history.replaceState({ page: slugKey }, '', newUrl)
+    } catch (_) { }
+  } catch (_) { }
+  return { topH1, h1Text, slugKey }
+}
+
 // given a collection of anchor elements pointing at HTML files, fetch
 // each HTML and extract a title or first H1 so we can map a friendly slug
 // without waiting until the navigation click occurs.
 export async function preScanHtmlSlugs(linkEls, base) {
   if (!linkEls || !linkEls.length) return
-  const outs = []
+
+  // collect unique HTML paths that need titles
+  const htmlPaths = new Set()
   for (const a of Array.from(linkEls || [])) {
     try {
       const href = a.getAttribute('href') || ''
@@ -85,46 +224,62 @@ export async function preScanHtmlSlugs(linkEls, base) {
       const htmlPath = path
       try {
         if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
-      } catch (e) { }
-      outs.push((async () => {
-        try {
-          const res = await fetchMarkdown(htmlPath, base)
-          if (res && res.raw) {
-            try {
-              const parser = new DOMParser()
-              const doc = parser.parseFromString(res.raw, 'text/html')
-              const titleTag = doc.querySelector('title')
-              const h1 = doc.querySelector('h1')
-              const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
-                ? titleTag.textContent.trim()
-                : (h1 && h1.textContent ? h1.textContent.trim() : null)
-              if (titleText) {
-                const slugKey = slugify(titleText)
-                if (slugKey) {
-                  try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (e) { }
-                }
-              }
-            } catch (e) { }
-          }
-        } catch (e) { }
-      })())
-    } catch (e) { }
+      } catch (_) { }
+      htmlPaths.add(htmlPath)
+    } catch (_) { }
   }
-  if (outs.length) await Promise.allSettled(outs)
+
+  if (!htmlPaths.size) return
+
+  // helper that fetches one HTML and extracts title/H1
+  const fetchAndExtract = async (htmlPath) => {
+    try {
+      const res = await fetchMarkdown(htmlPath, base)
+      if (res && res.raw) {
+        try {
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(res.raw, 'text/html')
+          const titleTag = doc.querySelector('title')
+          const h1 = doc.querySelector('h1')
+          const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
+            ? titleTag.textContent.trim()
+            : (h1 && h1.textContent ? h1.textContent.trim() : null)
+          if (titleText) {
+            const slugKey = slugify(titleText)
+            if (slugKey) {
+              try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (_) { }
+            }
+          }
+        } catch (_) { }
+      }
+    } catch (_) { }
+  }
+
+  // limit concurrent fetches to avoid overloading server
+  const CONCURRENCY = 5
+  const paths = Array.from(htmlPaths)
+  let idx = 0
+  const runners = []
+  while (idx < paths.length) {
+    const chunk = paths.slice(idx, idx + CONCURRENCY)
+    runners.push(Promise.all(chunk.map(fetchAndExtract)))
+    idx += CONCURRENCY
+  }
+  await Promise.all(runners)
 }
 
 
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
+    // parse or convert the input into HTML + metadata
     let parsed = null
     if (data.isHtml) {
       try {
         const parser = new DOMParser()
         const doc = parser.parseFromString(data.raw || '', 'text/html')
-        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-        heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+        addHeadingIds(doc)
         try {
           const imgs = doc.querySelectorAll('img')
-          imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
+          imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (_) { } })
         } catch (e) { }
         const codes = doc.querySelectorAll('pre code, code[class]')
         codes.forEach(codeEl => {
@@ -132,14 +287,15 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
             const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
             const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
             if (!match || !match[1]) {
-              try { hljs.highlightElement(codeEl) } catch (e) { }
+              try { hljs.highlightElement(codeEl) } catch (_) { }
             }
-          } catch (e) { }
+          } catch (_) { }
         })
         const docToc = []
+        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
         heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
         parsed = { html: doc.body.innerHTML, meta: {}, toc: docToc }
-      } catch (e) {
+      } catch (_) {
         parsed = { html: data.raw || '', meta: {}, toc: [] }
       }
     } else {
@@ -147,9 +303,9 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       for (const l of langs) {
         try {
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-          try { registerLanguage(canonical).catch(() => {}) } catch (e) { }
-          if (String(l) !== String(canonical)) try { registerLanguage(l).catch(() => {}) } catch (e) { }
-        } catch (e) {}
+          try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
+          if (String(l) !== String(canonical)) try { registerLanguage(l).catch(() => {}) } catch (_) { }
+        } catch (_) {}
       }
       parsed = await parseMarkdownToHtml(data.raw || '')
     }
@@ -157,119 +313,15 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const article = document.createElement('article')
     article.className = 'nimbi-article content'
     article.innerHTML = parsed.html
-    try { observeCodeBlocks(article) } catch (e) { }
+    try { observeCodeBlocks(article) } catch (_) { }
 
-    try {
-      const imgs = article.querySelectorAll('img')
-      if (imgs && imgs.length) {
-        const pageDirForImgs = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
-        imgs.forEach((img) => {
-          const src = img.getAttribute('src') || ''
-          if (!src) return
-          if (/^(https?:)?\/\//.test(src) || src.startsWith('/')) return
-          try {
-            const resolved = new URL(pageDirForImgs + src, contentBase).toString()
-            img.src = resolved
-            try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { }
-          } catch (e) {}
-        })
-      }
-    } catch (e) {}
+    lazyLoadImages(article, pagePath, contentBase)
+    await rewriteAnchors(article, contentBase)
 
-    try {
-      const anchors = article.querySelectorAll('a')
-      if (anchors && anchors.length) {
-        const contentBaseUrl = new URL(contentBase)
-        const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
-        for (const a of Array.from(anchors || [])) {
-          try {
-            const href = a.getAttribute('href') || ''
-            if (!href) continue
-            if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) continue
-            if (href.startsWith('/') && !href.endsWith('.md')) continue
-            const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
-            if (mdMatch) {
-              const mdPathRaw = mdMatch[1]
-              const frag = mdMatch[2]
-              try {
-                const resolved = new URL(mdPathRaw, contentBase).pathname
-                const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
-                let slug = null
-                try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (e) {}
-                if (!slug) {
-                  // derive slug by fetching markdown H1 if possible
-                  try {
-                    const mdData = await fetchMarkdown(rel, contentBase)
-                    if (mdData && mdData.raw) {
-                      const m = (mdData.raw || '').match(/^#\s+(.+)$/m)
-                      if (m && m[1]) {
-                        const candidate = slugify(m[1].trim())
-                        if (candidate) {
-                          slug = candidate
-                          try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (ee) {}
-                        }
-                      }
-                    }
-                  } catch (ee) { /* ignore errors */ }
-                }
-                if (slug) {
-                  if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
-                  else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
-                } else {
-                  if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
-                  else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
-                }
-              } catch (e) {
-                a.setAttribute('href', '?page=' + encodeURIComponent(mdPathRaw.replace(/^\.\//, '')))
-              }
-              continue
-            }
-            try {
-              const full = new URL(href, contentBase)
-              const p = full.pathname || ''
-              if (p && p.indexOf(contentBasePath) !== -1) {
-                let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
-                rel = rel.replace(/^[\.\/]+/, '')
-                if (rel.endsWith('/')) rel = rel.slice(0, -1)
-                if (!rel) rel = '_home'
-                if (!rel.endsWith('.md')) {
-                  if (slugToMd.has(rel)) {
-                    const mapped = slugToMd.get(rel)
-                    const slug = mdToSlug.get(mapped) || rel
-                    a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
-                  } else {
-                    a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
-                  }
-                }
-              }
-            } catch (e) {}
-          } catch (e) {}
-        }
-      }
-    } catch (e) {}
-
-    // compute H1 and slug mapping before building the TOC so TOC can use the friendly slug
-    const topH1 = article.querySelector('h1')
-    const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
-    let slugKey = ''
-    try {
-      if (h1Text) slugKey = slugify(h1Text)
-      if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
-      if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
-      if (!slugKey) slugKey = '_home'
-      try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (e) { }
-      try {
-        let newUrl = '?page=' + encodeURIComponent(slugKey)
-        try {
-          const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
-          if (curHash) newUrl += '#' + encodeURIComponent(curHash)
-        } catch (e) { }
-        history.replaceState({ page: slugKey }, '', newUrl)
-      } catch (e) { }
-    } catch (e) { }
+    const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
 
     const toc = buildTocElement(t, parsed.toc, pagePath)
-    return { article, parsed, toc, topH1: article.querySelector('h1'), h1Text, slugKey }
+    return { article, parsed, toc, topH1, h1Text, slugKey }
   }
 
     // render an error page for unresolved queries
@@ -299,8 +351,8 @@ export function attachTocClickHandler(toc) {
           if (!pageParam && !hash) return
           ev.preventDefault()
           history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
-          try { renderByQuery() } catch (e) { }
-        } catch (e) { /* ignore non-URL hrefs */ }
+          try { renderByQuery() } catch (_) { }
+        } catch (_) { /* ignore non-URL hrefs */ }
       })
     } catch (e) { }
   }
@@ -318,20 +370,20 @@ export function scrollToAnchorOrTop(anchor) {
                 const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
                 container.scrollTo({ top, behavior: 'smooth' })
               } else {
-                try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (e) { el.scrollIntoView() }
+                try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (_) { el.scrollIntoView() }
               }
-            } catch (e) {
-              try { el.scrollIntoView() } catch (ee) { }
+            } catch (_) {
+              try { el.scrollIntoView() } catch (_) { }
             }
           }
-          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (e) { setTimeout(doScroll, 50) }
-        } catch (e) { try { el.scrollIntoView() } catch (ee) { } }
+          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (_) { setTimeout(doScroll, 50) }
+        } catch (_) { try { el.scrollIntoView() } catch (_) { } }
       }
     } else {
       try {
         if (container && container.scrollTo) container.scrollTo({ top: 0, behavior: 'smooth' })
         else window.scrollTo(0, 0)
-      } catch (e) { window.scrollTo(0, 0) }
+      } catch (_) { window.scrollTo(0, 0) }
     }
   }
 
@@ -354,21 +406,21 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
           else if (containerEl && containerEl.appendChild) containerEl.appendChild(btn)
           else if (mountElLocal && mountElLocal.appendChild) mountElLocal.appendChild(btn)
           else document.body.appendChild(btn)
-        } catch (e) {
-          try { document.body.appendChild(btn) } catch (ee) { /* give up */ }
+        } catch (_) {
+          try { document.body.appendChild(btn) } catch (_) { /* give up */ }
         }
         try {
           btn.style.position = 'absolute'
           btn.style.right = '1rem'
           btn.style.bottom = '1.25rem'
           btn.style.zIndex = '60'
-        } catch (e) { }
+        } catch (_) { }
         btn.addEventListener('click', () => {
           try {
             if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
             else if (mountEl && mountEl.scrollTo) mountEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
             else window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-          } catch (e) {
+          } catch (_) {
             try { if (container) container.scrollTop = 0 } catch (e2) { }
             try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { }
             try { document.documentElement.scrollTop = 0 } catch (e4) { }
@@ -395,11 +447,11 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
               }
             }
           }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
-          const rootEl = containerEl instanceof Element ? containerEl : (mountElLocal instanceof Element ? mountElLocal : null)
+          // removed unused rootEl variable
           btn._nimbiObserver = obs
         }
-        try { btn._nimbiObserver.disconnect() } catch (e) { }
-        try { btn._nimbiObserver.observe(topH1) } catch (e) { }
+        try { btn._nimbiObserver.disconnect() } catch (_) { }
+        try { btn._nimbiObserver.observe(topH1) } catch (_) { }
         try {
           const checkIntersect = () => {
             try {
@@ -413,19 +465,17 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
                 btn.classList.add('show')
                 if (tocLabel) tocLabel.classList.add('show')
               }
-            } catch (e) { }
+            } catch (_) { }
           }
-          try {
-            checkIntersect()
-            requestAnimationFrame(checkIntersect)
-            setTimeout(checkIntersect, 50)
-            setTimeout(checkIntersect, 200)
-            setTimeout(checkIntersect, 500)
-          } catch (e) {
+          // initial evaluation; IntersectionObserver will handle subsequent
+          // changes automatically.  If Observer isn't available, do one delayed
+          // re-check so old browsers still update correctly.
+          checkIntersect()
+          if (!('IntersectionObserver' in window)) {
             setTimeout(checkIntersect, 100)
           }
-            } catch (e) { }
+            } catch (_) { }
         }
-      } catch (e) {
+      } catch (_) {
       }
     }

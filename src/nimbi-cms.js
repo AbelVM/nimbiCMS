@@ -347,9 +347,7 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
 
 
 
-    async function renderByQuery() {
-      const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
-      const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+    async function renderPage(raw, hashAnchor) {
       let data, pagePath, anchor
       try {
           ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
@@ -374,6 +372,12 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
       ensureScrollTopButton(article, topH1, { mountOverlay, container, mountEl, navWrap, t })
 
       currentPagePath = pagePath
+    }
+
+    async function renderByQuery() {
+      const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
+      const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+      await renderPage(raw, hashAnchor)
     }
 
   window.addEventListener('popstate', renderByQuery)
