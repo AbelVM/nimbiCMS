@@ -269,51 +269,77 @@ export async function preScanHtmlSlugs(linkEls, base) {
 }
 
 
+// helpers used by prepareArticle ------------------------------------------------
+
+/**
+ * Parse raw HTML input and return the normalized "parsed" object used by the
+ * rendering pipeline.
+ */
+function parseHtml(raw) {
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(raw || '', 'text/html')
+    addHeadingIds(doc)
+    try {
+      const imgs = doc.querySelectorAll('img')
+      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (_) { } })
+    } catch (_) { }
+    const codes = doc.querySelectorAll('pre code, code[class]')
+    codes.forEach(codeEl => {
+      try {
+        const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+        const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+        if (!match || !match[1]) {
+          try { hljs.highlightElement(codeEl) } catch (_) { }
+        }
+      } catch (_) { }
+    })
+    const tocEntries = []
+    const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+    heads.forEach(h => {
+      tocEntries.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id })
+    })
+    return { html: doc.body.innerHTML, meta: {}, toc: tocEntries }
+  } catch (_) {
+    return { html: raw || '', meta: {}, toc: [] }
+  }
+}
+
+/**
+ * Ensure highlight.js languages referenced in the markdown are registered.
+ */
+function ensureLanguages(raw) {
+  const langsArray = detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP)
+  const langs = new Set(langsArray)
+  for (const l of langs) {
+    try {
+      const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
+      if (!registeredLangs.has(canonical)) {
+        try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
+      }
+      if (String(l) !== String(canonical) && !registeredLangs.has(l)) {
+        try { registerLanguage(l).catch(() => {}) } catch (_) { }
+      }
+    } catch (_) { }
+  }
+}
+
+/**
+ * Convert markdown raw text to the normalized parsed object, registering
+ * any required languages along the way.
+ */
+async function parseMarkdown(raw) {
+  ensureLanguages(raw)
+  return await parseMarkdownToHtml(raw || '')
+}
+
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     // parse or convert the input into HTML + metadata
     let parsed = null
     if (data.isHtml) {
-      try {
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(data.raw || '', 'text/html')
-        addHeadingIds(doc)
-        try {
-          const imgs = doc.querySelectorAll('img')
-          imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (_) { } })
-        } catch (e) { }
-        const codes = doc.querySelectorAll('pre code, code[class]')
-        codes.forEach(codeEl => {
-          try {
-            const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
-            const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-            if (!match || !match[1]) {
-              try { hljs.highlightElement(codeEl) } catch (_) { }
-            }
-          } catch (_) { }
-        })
-        const docToc = []
-        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-        heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
-        parsed = { html: doc.body.innerHTML, meta: {}, toc: docToc }
-      } catch (_) {
-        parsed = { html: data.raw || '', meta: {}, toc: [] }
-      }
+      parsed = parseHtml(data.raw || '')
     } else {
-      const langsArray = detectFenceLanguages(data.raw || '', SUPPORTED_HLJS_MAP)
-      const langs = new Set(langsArray) // dedupe
-      for (const l of langs) {
-        try {
-          const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-          // skip languages we’ve already registered
-          if (!registeredLangs.has(canonical)) {
-            try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
-          }
-          if (String(l) !== String(canonical) && !registeredLangs.has(l)) {
-            try { registerLanguage(l).catch(() => {}) } catch (_) { }
-          }
-        } catch (_) {}
-      }
-      parsed = await parseMarkdownToHtml(data.raw || '')
+      parsed = await parseMarkdown(data.raw || '')
     }
 
     const article = document.createElement('article')
@@ -343,6 +369,9 @@ export function renderNotFound(contentWrap, t, e) {
     notFound.appendChild(p)
     if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(notFound)
   }
+
+// test helpers (not part of public API)
+export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages }
 
 export function attachTocClickHandler(toc) {
     try {

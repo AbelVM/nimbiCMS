@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { preScanHtmlSlugs } from '../src/htmlBuilder.js'
+import { preScanHtmlSlugs, _parseHtml, _parseMarkdown } from '../src/htmlBuilder.js'
 import { slugify, slugToMd, mdToSlug } from '../src/filesManager.js'
 import * as fm from '../src/filesManager.js'
 
@@ -11,6 +11,7 @@ function makeAnchor(href) {
 }
 
 describe('htmlBuilder utilities', () => {
+
   beforeEach(() => {
     // clear maps before each test
     slugToMd.clear()
@@ -45,5 +46,18 @@ describe('htmlBuilder utilities', () => {
     expect(slugToMd.get('already')).toBe('page.html')
     // no new mappings
     expect(slugToMd.size).toBe(1)
+  })
+
+  it('parseHtml returns html and toc entries', () => {
+    const raw = '<h1 id="foo">Foo</h1><p>bar</p>'
+    const parsed = _parseHtml(raw)
+    expect(parsed.html).toContain('Foo')
+    expect(parsed.toc).toEqual([{ level: 1, text: 'Foo', id: 'foo' }])
+  })
+
+  it('parseMarkdown runs markdown conversion and registers languages', async () => {
+    const md = '```js\nconsole.log(1)\n```'
+    const parsed = await _parseMarkdown(md)
+    expect(parsed.html).toContain('<code')
   })
 })
