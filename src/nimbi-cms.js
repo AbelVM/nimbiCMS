@@ -617,6 +617,22 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
       brandItem.textContent = t('home')
     }
     brand.appendChild(brandItem)
+    try {
+      // intercept clicks on the brand (home) link to perform SPA navigation
+      brandItem.addEventListener('click', (ev) => {
+        try {
+          const href = brandItem.getAttribute('href') || ''
+          const url = new URL(href, location.href)
+          const pageParam = url.searchParams.get('page')
+          const hash = url.hash ? url.hash.replace(/^#/, '') : null
+          if (pageParam) {
+            ev.preventDefault()
+            history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+            try { renderByQuery() } catch (e) { }
+          }
+        } catch (e) { }
+      })
+    } catch (e) { }
 
     const burger = document.createElement('a')
     burger.className = 'navbar-burger'
@@ -737,6 +753,30 @@ export async function initCMS({ el, contentPath = '/content', languages = [], de
             try { renderByQuery() } catch (e) { }
           }
         } catch (e) { }
+      })
+    } catch (e) { }
+
+    try {
+      // intercept internal links inside the content area so they use SPA navigation
+      container.addEventListener('click', (ev) => {
+        const a = ev.target && ev.target.closest ? ev.target.closest('a') : null
+        if (!a) return
+        const href = a.getAttribute('href') || ''
+        if (!href) return
+        // ignore external/mailto/tel links
+        if (/^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')) return
+        try {
+          const url = new URL(href, location.href)
+          const pageParam = url.searchParams.get('page')
+          const hash = url.hash ? url.hash.replace(/^#/, '') : null
+          if (pageParam) {
+            ev.preventDefault()
+            history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+            try { renderByQuery() } catch (e) { }
+          }
+        } catch (e) {
+          // ignore non-URL hrefs
+        }
       })
     } catch (e) { }
 
