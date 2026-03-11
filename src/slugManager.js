@@ -208,6 +208,19 @@ export let crawlForSlug = async function(decoded, contentBase) {
           }
           if (href.toLowerCase().endsWith('.md')) {
             const path = (relDir + href).replace(/^\/+/, '')
+            // avoid re-fetching files we already know the slug for; if the
+            // recorded slug doesn't match the one we're seeking there is no
+            // reason to load the file again.  the mapping might exist either
+            // as a key in mdToSlug or as a value in slugToMd, so check both.
+            try {
+              if (mdToSlug.has(path)) {
+                continue
+              }
+              // also skip if slugToMd contains this path as one of its values
+              for (const v of slugToMd.values()) {
+                if (v === path) { continue }
+              }
+            } catch (_e) {}
             try {
               const md = await fetchMarkdown(path, contentBase)
               if (md && md.raw) {

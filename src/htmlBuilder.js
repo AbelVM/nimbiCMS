@@ -95,7 +95,7 @@ function lazyLoadImages(el, pagePath, contentBase) {
   } catch (_) {}
 }
 
-async function rewriteAnchors(article, contentBase) {
+async function rewriteAnchors(article, contentBase, pagePath) {
   try {
     const anchors = article.querySelectorAll('a')
     if (!anchors || !anchors.length) return
@@ -115,8 +115,14 @@ async function rewriteAnchors(article, contentBase) {
         if (href.startsWith('/') && !href.endsWith('.md')) continue
         const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
         if (mdMatch) {
-          const mdPathRaw = mdMatch[1]
+          let mdPathRaw = mdMatch[1]
           const frag = mdMatch[2]
+          // if link is not absolute and we know current page path, resolve
+          // relative to the page's directory so missing folders don't drop off.
+          if (!mdPathRaw.startsWith('/') && pagePath) {
+            const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+            mdPathRaw = dir + mdPathRaw
+          }
           try {
             const resolved = new URL(mdPathRaw, contentBase).pathname
             const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
@@ -479,7 +485,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     try { observeCodeBlocks(article) } catch (_) { }
 
     lazyLoadImages(article, pagePath, contentBase)
-    await rewriteAnchors(article, contentBase)
+    await rewriteAnchors(article, contentBase, pagePath)
 
     const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
 
