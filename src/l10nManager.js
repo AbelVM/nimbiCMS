@@ -61,6 +61,7 @@ export async function loadL10nFile(path, pageDir) {
  * language is not available.
  *
  * @param {string} lang
+ * @returns {void}
  */
 export function setLang(lang) {
   const short = String(lang).split('-')[0].toLowerCase()

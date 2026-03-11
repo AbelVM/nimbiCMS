@@ -30,6 +30,7 @@ const hooks = {
  * Register a hook by name.  Throws if the name is not recognised.
  * @param {string} name
  * @param {Function} fn
+ * @returns {void}
  */
 export function addHook(name, fn) {
   if (!Object.prototype.hasOwnProperty.call(hooks, name)) {
@@ -47,17 +48,20 @@ export function addHook(name, fn) {
 /**
  * Register a callback to be invoked after each page is rendered.
  * @param {Function} fn
+ * @returns {void}
  */
 export function onPageLoad(fn) { addHook('onPageLoad', fn) }
 /**
  * Register a callback once the navigation DOM has been built.
  * @param {Function} fn
+ * @returns {void}
  */
 export function onNavBuild(fn) { addHook('onNavBuild', fn) }
 /**
  * Register a callback that can mutate the article element before it is
  * appended to the document.
  * @param {Function} fn
+ * @returns {void}
  */
 export function transformHtml(fn) { addHook('transformHtml', fn) }
 
@@ -83,6 +87,10 @@ async function runHooks(name, ctx) {
 // test helpers ---------------------------------------------------------------
 
 // reset all registered hooks (used by unit tests so each spec starts clean)
+/**
+ * Clear all hooks registered via `addHook` (testing use only).
+ * @returns {void}
+ */
 export function _clearHooks() {
   Object.keys(hooks).forEach(k => { hooks[k].length = 0 })
 }

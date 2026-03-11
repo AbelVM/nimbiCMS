@@ -60,6 +60,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
  * Toggle light/dark styling by setting `data-theme` and `is-dark`.
  *
  * @param {'light'|'dark'} style
+ * @returns {void}
  */
 export function setStyle(style) {
   currentStyle = style === 'dark' ? 'dark' : 'light'
@@ -74,11 +75,13 @@ export function setStyle(style) {
  * directly.  Property names should be provided without the leading `--`.
  *
  * @param {Record<string,string>} vars
+ * @returns {void}
  */
 /**
  * Apply custom CSS variables on :root for theming.
  *
  * @param {Record<string,string>} vars
+ * @returns {void}
  */
 export function setThemeVars(vars) {
   const root = document.documentElement

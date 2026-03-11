@@ -249,6 +249,7 @@ let __hlObserver = null
  * observer will register necessary languages as elements become visible.
  *
  * @param {ParentNode} [root=document]
+ * @returns {void}
  */
 export function observeCodeBlocks(root = document) {
   // make sure we have fetched supported languages list lazily when we start
@@ -339,6 +340,7 @@ export function observeCodeBlocks(root = document) {
  *
  * @param {string} theme
  * @param {{useCdn?:boolean}} [opts]
+ * @returns {void}
  */
 export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = document.querySelector('link[data-hl-theme]')

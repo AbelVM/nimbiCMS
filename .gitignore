@@ -35,4 +35,4 @@ coverage/
 .cache/
 *.tgz
 *.bak
-notes_.md
+notes.md

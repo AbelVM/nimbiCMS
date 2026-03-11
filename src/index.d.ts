@@ -44,20 +44,29 @@ export interface HookContext {
 export function initCMS(options: InitOptions): Promise<void>
 export default initCMS
 
-export function addSlugResolver(fn: any): any
+// hook / plugin API definitions
+export function addHook(name: string, fn: (...args:any[])=>any): void
+export function onPageLoad(fn: (...args:any[])=>any): void
+export function onNavBuild(fn: (...args:any[])=>any): void
+export function transformHtml(fn: (...args:any[])=>any): void
+export function _clearHooks(): void
+
+
+// --- from src/slugManager.js
 export const slugToMd: any
+export function addSlugResolver(fn: (slug:string,contentBase?:string)=>Promise<string|null>|string|null): void
 export const mdToSlug: any
-export function removeSlugResolver(fn: any): any
-export function _setAllMd(obj: Object<string,string>): any
+export function removeSlugResolver(fn: (slug:string)=>any): void
+export function _setAllMd(obj: Record<string,string>): any
 export const listSlugCache: any
-export function clearListCaches(): any
-export function setContentBase(contentBase: string): any
-export function slugify(s: any): string
+export function clearListCaches(): void
+export function setContentBase(contentBase: string): void
+export function slugify(s: string): string
 export const fetchCache: any
 export function clearFetchCache(): any
 export const fetchMarkdown: any
 export function buildSearchIndex(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
-export function setDefaultCrawlMaxQueue(n: number): any
+export function setDefaultCrawlMaxQueue(n: number): void
 export const crawlForSlug: any
 export function crawlAllMarkdown(contentBase: string, maxQueue: number): Promise<string[]>
 export function ensureSlug(decoded: string, contentBase: string, maxQueue: any): Promise<string|null>
@@ -68,53 +77,84 @@ export function ensureSlug(decoded: string, contentBase: string, maxQueue: any):
 
 
 
-export function setMetaTags(data: object, titleOverride: string, imageOverride: string, descOverride: string, initialDocumentTitle: string): any
-export function getSiteNameFromMeta(): string|null
-export function setStructuredData(data: object, pagePath: string, titleOverride: string, imageOverride: string, descOverride: string, initialDocumentTitle: string): any
-export function applyPageMeta(t: any, initialDocumentTitle: string, parsed: object, toc: any, article: any, pagePath: string, anchor: string|null, topH1: HTMLElement|null, h1Text: string|null, slugKey: string|null, data: object): any
 
+// --- from src/seoManager.js
+export function setMetaTags(data: object, titleOverride: string, imageOverride: string, descOverride: string, initialDocumentTitle: string): void
+export function getSiteNameFromMeta(): string|null
+export function setStructuredData(data: object, pagePath: string, titleOverride: string, imageOverride: string, descOverride: string, initialDocumentTitle: string): void
+export function applyPageMeta(t: (...args:any[])=>any, initialDocumentTitle: string, parsed: object, toc: any, article: any, pagePath: string, anchor: string|null, topH1: HTMLElement|null, h1Text: string|null, slugKey: string|null, data: object): void
+
+
+// --- from src/router.js
 export const resolutionCache: any
 export function _clearIndexCache(): any
-export function refreshIndexPaths(): any
+export function refreshIndexPaths(): void
 export function resolutionCacheGet(key: string): {resolved:string,anchor:string|null}|undefined
-export function resolutionCacheSet(key: string, value: {resolved:string},anchor:string|null): any
+export function resolutionCacheSet(key: string, value: {resolved:string,anchor:string|null}): void
 export function buildPageCandidates(resolved: string): string[]
 export function fetchPageData(raw: string, contentBase: string): Promise<{data:object,pagePath:string,anchor:string|null}>
 
+
+// --- from src/nimbi-cms.js
 export function addHook(name: any, fn: any): any
 export function onPageLoad(fn: any): any
-export function onNavBuild(fn: any): any
-export function transformHtml(fn: any): any
-export function _clearHooks(): Promise<void>
+export function onNavBuild(fn: (...args:any[])=>any): void
+export function transformHtml(fn: (...args:any[])=>any): void
+export function _clearHooks(): void
 
 
-export function parseMarkdownToHtml(md: string): Promise<{html:string,meta:Object,toc:Array<{level:number,text:string,id:string}>}>
+
+// --- from src/markdown.js
+export function parseMarkdownToHtml(md: string): Promise<{html:string,meta:object,toc:Array<{level:number,text:string,id:string}>}>
 export function detectFenceLanguages(md: string, supportedMap: Map<string,string>): Set<string>
-export function t(key: string, replacements: object): string
-export function loadL10nFile(path: string, pageDir: string): Promise<void>
-export function setLang(lang: string): any
 
-export function createNavTree(t: any, tree: {path:string,name:string,children?:any[]}[]): any
-export function buildTocElement(t: any, toc: {level:number,text:string,id?:string}[], pagePath: string): any
+// --- from src/l10nManager.js
+export function t(opts: any): string
+export function loadL10nFile(path: string, pageDir: string): Promise<void>
+export function setLang(lang: string): void
+
+
+// --- from src/htmlBuilder.js
+export function createNavTree(t: (...args:any[])=>any, tree: {path:string,name:string,children?:any[]}[]): any
+export function buildTocElement(t: (...args:any[])=>any, toc: {level:number,text:string,id?:string}[], pagePath: string): any
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): any
 export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
-export function prepareArticle(t: any, data: {raw:string,isHtml?:boolean}, pagePath: string, anchor: string|null, contentBase: string): Promise<{article:HTMLElement,parsed:Object,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}>
-export function attachTocClickHandler(toc: any): any
+export function prepareArticle(t: (...args:any[])=>any, data: {raw:string,isHtml?:boolean}, pagePath: string, anchor: string|null, contentBase: string): Promise<{article:HTMLElement,parsed:object,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}>
+export function attachTocClickHandler(toc: any): void
 export function scrollToAnchorOrTop(anchor: string|null): any
-export function ensureScrollTopButton(article: any, topH1: HTMLElement|null, opts: object, container: any, mountEl: any, navWrap: any, t: any): any
+export function ensureScrollTopButton(opts: object): any
 
+
+// --- from src/gen-dts-sample.js
+export function complexExample(opts: {a:number,b:string}): Promise<Array<{foo:string}|{bar:number}>>
+export function simpleUnion(): string|number
+export function recordExample(): Record<string, Array<number>>
+export function sum(opts: any): {sum:number}
+export function callIt(cb: (...args:any[])=>any): void
+
+// --- from src/filesManager.js
+
+// --- from src/codeblocksManager.js
 export function loadSupportedLanguages(url: string): Promise<void>
 export function registerLanguage(name: string, modulePath: string): Promise<boolean>
-export function observeCodeBlocks(root: any): any
-export function setHighlightTheme(theme: string, opts: {useCdn?:boolean}): any
+export function observeCodeBlocks(root: any): void
+export function setHighlightTheme(opts: {useCdn?:boolean}): void
 
 
 
+
+// --- from src/bulmaManager.js
 export function ensureBulma(bulmaCustomize: string, pageDir: string): Promise<void>
-export function setStyle(style: 'light'|'dark'): any
-export function setThemeVars(vars: Record<string,string>): any
+export function setStyle(style: 'light'|'dark'): void
+export function setThemeVars(vars: Record<string,string>): void
+
+// --- from src/worker/renderer.js
+
+// --- from src/utils/l10n-defaults.js
 
 
+
+// --- from src/utils/helpers.js
 export function isExternalLink(href: string): boolean
 export function normalizePath(p: string): string
 export function trimTrailingSlash(u: string): string
@@ -122,5 +162,9 @@ export function ensureTrailingSlash(u: string): string
 export function setLazyload(img: any): any
 export function joinPaths(...parts: any): string
 export function encodeURL(u: string): string
-export function safe(fn: any): any
+export function safe(fn: (...args:any[])=>any): any
 
+// --- from src/utils/frontmatter.js
+
+
+// --- from src/lib/index.js

@@ -10,7 +10,8 @@
     "build:lib": "vite build --config vite.config.js",
     "preview": "vite preview",
     "test": "npx vitest run",
-    "gen-dts": "node scripts/gen-dts.js"
+    "gen-dts": "node scripts/gen-dts.js",
+    "check-dts": "npx tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck"
   },
   "dependencies": {
     "bulma": "^1.0.4",

@@ -19,12 +19,14 @@ export const slugResolvers = new Set()
  * Register a custom resolver function.  The function should accept a slug
  * string and return a markdown path (or promise thereof) or `null` if not
  * resolved.
- * @param {Function} fn
+ * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn
+ * @returns {void}
  */
 export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.add(fn) }
 /**
  * Unregister a previously added resolver.
- * @param {Function} fn
+ * @param {(slug:string)=>any} fn
+ * @returns {void}
  */
 export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.delete(fn) }
 /**
@@ -103,6 +105,7 @@ function _deriveCommonPrefix(paths) {
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
  * maps and `allMarkdownPaths` relative to that base.
  * @param {string} [contentBase]
+ * @returns {void}
  */
 import { refreshIndexPaths } from './router.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
@@ -157,7 +160,7 @@ try { setContentBase() } catch (_) { }
  * addition to removing illegal characters we also strip any trailing
  * "md" or "html" segment to ensure that slugs never resemble filenames
  * (see tests and user documentation).
- * @param {any} s
+ * @param {string} s
  * @returns {string}
  */
 export function slugify(s) {
@@ -177,6 +180,7 @@ export const fetchCache = new Map()
 /**
  * Empty the in-memory markdown fetch cache.  Useful for tests or when the
  * consumer knows the underlying files have changed.
+ * @returns {void}
  */
 export function clearFetchCache() { fetchCache.clear() }
 
@@ -406,6 +410,7 @@ export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
  * `maxQueue` argument is provided.  Useful for controlling memory usage from
  * application code (e.g. via `initCMS` options).
  * @param {number} n
+ * @returns {void}
  */
 export function setDefaultCrawlMaxQueue(n) {
   if (typeof n === 'number' && n >= 0) defaultCrawlMaxQueue = n

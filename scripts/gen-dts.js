@@ -20,20 +20,34 @@ function jsdocTypeToTs(t) {
     s = s.slice(1, -1).trim()
   }
   const low = s.toLowerCase()
-  if (low === 'string' || low === 'number' || low === 'boolean' || low === 'any' || low === 'object') {
+  if (low === 'string' || low === 'number' || low === 'boolean' || low === 'any' || low === 'object' || low === 'void' || low === 'null' || low === 'undefined') {
+    // JSDoc "Object" should map to lowercase object
+    if (low === 'object') return 'object'
     return low
   }
+  // convert generic Object<k,v> to Record<k,v>; conversion of Array already handled above
   if (/^[A-Za-z0-9_]+\[\]$/.test(s)) {
     return s
   }
   if (/^array<.*>$/.test(low)) {
     return s.replace(/^array<(.*)>$/i, '$1[]')
   }
+  if (s.startsWith('Object<')) {
+    // simple blanket conversion; leaves nested generics intact
+    return s.replace(/^Object</, 'Record<')
+  }
+  if (/^function$/i.test(s)) {
+    return '(...args:any[])=>any'
+  }
   if (/^[A-Za-z0-9_]+<.*>$/.test(s)) {
     return s
   }
   if (s.includes('|')) {
     // leave union untouched, may contain braces
+    return s
+  }
+  // avoid wrapping function-signature types like `(x:number)=>string`
+  if (s.includes('=>')) {
     return s
   }
   if (s.includes(':') && !s.trim().startsWith('{')) {
@@ -94,12 +108,22 @@ export interface HookContext {
 // primary entrypoint – options object is strongly typed above
 export function initCMS(options: InitOptions): Promise<void>
 export default initCMS
+
+// hook / plugin API definitions
+export function addHook(name: string, fn: (...args:any[])=>any): void
+export function onPageLoad(fn: (...args:any[])=>any): void
+export function onNavBuild(fn: (...args:any[])=>any): void
+export function transformHtml(fn: (...args:any[])=>any): void
+export function _clearHooks(): void
 `
-decls.push(manualTypes)
-// record that we've already declared initCMS to avoid later duplicates
-seen.add('initCMS')
+decls.push(manualTypes);
+// record that we've already declared initCMS (and hook helpers) to avoid later duplicates
+['initCMS','addHook','onPageLoad','onNavBuild','transformHtml','_clearHooks'].forEach(n=>seen.add(n))
 
 globSync('src/**/*.js').forEach(file => {
+  // add a header comment so users can see where these symbols originate
+  decls.push(`\n// --- from ${file}`)
+
   const src = fs.readFileSync(file, 'utf8')
   const comments = parse(src, { spacing: 'preserve' })
 
@@ -136,7 +160,13 @@ globSync('src/**/*.js').forEach(file => {
       if (name === 'initCMS') {
         // already declared manually above
       } else {
-        const params = funcMatch[2].split(',').map(p=>p.trim()).filter(p=>p)
+        let params = []
+        if (funcMatch[2].includes('{') || funcMatch[2].includes('[')) {
+          // destructured or option object; treat as single opts parameter
+          params = ['opts']
+        } else {
+          params = funcMatch[2].split(',').map(p=>p.trim()).filter(p=>p)
+        }
         const jsdocParams = {}
         c.tags.filter(t=>t.tag==='param').forEach(t=>{
           jsdocParams[t.name] = jsdocTypeToTs(t.type)
@@ -145,12 +175,13 @@ globSync('src/**/*.js').forEach(file => {
         let retType = 'any'
         if (retTag) {
           const raw = String(retTag.type || '')
-          // determine if there is a *top-level* union (pipe not nested inside braces)
+          // determine if there is a *top-level* union (pipe not nested inside
+          // braces, parentheses, or generic angle brackets).
           function hasTopUnion(str) {
             let depth = 0
             for (const ch of str) {
-              if (ch === '{' || ch === '(') depth++
-              else if (ch === '}' || ch === ')') depth--
+              if (ch === '{' || ch === '(' || ch === '<') depth++
+              else if (ch === '}' || ch === ')' || ch === '>') depth--
               else if (ch === '|' && depth === 0) return true
             }
             return false
@@ -173,42 +204,39 @@ globSync('src/**/*.js').forEach(file => {
             // not a top-level union, fall back to standard conversion
             retType = jsdocTypeToTs(raw)
           }
+          // normalize any remaining bare Object references to lowercase
+          if (retType.includes('Object')) {
+            retType = retType.replace(/\bObject\b/g, 'object')
+          }
+        }
+        // helper to clean individual parameter type string
+        function sanitizeParamType(typeStr) {
+          let ty = String(typeStr || '').trim()
+          // don't modify function types or types containing arrows
+          if (ty.includes('=>')) return ty
+          // wrap object-like annotations if not already braced
+          if (ty.match(/[:].+/) && !ty.startsWith('{') && !ty.endsWith('}')) {
+            ty = `{${ty}}`
+          }
+          // bare Array -> any[]
+          ty = ty.replace(/\bArray\b/g, 'any[]')
+          // normalize Object to lowercase
+          ty = ty.replace(/\bObject\b/g, 'object')
+          return ty
         }
         const paramStr = params.map(p => {
           let pname = p.replace(/=.*$/,'').trim()
           if (pname.startsWith('{') || pname.startsWith('[')) {
             pname = 'opts'
           }
-          return `${pname}: ${jsdocParams[pname]||'any'}`
+          const rawType = jsdocParams[pname] || 'any'
+          const finalType = sanitizeParamType(rawType)
+          return `${pname}: ${finalType}`
         }).join(', ')
         // build basic declaration
-      let decl = `export function ${name}(${paramStr}): ${retType}`
-      // separate params from return type to avoid mangling the latter
-      const splitIndex = decl.indexOf('):')
-      if (splitIndex !== -1) {
-        const before = decl.slice(0, splitIndex+2) // include '):'
-        const after = decl.slice(splitIndex+2)    // return type onward
-        const sanitizedParams = before.replace(/:(\s*)([^,\)]+)/g, (m,p1,t) => {
-          let ty = t.trim()
-          if (ty.match(/[:].+/) && !ty.startsWith('{') && !ty.endsWith('}')) {
-            ty = `{${ty}}`
-          }
-          ty = ty.replace(/\bArray\b/g, 'any[]')
-          return ':' + p1 + ty
-        })
-        decl = sanitizedParams + after
-      } else {
-        // fallback: sanitize entire string but avoid touching generics
-        decl = decl.replace(/:(\s*)([^,\)]+)/g, (m,p1,t) => {
-          let ty = t.trim()
-          if (ty.match(/[:].+/) && !ty.startsWith('{') && !ty.endsWith('}')) {
-            ty = `{${ty}}`
-          }
-          ty = ty.replace(/\bArray\b/g, 'any[]')
-          return ':' + p1 + ty
-        })
-      }
-      addDecl(name, decl)
+        let decl = `export function ${name}(${paramStr}): ${retType}`
+        // we no longer need regex-based sanitization of the entire decl
+        addDecl(name, decl)
       }
     }
     const constMatch = after.match(/export\s+(?:const|let|var)\s+(\w+)\s*=/)
@@ -220,6 +248,8 @@ globSync('src/**/*.js').forEach(file => {
 
   // now catch any remaining exports that weren't preceded by JSDoc
   // simple regexes for functions, constants, classes, default
+  // if any exports were missed by preceding comment scan, fall back to
+  // regex detection.  we already inserted a file header above.
   const exportRegexes = [
     // capture parameters in group 2 too
     /export\s+(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g,
@@ -265,5 +295,9 @@ globSync('src/**/*.js').forEach(file => {
   })
 })
 
+// make sure manualTypes (which contains the hook API lines) is present
+if (!decls.includes(manualTypes)) {
+  decls.unshift(manualTypes)
+}
 fs.writeFileSync('src/index.d.ts', decls.join('\n') + '\n')
 console.log('wrote src/index.d.ts')

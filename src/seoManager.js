@@ -61,6 +61,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
  * @param {string} [imageOverride]
  * @param {string} [descOverride]
  * @param {string} [initialDocumentTitle]
+ * @returns {void}
  */
 export function setMetaTags(data, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   const meta = data.meta || {}
@@ -105,6 +106,7 @@ export function getSiteNameFromMeta() {
  * @param {string} [imageOverride]
  * @param {string} [descOverride]
  * @param {string} [initialDocumentTitle]
+ * @returns {void}
  */
 export function setStructuredData(data, pagePath, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   try {
@@ -172,6 +174,7 @@ import readingTime from 'reading-time/lib/reading-time'
  * @param {string|null} h1Text
  * @param {string|null} slugKey
  * @param {object} data
+ * @returns {void}
  */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
     try {

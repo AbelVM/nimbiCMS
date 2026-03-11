@@ -187,6 +187,10 @@ are exposed (all are also available from the UMD bundle namespace).
 > exports to keep the declarations up to date.  You can also edit the file
 > directly for more precise typings—just be aware that regenerating will
 > overwrite automatic sections.
+> 
+> To validate the output, use `npm run check-dts` (a thin wrapper around
+> `tsc --noEmit ...`).  This is handy in CI or before publishing to
+> catch accidental syntax errors caused by complex JSDoc expressions.
 
 ### Advanced utilities
 
