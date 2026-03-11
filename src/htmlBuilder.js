@@ -434,33 +434,21 @@ function parseHtml(raw) {
         const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
         const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
         if (match && match[1]) {
-          // register the language module if present so highlightElement
-          // has the definition available.  We don't block rendering
-          // waiting for the module; registration is best-effort.
+          // register the language module if present so the observer can
+          // highlight once the element comes into view.  We intentionally
+          // do **not** call `highlightElement` synchronously here because
+          // registration is asynchronous and may not complete before
+          // highlighting, which leads to warnings (see issue with dummy
+          // html).  The IntersectionObserver set up later in
+          // `observeCodeBlocks` will trigger the highlight when ready.
           const l = (match[1] || '').toLowerCase()
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
           try {
             ;(async () => {
               try { await registerLanguage(canonical) } catch (_) { }
             })()
-          } catch (_) { }          try {
-            // If a language class was present we can safely call
-            // highlightElement which may set classnames. If none, prefer
-            // highlightAuto and avoid mutating the element's language
-            // class attribute.
-            const hasLang = !!((codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className)
-            if (hasLang) {
-              try { hljs.highlightElement(codeEl) } catch (_) { }
-            } else {
-              try {
-                const out = hljs.highlightAuto ? hljs.highlightAuto(codeEl.textContent || '') : null
-                if (out && out.value) codeEl.innerHTML = out.value
-              } catch (_) {
-                try { hljs.highlightElement(codeEl) } catch (_) { }
-              }
-            }
           } catch (_) { }
-            } else {
+        } else {
               try {
                 // no explicit language: prefer plaintext rendering if
                 // available, otherwise avoid auto-detection.
