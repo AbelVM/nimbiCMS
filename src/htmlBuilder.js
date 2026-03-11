@@ -531,6 +531,16 @@ export function attachTocClickHandler(toc) {
 
 
 
+/**
+ * Scroll the primary CMS container to either the top or to a specific
+ * element with the given `id`.  When an anchor is supplied the helper
+ * attempts to position the element at the top of the scroll viewport;
+ * otherwise it simply resets the scroll offset to zero.  A small delay is
+ * used to ensure the DOM has been updated before performing the scroll.
+ *
+ * @param {string|null} anchor - element id (without '#') or `null` to scroll
+ *                               to the top.
+ */
 export function scrollToAnchorOrTop(anchor) {
     // container element is the scrolling div created by initCMS
     const containerEl = document.querySelector('.nimbi-cms') || null

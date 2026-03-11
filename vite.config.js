@@ -10,7 +10,8 @@ export default ({ command }) => {
           entry: path.resolve(__dirname, 'src/lib/index.js'),
           name: 'nimbiCMS',
           formats: ['es','cjs','umd'],
-          fileName: (format) => `nimbi-cms.${format}.js`
+          // emit a plain nimbi-cms.js for UMD (no .umd suffix)
+          fileName: (format) => format === 'umd' ? 'nimbi-cms.js' : `nimbi-cms.${format}.js`
         },
         
         rollupOptions: {

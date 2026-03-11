@@ -49,12 +49,28 @@ export function onNavBuild(fn: (ctx: HookContext) => any): void
 export function transformHtml(fn: (ctx: HookContext) => any): void
 export function addHook(name: string, fn: (ctx: HookContext) => any): void
 
+// low-level hook runner (exported for tests/plugins)
+export function runHooks(name: string, ctx: HookContext): Promise<void>
+
 // re-exported from codeblocksManager
 export function observeCodeBlocks(el: HTMLElement): void
+export function registerLanguage(name: string, modulePath?: string): Promise<boolean>
+export function loadSupportedLanguages(url?: string): Promise<void>
+export const SUPPORTED_HLJS_MAP: Map<string,string>
+export const BAD_LANGUAGES: Set<string>
 
 // accessible helpers from other modules
 declare const allMarkdownPaths: string[]
 export { allMarkdownPaths }
+
+// slug/markdown utilities
+export const slugToMd: Map<string,string>
+export const mdToSlug: Map<string,string>
+export function clearFetchCache(): void
+export const fetchCache: Map<string, Promise<any>>
+export function crawlForSlug(decoded: string, contentBase: string): Promise<string|null>
+export function ensureSlug(decoded: string, contentBase: string): Promise<string|null>
+export function setContentBase(contentBase?: string): void
 
 // additional low-level utilities (import from submodules if needed)
 export function slugify(s: string): string

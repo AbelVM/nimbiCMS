@@ -106,7 +106,14 @@ export function slugify(s) {
 }
 
 // simple in-memory cache of fetchMarkdown responses keyed by the resolved URL
+/**
+ * @type {Map<string,Promise<any>>}
+ */
 export const fetchCache = new Map()
+/**
+ * Empty the in-memory markdown fetch cache.  Useful for tests or when the
+ * consumer knows the underlying files have changed.
+ */
 export function clearFetchCache() { fetchCache.clear() }
 
 /**

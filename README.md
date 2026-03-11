@@ -1,23 +1,65 @@
-# nimbiCMS_pre
+
+<img src="./logo.png" alt="logo" width="256" height="256" />
+
+# nimbiCMS
 
 Lightweight client-side CMS used for local editing and testing.
 
 ## Table of Contents
+
 1. [Quick start](#quick-start)
-2. [Development notes](#development-notes)
-3. [Features](#features)
-4. [Options & API](#options--api)
-5. [Theming & Customization](#theming--customization)
-6. [Localization](#localization)
-7. [Content workflow](#content-workflow)
-8. [Testing](#testing)
-9. [Security & audit](#security--audit)
-10. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
-11. [Next steps](#next-steps)
+2. [Problem statement](#problem-statement)
+3. [Development notes](#development-notes)
+4. [Features](#features)
+5. [Options & API](#options--api)
+6. [Theming & Customization](#theming--customization)
+7. [Localization](#localization)
+8. [Content workflow](#content-workflow)
+9. [Testing](#testing)
+10. [Security & audit](#security--audit)
+11. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
+12. [Next steps](#next-steps)
 
 ---
 
 ## Quick start
+
+Remember this project exists because you want a CMS with **no database, no build step
+on the server, and zero backend**.
+Just drop a few markdown files into a folder, run a static host (e.g. GitHub
+Pages) and the client code does the rest: it crawls the directory, turns
+Markdown into HTML, hooks links, handles slugs and anchors, keeps a nav, and
+updates SEO tags – all in the browser.  You can even edit content via the
+GitHub web editor and refresh to see changes.  Perfect for gh-pages, S3, or
+the kind of lightweight site where you want live preview without any server.
+
+### basic HTML example
+
+```html
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="/dist/nimbi-cms.js"></script>
+<link rel="stylesheet" href="/dist/nimbi-cms.css">
+</head><body>
+<div id="app" style="height:100vh"></div>
+<script>
+  // UMD bundle exposes global `nimbiCMS`
+  nimbiCMS.initCMS({ el: '#app', contentPath: './content' })
+</script>
+</body></html>
+```
+
+Now create a `content/_navigation.md` file like this:
+
+```markdown
+- [Home](_home.md)
+- [Blog](blog/)
+```
+
+(usually you’d add proper titles, links to posts etc.); that file drives the
+sidebar navigation.
+
+Then follow the normal build & serve steps below:
 
 ```bash
 npm install
@@ -108,8 +150,64 @@ The `initCMS` export itself is returned when you call it; additional helpers
 are exposed (all are also available from the UMD bundle namespace).
 
 > **TypeScript users:**  a `src/index.d.ts` declaration file is shipped with
-> the package that describes the public API.
+the package that describes the public API.  It includes not only the main
+`initCMS` options but also the lower‑level utilities and maps documented below.
 
+### Advanced utilities
+
+For plugin authors and power users who want to dig deeper, here’s what you
+can grab from the bundle.  Examples follow each group.
+
+- `runHooks(name, ctx)` – trigger any hook yourself (useful in tests or if
+  you build your own navigation).  
+
+  ```js
+  // manually fire onPageLoad for analytics when you inject HTML
+  import { runHooks } from 'nimbi-cms'
+  runHooks('onPageLoad', { pagePath:'foo.md', article:el })
+  ```
+
+- Slug/markdown helpers: `slugToMd`, `mdToSlug` (maps), `ensureSlug()`,
+  `crawlForSlug()`, `setContentBase()`, `clearFetchCache()`, and the
+  `fetchCache` map.  Handy if you want to show a list of all slugs or resolve
+  them yourself.
+
+  ```js
+  import { slugToMd, ensureSlug } from 'nimbi-cms'
+  // log all known slugs
+  console.log(Array.from(slugToMd.keys()))
+  // programmatically resolve one
+  ensureSlug('my-page', '/content/').then(p => console.log(p))
+  ```
+
+- Code‑highlight helpers: `registerLanguage()`, `loadSupportedLanguages()`,
+  `SUPPORTED_HLJS_MAP`, `BAD_LANGUAGES`, and `observeCodeBlocks()`.
+  Use this if you want to pre‑register extra languages or tweak the list.
+
+  ```js
+  import { registerLanguage, observeCodeBlocks } from 'nimbi-cms'
+  registerLanguage('r') // load R syntax from CDN on demand
+  observeCodeBlocks(document.body)
+  ```
+
+- Misc helpers like `slugify()`, `isExternalLink()`, `normalizePath()`,
+  `setLazyload()`, and `safe()` are also exported for reuse in plugins.
+
+  ```js
+  import { slugify } from 'nimbi-cms'
+  console.log(slugify('My super title')) // -> 'my-super-title'
+  ```
+
+- Slug/markdown helpers: `slugToMd`, `mdToSlug` (maps), `ensureSlug()`,
+  `crawlForSlug()`, `setContentBase()`, `clearFetchCache()`, and the
+  `fetchCache` map.  These let you interrogate or modify the slug resolution
+  state directly.
+- Code‑highlight helpers: `registerLanguage()`, `loadSupportedLanguages()`,
+  `SUPPORTED_HLJS_MAP`, `BAD_LANGUAGES`, and the `observeCodeBlocks()` hook.
+- Low‑level helpers such as `slugify()`, `isExternalLink()`, `normalizePath()`,
+  `setLazyload()`, and `safe()` are also available for reuse in plugins.
+
+The TypeScript declaration file includes types for all of these symbols.
 
 - `registerLanguage(name, modulePath)` – dynamically register a highlight.js
   language (path may be a CDN URL).
@@ -211,6 +309,7 @@ Drop `.md` files into your content directory. No build step is necessary; a
 static server that serves the files is sufficient.
 
 **Required files**
+
 - `_home.md` – the site’s home page (must exist).
 - `_navigation.md` – renders into the navbar; use Markdown links.
 - `_404.md` – optional fallback for 404 responses.
@@ -243,7 +342,7 @@ materia, minty, nuclear, pulse, sandstone, simplex, slate, solar, spacelab,
 superhero, united, yeti.
 
 See previews at
-https://jenil.github.io/bulmaswatch/ and load via `bulmaCustomize`.
+<https://jenil.github.io/bulmaswatch/> and load via `bulmaCustomize`.
 
 ## Next steps
 

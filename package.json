@@ -26,6 +26,7 @@
   },
   "main": "dist/nimbi-cms.cjs.js",
   "module": "dist/nimbi-cms.es.js",
+  "unpkg": "dist/nimbi-cms.js",
   "files": [
     "dist"
   ]

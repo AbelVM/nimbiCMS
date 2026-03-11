@@ -491,7 +491,18 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
 
 // SEO helpers moved to src/seoManager.js
 
-// export for tests only – not part of the public API
+// export for tests and plugin authors – not part of the main initCMS API
+/**
+ * Invoke all registered hooks for a given event name.  This is the internal
+ * runner used by the CMS; plugins and tests may call it directly if they need
+ * to trigger or inspect hook behavior.  Errors thrown by callbacks are caught
+ * and ignored.
+ *
+ * @param {string} name - hook name ("onPageLoad", "onNavBuild", or
+ *                        "transformHtml")
+ * @param {object} ctx  - context object supplied to callbacks
+ * @returns {Promise<void>}
+ */
 export { runHooks }
 
 export { registerLanguage, loadSupportedLanguages, observeCodeBlocks, setHighlightTheme, SUPPORTED_HLJS_MAP, BAD_LANGUAGES } from './codeblocksManager.js'
