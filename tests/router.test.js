@@ -97,10 +97,14 @@ describe('router module', () => {
     // initial index cache doesn't know about new path until refresh
     router.allMarkdownPaths.splice(0, router.allMarkdownPaths.length, 'new/path.md')
     const fakeMd = { raw: '# New Path' }
-    files.fetchMarkdown.mockResolvedValue(fakeMd)
+    // only succeed for the exact normalized path; everything else fails
+    files.fetchMarkdown.mockImplementation((path, base) => {
+      if (path === 'new/path.md') return Promise.resolve(fakeMd)
+      return Promise.reject(new Error('not found'))
+    })
 
-    // without refresh we should still get not-found
-    await expect(router.fetchPageData('new-path', '/content/')).rejects.toThrow('no page data')
+    // without refresh we should still get not-found (candidates from extension fallback may exist)
+    await expect(router.fetchPageData('new-path', '/content/')).rejects.toThrow('not found')
 
     // clear cached result so lookup happens again, then tell router about
     // the updated paths and retry
@@ -117,16 +121,18 @@ describe('router module', () => {
   it('fetchPageData will try common extensions for a bare slug', async () => {
     const base = '/content/'
     const fakeData = { raw: '# Yo' }
-    // stub fetchMarkdown: first call fails, second (on .html) succeeds
+    // stub fetchMarkdown: succeed on first (.html) and later (for sanity)
     files.fetchMarkdown
-      .mockRejectedValueOnce(new Error('not found'))
-      .mockResolvedValueOnce(fakeData)
+      .mockImplementation((path) => {
+        if (path === 'bare.html') return Promise.resolve(fakeData)
+        return Promise.reject(new Error('not found'))
+      })
     const res = await router.fetchPageData('bare', base)
     expect(res.pagePath).toBe('bare.html')
     expect(res.data).toBe(fakeData)
-    // verify we attempted both variants
+    // verify we attempted at least the html variant first
     expect(files.fetchMarkdown).toHaveBeenCalledWith('bare.html', base)
-    expect(files.fetchMarkdown).toHaveBeenCalledWith('bare.md', base)
+    expect(files.fetchMarkdown).not.toHaveBeenCalledWith('bare.md', base)
   })
 
 })

@@ -203,6 +203,17 @@ export async function buildSearchIndex(contentBase) {
       if (v) paths.push(v)
     }
   }
+  // if there are still no paths, attempt a crawl of the whole content dir
+  try {
+    // always crawl the content directory for additional files; this is the
+    // the mechanism that allows search to cover pages that are not referenced
+    // in the navigation at all.  the crawl is safe on servers without
+    // directory listings (it will simply return an empty array).
+    const crawled = await crawlAllMarkdown(contentBase)
+    if (crawled && crawled.length) {
+      paths = paths.concat(crawled)
+    }
+  } catch (_) {}
   // dedupe in-case the same file appears multiple times
   const seen = new Set()
   paths = paths.filter(p => {
@@ -213,28 +224,40 @@ export async function buildSearchIndex(contentBase) {
 
   const idx = []
   for (const path of paths) {
-    // ignore anything that isn't a markdown filename
-    if (!/\.md(?:$|[?#])/i.test(path)) continue
+    // only process markdown or html pages
+    if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue
     try {
       const md = await fetchMarkdown(path, contentBase)
       if (md && md.raw) {
-        const raw = md.raw
-        const h1m = raw.match(/^#\s+(.+)$/m)
-        const title = h1m ? h1m[1].trim() : ''
+        let title = ''
         let excerpt = ''
-        const parts = raw.split(/\r?\n\s*\r?\n/)
-        // first paragraph after the heading
-        if (parts.length > 1) {
-          for (let i = 1; i < parts.length; i++) {
-            const p = parts[i].trim()
-            if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
+        if (md.isHtml) {
+          try {
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(md.raw, 'text/html')
+            const titleEl = doc.querySelector('title') || doc.querySelector('h1')
+            if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
+            const p = doc.querySelector('p')
+            if (p && p.textContent) excerpt = p.textContent.trim()
+          } catch (_) {}
+        } else {
+          const raw = md.raw
+          const h1m = raw.match(/^#\s+(.+)$/m)
+          title = h1m ? h1m[1].trim() : ''
+          const parts = raw.split(/\r?\n\s*\r?\n/)
+          // first paragraph after the heading
+          if (parts.length > 1) {
+            for (let i = 1; i < parts.length; i++) {
+              const p = parts[i].trim()
+              if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
+            }
           }
         }
         let slug = ''
         try {
           if (mdToSlug.has(path)) slug = mdToSlug.get(path)
         } catch (_) {}
-        if (!slug) slug = slugify(title)
+        if (!slug) slug = slugify(title || path)
         idx.push({ slug, title, excerpt, path })
       }
     } catch (err) {
@@ -353,6 +376,59 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
   }
   crawlCache.set(decoded, found)
   return found
+}
+
+/**
+ * Crawl the content directory collecting all markdown and HTML pages.  Uses
+ * the same directory‑listing traversal logic as `crawlForSlug` but does not
+ * stop early; it simply records any links ending in `.md` or `.html`.
+ *
+ * This is useful for building a search index over the entire site when the
+ * navigation only covers a subset of pages.
+ *
+ * @param {string} contentBase
+ * @param {number} [maxQueue]
+ * @returns {Promise<string[]>} list of relative paths
+ */
+export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQueue) {
+  const result = new Set()
+  const seenDirs = new Set()
+  const queue = ['']
+
+  while (queue.length) {
+    if (queue.length > maxQueue) break
+    const relDir = queue.shift()
+    if (seenDirs.has(relDir)) continue
+    seenDirs.add(relDir)
+    let url = contentBase
+    if (!url.endsWith('/')) url += '/'
+    url += relDir
+    try {
+      const res = await globalThis.fetch(url)
+      if (!res.ok) continue
+      const text = await res.text()
+      const doc = _crawlParser.parseFromString(text, 'text/html')
+      const links = doc.querySelectorAll(_crawlLinkSelector)
+      for (const a of links) {
+        try {
+          let href = a.getAttribute('href') || ''
+          if (!href) continue
+          if (href.endsWith('/')) {
+            const sub = relDir + href
+            if (!seenDirs.has(sub)) queue.push(sub)
+            continue
+          }
+          // record markdown or html pages
+          const path = (relDir + href).replace(/^\/+/, '')
+          if (/\.(md|html?)$/i.test(path)) {
+            result.add(path)
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  return Array.from(result)
 }
 
 /**

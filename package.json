@@ -9,7 +9,7 @@
     "build": "vite build",
     "build:lib": "vite build --config vite.config.js",
     "preview": "vite preview",
-    "test": "npx vitest"
+    "test": "npx vitest run"
   },
   "dependencies": {
     "bulma": "^1.0.4",

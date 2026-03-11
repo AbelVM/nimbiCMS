@@ -130,6 +130,49 @@ describe('slugManager module', () => {
     expect(idx[0].excerpt).toBe('Hello world')
   })
 
+  it('buildSearchIndex indexes HTML pages too', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.allMarkdownPaths.splice(0, slugMgr.allMarkdownPaths.length, 'foo.html')
+    global.fetch = vi.fn(async (url) => {
+      if (url.endsWith('foo.html')) return { ok: true, text: () => Promise.resolve('<html><head><title>FooTitle</title></head><body><p>Excerpt</p></body></html>') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    expect(idx.length).toBe(1)
+    expect(idx[0].title).toBe('FooTitle')
+    expect(idx[0].excerpt).toBe('Excerpt')
+  })
+
+  it('buildSearchIndex crawls for unlinked pages', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.allMarkdownPaths.splice(0)
+    slugMgr.slugToMd.clear()
+    // simulate crawler discovering a couple of files
+    global.fetch = vi.fn(async (url) => {
+      if (url === base) return { ok: true, text: () => Promise.resolve('<a href="a.md"></a>') }
+      if (url === base + 'a.md') return { ok: true, text: () => Promise.resolve('# A\n\nBodyA') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    expect(idx.map(e => e.path)).toContain('a.md')
+  })
+
+  it('buildSearchIndex crawls entire content when nav is empty', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.allMarkdownPaths.splice(0)
+    slugMgr.slugToMd.clear()
+    // simulate a directory listing with two markdown files
+    global.fetch = vi.fn(async (url) => {
+      if (url === base) return { ok: true, text: () => Promise.resolve('<a href="a.md"></a><a href="sub/"></a>') }
+      if (url === base + 'sub/') return { ok: true, text: () => Promise.resolve('<a href="b.md"></a>') }
+      if (url.endsWith('a.md')) return { ok: true, text: () => Promise.resolve('# A') }
+      if (url.endsWith('sub/b.md')) return { ok: true, text: () => Promise.resolve('# B') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    expect(idx.map(e => e.path).sort()).toEqual(['a.md','sub/b.md'])
+  })
+
   it('buildSearchIndex falls back to slugToMd entries when allMarkdownPaths is empty', async () => {
     const base = 'http://example.com/content/'
     // ensure index cache is cleared so we actually execute the logic
