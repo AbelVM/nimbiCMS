@@ -21,8 +21,27 @@ export const mdToSlug = new Map()
 // array may still be populated by the build when running the example
 // application, which gives us a cheap way to resolve slugs for pages that
 // aren't linked in the navigation.
+//
+// build-time glob placeholder.  In a library build we intentionally keep
+// this empty to avoid bundling actual markdown; the `allMarkdownPaths`
+// array may still be populated by the build when running the example
+// application, which gives us a cheap way to resolve slugs for pages that
+// aren't linked in the navigation.
+//
+// Historically the example harness used a Vite plugin to embed the list of
+// all content files into the bundle so that the search index could be
+// pre‑populated at startup.  The user has opted to perform indexing at
+// runtime only, so that plugin is no longer used; `_allMd` stays empty in
+// normal operation.
+
 let _allMd = {}
+
 export let allMarkdownPaths = []
+
+// helper used by tests to simulate injection of markdown data
+export function _setAllMd(obj) {
+  _allMd = obj || {}
+}
 
 function _deriveCommonPrefix(paths) {
   if (!paths || paths.length === 0) return ''
@@ -203,17 +222,60 @@ export async function buildSearchIndex(contentBase) {
       if (v) paths.push(v)
     }
   }
-  // if there are still no paths, attempt a crawl of the whole content dir
+  // always crawl the content directory as a fallback.  this handles cases
+  // where navigation is empty or the site has pages that aren’t linked.
   try {
-    // always crawl the content directory for additional files; this is the
-    // the mechanism that allows search to cover pages that are not referenced
-    // in the navigation at all.  the crawl is safe on servers without
-    // directory listings (it will simply return an empty array).
     const crawled = await crawlAllMarkdown(contentBase)
     if (crawled && crawled.length) {
       paths = paths.concat(crawled)
     }
   } catch (_) {}
+
+  // now attempt to discover additional pages by following links in the
+  // content paths we already know about.  this allows the index to grow
+  // beyond the strict navigation list while still respecting the caller's
+  // `crawlMaxQueue` limit (default 1000).
+  try {
+    const visited = new Set(paths)
+    const queue = [...paths]
+    if (visited.size === 0) {
+      // nothing to crawl
+    }
+    while (queue.length && visited.size <= defaultCrawlMaxQueue) {
+      const p = queue.shift()
+      try {
+        const md = await fetchMarkdown(p, contentBase)
+        if (md && md.raw) {
+          let raw = md.raw
+          const hrefs = []
+          const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
+          let m
+          while ((m = mdLinkRe.exec(raw))) {
+            hrefs.push(m[1])
+          }
+          const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
+          while ((m = htmlLinkRe.exec(raw))) {
+            hrefs.push(m[1])
+          }
+          for (let href of hrefs) {
+            if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue
+            href = href.replace(/^\.?\//, '')
+            if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
+            href = href.split(/[?#]/)[0]
+            if (!visited.has(href)) {
+              visited.add(href)
+              queue.push(href)
+              paths.push(href)
+            }
+          }
+        }
+      } catch (e) {
+        // swallow
+      }
+    }
+  } catch (e) {
+    // swallow
+  }
   // dedupe in-case the same file appears multiple times
   const seen = new Set()
   paths = paths.filter(p => {
@@ -392,6 +454,7 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
  */
 export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQueue) {
   const result = new Set()
+
   const seenDirs = new Set()
   const queue = ['']
 

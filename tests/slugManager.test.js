@@ -132,6 +132,9 @@ describe('slugManager module', () => {
 
   it('buildSearchIndex indexes HTML pages too', async () => {
     const base = 'http://example.com/content/'
+    // clear caches so test starts fresh
+    slugMgr.searchIndex.splice(0)
+    slugMgr.clearFetchCache()
     slugMgr.allMarkdownPaths.splice(0, slugMgr.allMarkdownPaths.length, 'foo.html')
     global.fetch = vi.fn(async (url) => {
       if (url.endsWith('foo.html')) return { ok: true, text: () => Promise.resolve('<html><head><title>FooTitle</title></head><body><p>Excerpt</p></body></html>') }
@@ -145,6 +148,7 @@ describe('slugManager module', () => {
 
   it('buildSearchIndex crawls for unlinked pages', async () => {
     const base = 'http://example.com/content/'
+    slugMgr.searchIndex.splice(0)
     slugMgr.allMarkdownPaths.splice(0)
     slugMgr.slugToMd.clear()
     // simulate crawler discovering a couple of files
@@ -159,6 +163,7 @@ describe('slugManager module', () => {
 
   it('buildSearchIndex crawls entire content when nav is empty', async () => {
     const base = 'http://example.com/content/'
+    slugMgr.searchIndex.splice(0)
     slugMgr.allMarkdownPaths.splice(0)
     slugMgr.slugToMd.clear()
     // simulate a directory listing with two markdown files
@@ -211,4 +216,35 @@ describe('slugManager module', () => {
     expect(idx.length).toBe(1)
     expect(idx[0].path).toBe('x.md')
   })
+
+  it('setContentBase picks up injected markdown list', () => {
+    // simulate injected list
+    slugMgr._setAllMd({
+      '/foo.md': '# Foo',
+      '/sub/bar.html': '<h1>Bar</h1>'
+    })
+    // clear any existing state
+    slugMgr.slugToMd.clear(); slugMgr.mdToSlug.clear(); slugMgr.allMarkdownPaths.splice(0)
+    slugMgr.setContentBase('/')
+    expect(slugMgr.allMarkdownPaths).toEqual(expect.arrayContaining(['foo.md', 'sub/bar.html']))
+  })
+
+  it('buildSearchIndex follows links recursively up to crawlMaxQueue', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.searchIndex.splice(0)
+    slugMgr.clearFetchCache()
+    // start with navigation file only
+    slugMgr.allMarkdownPaths.splice(0, slugMgr.allMarkdownPaths.length, 'nav.md')
+    // stub fetchMarkdown to return content with a link chain
+    global.fetch = vi.fn(async (url) => {
+      if (url.endsWith('nav.md')) return { ok: true, text: () => Promise.resolve('# Nav\n\n[Next](a.md)') }
+      if (url.endsWith('a.md')) return { ok: true, text: () => Promise.resolve('# A\n\n[More](b.md)') }
+      if (url.endsWith('b.md')) return { ok: true, text: () => Promise.resolve('# B') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    const paths = idx.map(i => i.path).sort()
+    expect(paths).toEqual(['a.md','b.md','nav.md'])
+  })
+
 })

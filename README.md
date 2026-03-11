@@ -150,11 +150,19 @@ Recent behaviour fixes worth knowing:
   localization dictionary under the key `searchPlaceholder` (see `l10n`
   options).
 
-  The input listener filters the index and renders matching links inside
-  `#nimbi-search-results` (a Bulma `box`) which is hidden when there are no
-  matches.  Because the library ship‑side has no content, the index may
-  initially be empty – it fills in as navigation links are parsed or pages
-  are visited.  Disable the option to skip the work entirely.
+  The core index builder runs entirely at runtime when `initCMS()` is
+  called.  It gathers slug information from three sources in order:
+
+  1. the `allMarkdownPaths` array, which is populated at build time only by the
+     example harness; library consumers ship with an empty list.
+  2. slug mappings inferred from navigation links or previously visited pages.
+  3. a directory crawl (`crawlAllMarkdown`) of the `contentPath`, which works
+     even when the server does not expose directory listings.
+
+  Because the index is built on init, there is **no** build-time scanning or
+  embedding of content paths.  The crawler will traverse directory listings at
+  runtime to discover every `.md`/`.html` file in the `contentPath`.
+  Disable `searchIndex` to skip the work entirely.
 - `defaultStyle` – `'light' | 'dark'` (default `'light'`). Controls initial
   theme; use `setStyle()` to toggle later.
 - `bulmaCustomize` – `'none' | 'local' | '{theme_name}'` (default `'none'`).
