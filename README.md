@@ -179,7 +179,7 @@ Recent behaviour fixes worth knowing:
   - `'local'`: load `<contentPath>/bulma.css` or `/bulma.css` and inject it.
   - `'{theme_name}'`: load from `https://unpkg.com/bulmaswatch/{theme_name}`.
 - `highlightTheme` – initial highlight.js theme (default `monokai`).
-- `markdownExtensions` – **Array&lt;object&gt;** (optional). A list of [marked](https://github.com/markedjs/marked) extension/plugin objects to register during initialization. These will be added via `addMarkdownExtension()` before any content is rendered; useful for custom syntax, link transformations, or other parser tweaks.
+- `markdownExtensions` – **Array&lt;object&gt;** (optional). A list of [marked](https://github.com/markedjs/marked) extension/plugin objects to register during initialization. These will be added via `addMarkdownExtension()` before any content is rendered; useful for custom syntax, link transformations, or other parser tweaks. Theres a big list of off-the-shelf extensions [here](https://marked.js.org/using_advanced#extensions).
 
   ```js
   // add a custom inline tokenizer that uppercases text
