@@ -24,6 +24,28 @@ export function normalizePath(p) {
 }
 
 /**
+ * Remove one or more trailing slashes from a URL or path.  This is handy
+ * when composing base paths to avoid the dreaded `//` sequence.
+ *
+ * @param {string} u
+ * @returns {string}
+ */
+export function trimTrailingSlash(u) {
+  return String(u || '').replace(/\/+$/, '')
+}
+
+/**
+ * Ensure the given URL/path ends with a single slash.  This wraps
+ * `trimTrailingSlash` and appends '/'.
+ *
+ * @param {string} u
+ * @returns {string}
+ */
+export function ensureTrailingSlash(u) {
+  return trimTrailingSlash(u) + '/'
+}
+
+/**
  * Apply the lazy-loading attribute to an <img> element if not already set.
  *
  * @param {HTMLImageElement} img
@@ -34,6 +56,49 @@ export function setLazyload(img) {
       img.setAttribute('loading', 'lazy')
     }
   } catch (_) { }
+}
+
+/**
+ * Join multiple path segments ensuring there is exactly one slash between
+ * them and no leading/trailing slashes on the result (unless the first
+ * segment starts with a slash, in which case the result is absolute).
+ * Similar to `path.posix.join` but for URL-like paths.
+ *
+ * @param {...string} parts
+ * @returns {string}
+ */
+export function joinPaths(...parts) {
+  if (!parts || parts.length === 0) return ''
+  const segs = parts.map(p => String(p || ''))
+    .filter(p => p !== '')
+    .map((p, i) => {
+      if (i === 0) return p.replace(/\/+$|(?<!^)\/+/g, '') // trim trailing but keep leading
+      return p.replace(/^\/+|\/+$/g, '')
+    })
+  let joined = segs.join('/')
+  // if first part started with slash, make absolute
+  if (String(parts[0] || '').startsWith('/')) {
+    if (!joined.startsWith('/')) joined = '/' + joined
+  }
+  return joined
+}
+
+/**
+ * Safely encode a URL or URL component using encodeURI.  Falls back to the
+ * original string if encoding fails.
+ *
+ * @param {string} u
+ * @returns {string}
+ */
+export function encodeURL(u) {
+  try {
+    const s = String(u || '')
+    // if the string already contains percent escapes, avoid double-encoding
+    if (s.includes('%')) return s
+    return encodeURI(s)
+  } catch (_) {
+    return String(u || '')
+  }
 }
 
 /**

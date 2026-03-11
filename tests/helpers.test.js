@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isExternalLink, normalizePath, setLazyload } from '../src/utils/helpers.js'
+import { isExternalLink, normalizePath, setLazyload, joinPaths, encodeURL } from '../src/utils/helpers.js'
 
 describe('utils helpers', () => {
   it('identifies external links correctly', () => {
@@ -36,5 +36,20 @@ describe('utils helpers', () => {
     expect(result).toBe(42)
     const bad = safe(() => { throw new Error('boom') })
     expect(bad).toBeUndefined()
+  })
+
+  it('joinPaths concatenates segments cleanly', () => {
+    // relative
+    expect(joinPaths('a', 'b', 'c')).toBe('a/b/c')
+    expect(joinPaths('a/', '/b/', '/c/')).toBe('a/b/c')
+    expect(joinPaths('/a', 'b', 'c')).toBe('/a/b/c')
+    expect(joinPaths('', 'x')).toBe('x')
+    expect(joinPaths('/')).toBe('/')
+  })
+
+  it('encodeURL safely encodes or returns original', () => {
+    expect(encodeURL('http://example.com/foo bar')).toContain('%20')
+    // invalid input should not throw
+    expect(encodeURL('%%%')).toBe('%%%')
   })
 })

@@ -116,7 +116,7 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
     let canonical = ''
     try {
       if (pagePath) {
-        const p = String(pagePath).replace(/^[\.\/]+/, '')
+        const p = normalizePath(pagePath)
         try {
           const base = location.origin + location.pathname
           canonical = base.split('?')[0] + '?page=' + encodeURIComponent(p)

@@ -80,6 +80,7 @@ function _deriveCommonPrefix(paths) {
  * @param {string} [contentBase]
  */
 import { refreshIndexPaths } from './router.js'
+import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 
 export function setContentBase(contentBase) {
   slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
@@ -91,7 +92,7 @@ export function setContentBase(contentBase) {
   try {
     if (contentBase) {
       try { prefix = new URL(contentBase).pathname } catch (_) { prefix = String(contentBase || '') }
-      if (!prefix.endsWith('/')) prefix = prefix + '/'
+      prefix = ensureTrailingSlash(prefix)
     }
   } catch (_) { prefix = '' }
 
@@ -100,9 +101,9 @@ export function setContentBase(contentBase) {
   for (const fullPath of keys) {
     let rel = fullPath
     if (prefix && fullPath.startsWith(prefix)) {
-      rel = fullPath.slice(prefix.length).replace(/^\/+/, '')
+      rel = normalizePath(fullPath.slice(prefix.length))
     } else {
-      rel = fullPath.replace(/^\.\//, '').replace(/^\//, '')
+      rel = normalizePath(fullPath)
     }
     allMarkdownPaths.push(rel)
     // keep router index up to date with newly discovered markdown
@@ -172,7 +173,7 @@ export let fetchMarkdown = async function(path, base) {
       }
     }
   } catch (_) {}
-  const baseClean = base.endsWith('/') ? base.slice(0, -1) : base
+  const baseClean = trimTrailingSlash(base)
   const url = `${baseClean}/${path}`
   if (fetchCache.has(url)) {
     return fetchCache.get(url)
@@ -286,7 +287,7 @@ export async function buildSearchIndex(contentBase) {
           }
           for (let href of hrefs) {
             if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue
-            href = href.replace(/^\.?\//, '')
+            href = normalizePath(href)
             if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
             href = href.split(/[?#]/)[0]
             if (!visited.has(href)) {
@@ -440,7 +441,7 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
             continue
           }
           if (href.toLowerCase().endsWith('.md')) {
-            const path = (relDir + href).replace(/^\/+/, '')
+            const path = normalizePath(relDir + href)
             // avoid re-fetching files we already know the slug for; if the
             // recorded slug doesn't match the one we're seeking there is no
             // reason to load the file again.  the mapping might exist either
@@ -540,7 +541,8 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
 export async function ensureSlug(decoded, contentBase, maxQueue) {
   // strip leading/trailing slashes which may come from URL path fragments
   if (decoded && typeof decoded === 'string') {
-    decoded = decoded.replace(/^\/+|\/+$/g, '')
+    decoded = normalizePath(decoded)
+    decoded = trimTrailingSlash(decoded)
   }
   if (slugToMd.has(decoded)) {
     return slugToMd.get(decoded)

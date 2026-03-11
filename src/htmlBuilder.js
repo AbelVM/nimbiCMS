@@ -1,7 +1,7 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './filesManager.js'
 import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
-import { isExternalLink, normalizePath, setLazyload, safe } from './utils/helpers.js'
+import { isExternalLink, normalizePath, setLazyload, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 
 export function createNavTree(t, tree) {
   const nav = document.createElement('aside')
@@ -113,7 +113,7 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       contentBasePath = _lastContentBasePath
     } else {
       contentBaseUrl = new URL(contentBase)
-      contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+      contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
       _lastContentBase = contentBase
       _lastContentBaseUrl = contentBaseUrl
       _lastContentBasePath = contentBasePath
@@ -141,7 +141,8 @@ async function rewriteAnchors(article, contentBase, pagePath) {
           }
           try {
             const resolved = new URL(mdPathRaw, contentBase).pathname
-            const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+            let rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved
+            rel = normalizePath(rel)
             anchorInfo.push({ node: a, mdPathRaw, frag, rel })
             if (!mdToSlug.has(rel)) pending.add(rel)
           } catch (_) {
@@ -154,9 +155,9 @@ async function rewriteAnchors(article, contentBase, pagePath) {
           const full = new URL(href, contentBase)
           const p = full.pathname || ''
           if (p && p.indexOf(contentBasePath) !== -1) {
-            let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
-            rel = rel.replace(/^[\.\/]+/, '')
-            if (rel.endsWith('/')) rel = rel.slice(0, -1)
+            let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p
+            rel = normalizePath(rel)
+            rel = trimTrailingSlash(rel)
             if (!rel) rel = '_home'
             if (!rel.endsWith('.md')) {
               if (slugToMd.has(rel)) {
@@ -266,7 +267,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
       try {
         const href = a.getAttribute('href') || ''
         if (!href) continue
-        const raw = href.replace(/^\.\//, '')
+        const raw = normalizePath(href)
         const parts = raw.split(/::|#/, 2)
         let path = parts[0]
         if (!path) continue
@@ -350,7 +351,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
   let contentBasePath = ''
   try {
     const contentBaseUrl = new URL(contentBase)
-    contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+    contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
   } catch (_) { contentBasePath = '' }
 
   for (const a of Array.from(linkEls || [])) {
@@ -360,8 +361,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
       // look for any markdown filename in the href (may include fragments & dirs)
       const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
       if (mdMatch) {
-        let mdPathRaw = mdMatch[1].replace(/^\.\//, '')
-        if (mdPathRaw.startsWith('/')) mdPathRaw = mdPathRaw.replace(/^\//, '')
+        let mdPathRaw = normalizePath(mdMatch[1])
         try {
           let resolved
         try {

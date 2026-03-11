@@ -1,4 +1,5 @@
 import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug } from './filesManager.js'
+import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 
 // in-memory LRU cache to avoid repeating slug resolution logic.
 // The Map insertion order is used to evict the oldest entry when the max
@@ -113,8 +114,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
       if (u.origin !== location.origin) continue
       const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/) 
       if (mdMatch) {
-        let candidate = mdMatch[1].replace(/^\.\//, '')
-        if (candidate.startsWith('/')) candidate = candidate.replace(/^\//, '')
+        let candidate = normalizePath(mdMatch[1])
         if (candidate) localCandidates.add(candidate)
         continue
       }
@@ -125,10 +125,10 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
         // sibling/index filenames; the content build should always reference
         // the correct markdown path or rely on slug-based navigation.
         const contentBaseUrl = new URL(contentBase)
-        const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+        const contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
         if (p.indexOf(contentBasePath) !== -1) {
-          let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
-          rel = rel.replace(/^[\.\/]+/, '')
+          let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p
+          rel = normalizePath(rel)
           if (rel) localCandidates.add(rel)
         }
       }
@@ -242,7 +242,10 @@ export async function fetchPageData(raw, contentBase) {
     if (!String(resolved).includes('.md') && !String(resolved).includes('.html')) {
       let decoded = decodeURIComponent(String(resolved || ''))
       // strip leading/trailing slashes to match slugManager normalization
-      if (decoded && typeof decoded === 'string') decoded = decoded.replace(/^\/+|\/+$/g, '')
+      if (decoded && typeof decoded === 'string') {
+        decoded = normalizePath(decoded)
+        decoded = trimTrailingSlash(decoded)
+      }
       if (slugToMd.has(decoded)) {
         resolved = slugToMd.get(decoded)
       } else {
@@ -268,7 +271,7 @@ export async function fetchPageData(raw, contentBase) {
   for (const candidate of pageCandidates) {
     if (!candidate) continue
     try {
-      const norm = String(candidate).replace(/^[\.\/]+/, '')
+      const norm = normalizePath(candidate)
       data = await fetchMarkdown(norm, contentBase)
       pagePath = norm
       break

@@ -1,6 +1,6 @@
 import 'highlight.js/styles/monokai.css'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase, buildSearchIndex, searchIndex } from './filesManager.js'
-import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
+import { isExternalLink, normalizePath, trimTrailingSlash, safe } from './utils/helpers.js'
 import { createNavTree, preScanHtmlSlugs, preMapMdSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
 import { parseMarkdownToHtml } from './markdown.js'
@@ -229,8 +229,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
         } else {
           const m = (u.pathname || '').match(/([^\/]+\.md)(?:$|[?#])/) 
           if (m) {
-            let md = m[1].replace(/^\.\//, '')
-            if (md.startsWith('/')) md = md.replace(/^\//, '')
+            let md = normalizePath(m[1])
             brandItem.href = '?page=' + encodeURIComponent(md)
           } else {
             // fallback to raw href if it's an external link
@@ -240,7 +239,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
       } catch (e) {
         // non-URL hrefs (hash-only or strange formats) -> handle simple cases
         if (/^[#].*\.md$/.test(rawHref)) brandItem.href = '?page=' + encodeURIComponent(rawHref.replace(/^#/, ''))
-        else if (/\.md$/.test(rawHref)) brandItem.href = '?page=' + encodeURIComponent(rawHref.replace(/^\.\//, ''))
+        else if (/\.md$/.test(rawHref)) brandItem.href = '?page=' + encodeURIComponent(normalizePath(rawHref))
         else brandItem.href = rawHref
       }
       brandItem.textContent = firstLink.textContent || t('home')
@@ -341,7 +340,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
       try {
         // Markdown links -> keep existing behavior
         if (/^[^#]*\.md(?:$|[#?])/.test(href) || href.endsWith('.md')) {
-          const mdRaw = href.replace(/^\.\//, '')
+          const mdRaw = normalizePath(href)
           // support legacy '::' or hash anchors in nav links
           const parts = mdRaw.split(/::|#/, 2)
           const mdPath = parts[0]
@@ -349,7 +348,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           item.href = '?page=' + encodeURIComponent(mdPath) + (frag ? '#' + encodeURIComponent(frag) : '')
         } else if (/\.html(?:$|[#?])/.test(href) || href.endsWith('.html')) {
           // HTML file - fetch title to produce friendly slug and map it
-          let raw = href.replace(/^\.\//, '')
+          let raw = normalizePath(href)
           const parts = raw.split(/::|#/, 2)
           let htmlPath = parts[0]
           // ensure explicit .html suffix when missing, as authors may link

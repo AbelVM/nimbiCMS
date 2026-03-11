@@ -89,6 +89,10 @@ export function fetchPageData(raw: string, contentBase: string): Promise<{data:a
 export function fetchMarkdown(path: string, base: string): Promise<{raw:string,isHtml?:boolean,status?:number}>
 export function isExternalLink(href: string): boolean
 export function normalizePath(p: string): string
+export function trimTrailingSlash(u: string): string
+export function ensureTrailingSlash(u: string): string
+export function joinPaths(...parts: string[]): string
+export function encodeURL(u: string): string
 export function setLazyload(img: HTMLImageElement): void
 export function safe(fn: Function): any
 
