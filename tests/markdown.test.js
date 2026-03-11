@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest'
-import { detectFenceLanguages } from '../src/markdown.js'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
+import { detectFenceLanguages, parseMarkdownToHtml, addMarkdownExtension, setMarkdownExtensions, markdownExtensions } from '../src/markdown.js'
 import { registerLanguage, BAD_LANGUAGES } from '../src/codeblocksManager.js'
 import { registerLanguage as regFromCms } from '../src/nimbi-cms.js'
+import initCMS from '../src/nimbi-cms.js'
 
 // helper to create a small "supported" map simulating fetched data
 function makeMap(entries) {
@@ -81,5 +82,43 @@ describe('markdown utilities', () => {
     expect(ok).toBe(true)
     const ok2 = await regFromCms('javascript')
     expect(ok2).toBe(true)
+  })
+
+  describe('markdown extension plugins', () => {
+    beforeEach(() => {
+      // clear any leftover plugins before each test
+      setMarkdownExtensions([])
+    })
+
+    it('can register an extension directly', async () => {
+      const ext = {
+        renderer: {
+          paragraph() {
+            return `<p>PLUGIN</p>`
+          }
+        }
+      }
+      addMarkdownExtension(ext)
+      const result = await parseMarkdownToHtml('hello')
+      // the paragraph renderer should replace entire paragraph with PLUGIN
+      expect(result.html.trim()).toBe('<p>PLUGIN</p>')
+    })
+
+    it('honors extensions passed to initCMS', async () => {
+      // plugin that uppercases headings
+      const ext = {
+        renderer: {
+          heading() {
+            return '<h1>UP</h1>'
+          }
+        }
+      }
+      // run initCMS with the extension; minimal DOM stub
+      document.body.innerHTML = '<div id="app"></div>'
+      global.fetch = vi.fn(async url => ({ ok: true, text: () => Promise.resolve('# home') }))
+      await initCMS({ el: '#app', searchIndex: false, markdownExtensions: [ext] })
+      const res = await parseMarkdownToHtml('# hi')
+      expect(res.html).toContain('UP')
+    })
   })
 })

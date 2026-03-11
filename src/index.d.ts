@@ -112,8 +112,11 @@ export function _clearHooks(): void
 
 
 // --- from src/markdown.js
+export function addMarkdownExtension(plugin: object): any
+export function setMarkdownExtensions(plugins: object[]): any
 export function parseMarkdownToHtml(md: string): Promise<{html:string,meta:object,toc:Array<{level:number,text:string,id:string}>}>
 export function detectFenceLanguages(md: string, supportedMap: Map<string,string>): Set<string>
+
 
 // --- from src/l10nManager.js
 export function t(opts: any): string

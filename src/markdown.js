@@ -1,5 +1,36 @@
 // helper utilities for working with Markdown content
 import { marked } from 'marked'
+
+// user-provided marked plugin objects will be stored here; each entry is an
+// object that can contain `tokenizer`, `renderer`, `walkTokens`, etc., as
+// defined by the marked plugin API.
+export const markdownPlugins = []
+
+/**
+ * Register a new marked plugin.  The object is passed directly to
+ * `marked.use()` which merges its fields into the global parser.
+ * @param {object} plugin
+ */
+export function addMarkdownExtension(plugin) {
+  if (plugin && typeof plugin === 'object') {
+    markdownPlugins.push(plugin)
+    try { marked.use(plugin) } catch (e) { }
+  }
+}
+
+/**
+ * Replace the full plugin list.  Existing list is cleared first.
+ * @param {Array<object>} plugins
+ */
+export function setMarkdownExtensions(plugins) {
+  markdownPlugins.length = 0
+  if (Array.isArray(plugins)) {
+    markdownPlugins.push(...plugins.filter(p=>p && typeof p === 'object'))
+  }
+  try {
+    markdownPlugins.forEach(p => marked.use(p))
+  } catch (e) { }
+}
 import { parseFrontmatter } from './utils/frontmatter.js'
 import { slugify } from './filesManager.js'
 import hljs from 'highlight.js/lib/core'
@@ -22,6 +53,10 @@ export async function parseMarkdownToHtml(md) {
     headerIds: false,
     headerPrefix: ''
   })
+  // ensure any registered plugins are applied; marked ignores duplicates
+  if (markdownPlugins && markdownPlugins.length) {
+    try { markdownPlugins.forEach(p=>marked.use(p)) } catch (e) { }
+  }
   let html = marked.parse(content)
 
   try {

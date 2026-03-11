@@ -8,6 +8,7 @@ import { parseMarkdownToHtml } from './markdown.js'
 import { fetchPageData } from './router.js'
 import { loadSupportedLanguages } from './codeblocksManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
+import * as markdown from './markdown.js'
 import { ensureBulma, setStyle, setThemeVars } from './bulmaManager.js'
 
 // Pre-scan nav links for HTML files and map title/H1 -> slug to avoid nav-time fetches
@@ -112,9 +113,10 @@ export function _clearHooks() {
  * @param {string|null} [options.l10nFile] - path to localization file
  * @param {number} [options.cacheTtlMinutes=5] - resolution cache time‑to‑live in minutes
  * @param {number} [options.cacheMaxEntries] - maximum number of resolution cache entries (defaults to module constant)
+ * @param {Array<object>} [options.markdownExtensions] - list of marked extensions to register on init
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
-export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, searchIndex: searchEnabled = true, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null, cacheTtlMinutes = 5, cacheMaxEntries } = {}) {
+export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, searchIndex: searchEnabled = true, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null, cacheTtlMinutes = 5, cacheMaxEntries, markdownExtensions } = {}) {
       if (!el) throw new Error('el is required')
 
       let mountEl = el
@@ -196,6 +198,16 @@ export async function initCMS({ el, contentPath = '/content', /* eslint-disable 
     if (typeof router.setResolutionCacheMax === 'function') {
       router.setResolutionCacheMax(cacheMaxEntries)
     }
+  }
+  // register any markdown extensions passed on init
+  if (markdownExtensions && Array.isArray(markdownExtensions) && markdownExtensions.length) {
+    try {
+      markdownExtensions.forEach(ext => {
+        if (typeof ext === 'object' && markdown && typeof markdown.addMarkdownExtension === 'function') {
+          markdown.addMarkdownExtension(ext)
+        }
+      })
+    } catch (_) {}
   }
 
   // allow crawling behavior to be tuned by consumer

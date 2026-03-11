@@ -140,11 +140,7 @@ Recent behaviour fixes worth knowing:
   `#app`). A DOM element is also accepted for compatibility.
 - `contentPath` – URL path to the content folder serving raw `.md` files
   (default `./content` or `/content`). The library normalizes trailing slashes.
-- `cacheTtlMinutes` – **number** (default `5`).  Time‑to‑live for slug
-  resolution cache entries, expressed in minutes.  Internally this is
-  converted to milliseconds and assigned to `RESOLUTION_CACHE_TTL` in the
-  router module.  Setting this to `0` effectively turns off expiration (the
-  cache is still size‑bounded by cacheMaxEntries).
+- `cacheTtlMinutes` – **number** (default `5`).  Time‑to‑live for slug resolution cache entries, expressed in minutes.  Internally this is converted to milliseconds and assigned to `RESOLUTION_CACHE_TTL` in the router module.  Setting this to `0` effectively turns off expiration (the cache is still size‑bounded by cacheMaxEntries).
 - `cacheMaxEntries` – **number** (optional).  Maximum number of entries the
   router will hold in its resolution cache.  If unspecified the built‑in
   constant `RESOLUTION_CACHE_MAX` (currently 100) is used.  Fine‑tune this
@@ -183,6 +179,7 @@ Recent behaviour fixes worth knowing:
   - `'local'`: load `<contentPath>/bulma.css` or `/bulma.css` and inject it.
   - `'{theme_name}'`: load from `https://unpkg.com/bulmaswatch/{theme_name}`.
 - `highlightTheme` – initial highlight.js theme (default `monokai`).
+- `markdownExtensions` – **Array&lt;object&gt;** (optional). A list of [marked](https://github.com/markedjs/marked) extension/plugin objects to register during initialization. These will be added via `addMarkdownExtension()` before any content is rendered; useful for custom syntax, link transformations, or other parser tweaks.
 
 > **Note:** the formerly available `languages` option has been removed. Fenced-
 > code detection handles language registration automatically.
@@ -229,6 +226,7 @@ can grab from the bundle.  Examples follow each group.
   runHooks('onPageLoad', { pagePath:'foo.md', article:el })
   ```
 
+- markdown plug-in helpers: addMarkdownExtension(ext) & setMarkdownExtensions(list) allow runtime registration of marked extensions.
 - Slug/markdown helpers: `slugToMd`, `mdToSlug` (maps), `ensureSlug()`,
   `crawlForSlug()`, `setContentBase()`, `clearFetchCache()`, and the
   `fetchCache` map.  Handy if you want to show a list of all slugs or resolve
