@@ -117,7 +117,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
  * @param {string} resolved
  * @returns {string[]}
  */
-function buildPageCandidates(resolved) {
+export function buildPageCandidates(resolved) {
   const pageCandidates = []
   if (String(resolved).includes('.md') || String(resolved).includes('.html')) {
     pageCandidates.push(resolved)
@@ -216,5 +216,4 @@ export async function fetchPageData(raw, contentBase) {
 
 // helpers exposed for unit tests
 // Export internals used by the test-suite and other modules.
-export { resolutionCacheGet as resolutionCacheGet, resolutionCacheSet as resolutionCacheSet, buildPageCandidates }
 
