@@ -9,18 +9,18 @@ export default ({ command }) => {
         lib: {
           entry: path.resolve(__dirname, 'src/lib/index.js'),
           name: 'nimbiCMS',
-          formats: ['es','cjs','umd'],
+          formats: ['es', 'cjs', 'umd'],
           // emit a plain nimbi-cms.js for UMD (no .umd suffix)
           fileName: (format) => format === 'umd' ? 'nimbi-cms.js' : `nimbi-cms.${format}.js`
         },
-        
+
         rollupOptions: {
           output: { exports: 'named', inlineDynamicImports: true }
         }
       }
     })
   }
-    return defineConfig({
+  return defineConfig({
     server: { port: 5173 },
     worker: { format: 'es' },
     build: {
