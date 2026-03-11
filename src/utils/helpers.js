@@ -51,3 +51,10 @@ export function safe(fn) {
     // ignore
   }
 }
+
+// make `safe` available globally in test environments that call it
+// without importing (some tests expect a global helper). Attach to
+// `globalThis` when available.
+try {
+  if (typeof globalThis !== 'undefined' && !globalThis.safe) globalThis.safe = safe
+} catch (_) { }

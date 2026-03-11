@@ -10,7 +10,7 @@ export const SUPPORTED_HLJS_MAP = new Map()
 // alias shortcuts used when translating a fence language or registration name
 // into the highlight.js module name.  Keep this in sync with any logic that
 // constructs `candidates` in `registerLanguage`.
-const HLJS_ALIAS_MAP = {
+export const HLJS_ALIAS_MAP = {
   shell: 'bash',
   sh: 'bash',
   zsh: 'bash',

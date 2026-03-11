@@ -3,7 +3,7 @@ import { marked } from 'marked'
 import { parseFrontmatter } from './utils/frontmatter.js'
 import { slugify } from './filesManager.js'
 import hljs from 'highlight.js/lib/core'
-import { BAD_LANGUAGES } from './codeblocksManager.js'
+import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
 
 // parse markdown into HTML and gather TOC data
 /**
@@ -108,12 +108,22 @@ export function detectFenceLanguages(md, supportedMap) {
       // avoids dropping common two-letter names like "js" during
       // initial page load when the asynchronous language list hasn't
       // arrived yet.
-      if (supportedMap && supportedMap.size && name.length < 3 && !supportedMap.has(name)) continue
+      if (supportedMap && supportedMap.size && name.length < 3 && !supportedMap.has(name) && !(HLJS_ALIAS_MAP && HLJS_ALIAS_MAP[name] && supportedMap.has(HLJS_ALIAS_MAP[name]))) continue
       if (supportedMap && supportedMap.size) {
         if (supportedMap.has(name)) {
           const canonical = supportedMap.get(name)
           if (canonical) set.add(canonical)
           continue
+        }
+        // handle common short aliases (e.g. 'js' -> 'javascript') using
+        // the alias map from the codeblocks manager
+        if (HLJS_ALIAS_MAP && HLJS_ALIAS_MAP[name]) {
+          const mapped = HLJS_ALIAS_MAP[name]
+          if (supportedMap.has(mapped)) {
+            const canonical = supportedMap.get(mapped) || mapped
+            set.add(canonical)
+            continue
+          }
         }
       }
       const isKnown = FALLBACK_KNOWN.has(name)

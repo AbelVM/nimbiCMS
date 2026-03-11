@@ -121,7 +121,7 @@ export function slugify(s) {
 // simple in-memory cache of fetchMarkdown responses keyed by the resolved URL
 export const fetchCache = new Map()
 
-function clearFetchCache() {
+export function clearFetchCache() {
   fetchCache.clear()
 }
 
