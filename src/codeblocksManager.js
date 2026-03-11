@@ -156,8 +156,12 @@ export async function registerLanguage(name, modulePath) {
   // ensure supported list is fetched lazily the first time we attempt
   // any registration (useful when initCMS didn't pre-load it).
   if (!loadSupportedLanguagesPromise) {
-    // fire-and-forget
-    loadSupportedLanguages().catch(() => {})
+    // fire-and-forget, swallow errors using async IIFE
+    ;(async () => {
+      try {
+        await loadSupportedLanguages()
+      } catch (_) { }
+    })()
   }
   // normalize missing values to an empty string so callers that pass
   // `undefined` don't end up attempting to import the literal
@@ -249,7 +253,9 @@ let __hlObserver = null
 export function observeCodeBlocks(root = document) {
   // make sure we have fetched supported languages list lazily when we start
   if (!loadSupportedLanguagesPromise) {
-    loadSupportedLanguages().catch(() => {})
+    ;(async () => {
+      try { await loadSupportedLanguages() } catch (_) { }
+    })()
   }
   const aliasMapLocal = HLJS_ALIAS_MAP
   const ensureObserver = () => {
@@ -268,7 +274,9 @@ export function observeCodeBlocks(root = document) {
               const l = (match[1] || '').toLowerCase()
               const mapped = aliasMapLocal[l] || l
               const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
-              try { await registerLanguage(canonical).catch(() => {}) } catch (_) { }
+              try {
+                await registerLanguage(canonical)
+              } catch (_) { }
               try {
                 // highlightElement may mutate the element's class (adding
                 // language-<name>). Only use highlightElement when an
@@ -312,7 +320,9 @@ export function observeCodeBlocks(root = document) {
           const l = (match[1] || '').toLowerCase()
           const mapped = aliasMapLocal[l] || l
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
-          try { await registerLanguage(canonical).catch(() => {}) } catch (_) { }
+          try {
+          await registerLanguage(canonical)
+        } catch (_) { }
         }
         try { hljs.highlightElement(el) } catch (_) { }
       } catch (_) { }

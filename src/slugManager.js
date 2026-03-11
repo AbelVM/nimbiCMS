@@ -191,7 +191,12 @@ export let fetchMarkdown = async function(path, base) {
           }
         } catch (_ee) { }
       }
-      const body = await res.clone().text().catch(() => '')
+      let body = ''
+      try {
+        body = await res.clone().text()
+      } catch (_) {
+        body = ''
+      }
       console.error('fetchMarkdown failed:', { url, status: res.status, statusText: res.statusText, body: body.slice(0, 200) })
       throw new Error('failed to fetch md')
     }

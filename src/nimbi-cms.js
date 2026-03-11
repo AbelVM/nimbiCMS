@@ -310,7 +310,16 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
 
       // kick off index build right away and remember promise for later
       try {
-        searchIndexPromise = import('./filesManager.js').then(fm => fm.buildSearchIndex(contentBase)).catch(() => [])
+        // buildSearchIndex returns a promise; await it inside a try/catch to
+        // swallow errors rather than chaining a .catch() on the import
+        searchIndexPromise = (async () => {
+          try {
+            const fm = await import('./filesManager.js')
+            return fm.buildSearchIndex(contentBase)
+          } catch (_) {
+            return []
+          }
+        })()
       } catch (_) {
         searchIndexPromise = Promise.resolve([])
       }

@@ -439,8 +439,11 @@ function parseHtml(raw) {
           // waiting for the module; registration is best-effort.
           const l = (match[1] || '').toLowerCase()
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-          try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
           try {
+            ;(async () => {
+              try { await registerLanguage(canonical) } catch (_) { }
+            })()
+          } catch (_) { }          try {
             // If a language class was present we can safely call
             // highlightElement which may set classnames. If none, prefer
             // highlightAuto and avoid mutating the element's language
@@ -494,9 +497,13 @@ async function ensureLanguages(raw) {
   for (const l of langs) {
     try {
       const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-      try { promises.push(registerLanguage(canonical).catch(() => {})) } catch (_) { }
+      try {
+        promises.push(registerLanguage(canonical))
+      } catch (_) { }
       if (String(l) !== String(canonical)) {
-        try { promises.push(registerLanguage(l).catch(() => {})) } catch (_) { }
+        try {
+          promises.push(registerLanguage(l))
+        } catch (_) { }
       }
     } catch (_) { }
   }
