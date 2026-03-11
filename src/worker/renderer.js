@@ -30,10 +30,14 @@ marked.setOptions({
   gfm: true,
   headerIds: true,
   mangle: false,
-  highlight: (code, lang) => {
+    highlighted: (code, lang) => {
     try {
       if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value
-      return hljs.highlightAuto(code).value
+      // Prefer plaintext if available; otherwise return raw code
+      if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+        return hljs.highlight(code, { language: 'plaintext' }).value
+      }
+      return code
     } catch (e) {
       return code
     }

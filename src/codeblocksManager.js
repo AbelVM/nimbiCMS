@@ -130,7 +130,10 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
           const sepKey = ':---------------------'
           if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
         } catch (_) { }
-
+        // Log the supported languages list for debugging/visibility.
+        try {
+          const keys = Array.from(SUPPORTED_HLJS_MAP.keys()).sort()
+        } catch (_) { }
       } catch (_) { }
     } catch (_) {
     }
@@ -156,7 +159,12 @@ export async function registerLanguage(name, modulePath) {
     // fire-and-forget
     loadSupportedLanguages().catch(() => {})
   }
-  if (!name || typeof name !== 'string') return false
+  // normalize missing values to an empty string so callers that pass
+  // `undefined` don't end up attempting to import the literal
+  // 'undefined' module.
+  name = (name === undefined || name === null) ? '' : String(name)
+  name = name.trim()
+  if (!name) return false
   const low = name.toLowerCase()
   // drop explicitly banned languages
   if (BAD_LANGUAGES.has(low)) return false
@@ -173,8 +181,15 @@ export async function registerLanguage(name, modulePath) {
   const aliasMap = HLJS_ALIAS_MAP
   try {
     const base = (modulePath || name || '').toString().replace(/\.js$/i, '').trim()
-    const primary = aliasMap[base] || aliasMap[name] || base || name
-    const candidates = Array.from(new Set([primary, base, name].filter(Boolean))).map(c => String(c).toLowerCase())
+    // Try the explicit name/module first, then aliases.  This ensures
+    // valid names like `pgsql` are attempted before falling back to
+    // broader aliases such as `sql`.
+    const candidates = Array.from(new Set([
+      base,
+      name,
+      aliasMap[base],
+      aliasMap[name]
+    ].filter(Boolean))).map(c => String(c).toLowerCase()).filter(c => c && c !== 'undefined')
     let mod = null
     let lastErr = null
     for (const candidate of candidates) {
@@ -183,11 +198,17 @@ export async function registerLanguage(name, modulePath) {
           mod = await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
         } catch (_localErr) {
           try {
-            const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/es/languages/${candidate}.js`
-            mod = await import(/* @vite-ignore */ esmUrl)
+            const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
+            // Use a runtime-evaluated import to avoid bundler rewrites of
+            // absolute CDN URLs (Vite can rewrite import() specifiers).
+            mod = await new Function('u', 'return import(u)')(esmUrl)
           } catch (_esmErr) {
-            const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/languages/${candidate}.js`
-            mod = await import(/* @vite-ignore */ moduleUrl)
+            try {
+              const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
+              mod = await new Function('u', 'return import(u)')(moduleUrl)
+            } catch (_cdnErr) {
+              // CDN import failed for this candidate
+            }
           }
         }
         if (mod) {
@@ -200,13 +221,17 @@ export async function registerLanguage(name, modulePath) {
             return true
           } catch (_e) {
             lastErr = _e
+            // registration failed for this candidate
           }
         }
       } catch (_e) {
         lastErr = _e
+        // import attempt failed for this candidate
       }
     }
-    if (lastErr) throw lastErr
+    if (lastErr) {
+      throw lastErr
+    }
     return false
   } catch (_) {
     return false
@@ -244,9 +269,29 @@ export function observeCodeBlocks(root = document) {
               const mapped = aliasMapLocal[l] || l
               const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
               try { await registerLanguage(canonical).catch(() => {}) } catch (_) { }
-              try { hljs.highlightElement(el) } catch (_) { }
+              try {
+                // highlightElement may mutate the element's class (adding
+                // language-<name>). Only use highlightElement when an
+                // explicit language class is present. For auto-detection we
+                // use highlightAuto and write the HTML without changing
+                // the element's language class.
+                hljs.highlightElement(el)
+              } catch (_) { }
             } else {
-              try { hljs.highlightElement(el) } catch (_) { }
+              try {
+                const code = el.textContent || ''
+                try {
+                  // Do not run auto-detection. Prefer `plaintext` if
+                  // available; otherwise skip highlighting to avoid
+                  // unnecessary imports or mis-detections.
+                  if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+                    const out = hljs.highlight(code, { language: 'plaintext' })
+                    if (out && out.value) el.innerHTML = out.value
+                  }
+                } catch (_) {
+                  try { hljs.highlightElement(el) } catch (_) { }
+                }
+              } catch (_) { }
             }
           } catch (_) { }
         })()

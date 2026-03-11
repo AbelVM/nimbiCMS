@@ -538,9 +538,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     decoded = decoded.replace(/^\/+|\/+$/g, '')
   }
   if (slugToMd.has(decoded)) {
-    const existing = slugToMd.get(decoded)
-    try { console.log('[slug] cache', decoded, '->', existing) } catch (_) {}
-    return existing
+    return slugToMd.get(decoded)
   }
 
   // allow external resolvers to override the slug before crawling
@@ -550,7 +548,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       if (res) {
         slugToMd.set(decoded, res)
         mdToSlug.set(res, decoded)
-        try { console.log('[slug] resolver', decoded, '->', res) } catch(_) {}
         return res
       }
     } catch (_) { }
@@ -560,7 +557,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   if (allMarkdownPaths && allMarkdownPaths.length) {
     if (listSlugCache.has(decoded)) {
       const p = listSlugCache.get(decoded)
-      try { console.log('[slug] list-cache', decoded, '->', p) } catch (_) {}
       slugToMd.set(decoded, p); mdToSlug.set(p, decoded)
       return p
     }
@@ -575,7 +571,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
             listPathsFetched.add(p)
             if (cand) listSlugCache.set(cand, p)
             if (cand === decoded) {
-              try { console.log('[slug] list', decoded, '->', p) } catch (_) {}
               slugToMd.set(decoded, p); mdToSlug.set(p, decoded)
               return p
             }
@@ -591,7 +586,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     if (idx && idx.length) {
       const match = idx.find(e => e.slug === decoded)
       if (match) {
-        try { console.log('[slug] index', decoded, '->', match.path) } catch(_) {}
         slugToMd.set(decoded, match.path)
         mdToSlug.set(match.path, decoded)
         return match.path
@@ -603,7 +597,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   try {
     const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue)
     if (foundCrawl) {
-      try { console.log('[slug] crawl', decoded, '->', foundCrawl) } catch(_) {}
       slugToMd.set(decoded, foundCrawl)
       mdToSlug.set(foundCrawl, decoded)
       return foundCrawl
@@ -618,7 +611,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       if (res && res.raw) {
         slugToMd.set(decoded, cand)
         mdToSlug.set(cand, decoded)
-        try { console.log('[slug] guess', decoded, '->', cand) } catch(_) {}
         return cand
       }
     } catch (_) { /* ignore failures */ }
@@ -632,7 +624,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         if (slugify(name) === decoded) {
           slugToMd.set(decoded, p)
           mdToSlug.set(p, decoded)
-          try { console.log('[slug] allMd', decoded, '->', p) } catch(_) {}
           return p
         }
       } catch (_) {}

@@ -433,9 +433,40 @@ function parseHtml(raw) {
       try {
         const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
         const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-        if (!match || !match[1]) {
-          try { hljs.highlightElement(codeEl) } catch (_) { }
-        }
+        if (match && match[1]) {
+          // register the language module if present so highlightElement
+          // has the definition available.  We don't block rendering
+          // waiting for the module; registration is best-effort.
+          const l = (match[1] || '').toLowerCase()
+          const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
+          try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
+          try {
+            // If a language class was present we can safely call
+            // highlightElement which may set classnames. If none, prefer
+            // highlightAuto and avoid mutating the element's language
+            // class attribute.
+            const hasLang = !!((codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className)
+            if (hasLang) {
+              try { hljs.highlightElement(codeEl) } catch (_) { }
+            } else {
+              try {
+                const out = hljs.highlightAuto ? hljs.highlightAuto(codeEl.textContent || '') : null
+                if (out && out.value) codeEl.innerHTML = out.value
+              } catch (_) {
+                try { hljs.highlightElement(codeEl) } catch (_) { }
+              }
+            }
+          } catch (_) { }
+            } else {
+              try {
+                // no explicit language: prefer plaintext rendering if
+                // available, otherwise avoid auto-detection.
+                if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+                  const out = hljs.highlight ? hljs.highlight(codeEl.textContent || '', { language: 'plaintext' }) : null
+                  if (out && out.value) codeEl.innerHTML = out.value
+                }
+              } catch (_) { }
+            }
       } catch (_) { }
     })
     const tocEntries = []
@@ -456,20 +487,20 @@ function parseHtml(raw) {
  *
  * @param {string} raw - markdown text to scan
  */
-function ensureLanguages(raw) {
+async function ensureLanguages(raw) {
   const langsArray = detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP)
   const langs = new Set(langsArray)
+  const promises = []
   for (const l of langs) {
     try {
       const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
-      if (!registeredLangs.has(canonical)) {
-        try { registerLanguage(canonical).catch(() => {}) } catch (_) { }
-      }
-      if (String(l) !== String(canonical) && !registeredLangs.has(l)) {
-        try { registerLanguage(l).catch(() => {}) } catch (_) { }
+      try { promises.push(registerLanguage(canonical).catch(() => {})) } catch (_) { }
+      if (String(l) !== String(canonical)) {
+        try { promises.push(registerLanguage(l).catch(() => {})) } catch (_) { }
       }
     } catch (_) { }
   }
+  try { await Promise.all(promises) } catch (_) { }
 }
 
 /**
@@ -480,7 +511,7 @@ function ensureLanguages(raw) {
  * @returns {Promise<{html:string,meta:Object,toc:Array}>}
  */
 async function parseMarkdown(raw) {
-  ensureLanguages(raw)
+  await ensureLanguages(raw)
   return await parseMarkdownToHtml(raw || '')
 }
 
@@ -507,6 +538,25 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const article = document.createElement('article')
     article.className = 'nimbi-article content'
     article.innerHTML = parsed.html
+    try {
+      // sanitize any accidental `language-undefined` classes that may
+      // have slipped through (ensure markdown and HTML paths behave
+      // consistently). Remove class entirely for blocks without a
+      // real language so lazy registration doesn't try to load
+      // 'undefined'.
+      const codeEls = article.querySelectorAll('pre code, code[class]')
+      codeEls.forEach(el => {
+        try {
+          const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
+          const cleaned = String(raw || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+          if (cleaned) {
+            try { el.setAttribute && el.setAttribute('class', cleaned) } catch (_) { el.className = cleaned }
+          } else {
+            try { el.removeAttribute && el.removeAttribute('class') } catch (_) { el.className = '' }
+          }
+        } catch (_) { }
+      })
+    } catch (_) { }
     try { observeCodeBlocks(article) } catch (_) { }
 
     lazyLoadImages(article, pagePath, contentBase)

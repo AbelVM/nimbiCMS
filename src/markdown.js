@@ -41,10 +41,35 @@ export async function parseMarkdownToHtml(md) {
       const codes = doc.querySelectorAll('pre code')
       codes.forEach(codeEl => {
         try {
-          const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+          // strip any accidental "undefined" tokens that some markdown
+          // renderers attach when no language was provided.  Prefer an
+          // empty class rather than `language-undefined` which later
+          // confuses dynamic loaders.
+          const rawCls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+          const cleanedCls = String(rawCls || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+          if (cleanedCls) {
+            try { codeEl.setAttribute && codeEl.setAttribute('class', cleanedCls) } catch (_) { codeEl.className = cleanedCls }
+          } else {
+            try { codeEl.removeAttribute && codeEl.removeAttribute('class') } catch (_) { codeEl.className = '' }
+          }
+          const cls = cleanedCls
           const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
           if (!match || !match[1]) {
-            try { hljs.highlightElement(codeEl) } catch (e) { }
+            try {
+              const code = codeEl.textContent || ''
+              try {
+                // Prefer rendering as plain text without auto-detection.
+                // If the runtime includes a registered 'plaintext' language
+                // use it; otherwise avoid `highlightAuto` and leave the
+                // code unchanged so no dynamic language import is attempted.
+                if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+                  const out = hljs.highlight(code, { language: 'plaintext' })
+                  if (out && out.value) codeEl.innerHTML = out.value
+                }
+              } catch (_) {
+                try { hljs.highlightElement(codeEl) } catch (e) { }
+              }
+            } catch (e) { }
           }
         } catch (e) { }
       })
