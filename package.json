@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:example": "npm run build -- --outDir example/dist --config vite.config.js && vite example --port 5173",
+    "dev:example": "sh -c \"npm run build -- --outDir example/dist --config vite.config.js && vite example --port 5173 &\"",
     "build": "vite build",
     "build:lib": "vite build --config vite.config.js",
     "preview": "vite preview",
