@@ -9,7 +9,8 @@
     "build": "vite build",
     "build:lib": "vite build --config vite.config.js",
     "preview": "vite preview",
-    "test": "npx vitest run"
+    "test": "npx vitest run",
+    "gen-dts": "node scripts/gen-dts.js"
   },
   "dependencies": {
     "bulma": "^1.0.4",
@@ -17,10 +18,13 @@
     "marked": "^17.0.4"
   },
   "devDependencies": {
+    "comment-parser": "^0.7.6",
     "eslint": "^10.0.3",
+    "glob": "^10.4.1",
     "jsdom": "^28.1.0",
     "reading-time": "^1.5.0",
     "terser": "^5.17.0",
+    "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vitest": "^4.0.18"
   },

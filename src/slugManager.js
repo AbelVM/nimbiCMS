@@ -15,7 +15,17 @@ export const slugToMd = new Map()
 // return a markdown path for a given slug.  These are checked before any
 // fallback logic.
 export const slugResolvers = new Set()
+/**
+ * Register a custom resolver function.  The function should accept a slug
+ * string and return a markdown path (or promise thereof) or `null` if not
+ * resolved.
+ * @param {Function} fn
+ */
 export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.add(fn) }
+/**
+ * Unregister a previously added resolver.
+ * @param {Function} fn
+ */
 export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.delete(fn) }
 /**
  * reverse mapping of `slugToMd` (markdown path -> slug).
@@ -46,6 +56,11 @@ let _allMd = {}
 export let allMarkdownPaths = []
 
 // helper used by tests to simulate injection of markdown data
+/**
+ * Replace internal manifest used by `setContentBase` with a custom object
+ * (keyed by full path).  Intended for unit tests.
+ * @param {Object<string,string>} obj
+ */
 export function _setAllMd(obj) {
   _allMd = obj || {}
 }
@@ -58,8 +73,18 @@ export const listSlugCache = new Map()
 // set of manifest paths we've already inspected and recorded in
 // `listSlugCache` so we don't re-fetch them.
 export const listPathsFetched = new Set()
+/**
+ * Clear any cached slug lookups derived from the build-time manifest.
+ * Useful in tests when `_allMd` is re‑injected.
+ * @returns {void}
+ */
 export function clearListCaches() { listSlugCache.clear(); listPathsFetched.clear() }
 
+/**
+ * Derive the longest common directory prefix from an array of paths.
+ * @param {string[]} paths
+ * @returns {string}
+ */
 function _deriveCommonPrefix(paths) {
   if (!paths || paths.length === 0) return ''
   let prefix = paths[0]

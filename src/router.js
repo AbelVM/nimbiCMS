@@ -17,6 +17,12 @@ export const resolutionCache = new Map()
 // imports.
 const indexSet = new Set()
 
+/**
+ * Add every value from a Map-like object to the internal `indexSet`.
+ * Used by refreshIndexPaths and map-tracking helpers.
+ *
+ * @param {{values:()=>Iterable}} map - object providing a `values()` iterator.
+ */
 function _augmentIndexWithMap(map) {
   if (!map || typeof map.values !== 'function') return
   for (const v of map.values()) {
@@ -25,6 +31,10 @@ function _augmentIndexWithMap(map) {
 }
 
 // test helper: clear the index cache completely (used by unit tests)
+/**
+ * Empties the internal markdown index set.  Only exposed for testing.
+ * @returns {void}
+ */
 export function _clearIndexCache() {
   indexSet.clear()
 }
@@ -32,6 +42,12 @@ export function _clearIndexCache() {
 // patch Map.prototype.set for our two slug maps so additions automatically
 // update the index set.  We only care about values (markdown paths);
 // keys are slugs which are not needed in the fallback search.
+/**
+ * Instrument a map so that any value inserted also populates the index set.
+ * @param {{set:function}} map - a Map-like object whose `set` method will be
+ *  wrapped.  No-op if `map.set` is not a function.
+ * @returns {void}
+ */
 function _trackMap(map) {
   if (!map || typeof map.set !== 'function') return
   const orig = map.set
@@ -42,6 +58,10 @@ function _trackMap(map) {
 }
 
 let _mapsTracked = false
+/**
+ * Lazily install tracking wrappers on the slug maps; idempotent.
+ * @returns {void}
+ */
 function _ensureMapsTracked() {
   if (_mapsTracked) return
   _trackMap(slugToMd)
