@@ -294,6 +294,9 @@ The TypeScript declaration file includes types for all of these symbols.
 - `setStyle('light'|'dark')` – switch between light and dark modes (adds
   `data-theme` / `is-dark` class). This is the runtime API for dark/light
   toggling.
+- `setLang(code)` – change the UI language on the fly. The string argument
+  is a short locale code (e.g. `'de'`, `'fr'`); it falls back to English
+  if the requested dictionary isn’t available.
 - `setThemeVars(vars)` – apply a set of CSS custom properties (`--foo:bar`)
   on the document root; handy for theming colors/fonts without rebuilding
   Bulma.
@@ -384,6 +387,10 @@ colors can be changed with `setHighlightTheme()` (CDN load if `useCdn=true`).
 - Built‑in defaults live in `DEFAULT_L10N`; loaded files merge on top and fall
   back to English.
 
+After initialization you can also change the UI language at any time by
+calling the exported `setLang(code)` helper. This updates internal state so
+subsequent calls to `t()` return strings from the new dictionary.
+
 Example translation file:
 
 ```json
@@ -397,6 +404,10 @@ Usage:
 ```js
 // contentPath is optional
 initCMS({ el: '#app', l10nFile: '/i18n/l10n.json', lang: 'de' })
+
+// later, switch to French at runtime
+import { setLang } from 'nimbi-cms'
+setLang('fr')
 ```
 
 ## Content workflow

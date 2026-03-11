@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import initCMS from '../src/nimbi-cms.js'
 import * as slugMgr from '../src/slugManager.js'
 import * as router from '../src/router.js'
+import { t, setLang, currentLang } from '../src/l10nManager.js'
 
 // minimal DOM support
 function makeAppContainer() {
@@ -53,5 +54,13 @@ describe('initCMS option handling', () => {
       router.setResolutionCacheMax(orig)
     }
     expect(router.RESOLUTION_CACHE_MAX).toBe(orig)
+  })
+
+  it('uses the lang option to set initial UI language', async () => {
+    makeAppContainer()
+    setLang('en') // ensure we start from english
+    await initCMS({ el: '#app', searchIndex: false, lang: 'de' })
+    expect(currentLang).toBe('de')
+    expect(t('home')).toBe('Startseite')
   })
 })

@@ -683,4 +683,7 @@ export { registerLanguage, loadSupportedLanguages, observeCodeBlocks, setHighlig
 // theming helpers
 export { setStyle, setThemeVars } from './bulmaManager.js'
 
+// localization helper functions exposed for runtime language switching
+export { t, loadL10nFile, setLang } from './l10nManager.js'
+
 export default initCMS
