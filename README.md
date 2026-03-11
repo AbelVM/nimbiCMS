@@ -151,6 +151,7 @@ Recent behaviour fixes worth knowing:
   traversal.  Setting this to `0` disables the guard; a lower value improves
   safety on deeply nested content trees but may prevent discovery of pages in
   extreme structures.
+- `languages` – **string[]** (optional). When provided, the CMS treats the first segment of each markdown path as a locale code and maintains separate slug mappings for every language. Supply the full set of supported codes (for example ['en','fr'] for content/en/... and content/fr/...). During navigation the slug resolver will prefer the mapping that matches the current UI language (see `setLang()`); if no match exists it falls back to a default or the first available translation. Leave this unset or use an empty array for a single-language site with all content at the root of `contentPath`.
 - `searchIndex` – **boolean** (default `true`). When enabled the CMS
   builds a lightweight index of page titles/excerpts and inserts a search box
   into the navbar.  The search input is initially disabled and shows a
@@ -428,6 +429,24 @@ Example nav markup:
 [Blog](blog.md)
 [About](about.md)
 ```
+
+> **Multilingual example**
+>
+> When using the `languages` option you typically maintain separate
+> directories for each locale. A sample `_navigation.md` for English/
+> French might look like:
+>
+> ```markdown
+> /en/:
+> - [Home](en/_home.md)
+> - [About](en/about.md)
+>
+> /fr/:
+> - [Accueil](fr/_home.md)
+> - [À propos](fr/about.md)
+> ```
+>
+> and you would initialize the CMS with `languages:['en','fr']`.
 
 Links are converted to hash‑based navigation (`?page=…`), preserving anchors.
 

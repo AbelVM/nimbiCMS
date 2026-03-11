@@ -1,4 +1,5 @@
-import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug, resolveSlugPath } from './filesManager.js'
+import * as l10n from './l10nManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 
 // in-memory cache to avoid repeating slug resolution logic.  We employ a
@@ -281,10 +282,12 @@ export function buildPageCandidates(resolved) {
     try {
       const dec = decodeURIComponent(String(resolved || ''))
       if (slugToMd.has(dec)) {
-        const val = slugToMd.get(dec)
-        pageCandidates.push(val)
-        if (val && !val.includes('.md') && !val.includes('.html')) {
-          pageCandidates.push(val + '.html')
+        const val = resolveSlugPath(dec) || slugToMd.get(dec)
+        if (val) {
+          pageCandidates.push(val)
+          if (!val.includes('.md') && !val.includes('.html')) {
+            pageCandidates.push(val + '.html')
+          }
         }
       } else {
         // try to find a matching path anywhere in allMarkdownPaths
@@ -335,7 +338,12 @@ export async function fetchPageData(raw, contentBase) {
     anchor = parts[1] || null
   }
 
-  const cached = resolutionCacheGet(raw)
+  // incorporate current UI language into cache key so that
+  // switching languages yields different entries.  We use a separator
+  // unlikely to appear in slugs.
+  const lang = (typeof l10n !== 'undefined' && l10n.currentLang) ? l10n.currentLang : ''
+  const cacheKey = `${raw}|||${lang}`
+  const cached = resolutionCacheGet(cacheKey)
   if (cached) {
     resolved = cached.resolved
     anchor = cached.anchor || anchor
@@ -348,7 +356,7 @@ export async function fetchPageData(raw, contentBase) {
         decoded = trimTrailingSlash(decoded)
       }
       if (slugToMd.has(decoded)) {
-        resolved = slugToMd.get(decoded)
+        resolved = resolveSlugPath(decoded) || slugToMd.get(decoded)
       } else {
         let idx = await tryDiscoverFromIndex(decoded, contentBase)
         if (idx) {
@@ -359,7 +367,7 @@ export async function fetchPageData(raw, contentBase) {
         }
       }
     }
-    resolutionCacheSet(raw, { resolved, anchor })
+    resolutionCacheSet(cacheKey, { resolved, anchor })
   }
 
   if (!anchor && hashAnchor) anchor = hashAnchor

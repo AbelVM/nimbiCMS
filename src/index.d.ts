@@ -56,6 +56,7 @@ export function _clearHooks(): void
 
 
 // --- from src/slugManager.js
+export function setLanguages(list: any): any
 export const slugToMd: any
 export function addSlugResolver(fn: (slug:string,contentBase?:string)=>Promise<string|null>|string|null): void
 export const mdToSlug: any
@@ -65,14 +66,18 @@ export const listSlugCache: any
 export function clearListCaches(): void
 export function setContentBase(contentBase: string): void
 export function slugify(s: string): string
-export const fetchCache: any
+export function resolveSlugPath(slug: string): string|null
 export function clearFetchCache(): any
+export const fetchCache: any
 export const fetchMarkdown: any
 export function buildSearchIndex(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
 export function setDefaultCrawlMaxQueue(n: number): void
 export const crawlForSlug: any
 export function crawlAllMarkdown(contentBase: string, maxQueue: number): Promise<string[]>
 export function ensureSlug(decoded: string, contentBase: string, maxQueue: any): Promise<string|null>
+
+
+
 
 
 

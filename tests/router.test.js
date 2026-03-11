@@ -19,11 +19,14 @@ vi.mock('../src/filesManager.js', async () => {
 import * as router from '../src/router.js'
 import * as files from '../src/filesManager.js'
 import * as slugMgr from '../src/slugManager.js'
+import { setLang } from '../src/l10nManager.js'
 
 describe('router module', () => {
   beforeEach(() => {
     files.slugToMd.clear()
     files.mdToSlug.clear()
+    // reset language to english to avoid bleed from other tests
+    setLang('en')
     // also clear router's internal index cache so each test starts fresh
     router._clearIndexCache()
     // clear the resolution cache map
@@ -80,6 +83,30 @@ describe('router module', () => {
     expect(router.buildPageCandidates('bar')).toEqual(['bar', 'bar.html'])
     // when no mapping exists, a bare slug should probe common extensions
     expect(router.buildPageCandidates('baz')).toEqual(['baz.html', 'baz.md'])
+  })
+
+  it('buildPageCandidates respects current language setting', () => {
+    // simulate multilingual slug map object
+    slugMgr.setLanguages(['en', 'fr'])
+    files.slugToMd.set('foo', { default: 'foo.md', langs: { en: 'en/foo.md', fr: 'fr/foo.md' } })
+    // default Lang is en
+    expect(router.buildPageCandidates('foo')).toEqual(['en/foo.md'])
+    setLang('fr')
+    expect(router.buildPageCandidates('foo')).toEqual(['fr/foo.md'])
+  })
+
+  it('fetchPageData respects language-aware slug mappings', async () => {
+    slugMgr.setLanguages(['en', 'fr'])
+    files.slugToMd.set('foo', { default: 'foo.md', langs: { en: 'en/foo.md', fr: 'fr/foo.md' } })
+    files.fetchMarkdown.mockResolvedValue({ raw: '# Hi', isHtml: false })
+    const base = '/content/'
+    // initial language en
+    let result = await router.fetchPageData('foo', base)
+    expect(result.pagePath).toBe('en/foo.md')
+    setLang('fr')
+    // show cache key being used by router (not directly accessible easily)
+    result = await router.fetchPageData('foo', base)
+    expect(result.pagePath).toBe('fr/foo.md')
   })
 
   it('fetchPageData resolves slugToMd entries, caches results, and uses supplied base without hardcoded paths', async () => {

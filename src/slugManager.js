@@ -11,6 +11,45 @@
  */
 export const slugToMd = new Map()
 
+// list of available language codes when running in a multilingual site.
+// When non-empty, slug-to-path mappings are stored in a nested object
+// so that each language can have its own file.  The option is populated by
+// `setLanguages()` called from `initCMS()`.
+export let availableLanguages = []
+
+// helper for tests and plugins
+export function setLanguages(list) {
+  availableLanguages = Array.isArray(list) ? list.slice() : []
+}
+export function getLanguages() { return availableLanguages }
+
+// import current UI language; slug resolution prefers this when available.
+import * as l10n from './l10nManager.js'
+
+// helper used internally to add slug ↔ path mappings respecting
+// `availableLanguages`.  Normalizes existing entries to object form as
+// needed.  Exposed here only for tests.
+export function _storeSlugMapping(slug, rel) {
+  if (!slug) return
+  if (availableLanguages && availableLanguages.length) {
+    const parts = rel.split('/')
+    const firstSeg = parts[0]
+    const isLang = availableLanguages.includes(firstSeg)
+    let entry = slugToMd.get(slug)
+    if (!entry || typeof entry === 'string') {
+      entry = { default: typeof entry === 'string' ? entry : undefined, langs: {} }
+    }
+    if (isLang) {
+      entry.langs[firstSeg] = rel
+    } else {
+      entry.default = rel
+    }
+    slugToMd.set(slug, entry)
+  } else {
+    slugToMd.set(slug, rel)
+  }
+}
+
 // external slug resolver hooks.  Plugins can register async functions that
 // return a markdown path for a given slug.  These are checked before any
 // fallback logic.
@@ -112,6 +151,7 @@ import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/h
 
 export function setContentBase(contentBase) {
   slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
+  availableLanguages = availableLanguages || []
 
   const keys = Object.keys(_allMd || {})
   if (!keys.length) return
@@ -143,7 +183,26 @@ export function setContentBase(contentBase) {
       if (m && m[1]) {
         const slug = slugify(m[1].trim())
         if (slug) {
-          try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (_e) { }
+          try {
+            if (availableLanguages && availableLanguages.length) {
+              const parts = rel.split('/')
+              const firstSeg = parts[0]
+              const isLang = availableLanguages.includes(firstSeg)
+              let entry = slugToMd.get(slug)
+              if (!entry || typeof entry === 'string') {
+                entry = { default: typeof entry === 'string' ? entry : undefined, langs: {} }
+              }
+              if (isLang) {
+                entry.langs[firstSeg] = rel
+              } else {
+                entry.default = rel
+              }
+              slugToMd.set(slug, entry)
+            } else {
+              slugToMd.set(slug, rel)
+            }
+            mdToSlug.set(rel, slug)
+          } catch (_e) { }
         }
       }
     }
@@ -172,6 +231,33 @@ export function slugify(s) {
   return slug
 }
 
+/**
+ * Given a slug, return the most appropriate markdown path taking the
+ * current UI language and available language list into account.  If no
+ * mapping exists the return value is `null`.
+ *
+ * @param {string} slug
+ * @returns {string|null}
+ */
+export function resolveSlugPath(slug) {
+  if (!slug || !slugToMd.has(slug)) return null
+  const entry = slugToMd.get(slug)
+  if (!entry) return null
+  if (typeof entry === 'string') return entry
+  // entry is object with {default?, langs?}
+  if (availableLanguages && availableLanguages.length && l10n.currentLang) {
+    if (entry.langs && entry.langs[l10n.currentLang]) {
+      return entry.langs[l10n.currentLang]
+    }
+  }
+  if (entry.default) return entry.default
+  if (entry.langs) {
+    const keys = Object.keys(entry.langs)
+    if (keys.length) return entry.langs[keys[0]]
+  }
+  return null
+}
+
 // simple in-memory cache of fetchMarkdown responses keyed by the resolved URL
 /**
  * @type {Map<string,Promise<any>>}
@@ -196,13 +282,12 @@ export let fetchMarkdown = async function(path, base) {
   try {
     const o = (String(path || '').match(/([^\/]+)\.md(?:$|[?#])/) || [])[1]
     if (o && slugToMd.has(o)) {
-      const mapped = slugToMd.get(o)
+      const mapped = resolveSlugPath(o) || slugToMd.get(o)
       if (mapped && mapped !== path) {
         path = mapped
       }
     }
-  } catch (_) {}
-  const baseClean = trimTrailingSlash(base)
+  } catch (_) {}  const baseClean = trimTrailingSlash(base)
   const url = `${baseClean}/${path}`
   if (fetchCache.has(url)) {
     return fetchCache.get(url)
@@ -575,7 +660,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     decoded = trimTrailingSlash(decoded)
   }
   if (slugToMd.has(decoded)) {
-    return slugToMd.get(decoded)
+    return resolveSlugPath(decoded) || slugToMd.get(decoded)
   }
 
   // allow external resolvers to override the slug before crawling
@@ -583,7 +668,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     try {
       const res = await resolver(decoded, contentBase)
       if (res) {
-        slugToMd.set(decoded, res)
+        _storeSlugMapping(decoded, res)
         mdToSlug.set(res, decoded)
         return res
       }
@@ -608,7 +693,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
             listPathsFetched.add(p)
             if (cand) listSlugCache.set(cand, p)
             if (cand === decoded) {
-              slugToMd.set(decoded, p); mdToSlug.set(p, decoded)
+              _storeSlugMapping(decoded, p); mdToSlug.set(p, decoded)
               return p
             }
           }
@@ -623,7 +708,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     if (idx && idx.length) {
       const match = idx.find(e => e.slug === decoded)
       if (match) {
-        slugToMd.set(decoded, match.path)
+        _storeSlugMapping(decoded, match.path)
         mdToSlug.set(match.path, decoded)
         return match.path
       }
@@ -634,7 +719,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   try {
     const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue)
     if (foundCrawl) {
-      slugToMd.set(decoded, foundCrawl)
+      _storeSlugMapping(decoded, foundCrawl)
       mdToSlug.set(foundCrawl, decoded)
       return foundCrawl
     }
@@ -646,7 +731,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     try {
       const res = await fetchMarkdown(cand, contentBase)
       if (res && res.raw) {
-        slugToMd.set(decoded, cand)
+        _storeSlugMapping(decoded, cand)
         mdToSlug.set(cand, decoded)
         return cand
       }
@@ -659,7 +744,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       try {
         const name = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
         if (slugify(name) === decoded) {
-          slugToMd.set(decoded, p)
+          _storeSlugMapping(decoded, p)
           mdToSlug.set(p, decoded)
           return p
         }
@@ -675,7 +760,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       if (mhome && mhome[1]) {
         const homeSlug = slugify(mhome[1].trim())
         if (homeSlug === decoded) {
-          slugToMd.set(decoded, '_home.md')
+          _storeSlugMapping(decoded, '_home.md')
           mdToSlug.set('_home.md', decoded)
           return '_home.md'
         }

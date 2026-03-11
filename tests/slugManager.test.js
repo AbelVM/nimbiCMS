@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as slugMgr from '../src/slugManager.js'
+import { setLang, currentLang } from '../src/l10nManager.js'
 
 // stub fetchMarkdown logic and global fetch when needed
 
@@ -10,6 +11,10 @@ describe('slugManager module', () => {
     slugMgr.searchIndex.splice(0)
     slugMgr.clearFetchCache()
     slugMgr.crawlCache && slugMgr.crawlCache.clear && slugMgr.crawlCache.clear()
+    // ensure any previous language configuration is cleared
+    slugMgr.setLanguages([])
+    // reset UI language to default
+    setLang('en')
     global.fetch = vi.fn()
   })
 
@@ -17,6 +22,32 @@ describe('slugManager module', () => {
     expect(slugMgr.slugify('Hello World')).toBe('hello-world')
     expect(slugMgr.slugify('File.md')).toBe('file')
     expect(slugMgr.slugify('Example.HTML')).toBe('example')
+  })
+
+  it('supports language-aware slug mappings', () => {
+    // configure two languages and populate manifest
+    slugMgr.setLanguages(['en', 'fr'])
+    slugMgr._setAllMd({
+      '/content/en/foo.md': '# Foo',
+      '/content/fr/foo.md': '# Foo',
+      '/content/about.md': '# About'
+    })
+    slugMgr.setContentBase('/content/')
+    // mapping object should have entries for both languages
+    const entry = slugMgr.slugToMd.get('foo')
+    // debug: inspect what paths were recorded for each language
+    expect(entry).toBeTruthy()
+    expect(entry.langs && entry.langs.en).toBe('en/foo.md')
+    expect(entry.langs && entry.langs.fr).toBe('fr/foo.md')
+
+    // default currentLang is 'en'
+    expect(slugMgr.resolveSlugPath('foo')).toBe('en/foo.md')
+    // switch language at runtime
+    setLang('fr')
+    expect(currentLang).toBe('fr')
+    expect(slugMgr.resolveSlugPath('foo')).toBe('fr/foo.md')
+    // slug with only default language available falls back
+    expect(slugMgr.resolveSlugPath('about')).toBe('about.md')
   })
 
   it('ensureSlug returns path for home slug when nothing else known', async () => {
