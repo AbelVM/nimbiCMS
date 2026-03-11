@@ -144,11 +144,17 @@ Recent behaviour fixes worth knowing:
   extreme structures.
 - `searchIndex` – **boolean** (default `true`). When enabled the CMS
   builds a lightweight index of page titles/excerpts and inserts a search box
-  into the navbar.  The input listener filters the index and renders matching
-  links inside `#nimbi-search-results` (hidden when there are no matches).
-  Because the library ship‑side has no content, the index may initially be
-  empty – it fills in as navigation links are parsed or pages are visited.
-  Disable the option to skip the work entirely.
+  into the navbar.  The search input is initially disabled and shows a
+  Bulma loading spinner while the index is being constructed; once ready the
+  field becomes interactive.  Placeholder text is pulled from the
+  localization dictionary under the key `searchPlaceholder` (see `l10n`
+  options).
+
+  The input listener filters the index and renders matching links inside
+  `#nimbi-search-results` (a Bulma `box`) which is hidden when there are no
+  matches.  Because the library ship‑side has no content, the index may
+  initially be empty – it fills in as navigation links are parsed or pages
+  are visited.  Disable the option to skip the work entirely.
 - `defaultStyle` – `'light' | 'dark'` (default `'light'`). Controls initial
   theme; use `setStyle()` to toggle later.
 - `bulmaCustomize` – `'none' | 'local' | '{theme_name}'` (default `'none'`).

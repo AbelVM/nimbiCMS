@@ -155,12 +155,25 @@ describe('htmlBuilder utilities', () => {
     await initCMS({ el: '#app', searchIndex: true })
     const input = document.getElementById('nimbi-search')
     expect(input).toBeTruthy()
+    // placeholder should come from l10n
+    const { t } = require('../src/l10nManager.js')
+    expect(input.placeholder).toBe(t('searchPlaceholder'))
+    // input initially disabled and shows loading spinner
+    expect(input.disabled).toBe(true)
+    expect(input.classList.contains('is-loading')).toBe(true)
+    // wait a bit for indexing to finish
+    await new Promise(r => setTimeout(r, 50))
+    expect(input.disabled).toBe(false)
+    expect(input.classList.contains('is-loading')).toBe(false)
+
+    // now search works
     input.value = 'foo'
     input.dispatchEvent(new Event('input'))
-    // allow async index building (longer to be safe)
     await new Promise(r => setTimeout(r, 50))
     const results = document.getElementById('nimbi-search-results')
     expect(results && results.textContent).toContain('Foo')
+    // results container should use Bulma box class
+    expect(results.classList.contains('box')).toBe(true)
   })
 
   it('scrollToAnchorOrTop scrolls the container element to top when anchor is null', async () => {

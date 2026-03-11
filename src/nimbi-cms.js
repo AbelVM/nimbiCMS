@@ -283,22 +283,44 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
     const start = document.createElement('div')
     start.className = 'navbar-start'
     // optional search UI container on right side
-    let end, searchItem, searchInput, resultsContainer
+    let end, searchItem, searchInput, resultsContainer, searchIndexPromise
     if (searchEnabled) {
       end = document.createElement('div')
       end.className = 'navbar-end'
       searchItem = document.createElement('div')
       searchItem.className = 'navbar-item'
+
       searchInput = document.createElement('input')
       searchInput.className = 'input'
       searchInput.type = 'search'
-      searchInput.placeholder = 'Search...'
+      // placeholder text comes from localization
+      searchInput.placeholder = t('searchPlaceholder') || ''
       searchInput.id = 'nimbi-search'
+      // disable until index has been built and show loading spinner
+      searchInput.disabled = true
+      searchInput.classList.add('is-loading')
       searchItem.appendChild(searchInput)
+
       resultsContainer = document.createElement('div')
       resultsContainer.id = 'nimbi-search-results'
+      // use Bulma "box" style for the dropdown
+      resultsContainer.className = 'box'
       searchItem.appendChild(resultsContainer)
       end.appendChild(searchItem)
+
+      // kick off index build right away and remember promise for later
+      try {
+        searchIndexPromise = import('./filesManager.js').then(fm => fm.buildSearchIndex(contentBase)).catch(() => [])
+      } catch (_) {
+        searchIndexPromise = Promise.resolve([])
+      }
+      // when index ready, re-enable input and remove spinner
+      searchIndexPromise.finally(() => {
+        if (searchInput) {
+          searchInput.disabled = false
+          searchInput.classList.remove('is-loading')
+        }
+      })
     }
 
     for (let i = 0; i < linkEls.length; i++) {
@@ -394,14 +416,6 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
     navbar.appendChild(menu)
     navbarWrap.appendChild(navbar)
 
-    // if search indexing is enabled build the index and hook up UI
-    try {
-      if (searchEnabled) {
-        // build index asynchronously; results will be available once ready
-        try { import('./filesManager.js').then(fm => fm.buildSearchIndex(contentBase).catch(() => {})) } catch (_) {}
-      }
-    } catch (_) {}
-
     // attach search box behavior (only valid if input exists)
     try {
       const input = document.getElementById('nimbi-search')
@@ -415,10 +429,10 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
         }
         items.forEach(it => {
           const a = document.createElement('a')
+          a.className = 'block'
           a.href = '?page=' + encodeURIComponent(it.slug)
           a.textContent = it.title
-          a.style.display = 'block'
-          a.style.padding = '0.25rem 0'
+          // Bulma box padding handles spacing; we still want clickable blocks
           a.addEventListener('click', () => { results.style.display = 'none' })
           results.appendChild(a)
         })
@@ -429,8 +443,9 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           const q = String(input.value || '').trim().toLowerCase()
           if (!q) { showResults([]); return }
           try {
+            // wait for index if it is still building
             const fm = await import('./filesManager.js')
-            const idx = await fm.buildSearchIndex(contentBase)
+            const idx = searchIndexPromise ? await searchIndexPromise : await fm.buildSearchIndex(contentBase)
             const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
             showResults(filtered.slice(0, 10))
           } catch (_) { showResults([]) }
