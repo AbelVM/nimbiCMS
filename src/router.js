@@ -1,4 +1,4 @@
-import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug } from './filesManager.js'
 
 // in-memory LRU cache to avoid repeating slug resolution logic.
 // The Map insertion order is used to evict the oldest entry when the max
@@ -182,29 +182,8 @@ export async function fetchPageData(raw, contentBase) {
         if (idx) {
           resolved = idx
         } else {
-          // final safety net: the home page is required, and it's common for
-          // sites to address it via a slug.  If we haven't yet mapped the
-          // home slug (e.g. because nothing has been rendered), try fetching
-          // its markdown to compute the slug.  This avoids `Page not found`
-          // errors on first load when the only relevant content is the home
-          // file.  We intentionally **do not** guess arbitrary filenames;
-          // only `_home.md` is touched here because that's a known constant
-          // required by the CMS.
-          try {
-            const home = await fetchMarkdown('_home.md', contentBase)
-            if (home && home.raw) {
-              const mhome = (home.raw || '').match(/^#\s+(.+)$/m)
-              if (mhome && mhome[1] && slugToMd.has(decoded) === false) {
-                const homeSlug = slugify(mhome[1].trim())
-                if (homeSlug === decoded) {
-                  resolved = '_home.md'
-                  try { slugToMd.set(decoded, '_home.md'); mdToSlug.set('_home.md', decoded) } catch (_) {}
-                }
-              }
-            }
-          } catch (_) {
-            // ignore failed home fetch; we'll just fall through to error
-          }
+          const found = await ensureSlug(decoded, contentBase)
+          if (found) resolved = found
         }
       }
     }

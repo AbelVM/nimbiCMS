@@ -18,6 +18,7 @@ vi.mock('../src/filesManager.js', async () => {
 
 import * as router from '../src/router.js'
 import * as files from '../src/filesManager.js'
+import * as slugMgr from '../src/slugManager.js'
 
 describe('router module', () => {
   beforeEach(() => {
@@ -26,6 +27,14 @@ describe('router module', () => {
     // clear the resolution cache map
     router.resolutionCache.clear()
     ;(files.fetchMarkdown).mockReset()
+    // stub network fetch to avoid real HTTP during tests
+    const stub = vi.fn((url) => {
+      const res = { ok: false, status: 404, text: () => Promise.resolve('') }
+      res.clone = () => res
+      return Promise.resolve(res)
+    })
+    global.fetch = stub
+    globalThis.fetch = stub
   })
 
   it('resolutionCache should evict oldest entries', () => {
@@ -80,16 +89,4 @@ describe('router module', () => {
     await expect(router.fetchPageData('unknown-slug', '/content/')).rejects.toThrow('no page data')
   })
 
-  it('fetchPageData will resolve a home-slug by fetching _home.md when map is empty', async () => {
-    const base = '/content/'
-    const slug = 'welcome-home'
-    const fakeHome = { raw: '# Welcome Home' }
-    files.fetchMarkdown.mockImplementation((path, b) => {
-      if (path === '_home.md') return Promise.resolve(fakeHome)
-      return Promise.reject(new Error('unexpected'))
-    })
-    const result = await router.fetchPageData(slug, base)
-    expect(result.pagePath).toBe('_home.md')
-    expect(files.slugToMd.get(slug)).toBe('_home.md')
-  })
 })

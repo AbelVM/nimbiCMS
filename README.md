@@ -66,7 +66,12 @@ Recent behaviour fixes worth knowing:
   keep direct links working even before any page has loaded, the router will
   perform a one-time check of the home page’s H1 slug and map it if it
   matches the requested slug; this means cold-start requests to the home
-  slug yield the expected content rather than an error.
+  slug yield the expected content rather than an error.  When a slug isn't
+  found in the navigation we fall back to crawling the `contentPath` using
+  directory listings, looking for a markdown file whose title slug matches
+  the requested value.  This on‑demand traversal means arbitrary files in
+  arbitrarily deep subfolders resolve correctly on static servers, with the
+  results cached for subsequent lookups.
 
 ## Features
 
