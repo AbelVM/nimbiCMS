@@ -37,9 +37,9 @@
     <div id="footer">Footer</div>
     <script src="/dist/nimbi-cms.umd.js"></script>
     <script>
-      const { initCMS } = window.nimbiCMS || {}
+      const initCMS = (window.nimbiCMS && (window.nimbiCMS.initCMS || window.nimbiCMS.default)) || null
       if (!initCMS) {
-        console.error('nimbiCMS UMD bundle not found. Run `npm run build` and ensure /dist/nimbi-cms.umd.js is served.')
+        console.error('NimbiCMS is not loaded. Please check the script path and ensure the library is properly included.')
       } else {
         const contentPath = './content'
         initCMS({ el: '#app', contentPath })

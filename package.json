@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:example": "vite --root example",
     "build": "vite build",
     "build:lib": "vite build --config vite.config.js",
     "preview": "vite preview",

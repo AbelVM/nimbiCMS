@@ -14,7 +14,7 @@ export default ({ command }) => {
         },
         
         rollupOptions: {
-          output: { exports: 'named' }
+          output: { exports: 'named', inlineDynamicImports: true }
         }
       }
     })

@@ -13,14 +13,12 @@ export const mdToSlug = new Map()
 // gather all markdown file paths via Vite glob at build time; this allows slug
 // resolution to work even for files not linked from the navigation.
 // paths are relative to the content base (e.g. 'blog/foo.md').
+// `_allMd` is a map of paths => raw contents or loader functions when
+// using `import.meta.glob`. We intentionally avoid using `import.meta.glob`
+// in the library build to prevent bundling or emitting per-markdown
+// chunks into the UMD/CJS artifacts. Keep an empty map here; the runtime
+// router will attempt to fetch content over HTTP when needed.
 let _allMd = {}
-try {
-  if (import.meta && typeof import.meta.glob === 'function') {
-    _allMd = import.meta.glob('/example/content/**/*.md', { as: 'raw', eager: true })
-  }
-} catch (_) {
-  // fall back to empty object in non-Vite environments (tests)
-}
 /**
  * List of all markdown file paths gathered at build time by Vite globbing.
  * @type {string[]}
@@ -86,12 +84,18 @@ export function setContentBase(contentBase) {
     }
     allMarkdownPaths.push(rel)
 
-    const raw = _allMd[fullPath] || ''
-    const m = (raw || '').match(/^#\s+(.+)$/m)
-    if (m && m[1]) {
-      const slug = slugify(m[1].trim())
-      if (slug) {
-        try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (_e) { }
+    const val = _allMd[fullPath]
+    // If the glob was eager this will be the raw file contents (string).
+    // If not, it's a function that returns a promise; avoid invoking it
+    // here to prevent bundling the file contents. Populate slug maps only
+    // when raw content is immediately available.
+    if (typeof val === 'string') {
+      const m = (val || '').match(/^#\s+(.+)$/m)
+      if (m && m[1]) {
+        const slug = slugify(m[1].trim())
+        if (slug) {
+          try { slugToMd.set(slug, rel); mdToSlug.set(rel, slug) } catch (_e) { }
+        }
       }
     }
   }
