@@ -432,11 +432,18 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           a.className = 'block'
           a.href = '?page=' + encodeURIComponent(it.slug)
           a.textContent = it.title
+          // make sure long titles are truncated with ellipsis
+          a.style.whiteSpace = 'nowrap'
+          a.style.overflow = 'hidden'
+          a.style.textOverflow = 'ellipsis'
           // Bulma box padding handles spacing; we still want clickable blocks
           a.addEventListener('click', () => { results.style.display = 'none' })
           results.appendChild(a)
         })
         results.style.display = 'block'
+          // ensure container is right-aligned (in case CSS not applied yet)
+          results.style.right = '0'
+          results.style.left = 'auto'
       }
       if (input) {
         input.addEventListener('input', async (ev) => {

@@ -207,13 +207,23 @@
 #nimbi-search-results {
     position: absolute;
     top: 100%;
-    left: 0;
+    right: 0;              /* grow to the left from the input */
+    left: auto;
+    margin-right: 0.5rem;  /* keep some space from right border */
+    width: 250px;          /* fixed width ensures ellipsis works */
     /* Bulma .box already provides background, border, and padding */
     display: none;
     max-height: 200px;
     overflow: auto;
     z-index: 100;
 }
+#nimbi-search-results a {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
 #nimbi-search { width: 200px; }
 #nimbi-search-results a { text-decoration: none; color: inherit; }
 #nimbi-search-results a:hover { background: #f5f5f5; }
