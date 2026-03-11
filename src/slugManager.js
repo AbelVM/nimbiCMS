@@ -10,6 +10,13 @@
  * @type {Map<string,string>}
  */
 export const slugToMd = new Map()
+
+// external slug resolver hooks.  Plugins can register async functions that
+// return a markdown path for a given slug.  These are checked before any
+// fallback logic.
+export const slugResolvers = new Set()
+export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.add(fn) }
+export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.delete(fn) }
 /**
  * reverse mapping of `slugToMd` (markdown path -> slug).
  * @type {Map<string,string>}
@@ -42,6 +49,16 @@ export let allMarkdownPaths = []
 export function _setAllMd(obj) {
   _allMd = obj || {}
 }
+
+// cache mapping discovered slugs from the `allMarkdownPaths` manifest to
+// their markdown path.  This is populated lazily when we fetch titles from
+// the manifest entries; storing it avoids repeated fetches during tests or
+// runtime lookups.
+export const listSlugCache = new Map()
+// set of manifest paths we've already inspected and recorded in
+// `listSlugCache` so we don't re-fetch them.
+export const listPathsFetched = new Set()
+export function clearListCaches() { listSlugCache.clear(); listPathsFetched.clear() }
 
 function _deriveCommonPrefix(paths) {
   if (!paths || paths.length === 0) return ''
@@ -205,10 +222,15 @@ export let searchIndex = []
  * @param {string} contentBase
  * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>}
  */
+let _indexPromise = null
 export async function buildSearchIndex(contentBase) {
+  // if we've already built the index, just return it
   if (searchIndex && searchIndex.length) return searchIndex
+  // if a build is in progress, reuse its promise
+  if (_indexPromise) return _indexPromise
 
-  // compile list of markdown paths to index.  normally this comes from
+  _indexPromise = (async () => {
+    // compile list of markdown paths to index.  normally this comes from
   // `allMarkdownPaths`, which is populated at build time for the example and
   // test harness.  library consumers ship without embedded content, so the
   // array is empty; fall back to any paths we've learned via the slug maps
@@ -327,6 +349,12 @@ export async function buildSearchIndex(contentBase) {
     }
   }
   searchIndex = idx
+  return searchIndex
+})()
+  // once finished, clear the promise so subsequent calls can rebuild if
+  // the cache is cleared externally.
+  try { await _indexPromise } catch (_) {}
+  _indexPromise = null
   return searchIndex
 }
 
@@ -505,25 +533,120 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
  * @returns {Promise<string|null>}
  */
 export async function ensureSlug(decoded, contentBase, maxQueue) {
-  if (slugToMd.has(decoded)) return slugToMd.get(decoded)
-  // first try crawling
-  let found
-  try { found = await crawlForSlug(decoded, contentBase, maxQueue) } catch (e) {
-    found = null
+  // strip leading/trailing slashes which may come from URL path fragments
+  if (decoded && typeof decoded === 'string') {
+    decoded = decoded.replace(/^\/+|\/+$/g, '')
   }
-  if (found) {
-    slugToMd.set(decoded, found)
-    mdToSlug.set(found, decoded)
-    return found
+  if (slugToMd.has(decoded)) {
+    const existing = slugToMd.get(decoded)
+    try { console.log('[slug] cache', decoded, '->', existing) } catch (_) {}
+    return existing
   }
-  // last-ditch home attempt
+
+  // allow external resolvers to override the slug before crawling
+  for (const resolver of slugResolvers) {
+    try {
+      const res = await resolver(decoded, contentBase)
+      if (res) {
+        slugToMd.set(decoded, res)
+        mdToSlug.set(res, decoded)
+        try { console.log('[slug] resolver', decoded, '->', res) } catch(_) {}
+        return res
+      }
+    } catch (_) { }
+  }
+
+  // manifest-based title lookup (lazy)
+  if (allMarkdownPaths && allMarkdownPaths.length) {
+    if (listSlugCache.has(decoded)) {
+      const p = listSlugCache.get(decoded)
+      try { console.log('[slug] list-cache', decoded, '->', p) } catch (_) {}
+      slugToMd.set(decoded, p); mdToSlug.set(p, decoded)
+      return p
+    }
+    for (const p of allMarkdownPaths) {
+      if (listPathsFetched.has(p)) continue
+      try {
+        const md = await fetchMarkdown(p, contentBase)
+        if (md && md.raw) {
+          const m = (md.raw || '').match(/^#\s+(.+)$/m)
+          if (m && m[1]) {
+            const cand = slugify(m[1].trim())
+            listPathsFetched.add(p)
+            if (cand) listSlugCache.set(cand, p)
+            if (cand === decoded) {
+              try { console.log('[slug] list', decoded, '->', p) } catch (_) {}
+              slugToMd.set(decoded, p); mdToSlug.set(p, decoded)
+              return p
+            }
+          }
+        }
+      } catch (_) { }
+    }
+  }
+
+  // search-index lookup (may await ongoing build)
+  try {
+    const idx = await buildSearchIndex(contentBase)
+    if (idx && idx.length) {
+      const match = idx.find(e => e.slug === decoded)
+      if (match) {
+        try { console.log('[slug] index', decoded, '->', match.path) } catch(_) {}
+        slugToMd.set(decoded, match.path)
+        mdToSlug.set(match.path, decoded)
+        return match.path
+      }
+    }
+  } catch (_) {}
+
+  // breadth-first crawl of directories
+  try {
+    const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue)
+    if (foundCrawl) {
+      try { console.log('[slug] crawl', decoded, '->', foundCrawl) } catch(_) {}
+      slugToMd.set(decoded, foundCrawl)
+      mdToSlug.set(foundCrawl, decoded)
+      return foundCrawl
+    }
+  } catch (_) {}
+
+  // attempt to resolve using an obvious filename guess (runtime-only)
+  const candidates = [`${decoded}.md`, `${decoded}.html`, `${decoded}/index.md`, `${decoded}/index.html`]
+  for (const cand of candidates) {
+    try {
+      const res = await fetchMarkdown(cand, contentBase)
+      if (res && res.raw) {
+        slugToMd.set(decoded, cand)
+        mdToSlug.set(cand, decoded)
+        try { console.log('[slug] guess', decoded, '->', cand) } catch(_) {}
+        return cand
+      }
+    } catch (_) { /* ignore failures */ }
+  }
+
+  // optional build-time filename match
+  if (allMarkdownPaths && allMarkdownPaths.length) {
+    for (const p of allMarkdownPaths) {
+      try {
+        const name = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
+        if (slugify(name) === decoded) {
+          slugToMd.set(decoded, p)
+          mdToSlug.set(p, decoded)
+          try { console.log('[slug] allMd', decoded, '->', p) } catch(_) {}
+          return p
+        }
+      } catch (_) {}
+    }
+  }
+
+  // last-ditch attempt via home page
   try {
     const home = await fetchMarkdown('_home.md', contentBase)
     if (home && home.raw) {
       const mhome = (home.raw || '').match(/^#\s+(.+)$/m)
       if (mhome && mhome[1]) {
         const homeSlug = slugify(mhome[1].trim())
-          if (homeSlug === decoded) {
+        if (homeSlug === decoded) {
           slugToMd.set(decoded, '_home.md')
           mdToSlug.set('_home.md', decoded)
           return '_home.md'

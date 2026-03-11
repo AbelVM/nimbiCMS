@@ -182,14 +182,22 @@ export function buildPageCandidates(resolved) {
       if (slugToMd.has(dec)) {
         const val = slugToMd.get(dec)
         pageCandidates.push(val)
-        // if the stored value lacks an extension, also try appending .html
         if (val && !val.includes('.md') && !val.includes('.html')) {
           pageCandidates.push(val + '.html')
         }
       } else {
-        // no mapping; if user passed a bare slug treat it as filename
-        // and try common extensions.
-        if (!String(resolved).includes('.')) {
+        // try to find a matching path anywhere in allMarkdownPaths
+        if (allMarkdownPaths && allMarkdownPaths.length) {
+          for (const p of allMarkdownPaths) {
+            const base = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
+            if (slugify(base) === dec) {
+              pageCandidates.push(p)
+              break
+            }
+          }
+        }
+        // if still nothing and original looks like bare slug, try filename guesses
+        if (pageCandidates.length === 0 && !String(resolved).includes('.')) {
           pageCandidates.push(dec + '.html', dec + '.md')
         }
       }
@@ -232,7 +240,9 @@ export async function fetchPageData(raw, contentBase) {
     anchor = cached.anchor || anchor
   } else {
     if (!String(resolved).includes('.md') && !String(resolved).includes('.html')) {
-      const decoded = decodeURIComponent(String(resolved || ''))
+      let decoded = decodeURIComponent(String(resolved || ''))
+      // strip leading/trailing slashes to match slugManager normalization
+      if (decoded && typeof decoded === 'string') decoded = decoded.replace(/^\/+|\/+$/g, '')
       if (slugToMd.has(decoded)) {
         resolved = slugToMd.get(decoded)
       } else {

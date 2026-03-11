@@ -10,6 +10,9 @@ export interface InitOptions {
   bulmaCustomize?: string
   lang?: string
   l10nFile?: string | null
+  /** optional array of markdown paths provided by the host (example plugin)
+   *  used by slug resolution and search index */
+  markdownPaths?: string[]
 }
 
 export interface PageContext {
