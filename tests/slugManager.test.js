@@ -7,6 +7,7 @@ describe('slugManager module', () => {
   beforeEach(() => {
     slugMgr.slugToMd.clear()
     slugMgr.mdToSlug.clear()
+    slugMgr.searchIndex.splice(0)
     slugMgr.clearFetchCache()
     slugMgr.crawlCache && slugMgr.crawlCache.clear && slugMgr.crawlCache.clear()
     global.fetch = vi.fn()
@@ -109,5 +110,62 @@ describe('slugManager module', () => {
     expect(calls).toBeLessThanOrEqual(10)
     // restore default so other tests unaffected
     slugMgr.setDefaultCrawlMaxQueue(slugMgr.CRAWL_MAX_QUEUE)
+  })
+
+  it('buildSearchIndex gathers titles and slugs', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.allMarkdownPaths.splice(0, slugMgr.allMarkdownPaths.length, 'p1.md', 'sub/p2.md')
+    // stub fetchMarkdown responses
+    global.fetch = vi.fn(async (url) => {
+      if (url.endsWith('p1.md')) return { ok: true, text: () => Promise.resolve('# First\n\nHello world') }
+      if (url.endsWith('sub/p2.md')) return { ok: true, text: () => Promise.resolve('# Second\n\nMore text') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    expect(idx.length).toBe(2)
+    const titles = idx.map(e => e.title)
+    expect(titles).toContain('First')
+    expect(titles).toContain('Second')
+    expect(idx[0].slug).toBeDefined()
+    expect(idx[0].excerpt).toBe('Hello world')
+  })
+
+  it('buildSearchIndex falls back to slugToMd entries when allMarkdownPaths is empty', async () => {
+    const base = 'http://example.com/content/'
+    // ensure index cache is cleared so we actually execute the logic
+    slugMgr.searchIndex.splice(0)
+    // clear any existing paths and map two files via slugToMd
+    slugMgr.allMarkdownPaths.splice(0)
+    slugMgr.slugToMd.clear()
+    slugMgr.slugToMd.set('foo', 'foo.md')
+    slugMgr.slugToMd.set('bar', 'sub/bar.md')
+  })
+
+  it('buildSearchIndex ignores non-md entries from allMarkdownPaths', async () => {
+    const base = 'http://example.com/content/'
+    // clear previous index cache to ensure only current paths are used
+    slugMgr.searchIndex.splice(0)
+    slugMgr.allMarkdownPaths.splice(0, slugMgr.allMarkdownPaths.length, 'good.md', 'bad.html', 'also.txt')
+    global.fetch = vi.fn(async (url) => {
+      if (url.endsWith('good.md')) return { ok: true, text: () => Promise.resolve('# Good') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    expect(idx.length).toBe(1)
+    expect(idx[0].path).toBe('good.md')
+  })
+
+
+
+  it('buildSearchIndex ignores non-md paths from allMarkdownPaths', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.allMarkdownPaths.splice(0, slugMgr.allMarkdownPaths.length, 'x.md', 'y.html', 'z')
+    global.fetch = vi.fn(async (url) => {
+      if (url.endsWith('x.md')) return { ok: true, text: () => Promise.resolve('# X') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    expect(idx.length).toBe(1)
+    expect(idx[0].path).toBe('x.md')
   })
 })

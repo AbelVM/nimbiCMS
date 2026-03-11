@@ -3,8 +3,6 @@
 // directory.  This module is the canonical home for anything dealing with
 // slugs or markdown path resolution.
 
-/* eslint-env browser */
-
 /**
  * mapping from a slug (generated from title/H1) to a markdown path.
  * Populated during nav construction, anchor rewriting, or on demand via
@@ -173,6 +171,79 @@ export let fetchMarkdown = async function(path, base) {
 
 // cache results from crawl attempts so we don't re-scan directories
 export const crawlCache = new Map()
+
+// simple client-side search index generated from headings.  Populated by
+// `buildSearchIndex`; stored here so UI components can query it directly.
+export let searchIndex = []
+
+/**
+ * Build a lightweight search index by fetching every markdown page and
+ * extracting the first H1 title plus a brief excerpt (first non-heading
+ * paragraph).  Results are cached in `searchIndex` for subsequent queries.
+ *
+ * `contentBase` should be the same URL passed to `fetchMarkdown`.
+ *
+ * @param {string} contentBase
+ * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>}
+ */
+export async function buildSearchIndex(contentBase) {
+  if (searchIndex && searchIndex.length) return searchIndex
+
+  // compile list of markdown paths to index.  normally this comes from
+  // `allMarkdownPaths`, which is populated at build time for the example and
+  // test harness.  library consumers ship without embedded content, so the
+  // array is empty; fall back to any paths we've learned via the slug maps
+  // (populated during navigation or crawling).
+  let paths = []
+  if (allMarkdownPaths && allMarkdownPaths.length) {
+    paths = Array.from(allMarkdownPaths)
+  }
+  if (!paths.length) {
+    for (const v of slugToMd.values()) {
+      if (v) paths.push(v)
+    }
+  }
+  // dedupe in-case the same file appears multiple times
+  const seen = new Set()
+  paths = paths.filter(p => {
+    if (!p || seen.has(p)) return false
+    seen.add(p)
+    return true
+  })
+
+  const idx = []
+  for (const path of paths) {
+    // ignore anything that isn't a markdown filename
+    if (!/\.md(?:$|[?#])/i.test(path)) continue
+    try {
+      const md = await fetchMarkdown(path, contentBase)
+      if (md && md.raw) {
+        const raw = md.raw
+        const h1m = raw.match(/^#\s+(.+)$/m)
+        const title = h1m ? h1m[1].trim() : ''
+        let excerpt = ''
+        const parts = raw.split(/\r?\n\s*\r?\n/)
+        // first paragraph after the heading
+        if (parts.length > 1) {
+          for (let i = 1; i < parts.length; i++) {
+            const p = parts[i].trim()
+            if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
+          }
+        }
+        let slug = ''
+        try {
+          if (mdToSlug.has(path)) slug = mdToSlug.get(path)
+        } catch (_) {}
+        if (!slug) slug = slugify(title)
+        idx.push({ slug, title, excerpt, path })
+      }
+    } catch (err) {
+      // ignore failures, continue index
+    }
+  }
+  searchIndex = idx
+  return searchIndex
+}
 
 // maximum number of pending directories we'll track during a crawl.  a
 // pathological site could expose an infinite or very deep tree, so we guard

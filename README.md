@@ -44,7 +44,8 @@ the kind of lightweight site where you want live preview without any server.
 <div id="app" style="height:100vh"></div>
 <script>
   // UMD bundle exposes global `nimbiCMS`
-  nimbiCMS.initCMS({ el: '#app', contentPath: './content' })
+  // `contentPath` is optional and defaults to `./content` if omitted
+  nimbiCMS.initCMS({ el: '#app' })
 </script>
 </body></html>
 ```
@@ -118,6 +119,7 @@ Recent behaviour fixes worth knowing:
 ## Features
 
 - Client-side rendering of GitHub‑flavored Markdown.
+- Optional client-side search box built from H1 titles and excerpts (enabled by default).
 - Code is now organized into small modules (`router.js`, `markdown.js`,
   `filesManager.js`, etc.) to ease maintenance and testing.
 - Sticky per-page TOC and Bulma‑based UI components (navbar, menu).
@@ -140,6 +142,13 @@ Recent behaviour fixes worth knowing:
   traversal.  Setting this to `0` disables the guard; a lower value improves
   safety on deeply nested content trees but may prevent discovery of pages in
   extreme structures.
+- `searchIndex` – **boolean** (default `true`). When enabled the CMS
+  builds a lightweight index of page titles/excerpts and inserts a search box
+  into the navbar.  The input listener filters the index and renders matching
+  links inside `#nimbi-search-results` (hidden when there are no matches).
+  Because the library ship‑side has no content, the index may initially be
+  empty – it fills in as navigation links are parsed or pages are visited.
+  Disable the option to skip the work entirely.
 - `defaultStyle` – `'light' | 'dark'` (default `'light'`). Controls initial
   theme; use `setStyle()` to toggle later.
 - `bulmaCustomize` – `'none' | 'local' | '{theme_name}'` (default `'none'`).
@@ -275,6 +284,21 @@ onPageLoad(({pagePath, article}) => {
 These hooks give you an easy entry point for adding analytics, search,
 custom rendering, and other features without needing to fork the source.
 
+
+## HTML Links without Extensions
+
+Navigation entries or anchors pointing at HTML pages need not include the
+`.html` suffix.  During startup the CMS will automatically append the
+extension when building slug mappings so that clicking or searching for the
+slug works regardless of whether the original link had the file name or not.
+
+
+## HTML links without extensions
+
+Navigation anchors pointing at HTML pages do not need to include the
+`.html` suffix.  During initialization the CMS will append the extension when
+creating slug mappings, ensuring both clicks and search resolve correctly.
+
 ## Theming & Customization
 
 Bulma is bundled by default. To alter styles at runtime, use
@@ -309,7 +333,8 @@ Example translation file:
 Usage:
 
 ```js
-initCMS({ el: '#app', contentPath: './content', l10nFile: '/i18n/l10n.json', lang: 'de' })
+// contentPath is optional
+initCMS({ el: '#app', l10nFile: '/i18n/l10n.json', lang: 'de' })
 ```
 
 ## Content workflow

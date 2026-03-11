@@ -180,7 +180,18 @@ export function buildPageCandidates(resolved) {
     try {
       const dec = decodeURIComponent(String(resolved || ''))
       if (slugToMd.has(dec)) {
-        pageCandidates.push(slugToMd.get(dec))
+        const val = slugToMd.get(dec)
+        pageCandidates.push(val)
+        // if the stored value lacks an extension, also try appending .html
+        if (val && !val.includes('.md') && !val.includes('.html')) {
+          pageCandidates.push(val + '.html')
+        }
+      } else {
+        // no mapping; if user passed a bare slug treat it as filename
+        // and try common extensions.
+        if (!String(resolved).includes('.')) {
+          pageCandidates.push(dec + '.html', dec + '.md')
+        }
       }
       // otherwise leave the list empty; fetchPageData will treat that as
       // a not-found condition rather than guessing a filename.

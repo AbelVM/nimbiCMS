@@ -199,6 +199,27 @@
 .nimbi-cms::-webkit-scrollbar-track, .nimbi-nav-wrap::-webkit-scrollbar-track {
     background: transparent;
 }
+
+/* search box result dropdown */
+/* container will be positioned relative so absolute child can overlay */
+.navbar-end .navbar-item { position: relative; }
+
+#nimbi-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid #ccc;
+    padding: 0.5rem;
+    display: none;
+    max-height: 200px;
+    overflow: auto;
+    z-index: 100;
+}
+#nimbi-search { width: 200px; }
+#nimbi-search-results a { text-decoration: none; color: inherit; }
+#nimbi-search-results a:hover { background: #f5f5f5; }
+
 .nimbi-cms::-webkit-scrollbar-thumb, .nimbi-nav-wrap::-webkit-scrollbar-thumb {
     background-color: rgba(0,0,0,0.28);
     border-radius: 999px;

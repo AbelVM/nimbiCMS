@@ -268,8 +268,17 @@ export async function preScanHtmlSlugs(linkEls, base) {
         if (!href) continue
         const raw = href.replace(/^\.\//, '')
         const parts = raw.split(/::|#/, 2)
-        const path = parts[0]
-        if (!path || (!/\.html(?:$|[?#])/.test(path) && !path.endsWith('.html'))) continue
+        let path = parts[0]
+        if (!path) continue
+        // if the link has no extension at all assume an HTML file; this
+        // allows authors to write `/foo` instead of `/foo.html` in nav
+        // sources.  we must not touch paths that already include `.md` or
+        // another extension, otherwise a markdown link would be misclassified.
+        if (!path.includes('.')) {
+          path = path + '.html'
+        }
+        // only proceed if the (possibly normalized) path targets an HTML file
+        if (!/\.html(?:$|[?#])/.test(path) && !path.toLowerCase().endsWith('.html')) continue
         const htmlPath = path
         try {
           // skip if already mapped by mdToSlug

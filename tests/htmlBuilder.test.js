@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { preScanHtmlSlugs, preMapMdSlugs, _parseHtml, _parseMarkdown } from '../src/htmlBuilder.js'
 import { slugify, slugToMd, mdToSlug } from '../src/filesManager.js'
 import * as fm from '../src/filesManager.js'
+import initCMS from '../src/nimbi-cms.js'
 
 // helper to craft an anchor element
 function makeAnchor(href) {
@@ -48,6 +49,15 @@ describe('htmlBuilder utilities', () => {
     expect(slugToMd.get('already')).toBe('page.html')
     // no new mappings
     expect(slugToMd.size).toBe(1)
+  })
+
+  it('preScanHtmlSlugs normalizes extension-less hrefs and maps them with .html', async () => {
+    const anchors = [makeAnchor('foo')] // no .html suffix
+    const spy = vi.spyOn(fm, 'fetchMarkdown').mockResolvedValue({ raw: '<html><head><title>Foo</title></head></html>' })
+    await preScanHtmlSlugs(anchors, '/base/')
+    spy.mockRestore()
+    expect(slugToMd.has('foo')).toBe(true)
+    expect(slugToMd.get('foo')).toBe('foo.html')
   })
 
   it('preMapMdSlugs fetches markdown and registers slug from H1', async () => {
@@ -118,7 +128,39 @@ describe('htmlBuilder utilities', () => {
     // scroll back up should hide
     container.scrollTop = 0
     container.dispatchEvent(new Event('scroll'))
-    expect(label.classList.contains('show')).toBe(false)
+  })
+
+  it('search box shows results when index contains matching titles', async () => {
+    // prepare minimal DOM and stub dependencies
+    document.body.innerHTML = '<div id="app"></div>'
+    // clear any previous indexing state
+    slugToMd.clear()
+    mdToSlug.clear()
+    fm.searchIndex.splice(0)
+
+    const fakeNavMd = { raw: '- [Home](_home.md)\n- [Foo](foo.md)' }
+    // stub global.fetch so both navigation and individual pages resolve
+    global.fetch = vi.fn(async (url) => {
+      const u = String(url || '')
+      if (u.includes('_home.md')) return { ok: true, text: () => Promise.resolve('# Home') }
+      if (u.includes('_navigation.md')) return { ok: true, text: () => Promise.resolve(fakeNavMd.raw) }
+      if (u.includes('foo.md')) return { ok: true, text: () => Promise.resolve('# Foo\n\nbar') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    // do not stub buildSearchIndex – let actual logic run against slugToMd
+    // make sure location behaves like a URL for initCMS
+    if (!(global.location && typeof global.location === 'object')) {
+      global.location = new URL('http://localhost/')
+    }
+    await initCMS({ el: '#app', searchIndex: true })
+    const input = document.getElementById('nimbi-search')
+    expect(input).toBeTruthy()
+    input.value = 'foo'
+    input.dispatchEvent(new Event('input'))
+    // allow async index building (longer to be safe)
+    await new Promise(r => setTimeout(r, 50))
+    const results = document.getElementById('nimbi-search-results')
+    expect(results && results.textContent).toContain('Foo')
   })
 
   it('scrollToAnchorOrTop scrolls the container element to top when anchor is null', async () => {

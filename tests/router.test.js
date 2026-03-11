@@ -51,12 +51,16 @@ describe('router module', () => {
     expect(router.resolutionCache.has('k1')).toBe(false)
   })
 
-  it('buildPageCandidates returns slug mapping only and never appends .md', () => {
+  it('buildPageCandidates returns slug mapping and handles missing extensions', () => {
     files.slugToMd.set('foo', 'foo.md')
     files.mdToSlug.set('foo.md', 'foo')
     expect(router.buildPageCandidates('foo')).toEqual(['foo.md'])
-    // when no mapping exists there should be no candidate generated at all
-    expect(router.buildPageCandidates('bar')).toEqual([])
+    // when slugToMd value lacks extension we should still try .html
+    files.slugToMd.set('bar', 'bar')
+    files.mdToSlug.set('bar', 'bar')
+    expect(router.buildPageCandidates('bar')).toEqual(['bar', 'bar.html'])
+    // when no mapping exists, a bare slug should probe common extensions
+    expect(router.buildPageCandidates('baz')).toEqual(['baz.html', 'baz.md'])
   })
 
   it('fetchPageData resolves slugToMd entries, caches results, and uses supplied base without hardcoded paths', async () => {
@@ -108,6 +112,21 @@ describe('router module', () => {
 
   it('fetchPageData throws when slug is unknown (no fallback)', async () => {
     await expect(router.fetchPageData('unknown-slug', '/content/')).rejects.toThrow('no page data')
+  })
+
+  it('fetchPageData will try common extensions for a bare slug', async () => {
+    const base = '/content/'
+    const fakeData = { raw: '# Yo' }
+    // stub fetchMarkdown: first call fails, second (on .html) succeeds
+    files.fetchMarkdown
+      .mockRejectedValueOnce(new Error('not found'))
+      .mockResolvedValueOnce(fakeData)
+    const res = await router.fetchPageData('bare', base)
+    expect(res.pagePath).toBe('bare.html')
+    expect(res.data).toBe(fakeData)
+    // verify we attempted both variants
+    expect(files.fetchMarkdown).toHaveBeenCalledWith('bare.html', base)
+    expect(files.fetchMarkdown).toHaveBeenCalledWith('bare.md', base)
   })
 
 })

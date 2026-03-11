@@ -1,5 +1,5 @@
 import 'highlight.js/styles/monokai.css'
-import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase, buildSearchIndex, searchIndex } from './filesManager.js'
 import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { createNavTree, preScanHtmlSlugs, preMapMdSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
@@ -88,13 +88,14 @@ export function _clearHooks() {
  * @param {string|Element} options.el - mount point selector or element
  * @param {string} [options.contentPath='/content'] - URL path to content
  * @param {number} [options.crawlMaxQueue] - maximum directory queue length for slug crawling (see docs)
+ * @param {boolean} [options.searchIndex=true] - build a client-side search index (adds search box to navbar)
  * @param {ThemeStyle} [options.defaultStyle='light'] - initial light/dark mode
  * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
  * @param {string} [options.lang] - UI language code
  * @param {string|null} [options.l10nFile] - path to localization file
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
-export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
+export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, searchIndex: searchEnabled = true, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
       if (!el) throw new Error('el is required')
 
       let mountEl = el
@@ -156,7 +157,9 @@ export async function initCMS({ el, contentPath = '/content', /* eslint-disable 
   const pageDir = pagePath.endsWith('/') ? pagePath : pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
   try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = '' }
   let cp = contentPath
+  // remove any leading './' or '/' to avoid creating protocol-relative URLs
   if (cp.startsWith('./')) cp = cp.slice(2)
+  if (cp.startsWith('/')) cp = cp.slice(1)
   if (!cp.endsWith('/')) cp = cp + '/'
   const contentBase = new URL(pageDir + cp, location.origin).toString()
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
@@ -279,6 +282,24 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
     menu.id = targetId
     const start = document.createElement('div')
     start.className = 'navbar-start'
+    // optional search UI container on right side
+    let end, searchItem, searchInput, resultsContainer
+    if (searchEnabled) {
+      end = document.createElement('div')
+      end.className = 'navbar-end'
+      searchItem = document.createElement('div')
+      searchItem.className = 'navbar-item'
+      searchInput = document.createElement('input')
+      searchInput.className = 'input'
+      searchInput.type = 'search'
+      searchInput.placeholder = 'Search...'
+      searchInput.id = 'nimbi-search'
+      searchItem.appendChild(searchInput)
+      resultsContainer = document.createElement('div')
+      resultsContainer.id = 'nimbi-search-results'
+      searchItem.appendChild(resultsContainer)
+      end.appendChild(searchItem)
+    }
 
     for (let i = 0; i < linkEls.length; i++) {
       const a = linkEls[i]
@@ -297,9 +318,14 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           item.href = '?page=' + encodeURIComponent(mdPath) + (frag ? '#' + encodeURIComponent(frag) : '')
         } else if (/\.html(?:$|[#?])/.test(href) || href.endsWith('.html')) {
           // HTML file - fetch title to produce friendly slug and map it
-          const raw = href.replace(/^\.\//, '')
+          let raw = href.replace(/^\.\//, '')
           const parts = raw.split(/::|#/, 2)
-          const htmlPath = parts[0]
+          let htmlPath = parts[0]
+          // ensure explicit .html suffix when missing, as authors may link
+          // without extensions (server may still serve the HTML file).
+          if (htmlPath && !htmlPath.toLowerCase().endsWith('.html')) {
+            htmlPath = htmlPath + '.html'
+          }
           const frag = parts[1]
           try {
             const res = await fetchMarkdown(htmlPath, contentBase)
@@ -363,9 +389,60 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           }
 
     menu.appendChild(start)
+    menu.appendChild(end)
     navbar.appendChild(brand)
     navbar.appendChild(menu)
     navbarWrap.appendChild(navbar)
+
+    // if search indexing is enabled build the index and hook up UI
+    try {
+      if (searchEnabled) {
+        // build index asynchronously; results will be available once ready
+        try { import('./filesManager.js').then(fm => fm.buildSearchIndex(contentBase).catch(() => {})) } catch (_) {}
+      }
+    } catch (_) {}
+
+    // attach search box behavior (only valid if input exists)
+    try {
+      const input = document.getElementById('nimbi-search')
+      const results = document.getElementById('nimbi-search-results')
+      let currentIndex = []
+      const showResults = (items) => {
+        results.innerHTML = ''
+        if (!items.length) {
+          results.style.display = 'none'
+          return
+        }
+        items.forEach(it => {
+          const a = document.createElement('a')
+          a.href = '?page=' + encodeURIComponent(it.slug)
+          a.textContent = it.title
+          a.style.display = 'block'
+          a.style.padding = '0.25rem 0'
+          a.addEventListener('click', () => { results.style.display = 'none' })
+          results.appendChild(a)
+        })
+        results.style.display = 'block'
+      }
+      if (input) {
+        input.addEventListener('input', async (ev) => {
+          const q = String(input.value || '').trim().toLowerCase()
+          if (!q) { showResults([]); return }
+          try {
+            const fm = await import('./filesManager.js')
+            const idx = await fm.buildSearchIndex(contentBase)
+            const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
+            showResults(filtered.slice(0, 10))
+          } catch (_) { showResults([]) }
+        })
+        // hide results when clicking outside
+        document.addEventListener('click', (ev) => {
+          if (input && !input.contains(ev.target) && results && !results.contains(ev.target)) {
+            results.style.display = 'none'
+          }
+        })
+      }
+    } catch (_) {}
 
     // invoke nav-build hooks so plugins can tweak the DOM or track data
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { }

@@ -68,6 +68,8 @@ export const slugToMd: Map<string,string>
 export const mdToSlug: Map<string,string>
 export function clearFetchCache(): void
 export const fetchCache: Map<string, Promise<any>>
+export let searchIndex: Array<{slug:string,title:string,excerpt:string,path:string}>
+export function buildSearchIndex(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
 export const defaultCrawlMaxQueue: number
 export function setDefaultCrawlMaxQueue(n: number): void
 export function crawlForSlug(decoded: string, contentBase: string, maxQueue?: number): Promise<string|null>
