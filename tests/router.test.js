@@ -40,26 +40,28 @@ describe('router module', () => {
     expect(router.resolutionCache.has('k1')).toBe(false)
   })
 
-  it('buildPageCandidates returns slug mapping and fallback', () => {
+  it('buildPageCandidates returns slug mapping only and never appends .md', () => {
     files.slugToMd.set('foo', 'foo.md')
     files.mdToSlug.set('foo.md', 'foo')
     expect(router.buildPageCandidates('foo')).toEqual(['foo.md'])
-    // when no mapping exists, fallback to raw + '.md'
-    expect(router.buildPageCandidates('bar')).toEqual(['bar.md'])
+    // when no mapping exists there should be no candidate generated at all
+    expect(router.buildPageCandidates('bar')).toEqual([])
   })
 
-  it('fetchPageData resolves slugToMd entries and caches results', async () => {
+  it('fetchPageData resolves slugToMd entries, caches results, and uses supplied base without hardcoded paths', async () => {
     files.slugToMd.set('slug', 'page.md')
     const fakeData = { raw: '# Hello', isHtml: false }
     files.fetchMarkdown.mockResolvedValue(fakeData)
 
-    const result = await router.fetchPageData('slug', '/content/')
+    const base = '/my/content/'
+    const result = await router.fetchPageData('slug', base)
     expect(result.pagePath).toBe('page.md')
     expect(result.data).toBe(fakeData)
+    expect(files.fetchMarkdown).toHaveBeenCalledWith('page.md', base)
 
     // second call will use cached slug but still invoke fetchMarkdown for content
     files.fetchMarkdown.mockClear()
-    const result2 = await router.fetchPageData('slug', '/content/')
+    const result2 = await router.fetchPageData('slug', base)
     expect(result2.pagePath).toBe('page.md')
     expect(files.fetchMarkdown).toHaveBeenCalled()
   })
@@ -72,5 +74,22 @@ describe('router module', () => {
 
     const result = await router.fetchPageData('test-page', '/content/')
     expect(result.pagePath).toBe('blog/test.md')
+  })
+
+  it('fetchPageData throws when slug is unknown (no fallback)', async () => {
+    await expect(router.fetchPageData('unknown-slug', '/content/')).rejects.toThrow('no page data')
+  })
+
+  it('fetchPageData will resolve a home-slug by fetching _home.md when map is empty', async () => {
+    const base = '/content/'
+    const slug = 'welcome-home'
+    const fakeHome = { raw: '# Welcome Home' }
+    files.fetchMarkdown.mockImplementation((path, b) => {
+      if (path === '_home.md') return Promise.resolve(fakeHome)
+      return Promise.reject(new Error('unexpected'))
+    })
+    const result = await router.fetchPageData(slug, base)
+    expect(result.pagePath).toBe('_home.md')
+    expect(files.slugToMd.get(slug)).toBe('_home.md')
   })
 })

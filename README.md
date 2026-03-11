@@ -47,8 +47,11 @@ and open the example at `http://localhost:5173/example/index.html`.
 
 Recent behaviour fixes worth knowing:
 
-- Avoids hardcoded `.md` appends and index fallbacks; slug resolution prefers known
-  mappings.
+- Avoids hardcoded `.md` appends, `_home` prefixes, or index fallbacks; slugs
+  resolve only via explicit mappings and derived H1 values (no guessing).  The
+  CMS now pre-computes the slug for the home page during initialization and
+  populates every nav-linked page's slug ahead of the first render, so
+  direct linking to a slug works even on a cold start.
 - Supports raw `.html` content (parses title/H1 and maps to a slug) without
   forcing Markdown rendering.
 - Prevents aggressive prefetching of linked markdown files.
@@ -57,8 +60,13 @@ Recent behaviour fixes worth knowing:
 - Lazy-loads images and defers code highlighting via `IntersectionObserver`.
 - In-memory caching of fetched markdown and slug resolutions speeds up
   repeat navigations and reduces network traffic.
-- URL slug fallback now tries both `.md` and `.html` when no extension is
-  provided, fixing direct-link 404s (e.g. `?page=dummy-html-test-page`).
+- URL slug fallback **no longer** appends `.md`/`.html`; passing an
+  unmapped slug produces a 404 rather than assuming a filename.  Slugs are
+  sanitized to strip any accidental `.md`/`.html` text from headers.  To
+  keep direct links working even before any page has loaded, the router will
+  perform a one-time check of the home page’s H1 slug and map it if it
+  matches the requested slug; this means cold-start requests to the home
+  slug yield the expected content rather than an error.
 
 ## Features
 

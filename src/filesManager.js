@@ -107,15 +107,23 @@ export function setContentBase(contentBase) {
 try { setContentBase() } catch (_) { }
 
 /**
- * Convert a string to a URL-friendly slug (lowercase, dashes).
+ * Convert a string to a URL-friendly slug (lowercase, dashes).  In
+ * addition to removing illegal characters we also strip any trailing
+ * "md" or "html" segment to ensure that slugs never resemble filenames
+ * (see tests and user documentation).
  * @param {any} s
  * @returns {string}
  */
 export function slugify(s) {
-  return String(s || '')
+  let slug = String(s || '')
     .toLowerCase()
     .replace(/[^a-z0-9\- ]/g, '')
     .replace(/ /g, '-')
+  // remove trailing "md" or "html" if present (possibly preceded by a
+  // dash). This prevents ``slug.md`` or ``slug.html`` from ever existing
+  // as a generated slug.
+  slug = slug.replace(/(?:-?)(?:md|html)$/, '')
+  return slug
 }
 
 // simple in-memory cache of fetchMarkdown responses keyed by the resolved URL

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { preScanHtmlSlugs, _parseHtml, _parseMarkdown } from '../src/htmlBuilder.js'
+import { preScanHtmlSlugs, preMapMdSlugs, _parseHtml, _parseMarkdown } from '../src/htmlBuilder.js'
 import { slugify, slugToMd, mdToSlug } from '../src/filesManager.js'
 import * as fm from '../src/filesManager.js'
 
@@ -46,6 +46,22 @@ describe('htmlBuilder utilities', () => {
     expect(slugToMd.get('already')).toBe('page.html')
     // no new mappings
     expect(slugToMd.size).toBe(1)
+  })
+
+  it('preMapMdSlugs fetches markdown and registers slug from H1', async () => {
+    const anchors = [makeAnchor('foo.md'), makeAnchor('sub/bar.md')]
+    const responses = {
+      'foo.md': '# Foo Title',
+      'sub/bar.md': '# Another'
+    }
+    const spy = vi.spyOn(fm, 'fetchMarkdown').mockImplementation((path, base) => {
+      return Promise.resolve({ raw: responses[path] })
+    })
+    // use absolute base to satisfy URL constructor
+    await preMapMdSlugs(anchors, 'http://example.com/base/')
+    spy.mockRestore()
+    expect(slugToMd.get('foo-title')).toBe('foo.md')
+    expect(slugToMd.get('another')).toBe('sub/bar.md')
   })
 
   it('parseHtml returns html and toc entries', () => {

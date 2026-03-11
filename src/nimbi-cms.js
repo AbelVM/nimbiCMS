@@ -1,7 +1,7 @@
 import 'highlight.js/styles/monokai.css'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase } from './filesManager.js'
 import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
-import { createNavTree, preScanHtmlSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
+import { createNavTree, preScanHtmlSlugs, preMapMdSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import { fetchPageData } from './router.js'
@@ -183,7 +183,12 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
     const parser = new DOMParser()
     const navDoc = parser.parseFromString(parsedNav.html || '', 'text/html')
     const linkEls = navDoc.querySelectorAll('a')
+    // populate slug maps from any HTML links (for HTML pages) and from
+    // markdown links appearing in the navigation.  Doing this before the
+    // first page render ensures that a slug referring to a nav page will
+    // resolve even when that page hasn't yet been visited.
 await safe(() => preScanHtmlSlugs(linkEls, contentBase))
+await safe(() => preMapMdSlugs(linkEls, contentBase))
 
     const navbar = document.createElement('nav')
     navbar.className = 'navbar'

@@ -67,15 +67,16 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
       }
       const p = u.pathname || ''
       if (p) {
+        // if the link points into the content base we can normalize it and
+        // treat it as a candidate.  we do **not** attempt to guess
+        // sibling/index filenames; the content build should always reference
+        // the correct markdown path or rely on slug-based navigation.
         const contentBaseUrl = new URL(contentBase)
         const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
         if (p.indexOf(contentBasePath) !== -1) {
           let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
           rel = rel.replace(/^[\.\/]+/, '')
-          if (rel && !rel.includes('.')) {
-            indexSet.add(rel + '/index.md')
-            indexSet.add(rel + '.md')
-          }
+          if (rel) indexSet.add(rel)
         }
       }
     } catch (e) {
@@ -118,27 +119,24 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
  * @returns {string[]}
  */
 export function buildPageCandidates(resolved) {
+  // Given a resolved identifier, return exactly the candidates that make
+  // sense under the current policy.  We no longer invent filenames out of
+  // thin air: slugs must be explicitly mapped via `slugToMd` or discovered
+  // from the index.  There is **no** fallback that appends `.md` or
+  // `_home` prefixes, and literal `content` segments are not injected here
+  // (the caller provides the full `contentBase`).
   const pageCandidates = []
   if (String(resolved).includes('.md') || String(resolved).includes('.html')) {
+    // caller already supplied an explicit path; use it verbatim
     pageCandidates.push(resolved)
   } else {
     try {
       const dec = decodeURIComponent(String(resolved || ''))
       if (slugToMd.has(dec)) {
         pageCandidates.push(slugToMd.get(dec))
-      } else {
-        const underscore = '_' + dec + '.md'
-        const indexPath = dec + '/index.md'
-        try { if (mdToSlug.has(underscore)) pageCandidates.push(underscore) } catch (e) { }
-        try { if (mdToSlug.has(indexPath)) pageCandidates.push(indexPath) } catch (e) { }
-        if (pageCandidates.length === 0) {
-          // final fallback: even if we have no prior mapping, treat the raw
-          // slug as a direct markdown filename. this fixes cases such as
-          // `?page=tech-experiments` when `tech-experiments.md` exists but was
-          // never registered via the navbar or slug map.
-          pageCandidates.push(dec + '.md')
-        }
       }
+      // otherwise leave the list empty; fetchPageData will treat that as
+      // a not-found condition rather than guessing a filename.
     } catch (e) { }
   }
   return pageCandidates
@@ -180,8 +178,34 @@ export async function fetchPageData(raw, contentBase) {
       if (slugToMd.has(decoded)) {
         resolved = slugToMd.get(decoded)
       } else {
-        const idx = await tryDiscoverFromIndex(decoded, contentBase)
-        if (idx) resolved = idx
+        let idx = await tryDiscoverFromIndex(decoded, contentBase)
+        if (idx) {
+          resolved = idx
+        } else {
+          // final safety net: the home page is required, and it's common for
+          // sites to address it via a slug.  If we haven't yet mapped the
+          // home slug (e.g. because nothing has been rendered), try fetching
+          // its markdown to compute the slug.  This avoids `Page not found`
+          // errors on first load when the only relevant content is the home
+          // file.  We intentionally **do not** guess arbitrary filenames;
+          // only `_home.md` is touched here because that's a known constant
+          // required by the CMS.
+          try {
+            const home = await fetchMarkdown('_home.md', contentBase)
+            if (home && home.raw) {
+              const mhome = (home.raw || '').match(/^#\s+(.+)$/m)
+              if (mhome && mhome[1] && slugToMd.has(decoded) === false) {
+                const homeSlug = slugify(mhome[1].trim())
+                if (homeSlug === decoded) {
+                  resolved = '_home.md'
+                  try { slugToMd.set(decoded, '_home.md'); mdToSlug.set('_home.md', decoded) } catch (_) {}
+                }
+              }
+            }
+          } catch (_) {
+            // ignore failed home fetch; we'll just fall through to error
+          }
+        }
       }
     }
     resolutionCacheSet(raw, { resolved, anchor })

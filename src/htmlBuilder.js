@@ -304,6 +304,80 @@ export async function preScanHtmlSlugs(linkEls, base) {
   await Promise.all(runners)
 }
 
+// ---------------------------------------------------------------------------
+// new helper: map markdown paths referenced by anchors to their slug keys.
+// This is used during nav building so that direct queries to a slug will
+// resolve even before the associated page has been rendered.  The logic is
+// essentially the same as the early portion of `prepareArticle` but only for
+// the provided anchor list.
+export async function preMapMdSlugs(linkEls, contentBase) {
+  if (!linkEls || !linkEls.length) return
+
+  const anchorInfo = []
+  const pending = new Set()
+  // normalize base path for resolving relative URLs
+  let contentBasePath = ''
+  try {
+    const contentBaseUrl = new URL(contentBase)
+    contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+  } catch (_) { contentBasePath = '' }
+
+  for (const a of Array.from(linkEls || [])) {
+    try {
+      const href = a.getAttribute('href') || ''
+      if (!href) continue
+      // look for any markdown filename in the href (may include fragments & dirs)
+      const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
+      if (mdMatch) {
+        let mdPathRaw = mdMatch[1].replace(/^\.\//, '')
+        if (mdPathRaw.startsWith('/')) mdPathRaw = mdPathRaw.replace(/^\//, '')
+        try {
+          let resolved
+        try {
+          resolved = new URL(mdPathRaw, contentBase).pathname
+        } catch (_) {
+          // base might be relative in tests; fall back to the raw path
+          resolved = mdPathRaw
+        }
+        const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+        anchorInfo.push({ rel })
+        if (!mdToSlug.has(rel)) pending.add(rel)
+      } catch (_) {}
+        continue
+      }
+    } catch (_) {}
+  }
+
+  if (pending.size) {
+    await Promise.all(Array.from(pending).map(async rel => {
+      try {
+        const m = String(rel).match(/([^\/]+)\.md$/)
+        const basename = m && m[1]
+        if (basename && slugToMd.has(basename)) {
+          try {
+            const mapped = slugToMd.get(basename)
+            if (mapped) mdToSlug.set(mapped, basename)
+          } catch (_) {}
+          return
+        }
+      } catch (_) {}
+
+      try {
+        const mdData = await fetchMarkdown(rel, contentBase)
+        if (mdData && mdData.raw) {
+          const m2 = (mdData.raw || '').match(/^#\s+(.+)$/m)
+          if (m2 && m2[1]) {
+            const candidate = slugify(m2[1].trim())
+            if (candidate) {
+              try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
+    }))
+  }
+}
+
 
 // helpers used by prepareArticle ------------------------------------------------
 

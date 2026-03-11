@@ -28,4 +28,24 @@ describe('filesManager module', () => {
     files.clearFetchCache()
     expect(files.fetchCache.size).toBe(0)
   })
+
+  it('slugify removes invalid chars and strips .md/.html suffix', () => {
+    expect(files.slugify('Hello World')).toBe('hello-world')
+    expect(files.slugify('Some File.md')).toBe('some-file')
+    expect(files.slugify('Example.HTML')).toBe('example')
+    // ensure trailing words are preserved when not exactly md/html
+    expect(files.slugify('readme-md')).toBe('readme')
+    expect(files.slugify('index-html')).toBe('index')
+  })
+
+  it('fetchMarkdown rewrites slug filename based on slugToMd map', async () => {
+    // mapping entry maps slug -> canonical file
+    files.slugToMd.set('foo', 'subdir/foo.md')
+    const dummy = { ok: true, text: () => Promise.resolve('# hi') }
+    global.fetch.mockResolvedValue(dummy)
+
+    await files.fetchMarkdown('foo.md', '/base/')
+    // should rewrite to canonical path before fetching
+    expect(global.fetch).toHaveBeenCalledWith('/base/subdir/foo.md')
+  })
 })
