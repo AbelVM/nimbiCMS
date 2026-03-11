@@ -11,6 +11,17 @@ function makeMap(entries) {
 }
 
 describe('markdown utilities', () => {
+  it('does not fetch supported language list until a language registration happens', async () => {
+    const fetchStub = vi.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve('') }))
+    global.fetch = fetchStub
+    // initial operation should not trigger a fetch
+    detectFenceLanguages('```js\nfoo\n```', new Map())
+    expect(fetchStub).not.toHaveBeenCalled()
+    // registering a language should kick off the fetch
+    await registerLanguage('javascript')
+    expect(fetchStub).toHaveBeenCalled()
+  })
+
   it('detects common fence languages including two-letter ones', () => {
     const md = []
       .concat(

@@ -188,6 +188,10 @@ can grab from the bundle.  Examples follow each group.
 - Code‑highlight helpers: `registerLanguage()`, `loadSupportedLanguages()`,
   `SUPPORTED_HLJS_MAP`, `BAD_LANGUAGES`, and `observeCodeBlocks()`.
   Use this if you want to pre‑register extra languages or tweak the list.
+  The supported-language list is now fetched lazily (only when a code block
+  is encountered or you explicitly call `registerLanguage`), so startup cost
+  is minimal.  You can still manually call `loadSupportedLanguages()` if you
+  prefer eager loading or want to inspect the map.
 
   ```js
   import { registerLanguage, observeCodeBlocks } from 'nimbi-cms'

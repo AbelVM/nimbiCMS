@@ -150,6 +150,12 @@ const registeredLangs = new Set()
  * @returns {Promise<boolean>}
  */
 export async function registerLanguage(name, modulePath) {
+  // ensure supported list is fetched lazily the first time we attempt
+  // any registration (useful when initCMS didn't pre-load it).
+  if (!loadSupportedLanguagesPromise) {
+    // fire-and-forget
+    loadSupportedLanguages().catch(() => {})
+  }
   if (!name || typeof name !== 'string') return false
   const low = name.toLowerCase()
   // drop explicitly banned languages
@@ -216,6 +222,10 @@ let __hlObserver = null
  * @param {ParentNode} [root=document]
  */
 export function observeCodeBlocks(root = document) {
+  // make sure we have fetched supported languages list lazily when we start
+  if (!loadSupportedLanguagesPromise) {
+    loadSupportedLanguages().catch(() => {})
+  }
   const aliasMapLocal = HLJS_ALIAS_MAP
   const ensureObserver = () => {
     if (__hlObserver) return __hlObserver

@@ -437,11 +437,9 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
   } catch (e) {
   }
 
-  try {
-    // start loading supported languages in background; do not block render
-    try { loadSupportedLanguages().catch(() => {}) } catch (e) { }
-  } catch (e) {
-  }
+  // supported languages list will be fetched lazily when we first
+  // encounter a code block or register a language.  preloading here is
+  // optional and no longer necessary.
 
   const siteNav = createNavTree(t, [{ path: '_home.md', name: t('home'), isIndex: true, children: [] }])
   let currentPagePath = null
