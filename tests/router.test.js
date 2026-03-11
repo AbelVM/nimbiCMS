@@ -51,6 +51,25 @@ describe('router module', () => {
     expect(router.resolutionCache.has('k1')).toBe(false)
   })
 
+  it('cache entries expire after TTL', () => {
+    // constant should be exported and a positive number by default
+    expect(typeof router.RESOLUTION_CACHE_TTL).toBe('number')
+    expect(router.RESOLUTION_CACHE_TTL).toBeGreaterThan(0)
+
+    // use fake timers so we can advance time arbitrarily
+    vi.useFakeTimers()
+    const key = 'foo'
+    router.resolutionCacheSet(key, { resolved: 'bar' })
+    expect(router.resolutionCacheGet(key)).toEqual({ resolved: 'bar' })
+
+    // move clock past the TTL and verify the record is gone
+    vi.advanceTimersByTime(router.RESOLUTION_CACHE_TTL + 1)
+    expect(router.resolutionCacheGet(key)).toBeUndefined()
+
+    // restore real timers for subsequent tests
+    vi.useRealTimers()
+  })
+
   it('buildPageCandidates returns slug mapping and handles missing extensions', () => {
     files.slugToMd.set('foo', 'foo.md')
     files.mdToSlug.set('foo.md', 'foo')

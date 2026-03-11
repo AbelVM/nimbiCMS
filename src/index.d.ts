@@ -7,6 +7,9 @@ export type ThemeStyle = 'light' | 'dark'
 export interface InitOptions {
   el: string | Element
   contentPath?: string
+  crawlMaxQueue?: number
+  searchIndex?: boolean
+  cacheTtlMinutes?: number
   defaultStyle?: ThemeStyle
   bulmaCustomize?: string
   lang?: string
@@ -86,11 +89,15 @@ export function applyPageMeta(t: (...args:any[])=>any, initialDocumentTitle: str
 
 
 // --- from src/router.js
+export function setResolutionCacheMax(n: number): any
+export const RESOLUTION_CACHE_TTL: any
+export function setResolutionCacheTtl(ms: any): any
 export const resolutionCache: any
 export function _clearIndexCache(): any
 export function refreshIndexPaths(): void
 export function resolutionCacheGet(key: string): {resolved:string,anchor:string|null}|undefined
 export function resolutionCacheSet(key: string, value: {resolved:string,anchor:string|null}): void
+export function _purgeExpiredEntries(): void
 export function buildPageCandidates(resolved: string): string[]
 export function fetchPageData(raw: string, contentBase: string): Promise<{data:object,pagePath:string,anchor:string|null}>
 
@@ -128,7 +135,7 @@ export function ensureScrollTopButton(opts: object): any
 // --- from src/gen-dts-sample.js
 export function complexExample(opts: {a:number,b:string}): Promise<Array<{foo:string}|{bar:number}>>
 export function simpleUnion(): string|number
-export function recordExample(): Record<string, Array<number>>
+export function recordExample(): Record<string, number[]>
 export function sum(opts: any): {sum:number}
 export function callIt(cb: (...args:any[])=>any): void
 

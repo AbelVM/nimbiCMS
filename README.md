@@ -45,7 +45,7 @@ the kind of lightweight site where you want live preview without any server.
 <script>
   // UMD bundle exposes global `nimbiCMS`
   // `contentPath` is optional and defaults to `./content` if omitted
-  nimbiCMS.initCMS({ el: '#app' })
+  nimbiCMS.initCMS({ el: '#app' /*, cacheTtlMinutes: 10 */ })
 </script>
 </body></html>
 ```
@@ -102,7 +102,10 @@ Recent behaviour fixes worth knowing:
 - Intercepts navbar/content links to perform SPA navigation (no reloads).
 - Lazy-loads images and defers code highlighting via `IntersectionObserver`.
 - In-memory caching of fetched markdown and slug resolutions speeds up
-  repeat navigations and reduces network traffic.
+  repeat navigations and reduces network traffic.  The router cache is
+  subject to both a maximum entry count and a time‑to‑live (TTL) so a
+  long‑running page won't accumulate stale lookups; the TTL is configurable
+  via the `cacheTtlMinutes` option passed to `initCMS()`.
 - URL slug fallback **no longer** appends `.md`/`.html`; passing an
   unmapped slug produces a 404 rather than assuming a filename.  Slugs are
   sanitized to strip any accidental `.md`/`.html` text from headers.  To
@@ -137,6 +140,16 @@ Recent behaviour fixes worth knowing:
   `#app`). A DOM element is also accepted for compatibility.
 - `contentPath` – URL path to the content folder serving raw `.md` files
   (default `./content` or `/content`). The library normalizes trailing slashes.
+- `cacheTtlMinutes` – **number** (default `5`).  Time‑to‑live for slug
+  resolution cache entries, expressed in minutes.  Internally this is
+  converted to milliseconds and assigned to `RESOLUTION_CACHE_TTL` in the
+  router module.  Setting this to `0` effectively turns off expiration (the
+  cache is still size‑bounded by cacheMaxEntries).
+- `cacheMaxEntries` – **number** (optional).  Maximum number of entries the
+  router will hold in its resolution cache.  If unspecified the built‑in
+  constant `RESOLUTION_CACHE_MAX` (currently 100) is used.  Fine‑tune this
+  when targeting devices with limited memory or when you want a larger cache
+  for a heavy traffic site.
 - `crawlMaxQueue` – **number** (default `1000`). Upper bound on the number of
   directories the internal slug crawler will queue during a breadth‑first
   traversal.  Setting this to `0` disables the guard; a lower value improves
@@ -192,6 +205,10 @@ are exposed (all are also available from the UMD bundle namespace).
 > the automatically generated portion of the declaration.  For additional
 > corner‑case coverage we maintain a small sample file (`src/gen-dts-sample.js`)
 > that the unit test exercises, so the generator is exercised against nested
+> 
+> The generated declaration also inserts a brief comment before each export
+> block indicating the originating source file, which makes it easy to trace a
+> type back to its implementation.
 > generics, unions, destructured parameters, and other tricky cases.
 > 
 > To validate the output, use `npm run check-dts` (a thin wrapper around

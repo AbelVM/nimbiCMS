@@ -1,13 +1,46 @@
 import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug } from './filesManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 
-// in-memory LRU cache to avoid repeating slug resolution logic.
-// The Map insertion order is used to evict the oldest entry when the max
-// size is exceeded.
-export const RESOLUTION_CACHE_MAX = 100
+// in-memory cache to avoid repeating slug resolution logic.  We employ a
+// combination of size-based LRU eviction **and** a time-to-live so entries
+// cannot remain in memory indefinitely during long‑running sessions.  This
+// mirrors the behaviour of a small in‑browser store with sensible limits.
+
+// maximum number of entries before the oldest are dropped.  Can be
+// adjusted at runtime via `setResolutionCacheMax`; useful if a host page has
+// known memory constraints or wants a larger cache for a high‑traffic site.
+export let RESOLUTION_CACHE_MAX = 100
+
 /**
- * LRU-style cache for recent page-resolution results.
- * Map<string, {resolved:string,anchor:string|null}>
+ * Change maximum cache size at runtime.
+ * @param {number} n
+ */
+export function setResolutionCacheMax(n) {
+  RESOLUTION_CACHE_MAX = n
+}
+/**
+ * Time‑to‑live (TTL) for cache entries, in milliseconds.  After this duration
+ * a stored resolution will be treated as if it does not exist, triggering a
+ * fresh lookup.  Setting to a non‑positive number disables expiration.
+ * This value is exported as a `let` so that callers (such as `initCMS`) can
+ * override it dynamically if they need a different cache lifetime.
+ */
+export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000 // five minutes
+
+/**
+ * Modify the resolution cache time‑to‑live at runtime.
+ * Accepts a value in milliseconds; passing a non‑positive value disables
+ * expiration.  This is the recommended API for external code rather than
+ * mutating the namespace object directly (which is read‑only in ESM).
+ * @param {number} ms
+ */
+export function setResolutionCacheTtl(ms) {
+  RESOLUTION_CACHE_TTL = ms
+}
+
+/**
+ * Runtime cache for recent page-resolution results.
+ * Map<string, {value:{resolved:string,anchor:string|null},ts:number}>
  */
 export const resolutionCache = new Map()
 
@@ -95,11 +128,17 @@ export function refreshIndexPaths() {
  */
 export function resolutionCacheGet(key) {
   if (!resolutionCache.has(key)) return undefined
-  const val = resolutionCache.get(key)
-  // refresh order
+  const record = resolutionCache.get(key)
+  const now = Date.now()
+  if (record.ts + RESOLUTION_CACHE_TTL < now) {
+    // expired, drop and signal miss
+    resolutionCache.delete(key)
+    return undefined
+  }
+  // refresh order by reinserting
   resolutionCache.delete(key)
-  resolutionCache.set(key, val)
-  return val
+  resolutionCache.set(key, record)
+  return record.value
 }
 /**
  * Store a resolution result in the runtime resolution cache. Evicts oldest
@@ -109,14 +148,35 @@ export function resolutionCacheGet(key) {
  * @returns {void}
  */
 export function resolutionCacheSet(key, value) {
+  // optionally purge expired items on every write.  this keeps the map from
+  // growing with stale entries if the TTL is enabled.
+  _purgeExpiredEntries()
   resolutionCache.delete(key)
-  resolutionCache.set(key, value)
+  resolutionCache.set(key, {value, ts: Date.now()})
   if (resolutionCache.size > RESOLUTION_CACHE_MAX) {
     const oldest = resolutionCache.keys().next().value
     if (oldest !== undefined) resolutionCache.delete(oldest)
   }
 }
 
+
+
+// internal helpers --------------------------------------------------------
+
+/**
+ * Remove any stale entries from the cache based on TTL.  Called by
+ * `resolutionCacheSet` and exposed for tests.
+ * @returns {void}
+ */
+export function _purgeExpiredEntries() {
+  if (!RESOLUTION_CACHE_TTL || RESOLUTION_CACHE_TTL <= 0) return
+  const now = Date.now()
+  for (const [k, record] of resolutionCache.entries()) {
+    if (record.ts + RESOLUTION_CACHE_TTL < now) {
+      resolutionCache.delete(k)
+    }
+  }
+}
 
 // re-export for testing convenience and user access
 /**

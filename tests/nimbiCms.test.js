@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import initCMS from '../src/nimbi-cms.js'
 import * as slugMgr from '../src/slugManager.js'
+import * as router from '../src/router.js'
 
 // minimal DOM support
 function makeAppContainer() {
@@ -25,5 +26,32 @@ describe('initCMS option handling', () => {
     makeAppContainer()
     await initCMS({ el: '#app', crawlMaxQueue: 7, searchIndex: false })
     expect(slugMgr.defaultCrawlMaxQueue).toBe(7)
+  })
+
+  it('respect cacheTtlMinutes option and defaults', async () => {
+    makeAppContainer()
+    // default should be 5 minutes
+    await initCMS({ el: '#app', searchIndex: false })
+    expect(router.RESOLUTION_CACHE_TTL).toBe(5 * 60 * 1000)
+
+    // override explicitly
+    await initCMS({ el: '#app', searchIndex: false, cacheTtlMinutes: 1 })
+    expect(router.RESOLUTION_CACHE_TTL).toBe(1 * 60 * 1000)
+  })
+
+  it('honors cacheMaxEntries option when provided', async () => {
+    makeAppContainer()
+    // default is whatever current constant is (100)
+    const orig = router.RESOLUTION_CACHE_MAX
+    expect(orig).toBeGreaterThan(0)
+
+    await initCMS({ el: '#app', searchIndex: false, cacheMaxEntries: 5 })
+    expect(router.RESOLUTION_CACHE_MAX).toBe(5)
+
+    // restore original value manually and verify
+    if (typeof router.setResolutionCacheMax === 'function') {
+      router.setResolutionCacheMax(orig)
+    }
+    expect(router.RESOLUTION_CACHE_MAX).toBe(orig)
   })
 })

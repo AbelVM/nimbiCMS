@@ -72,6 +72,9 @@ export type ThemeStyle = 'light' | 'dark'
 export interface InitOptions {
   el: string | Element
   contentPath?: string
+  crawlMaxQueue?: number
+  searchIndex?: boolean
+  cacheTtlMinutes?: number
   defaultStyle?: ThemeStyle
   bulmaCustomize?: string
   lang?: string

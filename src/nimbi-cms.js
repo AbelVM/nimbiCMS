@@ -1,5 +1,6 @@
 import 'highlight.js/styles/monokai.css'
 import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase, buildSearchIndex, searchIndex } from './filesManager.js'
+import * as router from './router.js'
 import { isExternalLink, normalizePath, trimTrailingSlash, safe } from './utils/helpers.js'
 import { createNavTree, preScanHtmlSlugs, preMapMdSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
@@ -109,9 +110,11 @@ export function _clearHooks() {
  * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
  * @param {string} [options.lang] - UI language code
  * @param {string|null} [options.l10nFile] - path to localization file
+ * @param {number} [options.cacheTtlMinutes=5] - resolution cache time‑to‑live in minutes
+ * @param {number} [options.cacheMaxEntries] - maximum number of resolution cache entries (defaults to module constant)
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
-export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, searchIndex: searchEnabled = true, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
+export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, searchIndex: searchEnabled = true, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null, cacheTtlMinutes = 5, cacheMaxEntries } = {}) {
       if (!el) throw new Error('el is required')
 
       let mountEl = el
@@ -180,6 +183,20 @@ export async function initCMS({ el, contentPath = '/content', /* eslint-disable 
   const contentBase = new URL(pageDir + cp, location.origin).toString()
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (lang) setLang(lang)
+
+  // configure router cache TTL if user supplied minutes
+  if (typeof cacheTtlMinutes === 'number' && cacheTtlMinutes >= 0) {
+    // use the exported setter to avoid namespace immutability errors
+    if (typeof router.setResolutionCacheTtl === 'function') {
+      router.setResolutionCacheTtl(cacheTtlMinutes * 60 * 1000)
+    }
+  }
+  // configure router max entries if given
+  if (typeof cacheMaxEntries === 'number' && cacheMaxEntries >= 0) {
+    if (typeof router.setResolutionCacheMax === 'function') {
+      router.setResolutionCacheMax(cacheMaxEntries)
+    }
+  }
 
   // allow crawling behavior to be tuned by consumer
   try {
