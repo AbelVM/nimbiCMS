@@ -16,6 +16,8 @@ describe('htmlBuilder utilities', () => {
     // clear maps before each test
     slugToMd.clear()
     mdToSlug.clear()
+    // remove any leftover container or scroll button elements from prior runs
+    document.querySelectorAll('.nimbi-cms, .nimbi-scroll-top').forEach(el => el.remove())
   })
 
   it('preScanHtmlSlugs ignores non-html links', async () => {
@@ -117,5 +119,68 @@ describe('htmlBuilder utilities', () => {
     container.scrollTop = 0
     container.dispatchEvent(new Event('scroll'))
     expect(label.classList.contains('show')).toBe(false)
+  })
+
+  it('scrollToAnchorOrTop scrolls the container element to top when anchor is null', async () => {
+    const container = document.createElement('div')
+    container.className = 'nimbi-cms'
+    container.style.height = '50px'
+    container.style.overflow = 'auto'
+    const filler = document.createElement('div')
+    filler.style.height = '200px'
+    container.appendChild(filler)
+    document.body.appendChild(container)
+
+    // stub scrollTo so we can observe changes synchronously
+    container.scrollTo = ({ top }) => { container.scrollTop = top }
+
+    // initially scroll down some amount
+    container.scrollTop = 100
+    const { scrollToAnchorOrTop } = require('../src/htmlBuilder.js')
+    // sanity check: querySelector should find the same element
+    expect(document.querySelector('.nimbi-cms')).toBe(container)
+    scrollToAnchorOrTop(null)
+    // allow any async scheduling to run
+    await new Promise(r => setTimeout(r, 0))
+    expect(container.scrollTop).toBe(0)
+  })
+
+  it('scrollToAnchorOrTop moves to a specific anchor within the container', async () => {
+    const container = document.createElement('div')
+    container.className = 'nimbi-cms'
+    container.style.height = '50px'
+    container.style.overflow = 'auto'
+    const inner = document.createElement('div')
+    inner.style.height = '1000px'
+    const target = document.createElement('div')
+    target.id = 'foo'
+    target.style.marginTop = '300px'
+    inner.appendChild(target)
+    container.appendChild(inner)
+    document.body.appendChild(container)
+
+    // spy on scrollTo to ensure it gets called with some value
+    const scrollSpy = vi.fn()
+    container.scrollTo = scrollSpy
+
+    // sanity check: target offset is greater than initial scrollTop
+    expect(container.contains(target)).toBe(true)
+    container.scrollTop = 0
+    const { scrollToAnchorOrTop } = require('../src/htmlBuilder.js')
+    expect(document.querySelector('.nimbi-cms')).toBe(container)
+    // patch timers so the deferred doScroll runs immediately
+    const origRAF = global.requestAnimationFrame
+    const origSetTimeout = global.setTimeout
+    global.requestAnimationFrame = cb => cb()
+    global.setTimeout = (cb, t) => { cb(); return 0 }
+
+    scrollToAnchorOrTop('foo')
+
+    // restore originals
+    global.requestAnimationFrame = origRAF
+    global.setTimeout = origSetTimeout
+
+    // now the spy should have been called synchronously
+    expect(scrollSpy).toHaveBeenCalled()
   })
 })

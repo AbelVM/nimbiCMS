@@ -447,6 +447,9 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           return
         }
       if (!anchor && hashAnchor) anchor = hashAnchor
+      // reset scroll before inserting new page; if an anchor is present
+      // the later scrollToAnchorOrTop call will position correctly.
+      try { scrollToAnchorOrTop(null) } catch (_) {}
       contentWrap.innerHTML = ''
 
       const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)

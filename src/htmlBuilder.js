@@ -532,15 +532,17 @@ export function attachTocClickHandler(toc) {
 
 
 export function scrollToAnchorOrTop(anchor) {
+    // container element is the scrolling div created by initCMS
+    const containerEl = document.querySelector('.nimbi-cms') || null
     if (anchor) {
       const el = document.getElementById(anchor)
       if (el) {
         try {
           const doScroll = () => {
             try {
-              if (container && container.scrollTo && container.contains(el)) {
-                const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
-                container.scrollTo({ top, behavior: 'smooth' })
+              if (containerEl && containerEl.scrollTo && containerEl.contains(el)) {
+                const top = el.getBoundingClientRect().top - containerEl.getBoundingClientRect().top + containerEl.scrollTop
+                containerEl.scrollTo({ top, behavior: 'smooth' })
               } else {
                 try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (_) { el.scrollIntoView() }
               }
@@ -553,7 +555,7 @@ export function scrollToAnchorOrTop(anchor) {
       }
     } else {
       try {
-        if (container && container.scrollTo) container.scrollTo({ top: 0, behavior: 'smooth' })
+        if (containerEl && containerEl.scrollTo) containerEl.scrollTo({ top: 0, behavior: 'smooth' })
         else window.scrollTo(0, 0)
       } catch (_) { window.scrollTo(0, 0) }
     }
