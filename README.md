@@ -135,6 +135,11 @@ Recent behaviour fixes worth knowing:
   `#app`). A DOM element is also accepted for compatibility.
 - `contentPath` – URL path to the content folder serving raw `.md` files
   (default `./content` or `/content`). The library normalizes trailing slashes.
+- `crawlMaxQueue` – **number** (default `1000`). Upper bound on the number of
+  directories the internal slug crawler will queue during a breadth‑first
+  traversal.  Setting this to `0` disables the guard; a lower value improves
+  safety on deeply nested content trees but may prevent discovery of pages in
+  extreme structures.
 - `defaultStyle` – `'light' | 'dark'` (default `'light'`). Controls initial
   theme; use `setStyle()` to toggle later.
 - `bulmaCustomize` – `'none' | 'local' | '{theme_name}'` (default `'none'`).

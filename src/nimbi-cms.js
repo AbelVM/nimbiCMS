@@ -87,13 +87,14 @@ export function _clearHooks() {
  * @param {Object} options
  * @param {string|Element} options.el - mount point selector or element
  * @param {string} [options.contentPath='/content'] - URL path to content
+ * @param {number} [options.crawlMaxQueue] - maximum directory queue length for slug crawling (see docs)
  * @param {ThemeStyle} [options.defaultStyle='light'] - initial light/dark mode
  * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
  * @param {string} [options.lang] - UI language code
  * @param {string|null} [options.l10nFile] - path to localization file
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
-export async function initCMS({ el, contentPath = '/content', /* languages (deprecated) */ defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
+export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null } = {}) {
       if (!el) throw new Error('el is required')
 
       let mountEl = el
@@ -160,6 +161,17 @@ export async function initCMS({ el, contentPath = '/content', /* languages (depr
   const contentBase = new URL(pageDir + cp, location.origin).toString()
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (lang) setLang(lang)
+
+  // allow crawling behavior to be tuned by consumer
+  try {
+    if (typeof crawlMaxQueue === 'number') {
+      // eslint-disable-next-line no-unused-vars
+      import('./filesManager.js').then(({ setDefaultCrawlMaxQueue }) => {
+        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) {}
+      })
+    }
+  } catch (_) {}
+
   // Inform filesManager of the runtime content base so slug -> md mapping
   // can be computed relative to the correct path instead of relying on
   // hardcoded segments.

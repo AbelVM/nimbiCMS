@@ -80,4 +80,34 @@ describe('slugManager module', () => {
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
+
+  it('crawlForSlug aborts when queue exceeds provided maxQueue', async () => {
+    const base = 'http://example.com/content/'
+    let calls = 0
+    global.fetch = vi.fn(async (url) => {
+      calls++
+      // always return a listing with two subdirectories so queue grows
+      return { ok: true, text: () => Promise.resolve('<a href="a/"></a><a href="b/"></a>') }
+    })
+
+    const result = await slugMgr.crawlForSlug('no-match', base, 3)
+    expect(result).toBe(null)
+    // ensure we didn't spin forever; a handful of calls is enough
+    expect(calls).toBeLessThanOrEqual(10)
+  })
+
+  it('defaultCrawlMaxQueue can be changed via setter', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.setDefaultCrawlMaxQueue(2)
+    let calls = 0
+    global.fetch = vi.fn(async (url) => {
+      calls++
+      return { ok: true, text: () => Promise.resolve('<a href="a/"></a><a href="b/"></a>') }
+    })
+    const result = await slugMgr.crawlForSlug('none', base)
+    expect(result).toBe(null)
+    expect(calls).toBeLessThanOrEqual(10)
+    // restore default so other tests unaffected
+    slugMgr.setDefaultCrawlMaxQueue(slugMgr.CRAWL_MAX_QUEUE)
+  })
 })

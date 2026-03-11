@@ -174,6 +174,28 @@ export let fetchMarkdown = async function(path, base) {
 // cache results from crawl attempts so we don't re-scan directories
 export const crawlCache = new Map()
 
+// maximum number of pending directories we'll track during a crawl.  a
+// pathological site could expose an infinite or very deep tree, so we guard
+// against runaway memory usage by aborting once the queue grows past this
+// threshold.  callers can override by passing a lower value to
+// `crawlForSlug`.
+export const CRAWL_MAX_QUEUE = 1000
+
+// runtime-configurable default for the maximum queue length used by
+// `crawlForSlug`.  Consumers (e.g. initCMS) may override this via
+// `setDefaultCrawlMaxQueue()`; tests can modify it as well for edge cases.
+export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
+
+/**
+ * Change the default queue limit used by `crawlForSlug` when no explicit
+ * `maxQueue` argument is provided.  Useful for controlling memory usage from
+ * application code (e.g. via `initCMS` options).
+ * @param {number} n
+ */
+export function setDefaultCrawlMaxQueue(n) {
+  if (typeof n === 'number' && n >= 0) defaultCrawlMaxQueue = n
+}
+
 // performance micro-optimizations used by crawlForSlug
 // a single DOMParser can be reused safely across calls and avoids allocating
 // a fresh one on every directory listing.
@@ -195,13 +217,18 @@ const _crawlLinkSelector = 'a[href]'
  * @param {string} contentBase
  * @returns {Promise<string|null>} relative markdown path or null
  */
-export let crawlForSlug = async function(decoded, contentBase) {
+export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaultCrawlMaxQueue) {
   if (crawlCache.has(decoded)) return crawlCache.get(decoded)
   let found = null
   const seenDirs = new Set()
   const queue = ['']
 
   while (queue.length && !found) {
+    if (queue.length > maxQueue) {
+      // abort early to avoid excessive memory use; record failure so
+      // subsequent calls won't replay the same expensive crawl.
+      break
+    }
     const relDir = queue.shift()
     if (seenDirs.has(relDir)) continue
     seenDirs.add(relDir)
@@ -267,11 +294,11 @@ export let crawlForSlug = async function(decoded, contentBase) {
  * @param {string} contentBase
  * @returns {Promise<string|null>}
  */
-export async function ensureSlug(decoded, contentBase) {
+export async function ensureSlug(decoded, contentBase, maxQueue) {
   if (slugToMd.has(decoded)) return slugToMd.get(decoded)
   // first try crawling
   let found
-  try { found = await crawlForSlug(decoded, contentBase) } catch (e) {
+  try { found = await crawlForSlug(decoded, contentBase, maxQueue) } catch (e) {
     found = null
   }
   if (found) {

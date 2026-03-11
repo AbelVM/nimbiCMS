@@ -68,8 +68,10 @@ export const slugToMd: Map<string,string>
 export const mdToSlug: Map<string,string>
 export function clearFetchCache(): void
 export const fetchCache: Map<string, Promise<any>>
-export function crawlForSlug(decoded: string, contentBase: string): Promise<string|null>
-export function ensureSlug(decoded: string, contentBase: string): Promise<string|null>
+export const defaultCrawlMaxQueue: number
+export function setDefaultCrawlMaxQueue(n: number): void
+export function crawlForSlug(decoded: string, contentBase: string, maxQueue?: number): Promise<string|null>
+export function ensureSlug(decoded: string, contentBase: string, maxQueue?: number): Promise<string|null>
 export function setContentBase(contentBase?: string): void
 // internal helper used by router to keep its index set current
 export function refreshIndexPaths(): void
