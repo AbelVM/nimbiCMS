@@ -24,6 +24,8 @@ describe('router module', () => {
   beforeEach(() => {
     files.slugToMd.clear()
     files.mdToSlug.clear()
+    // also clear router's internal index cache so each test starts fresh
+    router._clearIndexCache()
     // clear the resolution cache map
     router.resolutionCache.clear()
     ;(files.fetchMarkdown).mockReset()
@@ -78,11 +80,30 @@ describe('router module', () => {
   it('tryDiscoverFromIndex falls back to scanning allMarkdownPaths', async () => {
     // simulate a markdown file whose H1 slug matches
     router.allMarkdownPaths.splice(0, router.allMarkdownPaths.length, 'blog/test.md')
+    // inform router about the new path (mirrors what setContentBase does)
+    router.refreshIndexPaths()
     const fakeMd = { raw: '# Test Page' }
     files.fetchMarkdown.mockResolvedValue(fakeMd)
 
     const result = await router.fetchPageData('test-page', '/content/')
     expect(result.pagePath).toBe('blog/test.md')
+  })
+
+  it('refreshIndexPaths must be called when allMarkdownPaths is modified', async () => {
+    // initial index cache doesn't know about new path until refresh
+    router.allMarkdownPaths.splice(0, router.allMarkdownPaths.length, 'new/path.md')
+    const fakeMd = { raw: '# New Path' }
+    files.fetchMarkdown.mockResolvedValue(fakeMd)
+
+    // without refresh we should still get not-found
+    await expect(router.fetchPageData('new-path', '/content/')).rejects.toThrow('no page data')
+
+    // clear cached result so lookup happens again, then tell router about
+    // the updated paths and retry
+    router.resolutionCache.clear()
+    router.refreshIndexPaths()
+    const result = await router.fetchPageData('new-path', '/content/')
+    expect(result.pagePath).toBe('new/path.md')
   })
 
   it('fetchPageData throws when slug is unknown (no fallback)', async () => {

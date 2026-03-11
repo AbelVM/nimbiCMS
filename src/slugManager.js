@@ -45,6 +45,8 @@ function _deriveCommonPrefix(paths) {
  * maps and `allMarkdownPaths` relative to that base.
  * @param {string} [contentBase]
  */
+import { refreshIndexPaths } from './router.js'
+
 export function setContentBase(contentBase) {
   slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
 
@@ -69,6 +71,8 @@ export function setContentBase(contentBase) {
       rel = fullPath.replace(/^\.\//, '').replace(/^\//, '')
     }
     allMarkdownPaths.push(rel)
+    // keep router index up to date with newly discovered markdown
+    try { refreshIndexPaths() } catch (_) {}
 
     const val = _allMd[fullPath]
     if (typeof val === 'string') {
@@ -170,6 +174,13 @@ export let fetchMarkdown = async function(path, base) {
 // cache results from crawl attempts so we don't re-scan directories
 export const crawlCache = new Map()
 
+// performance micro-optimizations used by crawlForSlug
+// a single DOMParser can be reused safely across calls and avoids allocating
+// a fresh one on every directory listing.
+const _crawlParser = new DOMParser()
+// predefine selector string so we don't rebuild it each time
+const _crawlLinkSelector = 'a[href]'
+
 /**
  * Crawl the content directory looking for a markdown whose H1 slug produces
  * the provided decoded value.  This uses directory listings (HTML) to
@@ -201,10 +212,9 @@ export let crawlForSlug = async function(decoded, contentBase) {
       const res = await globalThis.fetch(url)
       if (!res.ok) continue
       const text = await res.text()
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(text, 'text/html')
-      const links = doc.querySelectorAll('a')
-      for (const a of Array.from(links)) {
+      const doc = _crawlParser.parseFromString(text, 'text/html')
+      const links = doc.querySelectorAll(_crawlLinkSelector)
+      for (const a of links) {
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue

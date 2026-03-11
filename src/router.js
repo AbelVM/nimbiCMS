@@ -6,6 +6,58 @@ import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlu
 export const RESOLUTION_CACHE_MAX = 100
 export const resolutionCache = new Map()
 
+// incremental index of known markdown paths for fallback lookups.  we
+// populate this when paths or slug maps change.  keeping it lazy avoids the
+// “cannot access before initialization” errors that occurred during test
+// imports.
+const indexSet = new Set()
+
+function _augmentIndexWithMap(map) {
+  if (!map || typeof map.values !== 'function') return
+  for (const v of map.values()) {
+    if (v) indexSet.add(v)
+  }
+}
+
+// test helper: clear the index cache completely (used by unit tests)
+export function _clearIndexCache() {
+  indexSet.clear()
+}
+
+// patch Map.prototype.set for our two slug maps so additions automatically
+// update the index set.  We only care about values (markdown paths);
+// keys are slugs which are not needed in the fallback search.
+function _trackMap(map) {
+  if (!map || typeof map.set !== 'function') return
+  const orig = map.set
+  map.set = function(k, v) {
+    if (v) indexSet.add(v)
+    return orig.call(this, k, v)
+  }
+}
+
+let _mapsTracked = false
+function _ensureMapsTracked() {
+  if (_mapsTracked) return
+  _trackMap(slugToMd)
+  _trackMap(mdToSlug)
+  _mapsTracked = true
+}
+
+// expose a helper so external code (slugManager) can refresh from
+// `allMarkdownPaths` when that array is repopulated during setContentBase.
+export function refreshIndexPaths() {
+  _ensureMapsTracked()
+  // clear and repopulate; callers may choose to invoke this repeatedly.
+  indexSet.clear()
+  for (const v of allMarkdownPaths) {
+    if (v) indexSet.add(v)
+  }
+  // also ingest any current slug mappings
+  _augmentIndexWithMap(slugToMd)
+  _augmentIndexWithMap(mdToSlug)
+}
+
 export function resolutionCacheGet(key) {
   if (!resolutionCache.has(key)) return undefined
   const val = resolutionCache.get(key)
@@ -48,9 +100,10 @@ export { allMarkdownPaths } from './filesManager.js'
  */
 async function tryDiscoverFromIndex(decoded, contentBase) {
   // attempt to locate a markdown file whose H1 slugifies to `decoded`
-  const indexSet = new Set()
-  // gather candidates from navbar links
-// gather candidates from navbar links; this is not expected to fail
+  // start with the pre-populated indexSet and clone it so we can add any
+  // links discovered in the DOM without mutating the shared cache.
+  const localCandidates = new Set(indexSet)
+  // gather candidates from navbar links; this is not expected to fail
   const anchorsForIndex = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
   for (const linkEl of Array.from(anchorsForIndex || [])) {
     const href = linkEl.getAttribute('href') || ''
@@ -62,7 +115,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
       if (mdMatch) {
         let candidate = mdMatch[1].replace(/^\.\//, '')
         if (candidate.startsWith('/')) candidate = candidate.replace(/^\//, '')
-        if (candidate) indexSet.add(candidate)
+        if (candidate) localCandidates.add(candidate)
         continue
       }
       const p = u.pathname || ''
@@ -76,7 +129,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
         if (p.indexOf(contentBasePath) !== -1) {
           let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p.replace(/^\//, '')
           rel = rel.replace(/^[\.\/]+/, '')
-          if (rel) indexSet.add(rel)
+          if (rel) localCandidates.add(rel)
         }
       }
     } catch (e) {
@@ -84,17 +137,11 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
     }
   }
 
-  for (const v of slugToMd.values()) if (v) indexSet.add(v)
-  for (const v of mdToSlug.keys()) if (v) indexSet.add(v)
-  // also consider every markdown path in the content directory so that
-  // arbitrary slugs resolve even when the page isn't referenced in nav.
-  for (const v of allMarkdownPaths) if (v) indexSet.add(v)
-
   // iterate through every candidate we collected; for modest numbers
   // of nav entries this is very cheap, and it ensures we can resolve
   // slugs that differ from the link text (e.g. 'tech-experiments' →
   // projects.md via its H1).
-  for (const candidate of Array.from(indexSet)) {
+  for (const candidate of localCandidates) {
     try {
       if (!candidate || !String(candidate).includes('.md')) continue
       const idxMd = await fetchMarkdown(candidate, contentBase)

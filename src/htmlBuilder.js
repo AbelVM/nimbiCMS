@@ -95,13 +95,29 @@ function lazyLoadImages(el, pagePath, contentBase) {
   } catch (_) {}
 }
 
+// cache last input and output to avoid allocating new URL objects when
+// the same contentBase string is passed repeatedly (common in a single
+// page render).  We keep the path separately as well.
+let _lastContentBase = ''
+let _lastContentBaseUrl = null
+let _lastContentBasePath = ''
+
 async function rewriteAnchors(article, contentBase, pagePath) {
   try {
     const anchors = article.querySelectorAll('a')
     if (!anchors || !anchors.length) return
 
-    const contentBaseUrl = new URL(contentBase)
-    const contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+    let contentBaseUrl, contentBasePath
+    if (contentBase === _lastContentBase && _lastContentBaseUrl) {
+      contentBaseUrl = _lastContentBaseUrl
+      contentBasePath = _lastContentBasePath
+    } else {
+      contentBaseUrl = new URL(contentBase)
+      contentBasePath = contentBaseUrl.pathname.endsWith('/') ? contentBaseUrl.pathname : contentBaseUrl.pathname + '/'
+      _lastContentBase = contentBase
+      _lastContentBaseUrl = contentBaseUrl
+      _lastContentBasePath = contentBasePath
+    }
 
     // collect MD paths that require slug lookup
     const pending = new Set()
