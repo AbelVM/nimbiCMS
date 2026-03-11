@@ -181,6 +181,22 @@ Recent behaviour fixes worth knowing:
 - `highlightTheme` – initial highlight.js theme (default `monokai`).
 - `markdownExtensions` – **Array&lt;object&gt;** (optional). A list of [marked](https://github.com/markedjs/marked) extension/plugin objects to register during initialization. These will be added via `addMarkdownExtension()` before any content is rendered; useful for custom syntax, link transformations, or other parser tweaks.
 
+  ```js
+  // add a custom inline tokenizer that uppercases text
+  const upperExt = {
+    name: 'upper',
+    level: 'inline',
+    start(src) { return src.search(/[A-Z]{2,}/); },
+    tokenizer(src) {
+      const match = /^[A-Z]{2,}/.exec(src);
+      if (match) return { type: 'upper', raw: match[0], text: match[0].toLowerCase() };
+    },
+    renderer(token) { return `<span class="upper">${token.text}</span>`; }
+  };
+
+  initCMS({ el: '#app', markdownExtensions: [upperExt] });
+  ```
+
 > **Note:** the formerly available `languages` option has been removed. Fenced-
 > code detection handles language registration automatically.
 
