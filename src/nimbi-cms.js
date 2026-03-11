@@ -61,6 +61,14 @@ export function onNavBuild(fn) { addHook('onNavBuild', fn) }
  */
 export function transformHtml(fn) { addHook('transformHtml', fn) }
 
+/**
+ * Invoke all registered hook callbacks for the given hook `name` with a
+ * supplied context object. Errors from individual callbacks are swallowed.
+ *
+ * @param {string} name - hook name
+ * @param {object} ctx - context passed to callbacks
+ * @returns {Promise<void>}
+ */
 async function runHooks(name, ctx) {
   const list = hooks[name] || []
   for (const fn of list) {
@@ -555,6 +563,13 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
 
 
 
+    /**
+     * Render a page identified by `raw` (slug/path) into the CMS container.
+     * This resolves the page, prepares the article DOM and updates navigation.
+     * @param {string} raw - raw page identifier (slug, path, or filename)
+     * @param {string|null} hashAnchor - optional anchor to scroll to
+     * @returns {Promise<void>}
+     */
     async function renderPage(raw, hashAnchor) {
       let data, pagePath, anchor
       try {
@@ -592,6 +607,10 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
       currentPagePath = pagePath
     }
 
+    /**
+     * Read the current `?page=` query param and render that page.
+     * @returns {Promise<void>}
+     */
     async function renderByQuery() {
       const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
       const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null

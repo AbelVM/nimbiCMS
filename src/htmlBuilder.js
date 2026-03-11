@@ -3,6 +3,12 @@ import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { isExternalLink, normalizePath, setLazyload, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 
+/**
+ * Build a navigation tree DOM element from a simple tree description.
+ * @param {Function} t - localization function that returns translated strings
+ * @param {Array<{path:string,name:string,children?:Array}>} tree - nav items
+ * @returns {HTMLElement} aside menu element
+ */
 export function createNavTree(t, tree) {
   const nav = document.createElement('aside')
   nav.className = 'menu nimbi-nav'
@@ -36,6 +42,15 @@ export function createNavTree(t, tree) {
   return nav
 }
 
+
+
+/**
+ * Build a table-of-contents DOM element from parsed TOC entries.
+ * @param {Function} t - localization function
+ * @param {Array<{level:number,text:string,id?:string}>} toc - TOC entries
+ * @param {string} [pagePath]
+ * @returns {HTMLElement}
+ */
 export function buildTocElement(t, toc, pagePath = '') {
   const aside = document.createElement('aside')
   aside.className = 'menu nimbi-toc-inner'
@@ -71,11 +86,24 @@ export function buildTocElement(t, toc, pagePath = '') {
 
 // helpers used by prepareArticle ------------------------------------------------
 
+/**
+ * Ensure every heading in the document has an id (slugified from text).
+ * @param {Document|HTMLElement} doc
+ * @returns {void}
+ */
 function addHeadingIds(doc) {
   const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
   heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
 }
 
+/**
+ * Resolve relative image `src` attributes against the content base and
+ * mark them for lazy loading where appropriate.
+ * @param {HTMLElement} el - container element to search for images
+ * @param {string} pagePath
+ * @param {string} contentBase
+ * @returns {void}
+ */
 function lazyLoadImages(el, pagePath, contentBase) {
   try {
     const imgs = el.querySelectorAll('img')
@@ -102,6 +130,14 @@ let _lastContentBase = ''
 let _lastContentBaseUrl = null
 let _lastContentBasePath = ''
 
+/**
+ * Rewrite anchor hrefs in an article element to SPA `?page=` links where
+ * applicable. Performs slug lookups and may fetch markdown titles.
+ * @param {HTMLElement} article
+ * @param {string} contentBase
+ * @param {string} [pagePath]
+ * @returns {Promise<void>}
+ */
 async function rewriteAnchors(article, contentBase, pagePath) {
   try {
     const anchors = article.querySelectorAll('a')
@@ -227,6 +263,16 @@ async function rewriteAnchors(article, contentBase, pagePath) {
   } catch (_) {}
 }
 
+/**
+ * Compute and replace the current history state slug for the article.
+ * Returns the detected top H1, its text, and the chosen slug key.
+ *
+ * @param {Object} parsed - parsed page metadata
+ * @param {HTMLElement} article
+ * @param {string} [pagePath]
+ * @param {string|null} [anchor]
+ * @returns {{topH1:HTMLElement|null,h1Text:string|null,slugKey:string}}
+ */
 function computeSlug(parsed, article, pagePath, anchor) {
   const topH1 = article.querySelector('h1')
   const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
@@ -337,11 +383,13 @@ export async function preScanHtmlSlugs(linkEls, base) {
 }
 
 // ---------------------------------------------------------------------------
-// new helper: map markdown paths referenced by anchors to their slug keys.
-// This is used during nav building so that direct queries to a slug will
-// resolve even before the associated page has been rendered.  The logic is
-// essentially the same as the early portion of `prepareArticle` but only for
-// the provided anchor list.
+
+/**
+ * Map referenced markdown links to slugs by fetching titles where needed.
+ * @param {NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[]} linkEls
+ * @param {string} contentBase
+ * @returns {Promise<void>}
+ */
 export async function preMapMdSlugs(linkEls, contentBase) {
   if (!linkEls || !linkEls.length) return
 
@@ -580,6 +628,13 @@ export function renderNotFound(contentWrap, t, e) {
 // test helpers (not part of public API)
 export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages }
 
+
+
+/**
+ * Attach a click handler to a generated TOC so clicks perform SPA navigation.
+ * @param {HTMLElement} toc
+ * @returns {void}
+ */
 export function attachTocClickHandler(toc) {
     try {
       toc.addEventListener('click', (ev) => {

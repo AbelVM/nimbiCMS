@@ -42,7 +42,8 @@ export interface HookContext {
 export function initCMS(options: InitOptions): Promise<void>
 export default initCMS
 
-export function registerLanguage(name: string, modulePath: string): void
+// registerLanguage is provided by the codeblocks manager and returns a
+// promise indicating whether the language was (or is already) registered.
 export function setStyle(style: ThemeStyle): void
 export function setThemeVars(vars: Record<string,string>): void
 export function setHighlightTheme(name: string, opts?: { useCdn?: boolean }): void
@@ -63,8 +64,7 @@ export const SUPPORTED_HLJS_MAP: Map<string,string>
 export const BAD_LANGUAGES: Set<string>
 
 // accessible helpers from other modules
-declare const allMarkdownPaths: string[]
-export { allMarkdownPaths }
+export let allMarkdownPaths: string[]
 
 // slug/markdown utilities
 export const slugToMd: Map<string,string>
@@ -73,7 +73,7 @@ export function clearFetchCache(): void
 export const fetchCache: Map<string, Promise<any>>
 export let searchIndex: Array<{slug:string,title:string,excerpt:string,path:string}>
 export function buildSearchIndex(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
-export const defaultCrawlMaxQueue: number
+export let defaultCrawlMaxQueue: number
 export function setDefaultCrawlMaxQueue(n: number): void
 export function crawlForSlug(decoded: string, contentBase: string, maxQueue?: number): Promise<string|null>
 export function ensureSlug(decoded: string, contentBase: string, maxQueue?: number): Promise<string|null>

@@ -5,6 +5,10 @@ import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/h
 // The Map insertion order is used to evict the oldest entry when the max
 // size is exceeded.
 export const RESOLUTION_CACHE_MAX = 100
+/**
+ * LRU-style cache for recent page-resolution results.
+ * Map<string, {resolved:string,anchor:string|null}>
+ */
 export const resolutionCache = new Map()
 
 // incremental index of known markdown paths for fallback lookups.  we
@@ -47,6 +51,11 @@ function _ensureMapsTracked() {
 
 // expose a helper so external code (slugManager) can refresh from
 // `allMarkdownPaths` when that array is repopulated during setContentBase.
+/**
+ * Refresh the internal index set from `allMarkdownPaths` and current slug maps.
+ * Useful when the content base or path list changes at runtime (tests/plugins).
+ * @returns {void}
+ */
 export function refreshIndexPaths() {
   _ensureMapsTracked()
   // clear and repopulate; callers may choose to invoke this repeatedly.
@@ -59,6 +68,11 @@ export function refreshIndexPaths() {
   _augmentIndexWithMap(mdToSlug)
 }
 
+/**
+ * Retrieve a cached resolution result and refresh its LRU position.
+ * @param {string} key
+ * @returns {{resolved:string,anchor:string|null}|undefined}
+ */
 export function resolutionCacheGet(key) {
   if (!resolutionCache.has(key)) return undefined
   const val = resolutionCache.get(key)
@@ -67,6 +81,13 @@ export function resolutionCacheGet(key) {
   resolutionCache.set(key, val)
   return val
 }
+/**
+ * Store a resolution result in the runtime resolution cache. Evicts oldest
+ * entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
+ * @param {string} key
+ * @param {{resolved:string,anchor:string|null}} value
+ * @returns {void}
+ */
 export function resolutionCacheSet(key, value) {
   resolutionCache.delete(key)
   resolutionCache.set(key, value)
