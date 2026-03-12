@@ -389,7 +389,27 @@ export let fetchMarkdown = async function(path, base) {
     }
     const raw = await res.text()
     const trimmed = raw.trim().slice(0, 16).toLowerCase()
-    const isHtml = trimmed.startsWith('<!doctype') || trimmed.startsWith('<html') || String(path || '').toLowerCase().endsWith('.html')
+    const looksLikeHtml = trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')
+    const isHtml = looksLikeHtml || String(path || '').toLowerCase().endsWith('.html')
+
+    // If the request was for a `.md` file but the server returned HTML (often
+    // due to a SPA fallback like index.html), treat this as a missing markdown
+    // page rather than a successful fetch. In that case, try to load the
+    // site's `_404.md` and return it if available so the CMS can render a
+    // proper 404 page instead of showing the site's index HTML.
+    if (looksLikeHtml && String(path || '').toLowerCase().endsWith('.md')) {
+      try {
+        const p404 = `${baseClean}/_404.md`
+        const r404 = await globalThis.fetch(p404)
+        if (r404.ok) {
+          const raw404 = await r404.text()
+          return { raw: raw404, status: 404 }
+        }
+      } catch (_ee) { }
+      console.error('fetchMarkdown: server returned HTML for .md request', url)
+      throw new Error('failed to fetch md')
+    }
+
     return isHtml ? { raw, isHtml: true } : { raw }
   })()
 
@@ -798,7 +818,10 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   } catch (_) {}
 
   // attempt to resolve using an obvious filename guess (runtime-only)
-  const candidates = [`${decoded}.md`, `${decoded}.html`, `${decoded}/index.md`, `${decoded}/index.html`]
+  // Do not guess directory index files (index.md/index.html) for unknown
+  // slugs; doing so caused unknown slugs to resolve to index.html and
+  // prevented 404 handling. Only try direct filename guesses.
+  const candidates = [`${decoded}.md`, `${decoded}.html`]
   for (const cand of candidates) {
     try {
       const res = await fetchMarkdown(cand, contentBase)

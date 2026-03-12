@@ -120,113 +120,120 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
  * @param {number} [options.cacheTtlMinutes=5] - resolution cache time‑to‑live in minutes
  * @param {number} [options.cacheMaxEntries] - maximum number of resolution cache entries (defaults to module constant)
  * @param {Array<object>} [options.markdownExtensions] - list of marked extensions to register on init
+ * @param {string} [options.homePage] - Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`.
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
 export async function initCMS(options = {}) {
-      if (!options || typeof options !== 'object') {
-        throw new TypeError('initCMS(options): options must be an object')
-      }
 
-      const {
-        el,
-        contentPath = '/content',
+  if (!options || typeof options !== 'object') {
+    throw new TypeError('initCMS(options): options must be an object')
+  }
+
+  const {
+    el,
+    contentPath = '/content',
         /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000,
-        searchIndex: searchEnabled = true,
-        searchIndexMode = 'eager',
-        defaultStyle = 'light',
-        bulmaCustomize = 'none',
-        lang = undefined,
-        l10nFile = null,
-        cacheTtlMinutes = 5,
-        cacheMaxEntries,
-        markdownExtensions
-      } = options
+    searchIndex: searchEnabled = true,
+    searchIndexMode = 'eager',
+    defaultStyle = 'light',
+    bulmaCustomize = 'none',
+    lang = undefined,
+    l10nFile = null,
+    cacheTtlMinutes = 5,
+    cacheMaxEntries,
+    markdownExtensions,
+    homePage = '_home.md'
+  } = options
 
-      if (!el) {
-        throw new Error('initCMS(options): "el" is required (CSS selector string or DOM Element)')
-      }
+  if (!el) {
+    throw new Error('initCMS(options): "el" is required (CSS selector string or DOM Element)')
+  }
 
-      let mountEl = el
-      if (typeof el === 'string') {
-        mountEl = document.querySelector(el)
-        if (!mountEl) throw new Error(`el selector "${el}" did not match any element`)
-      } else if (!(el instanceof Element)) {
-        throw new TypeError('initCMS(options): "el" must be a CSS selector string or a DOM Element')
-      }
+  let mountEl = el
+  if (typeof el === 'string') {
+    mountEl = document.querySelector(el)
+    if (!mountEl) throw new Error(`el selector "${el}" did not match any element`)
+  } else if (!(el instanceof Element)) {
+    throw new TypeError('initCMS(options): "el" must be a CSS selector string or a DOM Element')
+  }
 
-      if (typeof contentPath !== 'string' || !contentPath.trim()) {
-        throw new TypeError('initCMS(options): "contentPath" must be a non-empty string when provided')
-      }
+  if (typeof contentPath !== 'string' || !contentPath.trim()) {
+    throw new TypeError('initCMS(options): "contentPath" must be a non-empty string when provided')
+  }
 
-      if (typeof searchEnabled !== 'boolean') {
-        throw new TypeError('initCMS(options): "searchIndex" must be a boolean when provided')
-      }
+  if (typeof searchEnabled !== 'boolean') {
+    throw new TypeError('initCMS(options): "searchIndex" must be a boolean when provided')
+  }
 
-      if (searchIndexMode != null && searchIndexMode !== 'eager' && searchIndexMode !== 'lazy' && searchIndexMode !== 'off') {
-        throw new TypeError('initCMS(options): "searchIndexMode" must be "eager", "lazy", or "off" when provided')
-      }
+  if (searchIndexMode != null && searchIndexMode !== 'eager' && searchIndexMode !== 'lazy' && searchIndexMode !== 'off') {
+    throw new TypeError('initCMS(options): "searchIndexMode" must be "eager", "lazy", or "off" when provided')
+  }
 
-      if (defaultStyle !== 'light' && defaultStyle !== 'dark') {
-        throw new TypeError('initCMS(options): "defaultStyle" must be "light" or "dark"')
-      }
+  if (defaultStyle !== 'light' && defaultStyle !== 'dark') {
+    throw new TypeError('initCMS(options): "defaultStyle" must be "light" or "dark"')
+  }
 
-      if (bulmaCustomize != null && typeof bulmaCustomize !== 'string') {
-        throw new TypeError('initCMS(options): "bulmaCustomize" must be a string when provided')
-      }
+  if (bulmaCustomize != null && typeof bulmaCustomize !== 'string') {
+    throw new TypeError('initCMS(options): "bulmaCustomize" must be a string when provided')
+  }
 
-      if (lang != null && typeof lang !== 'string') {
-        throw new TypeError('initCMS(options): "lang" must be a string when provided')
-      }
+  if (lang != null && typeof lang !== 'string') {
+    throw new TypeError('initCMS(options): "lang" must be a string when provided')
+  }
 
-      if (l10nFile != null && typeof l10nFile !== 'string') {
-        throw new TypeError('initCMS(options): "l10nFile" must be a string or null when provided')
-      }
+  if (l10nFile != null && typeof l10nFile !== 'string') {
+    throw new TypeError('initCMS(options): "l10nFile" must be a string or null when provided')
+  }
 
-      if (cacheTtlMinutes != null && (typeof cacheTtlMinutes !== 'number' || !Number.isFinite(cacheTtlMinutes) || cacheTtlMinutes < 0)) {
-        throw new TypeError('initCMS(options): "cacheTtlMinutes" must be a non‑negative number when provided')
-      }
+  if (cacheTtlMinutes != null && (typeof cacheTtlMinutes !== 'number' || !Number.isFinite(cacheTtlMinutes) || cacheTtlMinutes < 0)) {
+    throw new TypeError('initCMS(options): "cacheTtlMinutes" must be a non‑negative number when provided')
+  }
 
-      if (cacheMaxEntries != null && (typeof cacheMaxEntries !== 'number' || !Number.isInteger(cacheMaxEntries) || cacheMaxEntries < 0)) {
-        throw new TypeError('initCMS(options): "cacheMaxEntries" must be a non‑negative integer when provided')
-      }
+  if (cacheMaxEntries != null && (typeof cacheMaxEntries !== 'number' || !Number.isInteger(cacheMaxEntries) || cacheMaxEntries < 0)) {
+    throw new TypeError('initCMS(options): "cacheMaxEntries" must be a non‑negative integer when provided')
+  }
 
-      if (markdownExtensions != null && (!Array.isArray(markdownExtensions) || markdownExtensions.some(ext => !ext || typeof ext !== 'object'))) {
-        throw new TypeError('initCMS(options): "markdownExtensions" must be an array of extension objects when provided')
-      }
+  if (markdownExtensions != null && (!Array.isArray(markdownExtensions) || markdownExtensions.some(ext => !ext || typeof ext !== 'object'))) {
+    throw new TypeError('initCMS(options): "markdownExtensions" must be an array of extension objects when provided')
+  }
 
-      const effectiveSearchEnabled = searchEnabled && searchIndexMode !== 'off'
+  if (homePage != null && (typeof homePage !== 'string' || !homePage.trim() || !/\.(md|html)$/.test(homePage))) {
+    throw new TypeError('initCMS(options): "homePage" must be a non-empty string ending with .md or .html')
+  }
 
-      try {
-        mountEl.classList.add('nimbi-mount')
-        mountEl.style.position = mountEl.style.position || 'relative'
-        mountEl.style.overflow = mountEl.style.overflow || 'hidden'
-      } catch (e) { }
+  const effectiveSearchEnabled = searchEnabled && searchIndexMode !== 'off'
 
-      const container = document.createElement('div')
-      container.className = 'nimbi-cms'
-      try {
-        container.style.position = container.style.position || 'relative'
-        container.style.overflow = container.style.overflow || 'auto'
-        try { if (!container.style.webkitOverflowScrolling) container.style.webkitOverflowScrolling = 'touch' } catch (e) { }
-        container.style.width = container.style.width || '100%'
-        container.style.height = container.style.height || '100%'
-        container.style.boxSizing = container.style.boxSizing || 'border-box'
-      } catch (e) { }
+  try {
+    mountEl.classList.add('nimbi-mount')
+    mountEl.style.position = mountEl.style.position || 'relative'
+    mountEl.style.overflow = mountEl.style.overflow || 'hidden'
+  } catch (e) { }
 
-      const cols = document.createElement('div')
-      cols.className = 'columns'
+  const container = document.createElement('div')
+  container.className = 'nimbi-cms'
+  try {
+    container.style.position = container.style.position || 'relative'
+    container.style.overflow = container.style.overflow || 'auto'
+    try { if (!container.style.webkitOverflowScrolling) container.style.webkitOverflowScrolling = 'touch' } catch (e) { }
+    container.style.width = container.style.width || '100%'
+    container.style.height = container.style.height || '100%'
+    container.style.boxSizing = container.style.boxSizing || 'border-box'
+  } catch (e) { }
 
-      const navCol = document.createElement('div')
-      navCol.className = 'column is-full-mobile is-3-tablet nimbi-nav-wrap'
-      cols.appendChild(navCol)
+  const cols = document.createElement('div')
+  cols.className = 'columns'
 
-      const contentCol = document.createElement('div')
-      contentCol.className = 'column nimbi-content'
-      cols.appendChild(contentCol)
+  const navCol = document.createElement('div')
+  navCol.className = 'column is-full-mobile is-3-tablet nimbi-nav-wrap'
+  cols.appendChild(navCol)
 
-      container.appendChild(cols)
+  const contentCol = document.createElement('div')
+  contentCol.className = 'column nimbi-content'
+  cols.appendChild(contentCol)
 
-    const navWrap = navCol
+  container.appendChild(cols)
+
+  const navWrap = navCol
   const contentWrap = contentCol
 
   mountEl.appendChild(container)
@@ -276,7 +283,7 @@ export async function initCMS(options = {}) {
           markdown.addMarkdownExtension(ext)
         }
       })
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // allow crawling behavior to be tuned by consumer
@@ -284,19 +291,19 @@ export async function initCMS(options = {}) {
     if (typeof crawlMaxQueue === 'number') {
       // eslint-disable-next-line no-unused-vars
       import('./filesManager.js').then(({ setDefaultCrawlMaxQueue }) => {
-        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) {}
+        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { }
       })
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Inform filesManager of the runtime content base so slug -> md mapping
   // can be computed relative to the correct path instead of relying on
   // hardcoded segments.
   try { setContentBase(contentBase) } catch (_) { }
   try {
-    await fetchMarkdown('_home.md', contentBase)
+    await fetchMarkdown(homePage, contentBase)
   } catch (e) {
-    throw new Error(`Required _home.md not found at ${contentBase}_home.md: ${e.message}`)
+    throw new Error(`Required homePage not found at ${contentBase}${homePage}: ${e.message}`)
   }
 
   setStyle(defaultStyle)
@@ -316,8 +323,8 @@ export async function initCMS(options = {}) {
     // markdown links appearing in the navigation.  Doing this before the
     // first page render ensures that a slug referring to a nav page will
     // resolve even when that page hasn't yet been visited.
-await safe(() => preScanHtmlSlugs(linkEls, contentBase))
-await safe(() => preMapMdSlugs(linkEls, contentBase))
+    await safe(() => preScanHtmlSlugs(linkEls, contentBase))
+    await safe(() => preMapMdSlugs(linkEls, contentBase))
 
     const navbar = document.createElement('nav')
     navbar.className = 'navbar'
@@ -341,7 +348,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           const h = u.hash.replace(/^#/, '')
           brandItem.href = '?page=' + encodeURIComponent(h)
         } else {
-          const m = (u.pathname || '').match(/([^\/]+\.md)(?:$|[?#])/) 
+          const m = (u.pathname || '').match(/([^\/]+\.md)(?:$|[?#])/)
           if (m) {
             let md = normalizePath(m[1])
             brandItem.href = '?page=' + encodeURIComponent(md)
@@ -359,7 +366,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
       brandItem.textContent = firstLink.textContent || t('home')
     } else {
       // ensure brand goes to the explicit home page slug
-      brandItem.href = '?page=_home.md'
+      brandItem.href = '?page=' + encodeURIComponent(homePage)
       brandItem.textContent = t('home')
     }
     brand.appendChild(brandItem)
@@ -526,9 +533,9 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
 
 
 
-            item.textContent = a.textContent || href
-            start.appendChild(item)
-          }
+      item.textContent = a.textContent || href
+      start.appendChild(item)
+    }
 
     menu.appendChild(start)
     menu.appendChild(end)
@@ -561,9 +568,9 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           results.appendChild(a)
         })
         results.style.display = 'block'
-          // ensure container is right-aligned (in case CSS not applied yet)
-          results.style.right = '0'
-          results.style.left = 'auto'
+        // ensure container is right-aligned (in case CSS not applied yet)
+        results.style.right = '0'
+        results.style.left = 'auto'
       }
       const debounce = (fn, delay) => {
         let timer = null
@@ -610,7 +617,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           }
         })
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // invoke nav-build hooks so plugins can tweak the DOM or track data
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { }
@@ -686,77 +693,73 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
   // encounter a code block or register a language.  preloading here is
   // optional and no longer necessary.
 
-  const siteNav = createNavTree(t, [{ path: '_home.md', name: t('home'), isIndex: true, children: [] }])
+  const siteNav = createNavTree(t, [{ path: homePage, name: t('home'), isIndex: true, children: [] }])
   let currentPagePath = null
 
 
 
 
 
-    /**
-     * Render a page identified by `raw` (slug/path) into the CMS container.
-     * This resolves the page, prepares the article DOM and updates navigation.
-     * @param {string} raw - raw page identifier (slug, path, or filename)
-     * @param {string|null} hashAnchor - optional anchor to scroll to
-     * @returns {Promise<void>}
-     */
-    async function renderPage(raw, hashAnchor) {
-      let data, pagePath, anchor
-      try {
-          ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
-        } catch (e) {
-          console.error('[nimbi-cms] fetchPageData failed', e)
-          renderNotFound(contentWrap, t, e)
-          return
-        }
-      if (!anchor && hashAnchor) anchor = hashAnchor
-      // reset scroll before inserting new page; if an anchor is present
-      // the later scrollToAnchorOrTop call will position correctly.
-      try { scrollToAnchorOrTop(null) } catch (_) {}
-      contentWrap.innerHTML = ''
-
-      const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
-
-      applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
-
-      navWrap.innerHTML = ''
-      navWrap.appendChild(toc)
-      attachTocClickHandler(toc)
-
-      // allow plugins to modify the generated article element before it is
-      // placed in the document (e.g. for analytics, extra widgets, etc.)
-      try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { }
-
-      contentWrap.appendChild(article)
-
-      scrollToAnchorOrTop(anchor)
-      ensureScrollTopButton(article, topH1, { mountOverlay, container, mountEl, navWrap, t })
-
-      // fire the onPageLoad hooks after everything is in place
-      try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { }
-
-      currentPagePath = pagePath
+  /**
+   * Render a page identified by `raw` (slug/path) into the CMS container.
+   * This resolves the page, prepares the article DOM and updates navigation.
+   * @param {string} raw - raw page identifier (slug, path, or filename)
+   * @param {string|null} hashAnchor - optional anchor to scroll to
+   * @returns {Promise<void>}
+   */
+  async function renderPage(raw, hashAnchor) {
+    let data, pagePath, anchor
+    try {
+      ({ data, pagePath, anchor } = await fetchPageData(raw, contentBase))
+    } catch (e) {
+      console.error('[nimbi-cms] fetchPageData failed', e)
+      renderNotFound(contentWrap, t, e)
+      return
     }
+    if (!anchor && hashAnchor) anchor = hashAnchor
+    // reset scroll before inserting new page; if an anchor is present
+    // the later scrollToAnchorOrTop call will position correctly.
+    try { scrollToAnchorOrTop(null) } catch (_) { }
+    contentWrap.innerHTML = ''
 
-    /**
-     * Read the current `?page=` query param and render that page.
-     * @returns {Promise<void>}
-     */
-    async function renderByQuery() {
-      let raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
-      const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
-      try {
-        await renderPage(raw, hashAnchor)
-      } catch (e) {
-        console.warn('[nimbi-cms] renderByQuery failed for', raw, e)
-        // if initial slug didn’t resolve, fall back to home page
-        if (raw !== '_home.md') {
-          try {
-            await renderPage('_home.md', null)
-          } catch (_) { /* give up */ }
-        }
-      }
+    const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
+
+    applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
+
+    navWrap.innerHTML = ''
+    navWrap.appendChild(toc)
+    attachTocClickHandler(toc)
+
+    // allow plugins to modify the generated article element before it is
+    // placed in the document (e.g. for analytics, extra widgets, etc.)
+    try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { }
+
+    contentWrap.appendChild(article)
+
+    scrollToAnchorOrTop(anchor)
+    ensureScrollTopButton(article, topH1, { mountOverlay, container, mountEl, navWrap, t })
+
+    // fire the onPageLoad hooks after everything is in place
+    try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { }
+
+    currentPagePath = pagePath
+  }
+
+  /**
+   * Read the current `?page=` query param and render that page.
+   * @returns {Promise<void>}
+   */
+  async function renderByQuery() {
+    let raw = (new URLSearchParams(location.search).get('page')) || homePage
+    const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+    try {
+      await renderPage(raw, hashAnchor)
+    } catch (e) {
+      console.warn('[nimbi-cms] renderByQuery failed for', raw, e)
+      // if initial slug didn’t resolve, show 404 page
+      renderNotFound(contentWrap, t, e)
     }
+  }
 
   window.addEventListener('popstate', renderByQuery)
   await renderByQuery()

@@ -44,6 +44,26 @@ describe('hook subsystem and init validation', () => {
 })
 
 describe('initCMS option handling', () => {
+    it('accepts homePage as .md or .html and falls back to _home.md', async () => {
+      makeAppContainer()
+      global.fetch = vi.fn(async (url) => ({ ok: true, text: () => Promise.resolve('# home') }))
+      // .md
+      await expect(initCMS({ el: '#app', homePage: 'welcome.md' })).resolves.toBeUndefined()
+      // .html
+      await expect(initCMS({ el: '#app', homePage: 'index.html' })).resolves.toBeUndefined()
+      // fallback
+      await expect(initCMS({ el: '#app' })).resolves.toBeUndefined()
+    })
+
+    it('throws if homePage is invalid', async () => {
+      makeAppContainer()
+      // not a string
+      await expect(initCMS({ el: '#app', homePage: 123 })).rejects.toThrow(/homePage/)
+      // empty string
+      await expect(initCMS({ el: '#app', homePage: '' })).rejects.toThrow(/homePage/)
+      // wrong extension
+      await expect(initCMS({ el: '#app', homePage: 'foo.txt' })).rejects.toThrow(/homePage/)
+    })
   beforeEach(() => {
     // reset any existing setting so tests don't interfere
     slugMgr.setDefaultCrawlMaxQueue(slugMgr.CRAWL_MAX_QUEUE)

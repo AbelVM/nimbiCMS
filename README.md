@@ -428,9 +428,19 @@ static server that serves the files is sufficient.
 
 **Required files**
 
-- `_home.md` – the site’s home page (must exist).
+- Home page: by default, `_home.md` is required. You can override this with the `homePage` option to use a different `.md` or `.html` file as the home page.
 - `_navigation.md` – renders into the navbar; use Markdown links.
 - `_404.md` – optional fallback for 404 responses.
+* `homePage` – **string** (optional, default `'_home.md'`). Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`. Example:
+  ```js
+  initCMS({ el: '#app', homePage: 'index.html' })
+  ```
+  This allows you to use either a Markdown or HTML file as the home page.
+* `homePage` – **string** (optional, default `'_home.md'`). Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`. Example:
+  ```js
+  initCMS({ el: '#app', homePage: 'index.html' })
+  ```
+  This allows you to use either a Markdown or HTML file as the home page.
 
 Example nav markup:
 

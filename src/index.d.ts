@@ -17,6 +17,11 @@ export interface InitOptions {
   /** optional array of markdown paths provided by the host (example plugin)
    *  used by slug resolution and search index */
   markdownPaths?: string[]
+  /**
+   * Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`.
+   * @default '_home.md'
+   */
+  homePage?: string
 }
 
 export interface PageContext {

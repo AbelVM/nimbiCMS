@@ -277,32 +277,28 @@ export function buildPageCandidates(resolved) {
   const pageCandidates = []
   if (String(resolved).includes('.md') || String(resolved).includes('.html')) {
     // caller already supplied an explicit path; use it verbatim
-    pageCandidates.push(resolved)
+    // Prevent index.html from being considered unless explicitly requested
+    if (!/index\.html$/i.test(resolved)) {
+      pageCandidates.push(resolved)
+    }
   } else {
     try {
       const dec = decodeURIComponent(String(resolved || ''))
       if (slugToMd.has(dec)) {
         const val = resolveSlugPath(dec) || slugToMd.get(dec)
-        if (val) {
+        if (val && !/index\.html$/i.test(val)) {
           pageCandidates.push(val)
-          if (!val.includes('.md') && !val.includes('.html')) {
-            pageCandidates.push(val + '.html')
-          }
         }
       } else {
         // try to find a matching path anywhere in allMarkdownPaths
         if (allMarkdownPaths && allMarkdownPaths.length) {
           for (const p of allMarkdownPaths) {
             const base = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
-            if (slugify(base) === dec) {
+            if (slugify(base) === dec && !/index\.html$/i.test(p)) {
               pageCandidates.push(p)
               break
             }
           }
-        }
-        // if still nothing and original looks like bare slug, try filename guesses
-        if (pageCandidates.length === 0 && !String(resolved).includes('.')) {
-          pageCandidates.push(dec + '.html', dec + '.md')
         }
       }
       // otherwise leave the list empty; fetchPageData will treat that as
@@ -373,6 +369,15 @@ export async function fetchPageData(raw, contentBase) {
   if (!anchor && hashAnchor) anchor = hashAnchor
 
   const pageCandidates = buildPageCandidates(resolved)
+
+  // If the only candidate is index.html and the slug is unknown, trigger 404
+  if (
+    pageCandidates.length === 1 &&
+    /index\.html$/i.test(pageCandidates[0]) &&
+    (!slugToMd.has(resolved) && !slugToMd.has(decodeURIComponent(String(resolved || ''))))
+  ) {
+    throw new Error('Unknown slug: index.html fallback prevented')
+  }
 
   let data = null
   let pagePath = null
