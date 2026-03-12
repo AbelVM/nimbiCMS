@@ -65,16 +65,16 @@ export function buildTocElement(t, toc, pagePath = '') {
     const li = document.createElement('li')
     const a = document.createElement('a')
     const slug = item.id || slugify(item.text)
-    try {
+      try {
       const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
       const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
       if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
-      else a.href = `?page=${encodeURIComponent(slug)}`
+      else a.href = `?page=${encodeURIComponent(slug)}#${encodeURIComponent(slug)}`
     } catch (_) {
       const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
       const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
       if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
-      else a.href = `?page=${encodeURIComponent(slug)}`
+      else a.href = `?page=${encodeURIComponent(slug)}#${encodeURIComponent(slug)}`
     }
     a.textContent = item.text
     li.appendChild(a)
@@ -540,6 +540,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const article = document.createElement('article')
     article.className = 'nimbi-article content'
     article.innerHTML = parsed.html
+    try { addHeadingIds(article) } catch (_) { }
     try {
       const codeEls = article.querySelectorAll('pre code, code[class]')
       codeEls.forEach(el => {
@@ -658,8 +659,37 @@ export function attachTocClickHandler(toc) {
           const hash = url.hash ? url.hash.replace(/^#/, '') : null
           if (!pageParam && !hash) return
           ev.preventDefault()
+          // If the requested page equals the current page (or no `page` param),
+          // don't re-render — just update the URL/hash and scroll to the anchor.
+          let currentPage = null
+          try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (_) { currentPage = null }
+          try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (_) { }
+
+          if ((!pageParam && hash) || (pageParam && currentPage && String(pageParam) === String(currentPage))) {
+            try {
+              // For anchor-only clicks, preserve existing search and only set hash.
+              if (!pageParam && hash) {
+                try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (_) { }
+              } else {
+                try { history.replaceState({ page: currentPage || pageParam }, '', '?page=' + encodeURIComponent(currentPage || pageParam) + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (_) { }
+              }
+            } catch (_) { }
+            try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (_) { }
+            try { scrollToAnchorOrTop(hash) } catch (_) { }
+            return
+          }
+
+          // Otherwise perform SPA navigation as before.
           history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
-          try { renderByQuery() } catch (_) { }
+          try {
+            if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') {
+              try { window.renderByQuery() } catch (_) { /* swallow */ }
+            } else if (typeof window !== 'undefined') {
+              try { window.dispatchEvent(new PopStateEvent('popstate')) } catch (_) { /* swallow */ }
+            } else {
+              try { renderByQuery() } catch (_) { }
+            }
+          } catch (_) { }
         } catch (_) { /* ignore non-URL hrefs */ }
       })
     } catch (e) { }

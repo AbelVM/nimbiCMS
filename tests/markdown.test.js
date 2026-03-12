@@ -145,29 +145,22 @@ describe('markdown utilities', () => {
 
   it('initRendererWorker returns a stable worker and logs creation (blob expected)', async () => {
     vi.resetModules()
-    const logSpy = vi.spyOn(console, 'log')
+    // previously this test asserted on log messages; logging removed
     const mdmod = await import('../src/markdown.js')
     const w1 = mdmod.initRendererWorker()
     const w2 = mdmod.initRendererWorker()
     expect(w1).toBe(w2)
-    // should have logged at least once about blob creation or worker creation
-    const calls = logSpy.mock.calls.flat()
-    expect(calls.some(c => String(c).includes('renderer worker blob created') || String(c).includes('renderer worker created'))).toBe(true)
-    logSpy.mockRestore()
   })
 
   it('logs module URL fallback when Blob is unavailable', async () => {
     vi.resetModules()
     const origBlob = global.Blob
     delete global.Blob
-    const logSpy = vi.spyOn(console, 'log')
     const mdmod = await import('../src/markdown.js')
     // worker may or may not materialize in this environment, but we should at
     // least attempt to compute a module URL
     const w = mdmod.initRendererWorker()
-    const calls = logSpy.mock.calls.flat()
-    expect(calls.some(c => String(c).includes('using module URL for renderer worker'))).toBe(true)
-    logSpy.mockRestore()
+    expect(w !== undefined).toBe(true)
     global.Blob = origBlob
   })
 

@@ -17,16 +17,6 @@ export interface InitOptions {
   /** optional array of markdown paths provided by the host (example plugin)
    *  used by slug resolution and search index */
   markdownPaths?: string[]
-  /**
-   * Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`.
-   * @default '_home.md'
-   */
-  homePage?: string
-  /**
-   * Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, defaults to `'_404.md'`.
-   * @default '_404.md'
-   */
-  notFoundPage?: string
 }
 
 export interface PageContext {
@@ -74,6 +64,8 @@ export function crawlForSlugWorker(slug: any, base: any, maxQueue: any): any
 export function addSlugResolver(fn: (slug:string,contentBase?:string)=>Promise<string|null>|string|null): void
 export const mdToSlug: any
 export function removeSlugResolver(fn: (slug:string)=>any): void
+export function setNotFoundPage(p: any): any
+export const notFoundPage: any
 export function _setAllMd(obj: Record<string,string>): any
 export const listSlugCache: any
 export function clearListCaches(): void
@@ -82,13 +74,12 @@ export function slugify(s: string): string
 export function resolveSlugPath(slug: string): string|null
 export function clearFetchCache(): any
 export const fetchCache: any
-export function fetchMarkdown(path: string, base: string): Promise<{raw:string,isHtml?:boolean,status?:number}>
+export const fetchMarkdown: any
 export function buildSearchIndex(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
 export function setDefaultCrawlMaxQueue(n: number): void
 export const crawlForSlug: any
 export function crawlAllMarkdown(contentBase: string, maxQueue: number): Promise<string[]>
 export function ensureSlug(decoded: string, contentBase: string, maxQueue: any): Promise<string|null>
-export function setNotFoundPage(p: string): void
 
 
 

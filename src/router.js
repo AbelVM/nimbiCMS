@@ -286,8 +286,16 @@ export function buildPageCandidates(resolved) {
       const dec = decodeURIComponent(String(resolved || ''))
       if (slugToMd.has(dec)) {
         const val = resolveSlugPath(dec) || slugToMd.get(dec)
-        if (val && !/index\.html$/i.test(val)) {
-          pageCandidates.push(val)
+        if (val) {
+          // If mapping lacks an explicit extension, also try the .html
+          // variant after the mapped value so callers can fetch either a
+          // raw path or an HTML file with the same base.
+          if (!/\.(md|html?)$/i.test(val)) {
+            pageCandidates.push(val)
+            pageCandidates.push(val + '.html')
+          } else if (!/index\.html$/i.test(val)) {
+            pageCandidates.push(val)
+          }
         }
       } else {
         // try to find a matching path anywhere in allMarkdownPaths
@@ -299,6 +307,14 @@ export function buildPageCandidates(resolved) {
               break
             }
           }
+        }
+        // If we didn't discover any candidate from the manifest or slug
+        // maps, probe common extensions for a bare slug.  Try `.html` first
+        // for friendliness, then `.md`.  Do not add directory index variants
+        // here (e.g. `foo/index.html`).
+        if (!pageCandidates.length && dec && !/\.(md|html?)$/i.test(dec)) {
+          pageCandidates.push(dec + '.html')
+          pageCandidates.push(dec + '.md')
         }
       }
       // otherwise leave the list empty; fetchPageData will treat that as

@@ -13,12 +13,14 @@ let _rendererWorker = null
 export function initRendererWorker() {
   if (!_rendererWorker) {
     try {
-      _rendererWorker = new RendererWorker()
-      _rendererWorker.addEventListener('error', e => {
-        console.warn('[markdown] renderer worker error event', e, e.message, e.filename, e.lineno, e.colno)
+      // Create the inlined renderer worker and retain a reference.
+      const w = new RendererWorker()
+      _rendererWorker = w
+      // On worker errors, clear the cached instance so future calls may retry.
+      w.addEventListener('error', () => {
+        try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (_) {}
       })
     } catch (e) {
-      console.warn('[markdown] renderer worker init failed', e)
       _rendererWorker = null
     }
   }
