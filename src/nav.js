@@ -48,6 +48,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   const parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null
   const navDoc = parser ? parser.parseFromString(navHtml || '', 'text/html') : null
   const linkEls = navDoc ? navDoc.querySelectorAll('a') : []
+  
 
   // ensure slug maps are populated for links inside the navigation
   await safe(() => preScanHtmlSlugs(linkEls, contentBase))
@@ -102,6 +103,20 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     brandItem.textContent = t('home')
   }
   brand.appendChild(brandItem)
+  
+      // Add SPA navigation handler for home link
+    brandItem.addEventListener('click', function(ev) {
+      const href = brandItem.getAttribute('href') || '';
+      if (href.startsWith('?page=')) {
+        ev.preventDefault();
+        const url = new URL(href, location.href);
+        const pageParam = url.searchParams.get('page');
+        const hash = url.hash ? url.hash.replace(/^#/, '') : null;
+        history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''));
+        try { renderByQuery(); } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e); }
+      }
+    });
+
 
   // mobile hamburger
   const burger = document.createElement('a')
