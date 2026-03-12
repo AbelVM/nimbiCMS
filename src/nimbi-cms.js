@@ -1,12 +1,4 @@
 import 'highlight.js/styles/monokai.css'
-import * as router from './router.js'
-import { safe } from './utils/helpers.js'
-import { parseMarkdownToHtml } from './markdown.js'
-import * as markdown from './markdown.js'
-import { buildNav } from './nav.js'
-import { createUI } from './ui.js'
-import { t, loadL10nFile, setLang } from './l10nManager.js'
-import { ensureBulma, setStyle } from './bulmaManager.js'
 
 // Pre-scan nav links for HTML files and map title/H1 -> slug to avoid nav-time fetches
 

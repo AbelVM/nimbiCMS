@@ -138,10 +138,26 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   let end, searchItem, resultsContainer
   // Respect searchIndex and searchIndexMode options
   if (!effectiveSearchEnabled || searchIndexMode === 'off') {
-    // skip search UI entirely
-    end = null
-    searchInput = null
-    resultsContainer = null
+    // Render search input (disabled) if search is enabled but mode is 'off'
+    if (effectiveSearchEnabled) {
+      end = document.createElement('div');
+      end.className = 'navbar-end';
+      searchItem = document.createElement('div');
+      searchItem.className = 'navbar-item';
+      searchInput = document.createElement('input');
+      searchInput.className = 'input';
+      searchInput.type = 'search';
+      searchInput.placeholder = t('searchPlaceholder') || '';
+      searchInput.id = 'nimbi-search';
+      searchInput.disabled = true;
+      searchItem.appendChild(searchInput);
+      end.appendChild(searchItem);
+      resultsContainer = null;
+    } else {
+      end = null;
+      searchInput = null;
+      resultsContainer = null;
+    }
   } else {
     end = document.createElement('div')
     end.className = 'navbar-end'

@@ -7,7 +7,6 @@
 
 import { fetchMarkdown, setContentBase, setNotFoundPage } from './filesManager.js'
 import * as router from './router.js'
-import { safe } from './utils/helpers.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
@@ -52,7 +51,7 @@ export async function initCMS(options = {}) {
   const {
     el,
     contentPath = '/content',
-        /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000,
+          crawlMaxQueue = 1000,
     searchIndex: searchEnabled = true,
     searchIndexMode = 'eager',
     defaultStyle = 'light',
