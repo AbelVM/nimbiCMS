@@ -5,6 +5,12 @@ import { makeWorkerManager } from './worker-manager.js'
 
 const _rendererManager = makeWorkerManager(() => new RendererWorker(), 'markdown')
 
+// Reuse a shared DOMParser in long‑running contexts to avoid repeated
+// construction (DOMParser is relatively cheap but can be called thousands
+// of times during heavy indexing or render loops). If DOMParser is not
+// available (e.g. some test runners) fall back to creating one per call.
+const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+
 /**
  * lazily return or create a renderer worker instance (may return null)
  */
@@ -69,8 +75,8 @@ export async function parseMarkdownToHtml(md) {
         // post-process worker HTML the same as inline path so tests and
         // runtime behavior match (assign heading ids, lazy-load images,
         // clean code classes, and allow hljs fallback behavior).
-        try {
-          const parser = new DOMParser()
+          try {
+          const parser = SHARED_DOM_PARSER || new DOMParser()
           const doc = parser.parseFromString(res.html, 'text/html')
           const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
           heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
@@ -140,7 +146,7 @@ export async function parseMarkdownToHtml(md) {
   let html = marked.parse(content)
 
   try {
-    const parser = new DOMParser()
+    const parser = SHARED_DOM_PARSER || new DOMParser()
     const doc = parser.parseFromString(html, 'text/html')
     const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
     heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
