@@ -137,12 +137,15 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   // optional search UI container on right side
   let end, searchItem, resultsContainer
   // Respect searchIndex and searchIndexMode options
-  if (!effectiveSearchEnabled || searchIndexMode === 'off') {
-    // Do not render search box at all
+  if (!effectiveSearchEnabled) {
+    // Ignore searchIndexMode, do not render search box or index
     end = null;
     searchInput = null;
     resultsContainer = null;
   } else {
+    // Only allow 'eager' or 'lazy' modes when search is enabled
+    const mode = (searchIndexMode === 'off') ? 'eager' : searchIndexMode;
+    searchIndexMode = mode;
     end = document.createElement('div')
     end.className = 'navbar-end'
     searchItem = document.createElement('div')

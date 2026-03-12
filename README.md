@@ -199,15 +199,12 @@ manager.terminate()
   can build a lightweight index of page titles/excerpts and insert a search box
   into the navbar.
 - `searchIndexMode` – `'eager' | 'lazy' | 'off'` (default `'eager'`). Controls
-  when the index is built:
-  - `'eager'`: build the index on init; the search input is initially disabled
-    and shows a Bulma loading spinner until the index is ready.
-  - `'lazy'`: wait until the user types a query before building the index; the
-    first non‑empty input triggers indexing, then results are debounced.
-  - `'off'`: do not build an index or render the search box even if
-    `searchIndex` is `true`.
-  Placeholder text is pulled from the localization dictionary under the key
-  `searchPlaceholder` (see `l10n` options).
+  `searchIndexMode` – `'eager' | 'lazy'` (default `'eager'`). Controls when the index is built:
+  - `'eager'`: build the index on init; the search input is initially disabled and shows a Bulma loading spinner until the index is ready.
+  - `'lazy'`: wait until the user types a query before building the index; the first non‑empty input triggers indexing, then results are debounced.
+  If `searchIndex` is `false`, `searchIndexMode` is ignored and no search box or index is built.
+  If `searchIndex` is `true`, only `'eager'` and `'lazy'` are valid modes; `'off'` is not supported.
+  Placeholder text is pulled from the localization dictionary under the key `searchPlaceholder` (see `l10n` options).
 
   The core index builder runs entirely at runtime when `initCMS()` is
   called.  It gathers slug information from three sources in order:
