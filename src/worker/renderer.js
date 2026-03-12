@@ -10,8 +10,10 @@ async function ensureHljs() {
     const mod = await import(HLJS_CDN_BASE + '/lib/core.js')
     hljs = mod.default || mod
   } catch (e) {
-    const mod = await import('highlight.js')
-    hljs = mod.default || mod
+    // if the CDN import fails we fall back to leaving `hljs` null and
+    // render code blocks without syntax highlighting rather than pulling
+    // in an additional bundled copy of highlight.js.
+    hljs = null
   }
   return hljs
 }

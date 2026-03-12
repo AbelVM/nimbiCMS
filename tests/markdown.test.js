@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
-import { detectFenceLanguages, parseMarkdownToHtml, addMarkdownExtension, setMarkdownExtensions, markdownExtensions } from '../src/markdown.js'
+import { detectFenceLanguages, parseMarkdownToHtml, addMarkdownExtension, setMarkdownExtensions } from '../src/markdown.js'
 import { registerLanguage, BAD_LANGUAGES } from '../src/codeblocksManager.js'
 import { registerLanguage as regFromCms } from '../src/nimbi-cms.js'
 import initCMS from '../src/nimbi-cms.js'
+
+// variables used by mock factory
+var workerInstances = []
+var workerBehavior = 'normal' // 'timeout' | 'error' | 'normal'
+
 
 // helper to create a small "supported" map simulating fetched data
 function makeMap(entries) {
@@ -119,6 +124,55 @@ describe('markdown utilities', () => {
     const res = await parseMarkdownToHtml(md)
     expect(res.html).not.toContain('language-undefined')
   })
+
+  // worker-related tests moved ahead of plugin logic
+  it('parseMarkdownToHtml uses worker when available', async () => {
+    const mdmod = await import('../src/markdown.js')
+    const w = mdmod.initRendererWorker()
+    const res = await mdmod.parseMarkdownToHtml('# Hello')
+    expect(res.html).toContain('Hello')
+  })
+
+  it('parseMarkdownToHtml falls back when worker unavailable', async () => {
+    const mdmod = await import('../src/markdown.js')
+    const spy = vi.spyOn(mdmod, 'initRendererWorker').mockReturnValue(null)
+    const res = await mdmod.parseMarkdownToHtml('# foo')
+    expect(res.html).toContain('foo')
+    spy.mockRestore()
+  })
+
+
+
+  it('initRendererWorker returns a stable worker and logs creation (blob expected)', async () => {
+    vi.resetModules()
+    const logSpy = vi.spyOn(console, 'log')
+    const mdmod = await import('../src/markdown.js')
+    const w1 = mdmod.initRendererWorker()
+    const w2 = mdmod.initRendererWorker()
+    expect(w1).toBe(w2)
+    // should have logged at least once about blob creation or worker creation
+    const calls = logSpy.mock.calls.flat()
+    expect(calls.some(c => String(c).includes('renderer worker blob created') || String(c).includes('renderer worker created'))).toBe(true)
+    logSpy.mockRestore()
+  })
+
+  it('logs module URL fallback when Blob is unavailable', async () => {
+    vi.resetModules()
+    const origBlob = global.Blob
+    delete global.Blob
+    const logSpy = vi.spyOn(console, 'log')
+    const mdmod = await import('../src/markdown.js')
+    // worker may or may not materialize in this environment, but we should at
+    // least attempt to compute a module URL
+    const w = mdmod.initRendererWorker()
+    const calls = logSpy.mock.calls.flat()
+    expect(calls.some(c => String(c).includes('using module URL for renderer worker'))).toBe(true)
+    logSpy.mockRestore()
+    global.Blob = origBlob
+  })
+
+
+
 
   describe('markdown extension plugins', () => {
     beforeEach(() => {

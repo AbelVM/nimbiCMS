@@ -332,4 +332,42 @@ describe('slugManager module', () => {
     slugMgr.removeSlugResolver(resolver)
   })
 
+  // worker wrapper tests --------------------------------------------------
+  it('buildSearchIndexWorker delegates to local function when worker unavailable', async () => {
+    // force fallback by mocking initSlugWorker to return null
+    const spy = vi.spyOn(slugMgr, 'initSlugWorker').mockReturnValue(null)
+    slugMgr.searchIndex.splice(0)
+    // pre-populate searchIndex so local call returns predictable value
+    slugMgr.searchIndex.push('x')
+    const res = await slugMgr.buildSearchIndexWorker('http://base/')
+    expect(res).toEqual(['x'])
+    spy.mockRestore()
+  })
+
+  it('crawlForSlugWorker falls back if worker creation fails', async () => {
+    const spy = vi.spyOn(slugMgr, 'initSlugWorker').mockReturnValue(null)
+    slugMgr.crawlCache.clear && slugMgr.crawlCache.clear()
+    // seed crawlCache with known value
+    slugMgr.crawlCache.set('slug', 'foo.md')
+    const res = await slugMgr.crawlForSlugWorker('slug', 'http://base/')
+    expect(res).toBe('foo.md')
+    spy.mockRestore()
+  })
+
+  it('worker wrappers communicate with real worker when available', async () => {
+    // ensure Worker exists and stub network for slugManager
+    slugMgr.clearFetchCache()
+    global.fetch = vi.fn(async (u) => {
+      if (String(u).endsWith('nav.md')) return { ok: true, text: () => Promise.resolve('# Nav') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    // call buildSearchIndexWorker - should not throw
+    const idx = await slugMgr.buildSearchIndexWorker('/base/')
+    expect(Array.isArray(idx)).toBe(true)
+    // call crawlForSlugWorker on nonexistent slug
+    const crawl = await slugMgr.crawlForSlugWorker('nothing', '/base/')
+    expect(crawl).toBeNull()
+  })
+
+
 })

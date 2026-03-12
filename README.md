@@ -130,7 +130,11 @@ Recent behaviour fixes worth knowing:
 - Syntax highlighting using `highlight.js` — only JS is bundled; other
   languages are auto-registered when detected.
 - Simple theming (light/dark) and Bulma customization options.
-- UMD build is self‑contained (no separate worker asset required).
+- UMD build is self‑contained (no separate worker asset required). The markdown
+  renderer now runs in an inlined Web Worker so the distributed bundle remains
+  a single JS file while still off‑loading heavy parsing work off the main
+  thread. Anchor rewriting currently runs in‑thread for portability, with a
+  worker implementation kept in the source for future experimentation.
 
 ## Options & API
 

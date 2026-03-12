@@ -58,6 +58,9 @@ export function _clearHooks(): void
 // --- from src/slugManager.js
 export function setLanguages(list: any): any
 export const slugToMd: any
+export function initSlugWorker(): Worker|null
+export function buildSearchIndexWorker(contentBase: any): any
+export function crawlForSlugWorker(slug: any, base: any, maxQueue: any): any
 export function addSlugResolver(fn: (slug:string,contentBase?:string)=>Promise<string|null>|string|null): void
 export const mdToSlug: any
 export function removeSlugResolver(fn: (slug:string)=>any): void
@@ -117,6 +120,7 @@ export function _clearHooks(): void
 
 
 // --- from src/markdown.js
+export function initRendererWorker(): any
 export function addMarkdownExtension(plugin: object): any
 export function setMarkdownExtensions(plugins: object[]): any
 export function parseMarkdownToHtml(md: string): Promise<{html:string,meta:object,toc:Array<{level:number,text:string,id:string}>}>
@@ -135,9 +139,11 @@ export function buildTocElement(t: (...args:any[])=>any, toc: {level:number,text
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): any
 export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
 export function prepareArticle(t: (...args:any[])=>any, data: {raw:string,isHtml?:boolean}, pagePath: string, anchor: string|null, contentBase: string): Promise<{article:HTMLElement,parsed:object,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}>
+export function initAnchorWorker(): Worker|null
 export function attachTocClickHandler(toc: any): void
 export function scrollToAnchorOrTop(anchor: string|null): any
 export function ensureScrollTopButton(opts: object): any
+
 
 
 // --- from src/gen-dts-sample.js
@@ -163,7 +169,11 @@ export function ensureBulma(bulmaCustomize: string, pageDir: string): Promise<vo
 export function setStyle(style: 'light'|'dark'): void
 export function setThemeVars(vars: Record<string,string>): void
 
+// --- from src/worker/slugWorker.js
+
 // --- from src/worker/renderer.js
+
+// --- from src/worker/anchorWorker.js
 
 // --- from src/utils/l10n-defaults.js
 

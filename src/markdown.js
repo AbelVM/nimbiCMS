@@ -1,5 +1,76 @@
-// helper utilities for working with Markdown content
 import { marked } from 'marked'
+// Renderer worker is inlined so the library ships as a single JS file.
+import RendererWorker from './worker/renderer.js?worker&inline'
+
+let _rendererWorker = null
+
+
+
+
+/**
+ * lazily return or create a renderer worker instance (may return null)
+ */
+export function initRendererWorker() {
+  if (!_rendererWorker) {
+    try {
+      _rendererWorker = new RendererWorker()
+      _rendererWorker.addEventListener('error', e => {
+        console.warn('[markdown] renderer worker error event', e, e.message, e.filename, e.lineno, e.colno)
+      })
+    } catch (e) {
+      console.warn('[markdown] renderer worker init failed', e)
+      _rendererWorker = null
+    }
+  }
+  return _rendererWorker
+}
+
+function _sendToRenderer(msg) {
+  return new Promise((resolve, reject) => {
+    const w = initRendererWorker()
+    if (!w) return reject(new Error('worker unavailable'))
+    const id = String(Math.random())
+    msg.id = id
+
+    let timeoutId = null
+    const cleanup = () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      w.removeEventListener('message', handler)
+      w.removeEventListener('error', errHandler)
+    }
+
+    const handler = (ev) => {
+      const data = ev.data || {}
+      if (data.id !== id) return
+      cleanup()
+      if (data.error) {
+        console.warn('[markdown] worker returned error', data.error)
+        reject(new Error(data.error))
+      } else {
+        resolve(data.result)
+      }
+    }
+
+    const errHandler = (ev) => {
+      cleanup()
+      console.warn('[markdown] worker error event', ev)
+      // worker has failed; clear cached instance so future calls retry
+      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (_) {}
+      reject(new Error(ev.message || 'worker error'))
+    }
+
+    timeoutId = setTimeout(() => {
+      cleanup()
+      console.warn('[markdown] worker timed out')
+      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (_) {}
+      reject(new Error('worker timeout'))
+    }, 1000)
+
+    w.addEventListener('message', handler)
+    w.addEventListener('error', errHandler)
+    w.postMessage(msg)
+  })
+}
 
 // user-provided marked plugin objects will be stored here; each entry is an
 // object that can contain `tokenizer`, `renderer`, `walkTokens`, etc., as
@@ -45,6 +116,18 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
  * @returns {Promise<{html:string,meta:Object,toc:Array<{level:number,text:string,id:string}>}>}
  */
 export async function parseMarkdownToHtml(md) {
+  // attempt to offload to worker if available
+  const w = initRendererWorker && initRendererWorker()
+  if (w) {
+    try {
+      const res = await _sendToRenderer({ type: 'render', md })
+      if (res && res.html !== undefined) return res
+    } catch (e) {
+      console.warn('[markdown] worker render failed', e)
+      // fall through to inline parsing
+    }
+  }
+
   const { content, data } = parseFrontmatter(md || '')
   // configure marked options here if needed
   marked.setOptions({

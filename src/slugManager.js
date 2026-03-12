@@ -26,6 +26,78 @@ export function getLanguages() { return availableLanguages }
 // import current UI language; slug resolution prefers this when available.
 import * as l10n from './l10nManager.js'
 
+// ------------------ worker support ----------------------------------------
+// Slug worker runs from inlined source so the published bundle remains a single JS file.
+let _slugWorker = null
+import slugWorkerCode from './worker/slugWorker.js?raw'
+
+/**
+ * lazily create or return a singleton worker instance
+ * @returns {Worker|null}
+ */
+export function initSlugWorker() {
+  if (!_slugWorker) {
+    try {
+      let workerUrl = null
+      if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && slugWorkerCode) {
+        try {
+          const blob = new Blob([slugWorkerCode], { type: 'application/javascript' })
+          workerUrl = URL.createObjectURL(blob)
+        } catch (_) {
+          workerUrl = null
+        }
+      }
+      if (workerUrl) {
+        _slugWorker = new Worker(workerUrl, { type: 'module' })
+      } else {
+        _slugWorker = null
+      }
+    } catch (e) {
+      // Worker may not be available in this environment
+      console.warn('[slugManager] slug worker init failed', e)
+      _slugWorker = null
+    }
+  }
+  return _slugWorker
+}
+
+function _sendToWorker(msg) {
+  return new Promise((resolve, reject) => {
+    const w = initSlugWorker()
+    if (!w) return reject(new Error('worker unavailable'))
+    const id = String(Math.random())
+    msg.id = id
+    const handler = (ev) => {
+      const data = ev.data || {}
+      if (data.id !== id) return
+      w.removeEventListener('message', handler)
+      if (data.error) reject(new Error(data.error))
+      else resolve(data.result)
+    }
+    w.addEventListener('message', handler)
+    w.postMessage(msg)
+  })
+}
+
+/**
+ * Build search index using worker if available.
+ */
+export async function buildSearchIndexWorker(contentBase) {
+  const w = initSlugWorker()
+  if (w) return _sendToWorker({ type: 'buildSearchIndex', contentBase })
+  return buildSearchIndex(contentBase)
+}
+
+/**
+ * Crawl for slug using worker when possible.
+ */
+export async function crawlForSlugWorker(slug, base, maxQueue) {
+  const w = initSlugWorker()
+  if (w) return _sendToWorker({ type: 'crawlForSlug', slug, base, maxQueue })
+  return crawlForSlug(slug, base, maxQueue)
+}
+
+
 // helper used internally to add slug ↔ path mappings respecting
 // `availableLanguages`.  Normalizes existing entries to object form as
 // needed.  Exposed here only for tests.

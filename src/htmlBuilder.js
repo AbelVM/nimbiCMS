@@ -84,8 +84,6 @@ export function buildTocElement(t, toc, pagePath = '') {
   return aside
 }
 
-// helpers used by prepareArticle ------------------------------------------------
-
 /**
  * Ensure every heading in the document has an id (slugified from text).
  * @param {Document|HTMLElement} doc
@@ -123,9 +121,6 @@ function lazyLoadImages(el, pagePath, contentBase) {
   } catch (_) {}
 }
 
-// cache last input and output to avoid allocating new URL objects when
-// the same contentBase string is passed repeatedly (common in a single
-// page render).  We keep the path separately as well.
 let _lastContentBase = ''
 let _lastContentBaseUrl = null
 let _lastContentBasePath = ''
@@ -155,9 +150,8 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       _lastContentBasePath = contentBasePath
     }
 
-    // collect MD paths that require slug lookup
     const pending = new Set()
-    const anchorInfo = [] // { node, mdPathRaw, frag, rel }
+    const anchorInfo = []
 
     for (const a of Array.from(anchors)) {
       try {
@@ -169,8 +163,6 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         if (mdMatch) {
           let mdPathRaw = mdMatch[1]
           const frag = mdMatch[2]
-          // if link is not absolute and we know current page path, resolve
-          // relative to the page's directory so missing folders don't drop off.
           if (!mdPathRaw.startsWith('/') && pagePath) {
             const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
             mdPathRaw = dir + mdPathRaw
@@ -181,12 +173,9 @@ async function rewriteAnchors(article, contentBase, pagePath) {
             rel = normalizePath(rel)
             anchorInfo.push({ node: a, mdPathRaw, frag, rel })
             if (!mdToSlug.has(rel)) pending.add(rel)
-          } catch (_) {
-            // swallow malformed url
-          }
+          } catch (_) {}
           continue
         }
-        // non-md link: treat as absolute or slug lookup by path without MD
         try {
           const full = new URL(href, contentBase)
           const p = full.pathname || ''
@@ -209,16 +198,9 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       } catch (_) {}
     }
 
-    // perform slug lookups in parallel. Prefer any existing slug->md mapping
-    // when the requested path looks like a slug filename (basename.md). This
-    // avoids fetching e.g. "an-ephemeral-status-update.md" when we already
-    // know that slug maps to `_home.md` or another canonical path.
     if (pending.size) {
       await Promise.all(Array.from(pending).map(async rel => {
         try {
-          // If the requested file looks like "basename.md" and we already
-          // have a slug->md mapping for that basename, use it instead of
-          // fetching the requested path.
           try {
             const m = String(rel).match(/([^\/]+)\.md$/)
             const basename = m && m[1]
@@ -247,7 +229,6 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       }))
     }
 
-    // apply href transformations for MD links now that lookup map is populated
     for (const info of anchorInfo) {
       const { node: a, frag, rel } = info
       let slug = null
@@ -307,7 +288,6 @@ function computeSlug(parsed, article, pagePath, anchor) {
 export async function preScanHtmlSlugs(linkEls, base) {
   if (!linkEls || !linkEls.length) return
 
-  // collect unique HTML paths that need titles
   const htmlPaths = new Set()
   for (const a of Array.from(linkEls || [])) {
       try {
@@ -317,22 +297,15 @@ export async function preScanHtmlSlugs(linkEls, base) {
         const parts = raw.split(/::|#/, 2)
         let path = parts[0]
         if (!path) continue
-        // if the link has no extension at all assume an HTML file; this
-        // allows authors to write `/foo` instead of `/foo.html` in nav
-        // sources.  we must not touch paths that already include `.md` or
-        // another extension, otherwise a markdown link would be misclassified.
         if (!path.includes('.')) {
           path = path + '.html'
         }
-        // only proceed if the (possibly normalized) path targets an HTML file
         if (!/\.html(?:$|[?#])/.test(path) && !path.toLowerCase().endsWith('.html')) continue
         const htmlPath = path
         try {
-          // skip if already mapped by mdToSlug
           if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
         } catch (_) { }
         try {
-          // also skip if slugToMd already contains this path as a value
           let already = false
           for (const v of slugToMd.values()) {
             if (v === htmlPath) { already = true; break }
@@ -345,7 +318,6 @@ export async function preScanHtmlSlugs(linkEls, base) {
 
   if (!htmlPaths.size) return
 
-  // helper that fetches one HTML and extracts title/H1
   const fetchAndExtract = async (htmlPath) => {
     try {
       const res = await fetchMarkdown(htmlPath, base)
@@ -369,7 +341,6 @@ export async function preScanHtmlSlugs(linkEls, base) {
     } catch (_) { }
   }
 
-  // limit concurrent fetches to avoid overloading server
   const CONCURRENCY = 5
   const paths = Array.from(htmlPaths)
   let idx = 0
@@ -382,8 +353,6 @@ export async function preScanHtmlSlugs(linkEls, base) {
   await Promise.all(runners)
 }
 
-// ---------------------------------------------------------------------------
-
 /**
  * Map referenced markdown links to slugs by fetching titles where needed.
  * @param {NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[]} linkEls
@@ -395,7 +364,6 @@ export async function preMapMdSlugs(linkEls, contentBase) {
 
   const anchorInfo = []
   const pending = new Set()
-  // normalize base path for resolving relative URLs
   let contentBasePath = ''
   try {
     const contentBaseUrl = new URL(contentBase)
@@ -412,16 +380,15 @@ export async function preMapMdSlugs(linkEls, contentBase) {
         let mdPathRaw = normalizePath(mdMatch[1])
         try {
           let resolved
-        try {
-          resolved = new URL(mdPathRaw, contentBase).pathname
-        } catch (_) {
-          // base might be relative in tests; fall back to the raw path
-          resolved = mdPathRaw
-        }
-        const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
-        anchorInfo.push({ rel })
-        if (!mdToSlug.has(rel)) pending.add(rel)
-      } catch (_) {}
+          try {
+            resolved = new URL(mdPathRaw, contentBase).pathname
+          } catch (_) {
+            resolved = mdPathRaw
+          }
+          const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+          anchorInfo.push({ rel })
+          if (!mdToSlug.has(rel)) pending.add(rel)
+        } catch (_) {}
         continue
       }
     } catch (_) {}
@@ -458,8 +425,6 @@ export async function preMapMdSlugs(linkEls, contentBase) {
 }
 
 
-// helpers used by prepareArticle ------------------------------------------------
-
 /**
  * Parse raw HTML input and return the normalized "parsed" object used by the
  * rendering pipeline.
@@ -482,13 +447,6 @@ function parseHtml(raw) {
         const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
         const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
         if (match && match[1]) {
-          // register the language module if present so the observer can
-          // highlight once the element comes into view.  We intentionally
-          // do **not** call `highlightElement` synchronously here because
-          // registration is asynchronous and may not complete before
-          // highlighting, which leads to warnings (see issue with dummy
-          // html).  The IntersectionObserver set up later in
-          // `observeCodeBlocks` will trigger the highlight when ready.
           const l = (match[1] || '').toLowerCase()
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
           try {
@@ -570,7 +528,6 @@ async function parseMarkdown(raw) {
  * @returns {Promise<{article:HTMLElement,parsed:Object,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}>}
  */
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
-    // parse or convert the input into HTML + metadata
     let parsed = null
     if (data.isHtml) {
       parsed = parseHtml(data.raw || '')
@@ -582,11 +539,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     article.className = 'nimbi-article content'
     article.innerHTML = parsed.html
     try {
-      // sanitize any accidental `language-undefined` classes that may
-      // have slipped through (ensure markdown and HTML paths behave
-      // consistently). Remove class entirely for blocks without a
-      // real language so lazy registration doesn't try to load
-      // 'undefined'.
       const codeEls = article.querySelectorAll('pre code, code[class]')
       codeEls.forEach(el => {
         try {
@@ -603,7 +555,12 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     try { observeCodeBlocks(article) } catch (_) { }
 
     lazyLoadImages(article, pagePath, contentBase)
-    await rewriteAnchors(article, contentBase, pagePath)
+    try {
+      await rewriteAnchorsWorker(article, contentBase, pagePath)
+    } catch (_) {
+      // fallback to in-thread implementation if worker fails
+      await rewriteAnchors(article, contentBase, pagePath)
+    }
 
     const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
 
@@ -625,8 +582,60 @@ export function renderNotFound(contentWrap, t, e) {
     if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(notFound)
   }
 
+// ---------------- worker support for anchor rewriting ------------------
+let _anchorWorker = null
+import anchorWorkerCode from './worker/anchorWorker.js?raw'
+
+/**
+ * @returns {Worker|null}
+ */
+export function initAnchorWorker() {
+  if (!_anchorWorker) {
+    try {
+      let url = null
+      if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && anchorWorkerCode) {
+        try {
+          const blob = new Blob([anchorWorkerCode], { type: 'application/javascript' })
+          url = URL.createObjectURL(blob)
+        } catch (_) { url = null }
+      }
+      if (url) {
+        _anchorWorker = new Worker(url, { type: 'module' })
+      } else {
+        _anchorWorker = null
+      }
+    } catch (e) {
+      console.warn('[htmlBuilder] anchor worker init failed', e)
+      _anchorWorker = null
+    }
+  }
+  return _anchorWorker
+}
+
+function _sendToAnchorWorker(msg) {
+  return new Promise((resolve, reject) => {
+    const w = initAnchorWorker()
+    if (!w) return reject(new Error('worker unavailable'))
+    const id = String(Math.random())
+    msg.id = id
+    const h = ev => {
+      const data = ev.data || {}
+      if (data.id !== id) return
+      w.removeEventListener('message', h)
+      if (data.error) reject(new Error(data.error))
+      else resolve(data.result)
+    }
+    w.addEventListener('message', h)
+    w.postMessage(msg)
+  })
+}
+
+export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
+  return rewriteAnchors(article, contentBase, pagePath)
+}
+
 // test helpers (not part of public API)
-export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages, rewriteAnchors as _rewriteAnchors, computeSlug as _computeSlug }
+export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages, rewriteAnchors, rewriteAnchors as _rewriteAnchors, computeSlug as _computeSlug, rewriteAnchorsWorker as _rewriteAnchorsWorker }
 
 
 
@@ -667,7 +676,6 @@ export function attachTocClickHandler(toc) {
  *                               to the top.
  */
 export function scrollToAnchorOrTop(anchor) {
-    // container element is the scrolling div created by initCMS
     const containerEl = document.querySelector('.nimbi-cms') || null
     if (anchor) {
       const el = document.getElementById(anchor)
@@ -748,7 +756,6 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
 
       const tocLabel = (navWrapEl && navWrapEl.querySelector) ? navWrapEl.querySelector('.menu-label') : null
       if (!topH1) {
-        // no heading available: toggle label based on scroll position
         btn.classList.remove('show')
         if (tocLabel) tocLabel.classList.remove('show')
         const root = (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : window)
@@ -782,7 +789,6 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
               }
             }
           }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
-          // removed unused rootEl variable
           btn._nimbiObserver = obs
         }
         try { btn._nimbiObserver.disconnect() } catch (_) { }
@@ -802,9 +808,6 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
               }
             } catch (_) { }
           }
-          // initial evaluation; IntersectionObserver will handle subsequent
-          // changes automatically.  If Observer isn't available, do one delayed
-          // re-check so old browsers still update correctly.
           checkIntersect()
           if (!('IntersectionObserver' in window)) {
             setTimeout(checkIntersect, 100)

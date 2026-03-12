@@ -102,12 +102,15 @@ export function _clearHooks() {
 /**
  * Initialize the CMS in a host page.
  *
+ * Throws a `TypeError` when options are of the wrong type so configuration
+ * mistakes are surfaced early (e.g. passing a number for `contentPath`).
+ *
  * @param {Object} options
  * @param {string|Element} options.el - mount point selector or element
  * @param {string} [options.contentPath='/content'] - URL path to content
- * @param {number} [options.crawlMaxQueue] - maximum directory queue length for slug crawling (see docs)
+ * @param {number} [options.crawlMaxQueue=1000] - maximum directory queue length for slug crawling (see docs)
  * @param {boolean} [options.searchIndex=true] - build a client-side search index (adds search box to navbar)
- * @param {ThemeStyle} [options.defaultStyle='light'] - initial light/dark mode
+ * @param {('light'|'dark')} [options.defaultStyle='light'] - initial light/dark mode
  * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
  * @param {string} [options.lang] - UI language code
  * @param {string|null} [options.l10nFile] - path to localization file
@@ -116,15 +119,71 @@ export function _clearHooks() {
  * @param {Array<object>} [options.markdownExtensions] - list of marked extensions to register on init
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
-export async function initCMS({ el, contentPath = '/content', /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000, searchIndex: searchEnabled = true, defaultStyle = 'light', bulmaCustomize = 'none', lang = undefined, l10nFile = null, cacheTtlMinutes = 5, cacheMaxEntries, markdownExtensions } = {}) {
-      if (!el) throw new Error('el is required')
+export async function initCMS(options = {}) {
+      if (!options || typeof options !== 'object') {
+        throw new TypeError('initCMS(options): options must be an object')
+      }
+
+      const {
+        el,
+        contentPath = '/content',
+        /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000,
+        searchIndex: searchEnabled = true,
+        defaultStyle = 'light',
+        bulmaCustomize = 'none',
+        lang = undefined,
+        l10nFile = null,
+        cacheTtlMinutes = 5,
+        cacheMaxEntries,
+        markdownExtensions
+      } = options
+
+      if (!el) {
+        throw new Error('initCMS(options): "el" is required (CSS selector string or DOM Element)')
+      }
 
       let mountEl = el
       if (typeof el === 'string') {
         mountEl = document.querySelector(el)
         if (!mountEl) throw new Error(`el selector "${el}" did not match any element`)
       } else if (!(el instanceof Element)) {
-        throw new Error('el must be a CSS selector string or a DOM element')
+        throw new TypeError('initCMS(options): "el" must be a CSS selector string or a DOM Element')
+      }
+
+      if (typeof contentPath !== 'string' || !contentPath.trim()) {
+        throw new TypeError('initCMS(options): "contentPath" must be a non-empty string when provided')
+      }
+
+      if (typeof searchEnabled !== 'boolean') {
+        throw new TypeError('initCMS(options): "searchIndex" must be a boolean when provided')
+      }
+
+      if (defaultStyle !== 'light' && defaultStyle !== 'dark') {
+        throw new TypeError('initCMS(options): "defaultStyle" must be "light" or "dark"')
+      }
+
+      if (bulmaCustomize != null && typeof bulmaCustomize !== 'string') {
+        throw new TypeError('initCMS(options): "bulmaCustomize" must be a string when provided')
+      }
+
+      if (lang != null && typeof lang !== 'string') {
+        throw new TypeError('initCMS(options): "lang" must be a string when provided')
+      }
+
+      if (l10nFile != null && typeof l10nFile !== 'string') {
+        throw new TypeError('initCMS(options): "l10nFile" must be a string or null when provided')
+      }
+
+      if (cacheTtlMinutes != null && (typeof cacheTtlMinutes !== 'number' || !Number.isFinite(cacheTtlMinutes) || cacheTtlMinutes < 0)) {
+        throw new TypeError('initCMS(options): "cacheTtlMinutes" must be a non‑negative number when provided')
+      }
+
+      if (cacheMaxEntries != null && (typeof cacheMaxEntries !== 'number' || !Number.isInteger(cacheMaxEntries) || cacheMaxEntries < 0)) {
+        throw new TypeError('initCMS(options): "cacheMaxEntries" must be a non‑negative integer when provided')
+      }
+
+      if (markdownExtensions != null && (!Array.isArray(markdownExtensions) || markdownExtensions.some(ext => !ext || typeof ext !== 'object'))) {
+        throw new TypeError('initCMS(options): "markdownExtensions" must be an array of extension objects when provided')
       }
 
       try {
@@ -505,7 +564,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           try {
             // wait for index if it is still building
             const fm = await import('./filesManager.js')
-            const idx = searchIndexPromise ? await searchIndexPromise : await fm.buildSearchIndex(contentBase)
+            const idx = searchIndexPromise ? await searchIndexPromise : await (fm.buildSearchIndexWorker ? fm.buildSearchIndexWorker(contentBase) : fm.buildSearchIndex(contentBase))
             const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
             showResults(filtered.slice(0, 10))
           } catch (_) { showResults([]) }
@@ -612,6 +671,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
       try {
           ({data,pagePath,anchor} = await fetchPageData(raw, contentBase))
         } catch (e) {
+          console.error('[nimbi-cms] fetchPageData failed', e)
           renderNotFound(contentWrap, t, e)
           return
         }
@@ -649,9 +709,19 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
      * @returns {Promise<void>}
      */
     async function renderByQuery() {
-      const raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
+      let raw = (new URLSearchParams(location.search).get('page')) || '_home.md'
       const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
-      await renderPage(raw, hashAnchor)
+      try {
+        await renderPage(raw, hashAnchor)
+      } catch (e) {
+        console.warn('[nimbi-cms] renderByQuery failed for', raw, e)
+        // if initial slug didn’t resolve, fall back to home page
+        if (raw !== '_home.md') {
+          try {
+            await renderPage('_home.md', null)
+          } catch (_) { /* give up */ }
+        }
+      }
     }
 
   window.addEventListener('popstate', renderByQuery)
