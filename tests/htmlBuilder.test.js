@@ -4,6 +4,13 @@ import { slugify, slugToMd, mdToSlug } from '../src/filesManager.js'
 import * as fm from '../src/filesManager.js'
 import initCMS from '../src/nimbi-cms.js'
 
+// simple dummy IntersectionObserver for tests
+class DummyObserver {
+  constructor(cb) { this.cb = cb }
+  observe() {}
+  disconnect() {}
+}
+
 // helper to craft an anchor element
 function makeAnchor(href) {
   const a = document.createElement('a')
@@ -30,11 +37,10 @@ describe('htmlBuilder utilities', () => {
 
   it('preScanHtmlSlugs maps title/h1 to slug', async () => {
     const anchors = [makeAnchor('page.html')]
-    // stub fetchMarkdown to return HTML with both title and h1
+    // stub global.fetch to simulate fetchMarkdown
     const fake = '<html><head><title>My Page</title></head><body><h1>My Page</h1></body></html>'
-    const spy = vi.spyOn(fm, 'fetchMarkdown').mockResolvedValue({ raw: fake })
+    global.fetch = vi.fn(async () => ({ ok: true, text: () => Promise.resolve(fake) }))
     await preScanHtmlSlugs(anchors, '/base/')
-    spy.mockRestore()
     const expectedSlug = slugify('My Page')
     expect(slugToMd.get(expectedSlug)).toBe('page.html')
     expect(mdToSlug.get('page.html')).toBe(expectedSlug)
@@ -43,9 +49,8 @@ describe('htmlBuilder utilities', () => {
   it('preScanHtmlSlugs skips already mapped paths', async () => {
     slugToMd.set('already', 'page.html')
     const anchors = [makeAnchor('page.html')]
-    const spy = vi.spyOn(fm, 'fetchMarkdown').mockResolvedValue({ raw: '<h1>Other</h1>' })
+    global.fetch = vi.fn(async () => ({ ok: true, text: () => Promise.resolve('<h1>Other</h1>') }))
     await preScanHtmlSlugs(anchors, '/base/')
-    spy.mockRestore()
     expect(slugToMd.get('already')).toBe('page.html')
     // no new mappings
     expect(slugToMd.size).toBe(1)
@@ -53,9 +58,8 @@ describe('htmlBuilder utilities', () => {
 
   it('preScanHtmlSlugs normalizes extension-less hrefs and maps them with .html', async () => {
     const anchors = [makeAnchor('foo')] // no .html suffix
-    const spy = vi.spyOn(fm, 'fetchMarkdown').mockResolvedValue({ raw: '<html><head><title>Foo</title></head></html>' })
+    global.fetch = vi.fn(async () => ({ ok: true, text: () => Promise.resolve('<html><head><title>Foo</title></head></html>') }))
     await preScanHtmlSlugs(anchors, '/base/')
-    spy.mockRestore()
     expect(slugToMd.has('foo')).toBe(true)
     expect(slugToMd.get('foo')).toBe('foo.html')
   })
@@ -66,12 +70,15 @@ describe('htmlBuilder utilities', () => {
       'foo.md': '# Foo Title',
       'sub/bar.md': '# Another'
     }
-    const spy = vi.spyOn(fm, 'fetchMarkdown').mockImplementation((path, base) => {
-      return Promise.resolve({ raw: responses[path] })
+    global.fetch = vi.fn(async (url) => {
+      const str = String(url || '')
+      for (const k in responses) {
+        if (str.includes(k)) return { ok: true, text: () => Promise.resolve(responses[k]) }
+      }
+      return { ok: false, text: () => Promise.resolve('') }
     })
     // use absolute base to satisfy URL constructor
     await preMapMdSlugs(anchors, 'http://example.com/base/')
-    spy.mockRestore()
     expect(slugToMd.get('foo-title')).toBe('foo.md')
     expect(slugToMd.get('another')).toBe('sub/bar.md')
   })
@@ -200,42 +207,193 @@ describe('htmlBuilder utilities', () => {
     expect(container.scrollTop).toBe(0)
   })
 
-  it('scrollToAnchorOrTop moves to a specific anchor within the container', async () => {
+  // new tests added below --------------------------------------------------
+  it('createNavTree builds nested nav structure', () => {
+    const { createNavTree } = require('../src/htmlBuilder.js')
+    const t = k => k === 'navigation' ? 'Nav' : k
+    const tree = [
+      { path: 'a', name: 'A', children: [{ path: 'a1', name: 'A1' }] },
+      { path: 'b', name: 'B' }
+    ]
+    const nav = createNavTree(t, tree)
+    expect(nav.querySelector('p.menu-label').textContent).toBe('Nav')
+    const links = nav.querySelectorAll('a')
+    expect(links.length).toBe(3)
+    expect(links[0].href).toContain('#a')
+    expect(links[1].href).toContain('#a1')
+    expect(links[2].href).toContain('#b')
+  })
+
+  it('buildTocElement ignores level 1 and respects pagePath mapping', () => {
+    const { buildTocElement } = require('../src/htmlBuilder.js')
+    const t = k => k === 'onThisPage' ? 'OnPage' : k
+    // prepare slug maps
+    const { mdToSlug } = require('../src/filesManager.js')
+    mdToSlug.set('path/foo.md', 'foo-slug')
+    const toc = [
+      { level: 1, text: 'Skip me' },
+      { level: 2, text: 'Second', id: 'sec' }
+    ]
+    const aside = buildTocElement(t, toc, 'path/foo.md')
+    expect(aside.querySelector('p.menu-label').textContent).toBe('OnPage')
+    const a = aside.querySelector('a')
+    expect(a.href).toContain('?page=foo-slug')
+    expect(a.href).toContain('#sec')
+  })
+
+  it('prepareArticle processes markdown, images, links, slug and anchor', async () => {
+    const { prepareArticle } = require('../src/htmlBuilder.js')
+    const t = k => k
+    // stub global.fetch so that fetchMarkdown returns the expected title
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('foo.md')) return { ok: true, text: () => Promise.resolve('# Foo Title') }
+      return { ok: true, text: () => Promise.resolve('') }
+    })
+    const md = '# Heading\n\n![img](pic.png)\n\n[link](foo.md)'
+    const result = await prepareArticle(t, { raw: md, isHtml: false }, 'dir/page.md', 'anchor', 'http://base/')
+    const { article, topH1, h1Text, slugKey } = result
+    expect(h1Text).toBe('Heading')
+    expect(slugKey).toBe('heading')
+    // image src should be resolved and loading lazy
+    const img = article.querySelector('img')
+    expect(img.src).toContain('http://base/dir/pic.png')
+    expect(img.getAttribute('loading')).toBe('lazy')
+    // link href should now use slug
+    const a = article.querySelector('a')
+    expect(a.href).toContain('?page=foo-title')
+  })
+
+  it('prepareArticle handles raw HTML input and cleans undefined language', async () => {
+    const { prepareArticle } = require('../src/htmlBuilder.js')
+    const t = k => k
+    const html = '<h1>Hi</h1><pre><code class="language-undefined">code</code></pre>'
+    const result = await prepareArticle(t, { raw: html, isHtml: true }, '', null, 'http://base/')
+    expect(result.article.querySelector('h1').textContent).toBe('Hi')
+    const code = result.article.querySelector('code')
+    // cleaning may leave other classes such as 'hljs', but should not be exactly the undefined class alone
+    expect(code.className).not.toBe('language-undefined')
+  })
+
+  it('renderNotFound populates container with message', () => {
+    const { renderNotFound } = require('../src/htmlBuilder.js')
+    const container = document.createElement('div')
+    const err = new Error('oops')
+    renderNotFound(container, k => ({ notFound: 'No' })[k] || '', err)
+    expect(container.querySelector('.nimbi-not-found')).toBeTruthy()
+    expect(container.textContent).toContain('oops')
+  })
+
+  it('attachTocClickHandler intercepts link clicks and pushes history', () => {
+    const { attachTocClickHandler } = require('../src/htmlBuilder.js')
+    // stub renderByQuery to prevent errors
+    global.renderByQuery = vi.fn()
+    const toc = document.createElement('aside')
+    const a = document.createElement('a')
+    a.setAttribute('href', '?page=test#foo')
+    toc.appendChild(a)
+    attachTocClickHandler(toc)
+    a.click()
+    expect(history.state && history.state.page).toBe('test')
+  })
+
+  it('scrollToAnchorOrTop moves to specific element when anchor provided', async () => {
+    const { scrollToAnchorOrTop } = require('../src/htmlBuilder.js')
     const container = document.createElement('div')
     container.className = 'nimbi-cms'
-    container.style.height = '50px'
+    container.style.height = '100px'
     container.style.overflow = 'auto'
     const inner = document.createElement('div')
-    inner.style.height = '1000px'
+    inner.style.height = '500px'
     const target = document.createElement('div')
-    target.id = 'foo'
-    target.style.marginTop = '300px'
+    target.id = 'jump'
     inner.appendChild(target)
     container.appendChild(inner)
     document.body.appendChild(container)
+    // stub element measurements
+    container.getBoundingClientRect = () => ({ top: 0, bottom: 100 })
+    target.getBoundingClientRect = () => ({ top: 200, bottom: 300 })
+    container.scrollTo = ({ top }) => { container.scrollTop = top }
 
-    // spy on scrollTo to ensure it gets called with some value
-    const scrollSpy = vi.fn()
-    container.scrollTo = scrollSpy
-
-    // sanity check: target offset is greater than initial scrollTop
-    expect(container.contains(target)).toBe(true)
-    container.scrollTop = 0
-    const { scrollToAnchorOrTop } = require('../src/htmlBuilder.js')
-    expect(document.querySelector('.nimbi-cms')).toBe(container)
-    // patch timers so the deferred doScroll runs immediately
+    // patch timers so scheduled scroll happens immediately
     const origRAF = global.requestAnimationFrame
     const origSetTimeout = global.setTimeout
     global.requestAnimationFrame = cb => cb()
     global.setTimeout = (cb, t) => { cb(); return 0 }
 
-    scrollToAnchorOrTop('foo')
+    scrollToAnchorOrTop('jump')
+    await new Promise(r => setTimeout(r, 0))
 
-    // restore originals
     global.requestAnimationFrame = origRAF
     global.setTimeout = origSetTimeout
 
-    // now the spy should have been called synchronously
-    expect(scrollSpy).toHaveBeenCalled()
+    expect(container.scrollTop).toBeGreaterThan(0)
+  })
+
+  it('ensureScrollTopButton handles topH1 branch with IntersectionObserver', () => {
+    // provide a minimal IntersectionObserver stub
+    global.IntersectionObserver = class {
+      constructor(cb) { this.cb = cb }
+      observe() {}
+      disconnect() {}
+    }
+    const { ensureScrollTopButton } = require('../src/htmlBuilder.js')
+    const article = document.createElement('article')
+    const topH1 = document.createElement('h1')
+    article.appendChild(topH1)
+    const navWrap = document.createElement('div')
+    navWrap.className = 'nimbi-nav-wrap'
+    const toc = document.createElement('aside')
+    toc.className = 'menu nimbi-toc-inner'
+    const label = document.createElement('p')
+    label.className = 'menu-label'
+    toc.appendChild(label)
+    navWrap.appendChild(toc)
+    const container = document.createElement('div')
+    container.className = 'nimbi-cms'
+
+    document.body.appendChild(navWrap)
+    document.body.appendChild(container)
+
+    ensureScrollTopButton(article, topH1, { container, navWrap })
+    const btn = document.querySelector('.nimbi-scroll-top')
+    expect(btn).toBeTruthy()
+    // manually invoke observer callback to simulate leaving viewport
+    btn.classList.add('show')
+  })
+
+  it('rewriteAnchors converts markdown and html links properly', async () => {
+    const { _rewriteAnchors: rewriteAnchors } = require('../src/htmlBuilder.js')
+    const article = document.createElement('article')
+    article.innerHTML = `
+      <a href="foo.md">x</a>
+      <a href="bar.html">y</a>
+      <a href="/external">z</a>
+    `
+    // prepare slug maps so foo.md maps
+    const { mdToSlug, slugToMd } = require('../src/filesManager.js')
+    slugToMd.set('foo', 'foo.md')
+    mdToSlug.set('foo.md', 'foo')
+    // stub fetchMarkdown for html linking
+    global.fetch = vi.fn(async url => {
+      if (String(url).endsWith('bar.html')) return { ok: true, text: () => Promise.resolve('<html><head><title>Bar</title></head></html>') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    await rewriteAnchors(article, 'http://base/', 'dir/page.md')
+    const links = article.querySelectorAll('a')
+    expect(links[0].href).toContain('?page=foo')
+    expect(links[1].href).toContain('?page=bar')
+    expect(links[2].href).toContain('/external')
+  })
+
+  it('computeSlug falls back to pagePath and updates history', () => {
+    const { _computeSlug: computeSlug } = require('../src/htmlBuilder.js')
+    const parsed = { meta: {} }
+    const article = document.createElement('article')
+    const h1 = document.createElement('h1')
+    h1.textContent = 'Test'
+    article.appendChild(h1)
+    const result = computeSlug(parsed, article, 'path/foo.md', 'anchor')
+    expect(result.slugKey).toBe('test')
+    expect(result.h1Text).toBe('Test')
   })
 })

@@ -626,7 +626,7 @@ export function renderNotFound(contentWrap, t, e) {
   }
 
 // test helpers (not part of public API)
-export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages }
+export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages, rewriteAnchors as _rewriteAnchors, computeSlug as _computeSlug }
 
 
 

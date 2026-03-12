@@ -69,6 +69,26 @@ describe('markdown utilities', () => {
     expect(langs.size).toBe(0)
   })
 
+  it('filters short stop words when supportedMap is empty', () => {
+    const md = ['```true','stuff','```'].join('\n')
+    const langs = detectFenceLanguages(md, makeMap([])) // empty map: length<5 bypass results in no addition
+    expect(langs.size).toBe(0)
+  })
+
+  it('allows stop words when explicitly listed in supportedMap', () => {
+    const md = ['```someone','stuff','```'].join('\n')
+    const langs = detectFenceLanguages(md, makeMap(['someone']))
+    // map contains the word so it should be returned despite STOP set
+    expect(langs.size).toBe(1)
+    expect(langs.has('someone')).toBe(true)
+  })
+
+  it('detects long unfamiliar words as languages when heuristics pass', () => {
+    const md = ['```somethinglong','x','```'].join('\n')
+    const langs = detectFenceLanguages(md, makeMap([]))
+    expect(langs.has('somethinglong')).toBe(true)
+  })
+
   it('registerLanguage returns false for banned languages', async () => {
     const ok = await registerLanguage('magic')
     expect(ok).toBe(false)
@@ -82,6 +102,22 @@ describe('markdown utilities', () => {
     expect(ok).toBe(true)
     const ok2 = await regFromCms('javascript')
     expect(ok2).toBe(true)
+  })
+
+  // additional tests for parseMarkdownToHtml
+  it('assigns ids to headings and lazy-loads images', async () => {
+    const md = '# Title\n\n![alt](img.png)'
+    const res = await parseMarkdownToHtml(md)
+    // heading should have id generated
+    expect(res.toc.some(e => e.level === 1 && e.id === 'title')).toBe(true)
+    // html should contain image with loading=lazy
+    expect(res.html).toContain('loading="lazy"')
+  })
+
+  it('cleans undefined language classes from code blocks', async () => {
+    const md = '```\ncode\n```' // no lang -> should leave classless
+    const res = await parseMarkdownToHtml(md)
+    expect(res.html).not.toContain('language-undefined')
   })
 
   describe('markdown extension plugins', () => {

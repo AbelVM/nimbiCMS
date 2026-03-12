@@ -278,4 +278,58 @@ describe('slugManager module', () => {
     expect(paths).toEqual(['a.md','b.md','nav.md'])
   })
 
+  // additional unit tests --------------------------------------------------
+  it('_storeSlugMapping respects availableLanguages and normalizes entries', () => {
+    slugMgr.slugToMd.clear()
+    slugMgr.setLanguages(['en','fr'])
+    slugMgr._storeSlugMapping('foo', 'en/foo.md')
+    slugMgr._storeSlugMapping('foo', 'fr/foo.md')
+    slugMgr._storeSlugMapping('foo', 'bar.md')
+    const entry = slugMgr.slugToMd.get('foo')
+    expect(entry.default).toBe('bar.md')
+    expect(entry.langs.en).toBe('en/foo.md')
+    expect(entry.langs.fr).toBe('fr/foo.md')
+    // non-language path should set default
+  })
+
+  it('resolveSlugPath respects availableLanguages and falls back to default', () => {
+    slugMgr.slugToMd.clear()
+    slugMgr.setLanguages(['en','de'])
+    slugMgr.slugToMd.set('test', { default: 'default.md', langs: { en: 'en/test.md', de: 'de/test.md' } })
+    // whichever currentLang is initially, result should be one of the language entries
+    const path = slugMgr.resolveSlugPath('test')
+    expect(['en/test.md','de/test.md']).toContain(path)
+    // always fallback to default when langs empty
+    slugMgr.slugToMd.set('test', { default: 'default.md', langs: {} })
+    expect(slugMgr.resolveSlugPath('test')).toBe('default.md')
+  })
+
+  it('fetchMarkdown caches results and handles 404/404 fallback', async () => {
+    slugMgr.clearFetchCache()
+    // stub fetch to return 404 first, then _404.md content
+    let call = 0
+    global.fetch = vi.fn(async (url) => {
+      call++
+      if (url.endsWith('/foo.md')) return { ok: false, status: 404, text: () => Promise.resolve('') }
+      if (url.endsWith('/_404.md')) return { ok: true, text: () => Promise.resolve('# Not found') }
+      return { ok: true, text: () => Promise.resolve('# OK') }
+    })
+    const res = await slugMgr.fetchMarkdown('foo.md', 'http://example.com')
+    expect(res.status).toBe(404)
+    expect(res.raw).toContain('Not found')
+    // second call should reuse cache (fetch count stays same)
+    const res2 = await slugMgr.fetchMarkdown('foo.md', 'http://example.com')
+    expect(call).toBe(2) // one for first, one for _404 fallback
+  })
+
+  it('slugResolvers allow custom resolution', async () => {
+    slugMgr.slugResolvers.clear()
+    const resolver = vi.fn(slug => slug === 'magic' ? 'path.md' : null)
+    slugMgr.addSlugResolver(resolver)
+    // attempt ensureSlug indirectly through private method
+    const result = await slugMgr.ensureSlug('magic', '/base/')
+    expect(result).toBe('path.md')
+    slugMgr.removeSlugResolver(resolver)
+  })
+
 })
