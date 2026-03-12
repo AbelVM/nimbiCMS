@@ -15,8 +15,13 @@ module.exports = [
         Element: 'readonly'
       }
     },
+    plugins: {
+      'unused-imports': require('eslint-plugin-unused-imports')
+    },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'unused-imports/no-unused-imports': 'warn',
+      'unused-imports/no-unused-vars': ['warn', { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' }],
       'no-console': 'off'
     }
   }

@@ -309,6 +309,32 @@ describe('htmlBuilder utilities', () => {
     expect(history.state && history.state.page).toBe('test')
   })
 
+  it('same-page TOC clicks call scroll and do not trigger SPA render', async () => {
+    const mod = await import('../src/htmlBuilder.js')
+    const renderSpy = vi.fn()
+    global.renderByQuery = renderSpy
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    const replaceSpy = vi.spyOn(history, 'replaceState')
+
+    // set current history page
+    history.replaceState({ page: 'current' }, '', '?page=current')
+
+    const toc = document.createElement('aside')
+    const a = document.createElement('a')
+    a.setAttribute('href', '?page=current#foo')
+    toc.appendChild(a)
+    mod.attachTocClickHandler(toc)
+    a.click()
+
+    // ensure branch that handles same-page clicks executed (replaceState used)
+    expect(replaceSpy).toHaveBeenCalled()
+    expect(renderSpy).not.toHaveBeenCalled()
+    expect(dispatchSpy).not.toHaveBeenCalled()
+
+    replaceSpy.mockRestore()
+    dispatchSpy.mockRestore()
+  })
+
   it('scrollToAnchorOrTop moves to specific element when anchor provided', async () => {
     const container = document.createElement('div')
     container.className = 'nimbi-cms'

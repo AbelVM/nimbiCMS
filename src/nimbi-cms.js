@@ -1,15 +1,14 @@
 import 'highlight.js/styles/monokai.css'
-import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase, buildSearchIndex, searchIndex, setNotFoundPage } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase, setNotFoundPage } from './filesManager.js'
 import * as router from './router.js'
-import { isExternalLink, normalizePath, trimTrailingSlash, safe } from './utils/helpers.js'
+import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { createNavTree, preScanHtmlSlugs, preMapMdSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
 import { applyPageMeta } from './seoManager.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import { fetchPageData } from './router.js'
-import { loadSupportedLanguages } from './codeblocksManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
 import * as markdown from './markdown.js'
-import { ensureBulma, setStyle, setThemeVars } from './bulmaManager.js'
+import { ensureBulma, setStyle } from './bulmaManager.js'
 
 // Pre-scan nav links for HTML files and map title/H1 -> slug to avoid nav-time fetches
 
@@ -295,7 +294,7 @@ export async function initCMS(options = {}) {
   // allow crawling behavior to be tuned by consumer
   try {
     if (typeof crawlMaxQueue === 'number') {
-      // eslint-disable-next-line no-unused-vars
+       
       import('./filesManager.js').then(({ setDefaultCrawlMaxQueue }) => {
         try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { }
       })

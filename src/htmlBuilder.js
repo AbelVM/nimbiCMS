@@ -1,7 +1,7 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './filesManager.js'
 import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
-import { isExternalLink, normalizePath, setLazyload, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
+import { isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 
 /**
  * Build a navigation tree DOM element from a simple tree description.
