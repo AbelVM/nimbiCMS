@@ -35,49 +35,16 @@ import slugWorkerCode from './worker/slugWorker.js?raw'
  * lazily create or return a singleton worker instance
  * @returns {Worker|null}
  */
+import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
+
+const _slugWorkerManager = makeWorkerManager(() => createWorkerFromRaw(slugWorkerCode), 'slugManager')
+
 export function initSlugWorker() {
-  if (!_slugWorker) {
-    try {
-      let workerUrl = null
-      if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && slugWorkerCode) {
-        try {
-          const blob = new Blob([slugWorkerCode], { type: 'application/javascript' })
-          workerUrl = URL.createObjectURL(blob)
-        } catch (err) {
-          workerUrl = null
-          console.warn('[slugManager] createObjectURL failed', err)
-        }
-      }
-      if (workerUrl) {
-        _slugWorker = new Worker(workerUrl, { type: 'module' })
-      } else {
-        _slugWorker = null
-      }
-    } catch (e) {
-      // Worker may not be available in this environment
-      console.warn('[slugManager] slug worker init failed', e)
-      _slugWorker = null
-    }
-  }
-  return _slugWorker
+  return _slugWorkerManager.get()
 }
 
 function _sendToWorker(msg) {
-  return new Promise((resolve, reject) => {
-    const w = initSlugWorker()
-    if (!w) return reject(new Error('worker unavailable'))
-    const id = String(Math.random())
-    msg.id = id
-    const handler = (ev) => {
-      const data = ev.data || {}
-      if (data.id !== id) return
-      w.removeEventListener('message', handler)
-      if (data.error) reject(new Error(data.error))
-      else resolve(data.result)
-    }
-    w.addEventListener('message', handler)
-    w.postMessage(msg)
-  })
+  return _slugWorkerManager.send(msg)
 }
 
 /**

@@ -1,78 +1,19 @@
 import { marked } from 'marked'
 // Renderer worker is inlined so the library ships as a single JS file.
 import RendererWorker from './worker/renderer.js?worker&inline'
+import { makeWorkerManager } from './worker-manager.js'
 
-let _rendererWorker = null
-
-
-
+const _rendererManager = makeWorkerManager(() => new RendererWorker(), 'markdown')
 
 /**
  * lazily return or create a renderer worker instance (may return null)
  */
 export function initRendererWorker() {
-  if (!_rendererWorker) {
-    try {
-      // Create the inlined renderer worker and retain a reference.
-      const w = new RendererWorker()
-      _rendererWorker = w
-      // On worker errors, clear the cached instance so future calls may retry.
-      w.addEventListener('error', () => {
-        try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (err) { console.warn('[markdown] error handler termination failed', err) }
-      })
-    } catch (e) {
-      _rendererWorker = null
-      console.warn('[markdown] initRendererWorker failed', e)
-    }
-  }
-  return _rendererWorker
+  return _rendererManager.get()
 }
 
 function _sendToRenderer(msg) {
-  return new Promise((resolve, reject) => {
-    const w = initRendererWorker()
-    if (!w) return reject(new Error('worker unavailable'))
-    const id = String(Math.random())
-    msg.id = id
-
-    let timeoutId = null
-    const cleanup = () => {
-      if (timeoutId) clearTimeout(timeoutId)
-      w.removeEventListener('message', handler)
-      w.removeEventListener('error', errHandler)
-    }
-
-    const handler = (ev) => {
-      const data = ev.data || {}
-      if (data.id !== id) return
-      cleanup()
-      if (data.error) {
-        console.warn('[markdown] worker returned error', data.error)
-        reject(new Error(data.error))
-      } else {
-        resolve(data.result)
-      }
-    }
-
-    const errHandler = (ev) => {
-      cleanup()
-      console.warn('[markdown] worker error event', ev)
-      // worker has failed; clear cached instance so future calls retry
-      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (err) { console.warn('[markdown] worker termination failed', err) }
-      reject(new Error(ev.message || 'worker error'))
-    }
-
-    timeoutId = setTimeout(() => {
-      cleanup()
-      console.warn('[markdown] worker timed out')
-      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (err) { console.warn('[markdown] worker termination on timeout failed', err) }
-      reject(new Error('worker timeout'))
-    }, 1000)
-
-    w.addEventListener('message', handler)
-    w.addEventListener('error', errHandler)
-    w.postMessage(msg)
-  })
+  return _rendererManager.send(msg, 1000)
 }
 
 // user-provided marked plugin objects will be stored here; each entry is an

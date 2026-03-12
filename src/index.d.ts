@@ -55,6 +55,10 @@ export function transformHtml(fn: (...args:any[])=>any): void
 export function _clearHooks(): void
 
 
+// --- from src/worker-manager.js
+export function makeWorkerManager(createWorker: {function(): (Worker|null)}, name: string): get: function(): (Worker|null), send: function(object, number=): Promise<any>, terminate: function(): void
+export function createWorkerFromRaw(code: string): (Worker|null)
+
 // --- from src/slugManager.js
 export function setLanguages(list: any): any
 export const slugToMd: any
@@ -123,11 +127,11 @@ export function _clearHooks(): Promise<void>
 
 // --- from src/markdown.js
 export function initRendererWorker(): any
+export const markdownPlugins: any
 export function addMarkdownExtension(plugin: object): any
 export function setMarkdownExtensions(plugins: object[]): any
 export function parseMarkdownToHtml(md: string): Promise<{html:string,meta:object,toc:Array<{level:number,text:string,id:string}>}>
 export function detectFenceLanguages(md: string, supportedMap: Map<string,string>): Set<string>
-
 
 // --- from src/l10nManager.js
 export function t(opts: any): string

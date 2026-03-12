@@ -136,6 +136,45 @@ Recent behaviour fixes worth knowing:
   thread. Anchor rewriting currently runs in‑thread for portability, with a
   worker implementation kept in the source for future experimentation.
 
+**Worker Manager**
+
+For consumers and contributors: the repository contains a small helper that
+centralizes Worker lifecycle and messaging. It exposes two helpers:
+
+- `makeWorkerManager(createWorker, name)` — returns a manager object with:
+  - `get()` — lazily create and return the underlying `Worker` instance.
+  - `send(msg, timeoutMs?)` — send a message and await a response with an
+    optional timeout (rejects on timeout or worker error). This method cleans
+    up a bad worker instance if a timeout or error occurs and logs a
+    module‑prefixed warning.
+  - `terminate()` — forcefully terminate the worker and clear internal state.
+
+- `createWorkerFromRaw(codeString)` — convenience helper that builds a
+  `Blob` URL from the provided raw worker source string and returns a function
+  suitable for passing as `createWorker` to `makeWorkerManager`.
+
+Guidance:
+
+- Prefer `manager.send(...)` for short request/response interactions so
+  timeouts and errors are handled consistently.
+- If you require a long‑lived worker for streaming data, call `manager.get()`
+  and hold the returned `Worker` reference; remember to call `manager.terminate()`
+  during teardown.
+- The manager logs conservative `console.warn('[<module>] ...', err)`
+  messages instead of throwing, preserving existing runtime behavior while
+  surfacing previously swallowed failures during development and testing.
+
+Example:
+
+```js
+import { makeWorkerManager, createWorkerFromRaw } from './src/worker-manager.js'
+// workerCode is a string containing the worker source
+const manager = makeWorkerManager(createWorkerFromRaw(workerCode), 'slugWorker')
+await manager.send({ type: 'init' }, 2000)
+// later
+manager.terminate()
+```
+
 ## Options & API
 
 `initCMS(options)` mounts the CMS into a page. Options:
