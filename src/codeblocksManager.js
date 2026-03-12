@@ -99,7 +99,7 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
           else SUPPORTED_HLJS_MAP.delete(a)
         }
         aliasesList = cleaned
-      } catch (_) { }
+      } catch (err) { console.warn('[codeblocksManager] cleanup aliases failed', err) }
       try {
         let removed = 0
         for (const k of Array.from(SUPPORTED_HLJS_MAP.keys())) {
@@ -129,14 +129,13 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
         try {
           const sepKey = ':---------------------'
           if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
-        } catch (_) { }
+        } catch (err) { console.warn('[codeblocksManager] remove sep key failed', err) }
         // Log the supported languages list for debugging/visibility.
         try {
           const keys = Array.from(SUPPORTED_HLJS_MAP.keys()).sort()
-        } catch (_) { }
+        } catch (err) { console.warn('[codeblocksManager] compute supported keys failed', err) }
       } catch (_) { }
-    } catch (_) {
-    }
+    } catch (err) { console.warn('[codeblocksManager] loadSupportedLanguages failed', err) }
   })()
   return loadSupportedLanguagesPromise
 }
@@ -160,7 +159,7 @@ export async function registerLanguage(name, modulePath) {
     ;(async () => {
       try {
         await loadSupportedLanguages()
-      } catch (_) { }
+      } catch (err) { console.warn('[codeblocksManager] loadSupportedLanguages (IIFE) failed', err) }
     })()
   }
   // normalize missing values to an empty string so callers that pass
@@ -266,7 +265,7 @@ export function observeCodeBlocks(root = document) {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return
         const el = entry.target
-        try { obs.unobserve(el) } catch (_) { }
+        try { obs.unobserve(el) } catch (err) { console.warn('[codeblocksManager] observer unobserve failed', err) }
         ;(async () => {
           try {
             const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''
@@ -277,7 +276,7 @@ export function observeCodeBlocks(root = document) {
               const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
               try {
                 await registerLanguage(canonical)
-              } catch (_) { }
+              } catch (err) { console.warn('[codeblocksManager] registerLanguage failed', err) }
               try {
                 // highlightElement may mutate the element's class (adding
                 // language-<name>). Only use highlightElement when an
@@ -285,7 +284,7 @@ export function observeCodeBlocks(root = document) {
                 // use highlightAuto and write the HTML without changing
                 // the element's language class.
                 hljs.highlightElement(el)
-              } catch (_) { }
+              } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed', err) }
             } else {
               try {
                 const code = el.textContent || ''
@@ -297,12 +296,12 @@ export function observeCodeBlocks(root = document) {
                     const out = hljs.highlight(code, { language: 'plaintext' })
                     if (out && out.value) el.innerHTML = out.value
                   }
-                } catch (_) {
-                  try { hljs.highlightElement(el) } catch (_) { }
+                } catch (err) {
+                  try { hljs.highlightElement(el) } catch (e) { console.warn('[codeblocksManager] fallback highlightElement failed', e) }
                 }
-              } catch (_) { }
+              } catch (err) { console.warn('[codeblocksManager] auto-detect plaintext failed', err) }
             }
-          } catch (_) { }
+          } catch (err) { console.warn('[codeblocksManager] observer entry processing failed', err) }
         })()
       })
     }, { root: null, rootMargin: '300px', threshold: 0.1 })
@@ -311,7 +310,7 @@ export function observeCodeBlocks(root = document) {
 
   const obs = ensureObserver()
   const blocks = (root && root.querySelectorAll) ? root.querySelectorAll('pre code') : []
-  if (!obs) {
+    if (!obs) {
     // no IntersectionObserver - highlight immediately (but register languages non-blocking)
     blocks.forEach(async (el) => {
       try {
@@ -323,14 +322,14 @@ export function observeCodeBlocks(root = document) {
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
           try {
           await registerLanguage(canonical)
-        } catch (_) { }
+        } catch (err) { console.warn('[codeblocksManager] registerLanguage failed (no observer)', err) }
         }
-        try { hljs.highlightElement(el) } catch (_) { }
+        try { hljs.highlightElement(el) } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed (no observer)', err) }
       } catch (_) { }
     })
     return
   }
-  blocks.forEach(b => { try { obs.observe(b) } catch (_) { } })
+  blocks.forEach(b => { try { obs.observe(b) } catch (err) { console.warn('[codeblocksManager] observe failed', err) } })
 }
 
 /**

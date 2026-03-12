@@ -236,6 +236,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
       }
     } catch (e) {
       // ignore malformed URLs
+      console.warn('[router] malformed URL while discovering index candidates', e)
     }
   }
 
@@ -255,7 +256,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
           return candidate
         }
       }
-    } catch (e) { }
+    } catch (e) { console.warn('[router] fetchMarkdown during index discovery failed', e) }
   }
   return null
 }
@@ -319,7 +320,7 @@ export function buildPageCandidates(resolved) {
       }
       // otherwise leave the list empty; fetchPageData will treat that as
       // a not-found condition rather than guessing a filename.
-    } catch (e) { }
+    } catch (e) { console.warn('[router] buildPageCandidates failed during slug handling', e) }
   }
   return pageCandidates
 }

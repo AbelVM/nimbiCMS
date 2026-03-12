@@ -35,7 +35,7 @@ function upsertLinkRel(rel, href) {
       document.head.appendChild(link)
     }
     link.setAttribute('href', href)
-  } catch (e) { }
+  } catch (e) { console.warn('[seoManager] upsertLinkRel failed', e) }
 }
 
 function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
@@ -93,6 +93,7 @@ export function getSiteNameFromMeta() {
       }
     }
   } catch (e) {
+    console.warn('[seoManager] getSiteNameFromMeta failed', e)
   }
   return ''
 }
@@ -128,10 +129,10 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
       } else {
         canonical = location.href.split('#')[0]
       }
-    } catch (e) { canonical = location.href.split('#')[0] }
+    } catch (e) { canonical = location.href.split('#')[0]; console.warn('[seoManager] compute canonical failed', e) }
 
     if (canonical) upsertLinkRel('canonical', canonical)
-    try { upsertMeta('property', 'og:url', canonical) } catch (e) { }
+    try { upsertMeta('property', 'og:url', canonical) } catch (e) { console.warn('[seoManager] upsertMeta og:url failed', e) }
 
     const json = {
       '@context': 'https://schema.org',
@@ -153,7 +154,7 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
       document.head.appendChild(el)
     }
     el.textContent = JSON.stringify(json, null, 2)
-  } catch (e) { }
+  } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
 }
 
 import readingTime from 'reading-time/lib/reading-time'
@@ -182,7 +183,7 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
       if (labelEl) {
         labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
       }
-    } catch (e) {}
+    } catch (e) { console.warn('[seoManager] update toc label failed', e) }
 
     try {
       const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
@@ -206,10 +207,10 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
           found = existingDescTag && existingDescTag.getAttribute ? (existingDescTag.getAttribute('content') || '') : ''
         }
         descOverride = found
-      } catch (e) { }
+      } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
 
-      try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { }
-      try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { }
+      try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { console.warn('[seoManager] setMetaTags failed', e) }
+      try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
       const siteName = getSiteNameFromMeta()
       if (h1Text) {
         if (siteName) document.title = `${siteName} - ${h1Text}`
@@ -219,7 +220,7 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
       } else {
         document.title = initialDocumentTitle || document.title
       }
-    } catch (e) { }
+    } catch (e) { console.warn('[seoManager] applyPageMeta failed', e) }
 
     try {
       const prev = article.querySelector('.nimbi-reading-time')
@@ -233,5 +234,5 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
         const topH1Elem = article.querySelector('h1')
         if (topH1Elem) topH1Elem.insertAdjacentElement('afterend', p)
       }
-    } catch (ee) { }
+    } catch (ee) { console.warn('[seoManager] reading time update failed', ee) }
   }

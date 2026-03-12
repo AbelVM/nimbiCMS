@@ -18,10 +18,11 @@ export function initRendererWorker() {
       _rendererWorker = w
       // On worker errors, clear the cached instance so future calls may retry.
       w.addEventListener('error', () => {
-        try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (_) {}
+        try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (err) { console.warn('[markdown] error handler termination failed', err) }
       })
     } catch (e) {
       _rendererWorker = null
+      console.warn('[markdown] initRendererWorker failed', e)
     }
   }
   return _rendererWorker
@@ -57,14 +58,14 @@ function _sendToRenderer(msg) {
       cleanup()
       console.warn('[markdown] worker error event', ev)
       // worker has failed; clear cached instance so future calls retry
-      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (_) {}
+      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (err) { console.warn('[markdown] worker termination failed', err) }
       reject(new Error(ev.message || 'worker error'))
     }
 
     timeoutId = setTimeout(() => {
       cleanup()
       console.warn('[markdown] worker timed out')
-      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (_) {}
+      try { if (_rendererWorker === w) { _rendererWorker = null; w.terminate && w.terminate() } } catch (err) { console.warn('[markdown] worker termination on timeout failed', err) }
       reject(new Error('worker timeout'))
     }, 1000)
 
@@ -85,9 +86,9 @@ export const markdownPlugins = []
  * @param {object} plugin
  */
 export function addMarkdownExtension(plugin) {
-  if (plugin && typeof plugin === 'object') {
+    if (plugin && typeof plugin === 'object') {
     markdownPlugins.push(plugin)
-    try { marked.use(plugin) } catch (e) { }
+    try { marked.use(plugin) } catch (e) { console.warn('[markdown] failed to apply plugin', e) }
   }
 }
 
@@ -102,7 +103,7 @@ export function setMarkdownExtensions(plugins) {
   }
   try {
     markdownPlugins.forEach(p => marked.use(p))
-  } catch (e) { }
+  } catch (e) { console.warn('[markdown] failed to apply markdown extensions', e) }
 }
 import { parseFrontmatter } from './utils/frontmatter.js'
 import { slugify } from './filesManager.js'
@@ -140,7 +141,7 @@ export async function parseMarkdownToHtml(md) {
   })
   // ensure any registered plugins are applied; marked ignores duplicates
   if (markdownPlugins && markdownPlugins.length) {
-    try { markdownPlugins.forEach(p=>marked.use(p)) } catch (e) { }
+    try { markdownPlugins.forEach(p=>marked.use(p)) } catch (e) { console.warn('[markdown] apply plugins failed', e) }
   }
   let html = marked.parse(content)
 
@@ -153,8 +154,8 @@ export async function parseMarkdownToHtml(md) {
     // prefer lazy-loading images to reduce initial network pressure
     try {
       const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { } })
-    } catch (e) { }
+      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
+    } catch (e) { console.warn('[markdown] query images failed', e) }
 
     // don't block: leave language-tagged blocks for the IntersectionObserver
     try {
@@ -186,14 +187,14 @@ export async function parseMarkdownToHtml(md) {
                   const out = hljs.highlight(code, { language: 'plaintext' })
                   if (out && out.value) codeEl.innerHTML = out.value
                 }
-              } catch (_) {
-                try { hljs.highlightElement(codeEl) } catch (e) { }
+              } catch (err) {
+                try { hljs.highlightElement(codeEl) } catch (e) { console.warn('[markdown] hljs.highlightElement failed', e) }
               }
-            } catch (e) { }
+            } catch (e) { console.warn('[markdown] code auto-detect failed', e) }
           }
-        } catch (e) { }
+        } catch (e) { console.warn('[markdown] processing code blocks failed', e) }
       })
-    } catch (e) { }
+    } catch (e) { console.warn('[markdown] query code blocks failed', e) }
 
     html = doc.body.innerHTML
     const docToc = []

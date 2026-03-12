@@ -212,14 +212,14 @@ export async function initCMS(options = {}) {
     mountEl.classList.add('nimbi-mount')
     mountEl.style.position = mountEl.style.position || 'relative'
     mountEl.style.overflow = mountEl.style.overflow || 'hidden'
-  } catch (e) { }
+  } catch (e) { console.warn('[nimbi-cms] mount element setup failed', e) }
 
   const container = document.createElement('div')
   container.className = 'nimbi-cms'
   try {
     container.style.position = container.style.position || 'relative'
     container.style.overflow = container.style.overflow || 'auto'
-    try { if (!container.style.webkitOverflowScrolling) container.style.webkitOverflowScrolling = 'touch' } catch (e) { }
+    try { if (!container.style.webkitOverflowScrolling) container.style.webkitOverflowScrolling = 'touch' } catch (e) { console.warn('[nimbi-cms] set container webkitOverflowScrolling failed', e) }
     container.style.width = container.style.width || '100%'
     container.style.height = container.style.height || '100%'
     container.style.boxSizing = container.style.boxSizing || 'border-box'
@@ -253,11 +253,12 @@ export async function initCMS(options = {}) {
     }
   } catch (e) {
     mountOverlay = null
+    console.warn('[nimbi-cms] mount overlay setup failed', e)
   }
 
   const pagePath = location.pathname || '/'
   const pageDir = pagePath.endsWith('/') ? pagePath : pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
-  try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = '' }
+  try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; console.warn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
   // remove any leading './' or '/' to avoid creating protocol-relative URLs
   if (cp.startsWith('./')) cp = cp.slice(2)
@@ -288,7 +289,7 @@ export async function initCMS(options = {}) {
           markdown.addMarkdownExtension(ext)
         }
       })
-    } catch (_) { }
+    } catch (err) { console.warn('[nimbi-cms] applying markdownExtensions failed', err) }
   }
 
   // allow crawling behavior to be tuned by consumer
@@ -299,13 +300,13 @@ export async function initCMS(options = {}) {
         try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { }
       })
     }
-  } catch (_) { }
+  } catch (err) { console.warn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
 
   // Inform filesManager of the runtime content base so slug -> md mapping
   // can be computed relative to the correct path instead of relying on
   // hardcoded segments.
-  try { setContentBase(contentBase) } catch (_) { }
-  try { setNotFoundPage(notFoundPage) } catch (_) { }
+  try { setContentBase(contentBase) } catch (err) { console.warn('[nimbi-cms] setContentBase failed', err) }
+  try { setNotFoundPage(notFoundPage) } catch (err) { console.warn('[nimbi-cms] setNotFoundPage failed', err) }
   try {
     await fetchMarkdown(homePage, contentBase)
   } catch (e) {
@@ -392,11 +393,11 @@ export async function initCMS(options = {}) {
           if (pageParam) {
             ev.preventDefault()
             history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
-            try { renderByQuery() } catch (e) { }
+            try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
           }
-        } catch (e) { }
+        } catch (e) { console.warn('[nimbi-cms] brand click handler failed', e) }
       })
-    } catch (e) { }
+    } catch (e) { console.warn('[nimbi-cms] attach brand click handler failed', e) }
 
     const burger = document.createElement('a')
     burger.className = 'navbar-burger'

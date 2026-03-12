@@ -70,7 +70,8 @@ export function buildTocElement(t, toc, pagePath = '') {
       const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
       if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
       else a.href = `?page=${encodeURIComponent(slug)}#${encodeURIComponent(slug)}`
-    } catch (_) {
+    } catch (err) {
+      console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
       const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
       const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
       if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
@@ -114,11 +115,11 @@ function lazyLoadImages(el, pagePath, contentBase) {
         try {
           const resolved = new URL(pageDirForImgs + src, contentBase).toString()
           img.src = resolved
-          try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (_) { }
-        } catch (_) {}
+          try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (err) { console.warn('[htmlBuilder] set image loading attribute failed', err) }
+        } catch (err) { console.warn('[htmlBuilder] resolve image src failed', err) }
       })
     }
-  } catch (_) {}
+  } catch (err) { console.warn('[htmlBuilder] lazyLoadImages failed', err) }
 }
 
 let _lastContentBase = ''
@@ -160,7 +161,7 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         if (isExternalLink(href)) continue
         if (href.startsWith('/') && !href.endsWith('.md')) continue
         const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
-        if (mdMatch) {
+          if (mdMatch) {
           let mdPathRaw = mdMatch[1]
           const frag = mdMatch[2]
           if (!mdPathRaw.startsWith('/') && pagePath) {
@@ -173,7 +174,7 @@ async function rewriteAnchors(article, contentBase, pagePath) {
             rel = normalizePath(rel)
             anchorInfo.push({ node: a, mdPathRaw, frag, rel })
             if (!mdToSlug.has(rel)) pending.add(rel)
-          } catch (_) {}
+          } catch (err) { console.warn('[htmlBuilder] resolve mdPath failed', err) }
           continue
         }
         try {
@@ -194,8 +195,8 @@ async function rewriteAnchors(article, contentBase, pagePath) {
               }
             }
           }
-        } catch (_) {}
-      } catch (_) {}
+        } catch (err) { console.warn('[htmlBuilder] resolving href to URL failed', err) }
+      } catch (err) { console.warn('[htmlBuilder] processing anchor failed', err) }
     }
 
     if (pending.size) {
@@ -208,31 +209,31 @@ async function rewriteAnchors(article, contentBase, pagePath) {
               try {
                 const mapped = slugToMd.get(basename)
                 if (mapped) {
-                  try { mdToSlug.set(mapped, basename) } catch (_) {}
+                  try { mdToSlug.set(mapped, basename) } catch (err) { console.warn('[htmlBuilder] mdToSlug.set failed', err) }
                 }
-              } catch (_) {}
+              } catch (err) { console.warn('[htmlBuilder] reading slugToMd failed', err) }
               return
             }
-          } catch (_) {}
+          } catch (err) { console.warn('[htmlBuilder] basename slug lookup failed', err) }
 
           const mdData = await fetchMarkdown(rel, contentBase)
-          if (mdData && mdData.raw) {
+            if (mdData && mdData.raw) {
             const m2 = (mdData.raw || '').match(/^#\s+(.+)$/m)
             if (m2 && m2[1]) {
               const candidate = slugify(m2[1].trim())
               if (candidate) {
-                try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (_) {}
+                try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] setting slug mapping failed', err) }
               }
             }
           }
-        } catch (_) {}
+          } catch (err) { console.warn('[htmlBuilder] fetchMarkdown during rewriteAnchors failed', err) }
       }))
     }
 
     for (const info of anchorInfo) {
       const { node: a, frag, rel } = info
       let slug = null
-      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (_) {}
+      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { console.warn('[htmlBuilder] mdToSlug access failed', err) }
       if (slug) {
         if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
         else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
@@ -241,7 +242,7 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
       }
     }
-  } catch (_) {}
+  } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
 }
 
 /**
@@ -263,16 +264,18 @@ function computeSlug(parsed, article, pagePath, anchor) {
     if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
     if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
     if (!slugKey) slugKey = '_home'
-    try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (_) { }
+    try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { console.warn('[htmlBuilder] computeSlug set slug mapping failed', err) }
     try {
       let newUrl = '?page=' + encodeURIComponent(slugKey)
       try {
         const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
         if (curHash) newUrl += '#' + encodeURIComponent(curHash)
-      } catch (_) { }
-      history.replaceState({ page: slugKey }, '', newUrl)
-    } catch (_) { }
-  } catch (_) { }
+      } catch (err) { console.warn('[htmlBuilder] computeSlug hash decode failed', err) }
+      try {
+        history.replaceState({ page: slugKey }, '', newUrl)
+      } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
+    } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
+  } catch (err) { console.warn('[htmlBuilder] computeSlug failed', err) }
   return { topH1, h1Text, slugKey }
 }
 
@@ -304,16 +307,16 @@ export async function preScanHtmlSlugs(linkEls, base) {
         const htmlPath = path
         try {
           if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
-        } catch (_) { }
+        } catch (err) { console.warn('[htmlBuilder] mdToSlug check failed', err) }
         try {
           let already = false
           for (const v of slugToMd.values()) {
             if (v === htmlPath) { already = true; break }
           }
           if (already) continue
-        } catch (_) { }
+        } catch (err) { console.warn('[htmlBuilder] slugToMd iteration failed', err) }
         htmlPaths.add(htmlPath)
-      } catch (_) { }
+      } catch (err) { console.warn('[htmlBuilder] preScanHtmlSlugs anchor iteration failed', err) }
   }
 
   if (!htmlPaths.size) return
@@ -323,22 +326,22 @@ export async function preScanHtmlSlugs(linkEls, base) {
       const res = await fetchMarkdown(htmlPath, base)
       if (res && res.raw) {
         try {
-          const parser = HTML_PARSER || new DOMParser()
-          const doc = parser.parseFromString(res.raw, 'text/html')
-          const titleTag = doc.querySelector('title')
-          const h1 = doc.querySelector('h1')
-          const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
-            ? titleTag.textContent.trim()
-            : (h1 && h1.textContent ? h1.textContent.trim() : null)
-          if (titleText) {
-            const slugKey = slugify(titleText)
-            if (slugKey) {
-              try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (_) { }
+            const parser = HTML_PARSER || new DOMParser()
+            const doc = parser.parseFromString(res.raw, 'text/html')
+            const titleTag = doc.querySelector('title')
+            const h1 = doc.querySelector('h1')
+            const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
+              ? titleTag.textContent.trim()
+              : (h1 && h1.textContent ? h1.textContent.trim() : null)
+            if (titleText) {
+              const slugKey = slugify(titleText)
+              if (slugKey) {
+                try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (err) { console.warn('[htmlBuilder] set slugToMd/mdToSlug failed', err) }
+              }
             }
-          }
-        } catch (_) { }
+          } catch (err) { console.warn('[htmlBuilder] parse HTML title failed', err) }
       }
-    } catch (_) { }
+    } catch (err) { console.warn('[htmlBuilder] fetchAndExtract failed', err) }
   }
 
   const CONCURRENCY = 5
@@ -368,7 +371,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
   try {
     const contentBaseUrl = new URL(contentBase)
     contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
-  } catch (_) { contentBasePath = '' }
+  } catch (err) { contentBasePath = ''; console.warn('[htmlBuilder] preMapMdSlugs parse base failed', err) }
 
   for (const a of Array.from(linkEls || [])) {
     try {
@@ -378,20 +381,21 @@ export async function preMapMdSlugs(linkEls, contentBase) {
       const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
       if (mdMatch) {
         let mdPathRaw = normalizePath(mdMatch[1])
-        try {
-          let resolved
           try {
-            resolved = new URL(mdPathRaw, contentBase).pathname
-          } catch (_) {
-            resolved = mdPathRaw
-          }
+            let resolved
+            try {
+              resolved = new URL(mdPathRaw, contentBase).pathname
+            } catch (err) {
+              resolved = mdPathRaw
+              console.warn('[htmlBuilder] resolve mdPath URL failed', err)
+            }
           const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
           anchorInfo.push({ rel })
           if (!mdToSlug.has(rel)) pending.add(rel)
-        } catch (_) {}
+        } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
         continue
       }
-    } catch (_) {}
+    } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs anchor iteration failed', err) }
   }
 
   if (pending.size) {
@@ -401,12 +405,12 @@ export async function preMapMdSlugs(linkEls, contentBase) {
         const basename = m && m[1]
         if (basename && slugToMd.has(basename)) {
           try {
-            const mapped = slugToMd.get(basename)
-            if (mapped) mdToSlug.set(mapped, basename)
-          } catch (_) {}
+              const mapped = slugToMd.get(basename)
+              if (mapped) mdToSlug.set(mapped, basename)
+            } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs slug map access failed', err) }
           return
         }
-      } catch (_) {}
+        } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs basename check failed', err) }
 
       try {
         const mdData = await fetchMarkdown(rel, contentBase)
@@ -415,11 +419,11 @@ export async function preMapMdSlugs(linkEls, contentBase) {
           if (m2 && m2[1]) {
             const candidate = slugify(m2[1].trim())
             if (candidate) {
-              try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (_) {}
+              try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs setting slug mapping failed', err) }
             }
           }
         }
-      } catch (_) {}
+      } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs fetch failed', err) }
     }))
   }
 }
@@ -441,8 +445,8 @@ function parseHtml(raw) {
     addHeadingIds(doc)
     try {
       const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (_) { } })
-    } catch (_) { }
+      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (err) { console.warn('[htmlBuilder] parseHtml set image loading attribute failed', err) } })
+    } catch (err) { console.warn('[htmlBuilder] parseHtml query images failed', err) }
     const codes = doc.querySelectorAll('pre code, code[class]')
     codes.forEach(codeEl => {
       try {
@@ -453,20 +457,20 @@ function parseHtml(raw) {
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
           try {
             ;(async () => {
-              try { await registerLanguage(canonical) } catch (_) { }
+              try { await registerLanguage(canonical) } catch (err) { console.warn('[htmlBuilder] registerLanguage failed', err) }
             })()
-          } catch (_) { }
+          } catch (err) { console.warn('[htmlBuilder] schedule registerLanguage failed', err) }
         } else {
-              try {
-                // no explicit language: prefer plaintext rendering if
-                // available, otherwise avoid auto-detection.
-                if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
-                  const out = hljs.highlight ? hljs.highlight(codeEl.textContent || '', { language: 'plaintext' }) : null
-                  if (out && out.value) codeEl.innerHTML = out.value
-                }
-              } catch (_) { }
+          try {
+            // no explicit language: prefer plaintext rendering if
+            // available, otherwise avoid auto-detection.
+            if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+              const out = hljs.highlight ? hljs.highlight(codeEl.textContent || '', { language: 'plaintext' }) : null
+              if (out && out.value) codeEl.innerHTML = out.value
             }
-      } catch (_) { }
+          } catch (err) { console.warn('[htmlBuilder] plaintext highlight fallback failed', err) }
+        }
+      } catch (err) { console.warn('[htmlBuilder] code element processing failed', err) }
     })
     const tocEntries = []
     const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
@@ -474,9 +478,7 @@ function parseHtml(raw) {
       tocEntries.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id })
     })
     return { html: doc.body.innerHTML, meta: {}, toc: tocEntries }
-  } catch (_) {
-    return { html: raw || '', meta: {}, toc: [] }
-  }
+  } catch (err) { console.warn('[htmlBuilder] parseHtml failed', err); return { html: raw || '', meta: {}, toc: [] } }
 }
 
 /**
@@ -495,15 +497,15 @@ async function ensureLanguages(raw) {
       const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
       try {
         promises.push(registerLanguage(canonical))
-      } catch (_) { }
+      } catch (err) { console.warn('[htmlBuilder] ensureLanguages push canonical failed', err) }
       if (String(l) !== String(canonical)) {
         try {
           promises.push(registerLanguage(l))
-        } catch (_) { }
+        } catch (err) { console.warn('[htmlBuilder] ensureLanguages push alias failed', err) }
       }
-    } catch (_) { }
+    } catch (err) { console.warn('[htmlBuilder] ensureLanguages inner failed', err) }
   }
-  try { await Promise.all(promises) } catch (_) { }
+  try { await Promise.all(promises) } catch (err) { console.warn('[htmlBuilder] ensureLanguages failed', err) }
 }
 
 /**
@@ -540,7 +542,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const article = document.createElement('article')
     article.className = 'nimbi-article content'
     article.innerHTML = parsed.html
-    try { addHeadingIds(article) } catch (_) { }
+    try { addHeadingIds(article) } catch (err) { console.warn('[htmlBuilder] addHeadingIds failed', err) }
     try {
       const codeEls = article.querySelectorAll('pre code, code[class]')
       codeEls.forEach(el => {
@@ -548,19 +550,20 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
           const cleaned = String(raw || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
           if (cleaned) {
-            try { el.setAttribute && el.setAttribute('class', cleaned) } catch (_) { el.className = cleaned }
+            try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned; console.warn('[htmlBuilder] set element class failed', err) }
           } else {
-            try { el.removeAttribute && el.removeAttribute('class') } catch (_) { el.className = '' }
+            try { el.removeAttribute && el.removeAttribute('class') } catch (err) { el.className = ''; console.warn('[htmlBuilder] remove element class failed', err) }
           }
-        } catch (_) { }
+        } catch (err) { console.warn('[htmlBuilder] code element cleanup failed', err) }
       })
-    } catch (_) { }
-    try { observeCodeBlocks(article) } catch (_) { }
+    } catch (err) { console.warn('[htmlBuilder] processing code elements failed', err) }
+    try { observeCodeBlocks(article) } catch (err) { console.warn('[htmlBuilder] observeCodeBlocks failed', err) }
 
     lazyLoadImages(article, pagePath, contentBase)
     try {
       await rewriteAnchorsWorker(article, contentBase, pagePath)
-    } catch (_) {
+    } catch (err) {
+      console.warn('[htmlBuilder] rewriteAnchorsWorker failed, falling back to main thread', err)
       // fallback to in-thread implementation if worker fails
       await rewriteAnchors(article, contentBase, pagePath)
     }
@@ -600,7 +603,7 @@ export function initAnchorWorker() {
         try {
           const blob = new Blob([anchorWorkerCode], { type: 'application/javascript' })
           url = URL.createObjectURL(blob)
-        } catch (_) { url = null }
+        } catch (err) { url = null; console.warn('[htmlBuilder] createObjectURL failed', err) }
       }
       if (url) {
         _anchorWorker = new Worker(url, { type: 'module' })
@@ -662,20 +665,20 @@ export function attachTocClickHandler(toc) {
           // If the requested page equals the current page (or no `page` param),
           // don't re-render — just update the URL/hash and scroll to the anchor.
           let currentPage = null
-          try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (_) { currentPage = null }
-          try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (_) { }
+          try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (err) { currentPage = null; console.warn('[htmlBuilder] access history.state failed', err) }
+          try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (err) { console.warn('[htmlBuilder] parse current location failed', err) }
 
           if ((!pageParam && hash) || (pageParam && currentPage && String(pageParam) === String(currentPage))) {
             try {
               // For anchor-only clicks, preserve existing search and only set hash.
               if (!pageParam && hash) {
-                try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (_) { }
+                try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               } else {
-                try { history.replaceState({ page: currentPage || pageParam }, '', '?page=' + encodeURIComponent(currentPage || pageParam) + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (_) { }
+                try { history.replaceState({ page: currentPage || pageParam }, '', '?page=' + encodeURIComponent(currentPage || pageParam) + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               }
-            } catch (_) { }
-            try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (_) { }
-            try { scrollToAnchorOrTop(hash) } catch (_) { }
+            } catch (err) { console.warn('[htmlBuilder] update history for anchor failed', err) }
+            try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (err) { console.warn('[htmlBuilder] stopPropagation failed', err) }
+            try { scrollToAnchorOrTop(hash) } catch (err) { console.warn('[htmlBuilder] scrollToAnchorOrTop failed', err) }
             return
           }
 
@@ -683,16 +686,16 @@ export function attachTocClickHandler(toc) {
           history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
           try {
             if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') {
-              try { window.renderByQuery() } catch (_) { /* swallow */ }
+              try { window.renderByQuery() } catch (err) { console.warn('[htmlBuilder] window.renderByQuery failed', err) }
             } else if (typeof window !== 'undefined') {
-              try { window.dispatchEvent(new PopStateEvent('popstate')) } catch (_) { /* swallow */ }
+              try { window.dispatchEvent(new PopStateEvent('popstate')) } catch (err) { console.warn('[htmlBuilder] dispatch popstate failed', err) }
             } else {
-              try { renderByQuery() } catch (_) { }
+              try { renderByQuery() } catch (err) { console.warn('[htmlBuilder] renderByQuery failed', err) }
             }
-          } catch (_) { }
-        } catch (_) { /* ignore non-URL hrefs */ }
+          } catch (err) { console.warn('[htmlBuilder] SPA navigation invocation failed', err) }
+        } catch (err) { /* ignore non-URL hrefs */ console.warn('[htmlBuilder] non-URL href in attachTocClickHandler', err) }
       })
-    } catch (e) { }
+    } catch (e) { console.warn('[htmlBuilder] attachTocClickHandler failed', e) }
   }
 
 
@@ -714,25 +717,25 @@ export function scrollToAnchorOrTop(anchor) {
       if (el) {
         try {
           const doScroll = () => {
-            try {
-              if (containerEl && containerEl.scrollTo && containerEl.contains(el)) {
-                const top = el.getBoundingClientRect().top - containerEl.getBoundingClientRect().top + containerEl.scrollTop
-                containerEl.scrollTo({ top, behavior: 'smooth' })
-              } else {
-                try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (_) { el.scrollIntoView() }
+              try {
+                if (containerEl && containerEl.scrollTo && containerEl.contains(el)) {
+                  const top = el.getBoundingClientRect().top - containerEl.getBoundingClientRect().top + containerEl.scrollTop
+                  containerEl.scrollTo({ top, behavior: 'smooth' })
+                } else {
+                  try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (err) { try { el.scrollIntoView() } catch (err2) { console.warn('[htmlBuilder] scrollIntoView failed', err2) } }
+                }
+              } catch (err) {
+                try { el.scrollIntoView() } catch (err2) { console.warn('[htmlBuilder] final scroll fallback failed', err2) }
               }
-            } catch (_) {
-              try { el.scrollIntoView() } catch (_) { }
-            }
           }
-          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (_) { setTimeout(doScroll, 50) }
-        } catch (_) { try { el.scrollIntoView() } catch (_) { } }
+          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (err) { console.warn('[htmlBuilder] scheduling scroll failed', err); setTimeout(doScroll, 50) }
+        } catch (err) { try { el.scrollIntoView() } catch (err2) { console.warn('[htmlBuilder] final scroll fallback failed', err2) } ; console.warn('[htmlBuilder] doScroll failed', err) }
       }
     } else {
       try {
         if (containerEl && containerEl.scrollTo) containerEl.scrollTo({ top: 0, behavior: 'smooth' })
         else window.scrollTo(0, 0)
-      } catch (_) { window.scrollTo(0, 0) }
+      } catch (err) { try { window.scrollTo(0, 0) } catch (err2) { console.warn('[htmlBuilder] window.scrollTo failed', err2) } ; console.warn('[htmlBuilder] scroll to top failed', err) }
     }
   }
 
@@ -746,106 +749,106 @@ export function scrollToAnchorOrTop(anchor) {
  * @param {object} opts
  */
 export function ensureScrollTopButton(article, topH1, { mountOverlay = null, container = null, mountEl = null, navWrap = null, t = null } = {}) {
-    try {
-      const tFn = t || (k => (typeof k === 'string' ? k : ''))
-      const containerEl = container || document.querySelector('.nimbi-cms')
-      const mountElLocal = mountEl || document.querySelector('.nimbi-mount')
-      const mountOverlayEl = mountOverlay || document.querySelector('.nimbi-overlay')
-      const navWrapEl = navWrap || document.querySelector('.nimbi-nav-wrap')
-      const existingBtn = document.querySelector('.nimbi-scroll-top')
-      let btn = existingBtn
-      if (!btn) {
-        btn = document.createElement('button')
-        btn.className = 'nimbi-scroll-top'
-        btn.setAttribute('aria-label', tFn('scrollToTop'))
-        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>'
-        try {
-          if (mountOverlayEl && mountOverlayEl.appendChild) mountOverlayEl.appendChild(btn)
-          else if (containerEl && containerEl.appendChild) containerEl.appendChild(btn)
-          else if (mountElLocal && mountElLocal.appendChild) mountElLocal.appendChild(btn)
-          else document.body.appendChild(btn)
-        } catch (_) {
-          try { document.body.appendChild(btn) } catch (_) { /* give up */ }
-        }
-        try {
-          btn.style.position = 'absolute'
-          btn.style.right = '1rem'
-          btn.style.bottom = '1.25rem'
-          btn.style.zIndex = '60'
-        } catch (_) { }
-        btn.addEventListener('click', () => {
-          try {
-            if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-            else if (mountEl && mountEl.scrollTo) mountEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-            else window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
-          } catch (_) {
-            try { if (container) container.scrollTop = 0 } catch (e2) { }
-            try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { }
-            try { document.documentElement.scrollTop = 0 } catch (e4) { }
-          }
-        })
-      }
+  try {
+    const tFn = t || (k => (typeof k === 'string' ? k : ''))
+    const containerEl = container || document.querySelector('.nimbi-cms')
+    const mountElLocal = mountEl || document.querySelector('.nimbi-mount')
+    const mountOverlayEl = mountOverlay || document.querySelector('.nimbi-overlay')
+    const navWrapEl = navWrap || document.querySelector('.nimbi-nav-wrap')
+    const existingBtn = document.querySelector('.nimbi-scroll-top')
+    let btn = existingBtn
 
-      const tocLabel = (navWrapEl && navWrapEl.querySelector) ? navWrapEl.querySelector('.menu-label') : null
-      if (!topH1) {
-        btn.classList.remove('show')
-        if (tocLabel) tocLabel.classList.remove('show')
-        const root = (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : window)
-        const onScroll = () => {
-          try {
-            const scrollTop = (root === window) ? window.scrollY : (root.scrollTop || 0)
-            const shouldShow = scrollTop > 10
-            if (shouldShow) {
-              btn.classList.add('show')
-              if (tocLabel) tocLabel.classList.add('show')
-            } else {
-              btn.classList.remove('show')
-              if (tocLabel) tocLabel.classList.remove('show')
-            }
-          } catch (_) {}
-        }
-        safe(() => root.addEventListener('scroll', onScroll))
-        onScroll()
-      } else {
-        if (!btn._nimbiObserver) {
-          const obs = new IntersectionObserver((entries) => {
-            for (const entry of entries) {
-              if (entry.target instanceof Element) {
-                if (entry.isIntersecting) {
-                  btn.classList.remove('show')
-                  if (tocLabel) tocLabel.classList.remove('show')
-                } else {
-                  btn.classList.add('show')
-                  if (tocLabel) tocLabel.classList.add('show')
-                }
-              }
-            }
-          }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
-          btn._nimbiObserver = obs
-        }
-        try { btn._nimbiObserver.disconnect() } catch (_) { }
-        try { btn._nimbiObserver.observe(topH1) } catch (_) { }
+    if (!btn) {
+      btn = document.createElement('button')
+      btn.className = 'nimbi-scroll-top'
+      btn.setAttribute('aria-label', tFn('scrollToTop'))
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>'
+      try {
+        if (mountOverlayEl && mountOverlayEl.appendChild) mountOverlayEl.appendChild(btn)
+        else if (containerEl && containerEl.appendChild) containerEl.appendChild(btn)
+        else if (mountElLocal && mountElLocal.appendChild) mountElLocal.appendChild(btn)
+        else document.body.appendChild(btn)
+      } catch (err) {
+        try { document.body.appendChild(btn) } catch (err2) { console.warn('[htmlBuilder] append scroll top button failed', err2) }
+      }
+      try {
+        btn.style.position = 'absolute'
+        btn.style.right = '1rem'
+        btn.style.bottom = '1.25rem'
+        btn.style.zIndex = '60'
+      } catch (err) { console.warn('[htmlBuilder] set scroll-top button styles failed', err) }
+      btn.addEventListener('click', () => {
         try {
-          const checkIntersect = () => {
-            try {
-              const rootRect = (containerEl instanceof Element) ? containerEl.getBoundingClientRect() : { top: 0, bottom: window.innerHeight }
-              const elRect = topH1.getBoundingClientRect()
-              const isIntersecting = !(elRect.bottom < rootRect.top || elRect.top > rootRect.bottom)
-              if (isIntersecting) {
+          if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          else if (mountEl && mountEl.scrollTo) mountEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          else window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+        } catch (err) {
+          try { if (container) container.scrollTop = 0 } catch (e2) { console.warn('[htmlBuilder] fallback container scrollTop failed', e2) }
+          try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { console.warn('[htmlBuilder] fallback mountEl scrollTop failed', e3) }
+          try { document.documentElement.scrollTop = 0 } catch (e4) { console.warn('[htmlBuilder] fallback document scrollTop failed', e4) }
+        }
+      })
+    }
+
+    const tocLabel = (navWrapEl && navWrapEl.querySelector) ? navWrapEl.querySelector('.menu-label') : null
+    if (!topH1) {
+      btn.classList.remove('show')
+      if (tocLabel) tocLabel.classList.remove('show')
+      const root = (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : window)
+      const onScroll = () => {
+        try {
+          const scrollTop = (root === window) ? window.scrollY : (root.scrollTop || 0)
+          const shouldShow = scrollTop > 10
+          if (shouldShow) {
+            btn.classList.add('show')
+            if (tocLabel) tocLabel.classList.add('show')
+          } else {
+            btn.classList.remove('show')
+            if (tocLabel) tocLabel.classList.remove('show')
+          }
+        } catch (err) { console.warn('[htmlBuilder] onScroll handler failed', err) }
+      }
+      safe(() => root.addEventListener('scroll', onScroll))
+      onScroll()
+    } else {
+      if (!btn._nimbiObserver) {
+        const obs = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.target instanceof Element) {
+              if (entry.isIntersecting) {
                 btn.classList.remove('show')
                 if (tocLabel) tocLabel.classList.remove('show')
               } else {
                 btn.classList.add('show')
                 if (tocLabel) tocLabel.classList.add('show')
               }
-            } catch (_) { }
+            }
           }
-          checkIntersect()
-          if (!('IntersectionObserver' in window)) {
-            setTimeout(checkIntersect, 100)
-          }
-            } catch (_) { }
-        }
-      } catch (_) {
+        }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
+        btn._nimbiObserver = obs
       }
+      try { btn._nimbiObserver.disconnect() } catch (err) { console.warn('[htmlBuilder] observer disconnect failed', err) }
+      try { btn._nimbiObserver.observe(topH1) } catch (err) { console.warn('[htmlBuilder] observer observe failed', err) }
+      try {
+        const checkIntersect = () => {
+          try {
+            const rootRect = (containerEl instanceof Element) ? containerEl.getBoundingClientRect() : { top: 0, bottom: window.innerHeight }
+            const elRect = topH1.getBoundingClientRect()
+            const isIntersecting = !(elRect.bottom < rootRect.top || elRect.top > rootRect.bottom)
+            if (isIntersecting) {
+              btn.classList.remove('show')
+              if (tocLabel) tocLabel.classList.remove('show')
+            } else {
+              btn.classList.add('show')
+              if (tocLabel) tocLabel.classList.add('show')
+            }
+          } catch (err) { console.warn('[htmlBuilder] checkIntersect failed', err) }
+        }
+        checkIntersect()
+        if (!('IntersectionObserver' in window)) {
+          setTimeout(checkIntersect, 100)
+        }
+      } catch (err) { console.warn('[htmlBuilder] checkIntersect outer failed', err) }
     }
+  } catch (err) { console.warn('[htmlBuilder] ensureScrollTopButton failed', err) }
+}

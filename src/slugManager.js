@@ -43,8 +43,9 @@ export function initSlugWorker() {
         try {
           const blob = new Blob([slugWorkerCode], { type: 'application/javascript' })
           workerUrl = URL.createObjectURL(blob)
-        } catch (_) {
+        } catch (err) {
           workerUrl = null
+          console.warn('[slugManager] createObjectURL failed', err)
         }
       }
       if (workerUrl) {
@@ -248,10 +249,15 @@ export function setContentBase(contentBase) {
   let prefix = ''
   try {
     if (contentBase) {
-      try { prefix = new URL(contentBase).pathname } catch (_) { prefix = String(contentBase || '') }
+      try {
+        prefix = new URL(contentBase).pathname
+      } catch (err) {
+        prefix = String(contentBase || '')
+        console.warn('[slugManager] parse contentBase failed', err)
+      }
       prefix = ensureTrailingSlash(prefix)
     }
-  } catch (_) { prefix = '' }
+  } catch (err) { prefix = ''; console.warn('[slugManager] setContentBase prefix derivation failed', err) }
 
   if (!prefix) prefix = _deriveCommonPrefix(keys)
 
@@ -264,7 +270,7 @@ export function setContentBase(contentBase) {
     }
     allMarkdownPaths.push(rel)
     // keep router index up to date with newly discovered markdown
-    try { refreshIndexPaths() } catch (_) {}
+    try { refreshIndexPaths() } catch (err) { console.warn('[slugManager] refreshIndexPaths failed', err) }
 
     const val = _allMd[fullPath]
     if (typeof val === 'string') {
@@ -290,8 +296,8 @@ export function setContentBase(contentBase) {
             } else {
               slugToMd.set(slug, rel)
             }
-            mdToSlug.set(rel, slug)
-          } catch (_e) { }
+              mdToSlug.set(rel, slug)
+          } catch (_e) { console.warn('[slugManager] set slug mapping failed', _e) }
         }
       }
     }
@@ -301,7 +307,7 @@ export function setContentBase(contentBase) {
 // run an initial populate using whatever information is available at module
 // load time.  This avoids breaking tests that expect `allMarkdownPaths` to be
 // populated even if `initCMS` hasn't been called yet.
-try { setContentBase() } catch (_) { }
+try { setContentBase() } catch (err) { console.warn('[slugManager] initial setContentBase failed', err) }
 
 /**
  * Convert a string to a URL-friendly slug (lowercase, dashes).  In
@@ -387,7 +393,7 @@ export let fetchMarkdown = async function(path, base) {
         path = mapped
       }
     }
-  } catch (_) {}  const baseClean = trimTrailingSlash(base)
+  } catch (err) { console.warn('[slugManager] slug mapping normalization failed', err) }  const baseClean = trimTrailingSlash(base)
   const url = `${baseClean}/${path}`
   if (fetchCache.has(url)) {
     return fetchCache.get(url)
@@ -404,13 +410,14 @@ export let fetchMarkdown = async function(path, base) {
             const raw404 = await r404.text()
             return { raw: raw404, status: 404 }
           }
-        } catch (_ee) { }
+        } catch (_ee) { console.warn('[slugManager] fetching fallback 404 failed', _ee) }
       }
       let body = ''
       try {
         body = await res.clone().text()
-      } catch (_) {
+      } catch (err) {
         body = ''
+        console.warn('[slugManager] reading error body failed', err)
       }
       console.error('fetchMarkdown failed:', { url, status: res.status, statusText: res.statusText, body: body.slice(0, 200) })
       throw new Error('failed to fetch md')
@@ -433,7 +440,7 @@ export let fetchMarkdown = async function(path, base) {
           const raw404 = await r404.text()
           return { raw: raw404, status: 404 }
         }
-      } catch (_ee) { }
+      } catch (_ee) { console.warn('[slugManager] fetching fallback 404 failed', _ee) }
       console.error('fetchMarkdown: server returned HTML for .md request', url)
       throw new Error('failed to fetch md')
     }
@@ -491,7 +498,7 @@ export async function buildSearchIndex(contentBase) {
     if (crawled && crawled.length) {
       paths = paths.concat(crawled)
     }
-  } catch (_) {}
+  } catch (err) { console.warn('[slugManager] crawlAllMarkdown during buildSearchIndex failed', err) }
 
   // now attempt to discover additional pages by following links in the
   // content paths we already know about.  this allows the index to grow
@@ -503,7 +510,7 @@ export async function buildSearchIndex(contentBase) {
     if (visited.size === 0) {
       // nothing to crawl
     }
-    while (queue.length && visited.size <= defaultCrawlMaxQueue) {
+      while (queue.length && visited.size <= defaultCrawlMaxQueue) {
       const p = queue.shift()
       try {
         const md = await fetchMarkdown(p, contentBase)
@@ -532,11 +539,11 @@ export async function buildSearchIndex(contentBase) {
           }
         }
       } catch (e) {
-        // swallow
+        console.warn('[slugManager] discovery fetch failed for', p, e)
       }
     }
   } catch (e) {
-    // swallow
+    console.warn('[slugManager] discovery loop failed', e)
   }
   // dedupe in-case the same file appears multiple times
   const seen = new Set()
@@ -563,7 +570,7 @@ export async function buildSearchIndex(contentBase) {
             if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
             const p = doc.querySelector('p')
             if (p && p.textContent) excerpt = p.textContent.trim()
-          } catch (_) {}
+          } catch (err) { console.warn('[slugManager] parsing HTML for index failed', err) }
         } else {
           const raw = md.raw
           const h1m = raw.match(/^#\s+(.+)$/m)
@@ -580,12 +587,12 @@ export async function buildSearchIndex(contentBase) {
         let slug = ''
         try {
           if (mdToSlug.has(path)) slug = mdToSlug.get(path)
-        } catch (_) {}
+        } catch (err) { console.warn('[slugManager] mdToSlug access failed', err) }
         if (!slug) slug = slugify(title || path)
         idx.push({ slug, title, excerpt, path })
       }
     } catch (err) {
-      // ignore failures, continue index
+      console.warn('[slugManager] buildSearchIndex: entry fetch failed', err)
     }
   }
   searchIndex = idx
@@ -593,7 +600,7 @@ export async function buildSearchIndex(contentBase) {
 })()
   // once finished, clear the promise so subsequent calls can rebuild if
   // the cache is cleared externally.
-  try { await _indexPromise } catch (_) {}
+  try { await _indexPromise } catch (err) { console.warn('[slugManager] awaiting _indexPromise failed', err) }
   _indexPromise = null
   return searchIndex
 }
@@ -689,7 +696,7 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
               for (const v of slugToMd.values()) {
                 if (v === path) { continue }
               }
-            } catch (_e) {}
+            } catch (err) { console.warn('[slugManager] slug map access failed', err) }
             try {
               const md = await fetchMarkdown(path, contentBase)
               if (md && md.raw) {
@@ -699,11 +706,11 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
                   break
                 }
               }
-            } catch (_) {}
+            } catch (err) { console.warn('[slugManager] crawlForSlug: fetchMarkdown failed', err) }
           }
-        } catch (_) {}
+            } catch (err) { console.warn('[slugManager] crawlForSlug: link iteration failed', err) }
       }
-    } catch (_) {}
+          } catch (err) { console.warn('[slugManager] crawlForSlug: directory fetch failed', err) }
   }
   crawlCache.set(decoded, found)
   return found
@@ -755,9 +762,9 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
           if (/\.(md|html?)$/i.test(path)) {
             result.add(path)
           }
-        } catch (_) {}
+        } catch (err) { console.warn('[slugManager] crawlAllMarkdown: link iteration failed', err) }
       }
-    } catch (_) {}
+    } catch (err) { console.warn('[slugManager] crawlAllMarkdown: directory fetch failed', err) }
   }
 
   return Array.from(result)
@@ -792,7 +799,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         mdToSlug.set(res, decoded)
         return res
       }
-    } catch (_) { }
+    } catch (err) { console.warn('[slugManager] slug resolver failed', err) }
   }
 
   // manifest-based title lookup (lazy)
@@ -818,7 +825,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
             }
           }
         }
-      } catch (_) { }
+      } catch (err) { console.warn('[slugManager] manifest title fetch failed', err) }
     }
   }
 
@@ -833,7 +840,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         return match.path
       }
     }
-  } catch (_) {}
+  } catch (err) { console.warn('[slugManager] buildSearchIndex lookup failed', err) }
 
   // breadth-first crawl of directories
   try {
@@ -843,7 +850,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       mdToSlug.set(foundCrawl, decoded)
       return foundCrawl
     }
-  } catch (_) {}
+  } catch (err) { console.warn('[slugManager] crawlForSlug lookup failed', err) }
 
   // attempt to resolve using an obvious filename guess (runtime-only)
   // Do not guess directory index files (index.md/index.html) for unknown
@@ -871,7 +878,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
           mdToSlug.set(p, decoded)
           return p
         }
-      } catch (_) {}
+      } catch (err) { console.warn('[slugManager] build-time filename match failed', err) }
     }
   }
 
@@ -890,7 +897,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       }
     }
   } catch (e) {
-    // ignore failures
+    console.warn('[slugManager] home page fetch failed', e)
   }
   return null
 }
