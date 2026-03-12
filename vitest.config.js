@@ -6,5 +6,6 @@ export default defineConfig({
     globals: true,
     testTimeout: 5000,
     include: ['tests/**/*.test.{js,ts}'],
+    setupFiles: ['tests/setup.js'],
   },
 })

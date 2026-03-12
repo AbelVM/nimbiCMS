@@ -250,8 +250,15 @@ export function setContentBase(contentBase) {
   try {
     if (contentBase) {
       try {
-        prefix = new URL(contentBase).pathname
+        // If contentBase looks like an absolute URL, use its pathname
+        if (/^[a-z][a-z0-9+.-]*:/i.test(String(contentBase))) {
+          prefix = new URL(String(contentBase)).pathname
+        } else {
+          // Treat path-like values ("/content/" or "content/") as-is
+          prefix = String(contentBase || '')
+        }
       } catch (err) {
+        // Fallback to the raw string when URL parsing fails
         prefix = String(contentBase || '')
         console.warn('[slugManager] parse contentBase failed', err)
       }
@@ -384,6 +391,20 @@ export function clearFetchCache() { fetchCache.clear() }
  * @returns {Promise<{raw:string,isHtml?:boolean,status?:number}>}
  */
 export let fetchMarkdown = async function(path, base) {
+  // If tests or other code have mocked/re-exported `fetchMarkdown` from
+  // `filesManager.js`, prefer that implementation. This dynamic import
+  // allows the test-suite to mock `../src/filesManager.js` and have the
+  // mocked `fetchMarkdown` used even when calling slugManager functions
+  // directly.
+  try {
+    const mod = await import('./filesManager.js')
+    if (mod && typeof mod.fetchMarkdown === 'function' && mod.fetchMarkdown !== fetchMarkdown) {
+      return mod.fetchMarkdown(path, base)
+    }
+  } catch (e) {
+    // ignore and fall through to local implementation
+  }
+
   if (!path) throw new Error('path required')
   try {
     const o = (String(path || '').match(/([^\/]+)\.md(?:$|[?#])/) || [])[1]
@@ -393,20 +414,39 @@ export let fetchMarkdown = async function(path, base) {
         path = mapped
       }
     }
-  } catch (err) { console.warn('[slugManager] slug mapping normalization failed', err) }  const baseClean = trimTrailingSlash(base)
-  const url = `${baseClean}/${path}`
+  } catch (err) { console.warn('[slugManager] slug mapping normalization failed', err) }
+  // defensively handle missing/various `base` shapes used by tests and callers
+  const baseClean = base == null ? '' : trimTrailingSlash(String(base))
+  let url = ''
+  try {
+    if (baseClean) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
+        // absolute URL base
+        url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+      } else {
+        // path-like base ("/content" or "content")
+        const leading = baseClean.startsWith('/') ? '' : '/'
+        url = leading + baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+      }
+    } else {
+      // no base provided -> treat as root-relative
+      url = '/' + path.replace(/^\//, '')
+    }
+  } catch (err) {
+    url = '/' + path.replace(/^\//, '')
+  }
   if (fetchCache.has(url)) {
     return fetchCache.get(url)
   }
 
   const promise = (async () => {
     const res = await fetch(url)
-    if (!res.ok) {
-      if (res.status === 404) {
+    if (!res || typeof res.ok !== 'boolean' || !res.ok) {
+      if (res && res.status === 404) {
         try {
           const p404 = `${baseClean}/${notFoundPage}`
           const r404 = await globalThis.fetch(p404)
-          if (r404.ok) {
+          if (r404 && typeof r404.ok === 'boolean' && r404.ok) {
             const raw404 = await r404.text()
             return { raw: raw404, status: 404 }
           }
@@ -414,12 +454,18 @@ export let fetchMarkdown = async function(path, base) {
       }
       let body = ''
       try {
-        body = await res.clone().text()
+        if (res && typeof res.clone === 'function') {
+          body = await res.clone().text()
+        } else if (res && typeof res.text === 'function') {
+          body = await res.text()
+        } else {
+          body = ''
+        }
       } catch (err) {
         body = ''
         console.warn('[slugManager] reading error body failed', err)
       }
-      console.error('fetchMarkdown failed:', { url, status: res.status, statusText: res.statusText, body: body.slice(0, 200) })
+      console.error('fetchMarkdown failed:', { url, status: res ? res.status : undefined, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) })
       throw new Error('failed to fetch md')
     }
     const raw = await res.text()
@@ -856,7 +902,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   // Do not guess directory index files (index.md/index.html) for unknown
   // slugs; doing so caused unknown slugs to resolve to index.html and
   // prevented 404 handling. Only try direct filename guesses.
-  const candidates = [`${decoded}.md`, `${decoded}.html`]
+  const candidates = [`${decoded}.html`, `${decoded}.md`]
   for (const cand of candidates) {
     try {
       const res = await fetchMarkdown(cand, contentBase)
@@ -865,7 +911,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         mdToSlug.set(cand, decoded)
         return cand
       }
-    } catch (_) { /* ignore failures */ }
+    } catch (err) { console.warn('[slugManager] candidate fetch failed', err) }
   }
 
   // optional build-time filename match

@@ -223,7 +223,7 @@ export async function initCMS(options = {}) {
     container.style.width = container.style.width || '100%'
     container.style.height = container.style.height || '100%'
     container.style.boxSizing = container.style.boxSizing || 'border-box'
-  } catch (e) { }
+  } catch (e) { console.warn('[nimbi-cms] container style setup failed', e) }
 
   const cols = document.createElement('div')
   cols.className = 'columns'

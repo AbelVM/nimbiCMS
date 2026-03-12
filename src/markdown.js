@@ -124,7 +124,60 @@ export async function parseMarkdownToHtml(md) {
   if (w) {
     try {
       const res = await _sendToRenderer({ type: 'render', md })
-      if (res && res.html !== undefined) return res
+      if (res && res.html !== undefined) {
+        // post-process worker HTML the same as inline path so tests and
+        // runtime behavior match (assign heading ids, lazy-load images,
+        // clean code classes, and allow hljs fallback behavior).
+        try {
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(res.html, 'text/html')
+          const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+          heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+
+          try {
+            const imgs = doc.querySelectorAll('img')
+            imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
+          } catch (e) { console.warn('[markdown] query images failed', e) }
+
+          try {
+            const codes = doc.querySelectorAll('pre code')
+            codes.forEach(codeEl => {
+              try {
+                const rawCls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+                const cleanedCls = String(rawCls || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+                if (cleanedCls) {
+                  try { codeEl.setAttribute && codeEl.setAttribute('class', cleanedCls) } catch (_) { codeEl.className = cleanedCls }
+                } else {
+                  try { codeEl.removeAttribute && codeEl.removeAttribute('class') } catch (_) { codeEl.className = '' }
+                }
+                const cls = cleanedCls
+                const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
+                if (!match || !match[1]) {
+                  try {
+                    const code = codeEl.textContent || ''
+                    try {
+                      if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+                        const out = hljs.highlight(code, { language: 'plaintext' })
+                        if (out && out.value) codeEl.innerHTML = out.value
+                      }
+                    } catch (err) {
+                      try { hljs.highlightElement(codeEl) } catch (e) { console.warn('[markdown] hljs.highlightElement failed', e) }
+                    }
+                  } catch (e) { console.warn('[markdown] code auto-detect failed', e) }
+                }
+              } catch (e) { console.warn('[markdown] processing code blocks failed', e) }
+            })
+          } catch (e) { console.warn('[markdown] query code blocks failed', e) }
+
+          const outHtml = doc.body.innerHTML
+          const docToc = []
+          heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
+          return { html: outHtml, meta: res.meta || {}, toc: docToc }
+        } catch (e) {
+          console.warn('[markdown] post-process worker HTML failed', e)
+          return res
+        }
+      }
     } catch (e) {
       console.warn('[markdown] worker render failed', e)
       // fall through to inline parsing

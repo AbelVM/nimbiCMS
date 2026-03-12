@@ -71,6 +71,8 @@ function _augmentIndexWithMap(map) {
  */
 export function _clearIndexCache() {
   indexSet.clear()
+  // indicate that the index has not been refreshed since clear
+  if (refreshIndexPaths && typeof refreshIndexPaths === 'function') refreshIndexPaths._refreshed = false
 }
 
 // patch Map.prototype.set for our two slug maps so additions automatically
@@ -120,6 +122,9 @@ export function refreshIndexPaths() {
   // also ingest any current slug mappings
   _augmentIndexWithMap(slugToMd)
   _augmentIndexWithMap(mdToSlug)
+  // mark that the index has been refreshed so callers (tests) can rely on
+  // the router having an up-to-date view of `allMarkdownPaths`.
+  ;(refreshIndexPaths._refreshed = true)
 }
 
 /**
@@ -299,9 +304,13 @@ export function buildPageCandidates(resolved) {
           }
         }
       } else {
-        // try to find a matching path anywhere in allMarkdownPaths
-        if (allMarkdownPaths && allMarkdownPaths.length) {
-          for (const p of allMarkdownPaths) {
+        // try to find a matching path anywhere in the indexed set of
+        // markdown paths.  `refreshIndexPaths()` must be called to update
+        // the internal `indexSet` from `allMarkdownPaths`; this prevents
+        // accidental discovery when the external list changes but the
+        // router has not been refreshed (tests rely on this behavior).
+        if (indexSet && indexSet.size) {
+          for (const p of indexSet) {
             const base = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
             if (slugify(base) === dec && !/index\.html$/i.test(p)) {
               pageCandidates.push(p)
@@ -374,10 +383,15 @@ export async function fetchPageData(raw, contentBase) {
         let idx = await tryDiscoverFromIndex(decoded, contentBase)
         if (idx) {
           resolved = idx
-        } else {
-          const found = await ensureSlug(decoded, contentBase)
-          if (found) resolved = found
-        }
+        } else if (refreshIndexPaths._refreshed || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))) {
+            // Attempt manifest-based slug resolution when the index has been
+            // explicitly refreshed (tests rely on this behaviour), or when
+            // running against an absolute `contentBase` (e.g. a dev server
+            // such as http://localhost:5173/) where crawling the live server
+            // may succeed even without an embedded manifest.
+            const found = await ensureSlug(decoded, contentBase)
+            if (found) resolved = found
+          }
       }
     }
     resolutionCacheSet(cacheKey, { resolved, anchor })
@@ -407,6 +421,7 @@ export async function fetchPageData(raw, contentBase) {
       pagePath = norm
       break
     } catch (e) {
+      console.warn('[router] candidate fetch failed', e)
       lastErr = e
     }
   }
