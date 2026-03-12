@@ -111,7 +111,16 @@ export function encodeURL(u) {
  */
 export function safe(fn) {
   try {
-    return fn()
+    const result = fn()
+    // if result is a promise, attach a catch handler so errors are swallowed
+    if (result && typeof result.then === 'function') {
+      return result.catch(e => {
+        console.warn('[helpers] safe swallowed error', e)
+        // resolve to undefined so callers can await without throwing
+        return undefined
+      })
+    }
+    return result
   } catch (_e) {
     console.warn('[helpers] safe swallowed error', _e)
   }

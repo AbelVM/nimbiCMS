@@ -59,6 +59,9 @@ export function _clearHooks(): void
 export function makeWorkerManager(createWorker: {function(): (Worker|null)}, name: string): get: function(): (Worker|null), send: function(object, number=): Promise<any>, terminate: function(): void
 export function createWorkerFromRaw(code: string): (Worker|null)
 
+// --- from src/ui.js
+export function createUI(opts: object): renderByQuery: function():Promise<void>, siteNav: object, getCurrentPagePath: function():string|null
+
 // --- from src/slugManager.js
 export function setLanguages(list: any): any
 export const slugToMd: any
@@ -123,7 +126,9 @@ export function onNavBuild(fn: (...args:any[])=>any): void
 export function transformHtml(fn: (...args:any[])=>any): void
 export function _clearHooks(): Promise<void>
 
-
+// --- from src/nav.js
+export function createSiteNav(homePage: string): object
+export function buildNav(navbarWrap: any, container: any, navHtml: string, contentBase: string, homePage: string, t: (...args:any[])=>any, renderByQuery: (...args:any[])=>any, effectiveSearchEnabled: any, searchIndexMode: ('eager'|'lazy'|'off')): Promise<object>
 
 // --- from src/markdown.js
 export function initRendererWorker(): any
@@ -137,6 +142,11 @@ export function detectFenceLanguages(md: string, supportedMap: Map<string,string
 export function t(opts: any): string
 export function loadL10nFile(path: string, pageDir: string): Promise<void>
 export function setLang(lang: string): void
+
+
+// --- from src/init.js
+
+
 
 
 // --- from src/htmlBuilder.js
