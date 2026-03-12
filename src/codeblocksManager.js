@@ -26,6 +26,11 @@ export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
 
+// Cache for candidate import attempts: candidate -> { promise, module, ok, ts }
+const languageImportCache = new Map()
+// Negative cache TTL (ms) - avoid retrying failing CDN imports for this duration
+const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
 /**
  * Load the list of supported highlight.js languages from the canonical
  * GitHub markdown file and populate `SUPPORTED_HLJS_MAP`.  This is called
@@ -197,23 +202,61 @@ export async function registerLanguage(name, modulePath) {
     let lastErr = null
     for (const candidate of candidates) {
       try {
-        try {
-          mod = await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
-        } catch (_localErr) {
-          try {
-            const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
-            // Use a runtime-evaluated import to avoid bundler rewrites of
-            // absolute CDN URLs (Vite can rewrite import() specifiers).
-            mod = await new Function('u', 'return import(u)')(esmUrl)
-          } catch (_esmErr) {
+        // Reuse cached import attempts (including in-flight promises)
+        const now = Date.now()
+        const cached = languageImportCache.get(candidate)
+        if (cached) {
+          // If negative cache still valid, skip retrying this candidate
+          if (cached.ok === false && (now - (cached.ts || 0) < NEGATIVE_CACHE_TTL_MS)) {
+            mod = null
+          } else if (cached.module) {
+            mod = cached.module
+          } else if (cached.promise) {
             try {
-              const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
-              mod = await new Function('u', 'return import(u)')(moduleUrl)
-            } catch (_cdnErr) {
-              // CDN import failed for this candidate
+              mod = await cached.promise
+            } catch (cacheErr) {
+              mod = null
             }
           }
+        } else {
+          // create a cache entry and perform the import; store in entry so
+          // concurrent requests share the same promise
+          const entry = { promise: null, module: null, ok: null, ts: 0 }
+          languageImportCache.set(candidate, entry)
+          entry.promise = (async () => {
+            try {
+              try {
+                return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
+              } catch (_localErr) {
+                try {
+                  const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
+                  return await new Function('u', 'return import(u)')(esmUrl)
+                } catch (_esmErr) {
+                  try {
+                    const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
+                    return await new Function('u', 'return import(u)')(moduleUrl)
+                  } catch (_cdnErr) {
+                    return null
+                  }
+                }
+              }
+            } catch (err) {
+              return null
+            }
+          })()
+          try {
+            mod = await entry.promise
+            entry.module = mod
+            entry.ok = !!mod
+            entry.ts = Date.now()
+          } catch (err) {
+            entry.module = null
+            entry.ok = false
+            entry.ts = Date.now()
+            mod = null
+          }
         }
+
         if (mod) {
           const langDef = mod.default || mod
           try {
@@ -226,6 +269,8 @@ export async function registerLanguage(name, modulePath) {
             lastErr = _e
             // registration failed for this candidate
           }
+        } else {
+          // negative result cached; proceed to next candidate
         }
       } catch (_e) {
         lastErr = _e
