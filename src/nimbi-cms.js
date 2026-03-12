@@ -99,6 +99,8 @@ export function _clearHooks() {
 
 
 
+const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+
 /**
  * Initialize the CMS in a host page.
  *
@@ -110,6 +112,7 @@ export function _clearHooks() {
  * @param {string} [options.contentPath='/content'] - URL path to content
  * @param {number} [options.crawlMaxQueue=1000] - maximum directory queue length for slug crawling (see docs)
  * @param {boolean} [options.searchIndex=true] - build a client-side search index (adds search box to navbar)
+ * @param {('eager'|'lazy'|'off')} [options.searchIndexMode='eager'] - when to build the search index
  * @param {('light'|'dark')} [options.defaultStyle='light'] - initial light/dark mode
  * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
  * @param {string} [options.lang] - UI language code
@@ -129,6 +132,7 @@ export async function initCMS(options = {}) {
         contentPath = '/content',
         /* eslint-disable no-unused-vars */ crawlMaxQueue = 1000,
         searchIndex: searchEnabled = true,
+        searchIndexMode = 'eager',
         defaultStyle = 'light',
         bulmaCustomize = 'none',
         lang = undefined,
@@ -158,6 +162,10 @@ export async function initCMS(options = {}) {
         throw new TypeError('initCMS(options): "searchIndex" must be a boolean when provided')
       }
 
+      if (searchIndexMode != null && searchIndexMode !== 'eager' && searchIndexMode !== 'lazy' && searchIndexMode !== 'off') {
+        throw new TypeError('initCMS(options): "searchIndexMode" must be "eager", "lazy", or "off" when provided')
+      }
+
       if (defaultStyle !== 'light' && defaultStyle !== 'dark') {
         throw new TypeError('initCMS(options): "defaultStyle" must be "light" or "dark"')
       }
@@ -185,6 +193,8 @@ export async function initCMS(options = {}) {
       if (markdownExtensions != null && (!Array.isArray(markdownExtensions) || markdownExtensions.some(ext => !ext || typeof ext !== 'object'))) {
         throw new TypeError('initCMS(options): "markdownExtensions" must be an array of extension objects when provided')
       }
+
+      const effectiveSearchEnabled = searchEnabled && searchIndexMode !== 'off'
 
       try {
         mountEl.classList.add('nimbi-mount')
@@ -299,7 +309,7 @@ export async function initCMS(options = {}) {
     const navMd = await fetchMarkdown('_navigation.md', contentBase)
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
 
-    const parser = new DOMParser()
+    const parser = SHARED_DOM_PARSER || new DOMParser()
     const navDoc = parser.parseFromString(parsedNav.html || '', 'text/html')
     const linkEls = navDoc.querySelectorAll('a')
     // populate slug maps from any HTML links (for HTML pages) and from
@@ -387,7 +397,7 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
     start.className = 'navbar-start'
     // optional search UI container on right side
     let end, searchItem, searchInput, resultsContainer, searchIndexPromise
-    if (searchEnabled) {
+    if (effectiveSearchEnabled) {
       end = document.createElement('div')
       end.className = 'navbar-end'
       searchItem = document.createElement('div')
@@ -411,28 +421,26 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
       searchItem.appendChild(resultsContainer)
       end.appendChild(searchItem)
 
-      // kick off index build right away and remember promise for later
-      try {
-        // buildSearchIndex returns a promise; await it inside a try/catch to
-        // swallow errors rather than chaining a .catch() on the import
-        searchIndexPromise = (async () => {
-          try {
-            const fm = await import('./filesManager.js')
-            return fm.buildSearchIndex(contentBase)
-          } catch (_) {
-            return []
-          }
-        })()
-      } catch (_) {
-        searchIndexPromise = Promise.resolve([])
-      }
-      // when index ready, re-enable input and remove spinner
-      searchIndexPromise.finally(() => {
-        if (searchInput) {
-          searchInput.disabled = false
-          searchInput.classList.remove('is-loading')
+      if (searchIndexMode === 'eager') {
+        try {
+          searchIndexPromise = (async () => {
+            try {
+              const fm = await import('./filesManager.js')
+              return fm.buildSearchIndex(contentBase)
+            } catch (_) {
+              return []
+            }
+          })()
+        } catch (_) {
+          searchIndexPromise = Promise.resolve([])
         }
-      })
+        searchIndexPromise.finally(() => {
+          if (searchInput) {
+            searchInput.disabled = false
+            searchInput.classList.remove('is-loading')
+          }
+        })
+      }
     }
 
     for (let i = 0; i < linkEls.length; i++) {
@@ -557,18 +565,44 @@ await safe(() => preMapMdSlugs(linkEls, contentBase))
           results.style.right = '0'
           results.style.left = 'auto'
       }
+      const debounce = (fn, delay) => {
+        let timer = null
+        return (...args) => {
+          if (timer) clearTimeout(timer)
+          timer = setTimeout(() => fn(...args), delay)
+        }
+      }
+
       if (input) {
-        input.addEventListener('input', async (ev) => {
+        const handleInput = debounce(async () => {
           const q = String(input.value || '').trim().toLowerCase()
           if (!q) { showResults([]); return }
           try {
-            // wait for index if it is still building
             const fm = await import('./filesManager.js')
-            const idx = searchIndexPromise ? await searchIndexPromise : await (fm.buildSearchIndexWorker ? fm.buildSearchIndexWorker(contentBase) : fm.buildSearchIndex(contentBase))
+            if (!searchIndexPromise) {
+              searchIndexPromise = (async () => {
+                try {
+                  if (searchIndexMode === 'lazy' && fm.buildSearchIndexWorker) {
+                    return fm.buildSearchIndexWorker(contentBase)
+                  }
+                  return fm.buildSearchIndex(contentBase)
+                } catch (_) {
+                  return []
+                } finally {
+                  if (searchInput) {
+                    searchInput.disabled = false
+                    searchInput.classList.remove('is-loading')
+                  }
+                }
+              })()
+            }
+            const idx = await searchIndexPromise
             const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
             showResults(filtered.slice(0, 10))
           } catch (_) { showResults([]) }
-        })
+        }, 200)
+
+        input.addEventListener('input', handleInput)
         // hide results when clicking outside
         document.addEventListener('click', (ev) => {
           if (input && !input.contains(ev.target) && results && !results.contains(ev.target)) {

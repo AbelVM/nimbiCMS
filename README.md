@@ -157,12 +157,18 @@ Recent behaviour fixes worth knowing:
   extreme structures.
 - `languages` – **string[]** (optional). When provided, the CMS treats the first segment of each markdown path as a locale code and maintains separate slug mappings for every language. Supply the full set of supported codes (for example ['en','fr'] for content/en/... and content/fr/...). During navigation the slug resolver will prefer the mapping that matches the current UI language (see `setLang()`); if no match exists it falls back to a default or the first available translation. Leave this unset or use an empty array for a single-language site with all content at the root of `contentPath`.
 - `searchIndex` – **boolean** (default `true`). When enabled the CMS
-  builds a lightweight index of page titles/excerpts and inserts a search box
-  into the navbar.  The search input is initially disabled and shows a
-  Bulma loading spinner while the index is being constructed; once ready the
-  field becomes interactive.  Placeholder text is pulled from the
-  localization dictionary under the key `searchPlaceholder` (see `l10n`
-  options).
+  can build a lightweight index of page titles/excerpts and insert a search box
+  into the navbar.
+- `searchIndexMode` – `'eager' | 'lazy' | 'off'` (default `'eager'`). Controls
+  when the index is built:
+  - `'eager'`: build the index on init; the search input is initially disabled
+    and shows a Bulma loading spinner until the index is ready.
+  - `'lazy'`: wait until the user types a query before building the index; the
+    first non‑empty input triggers indexing, then results are debounced.
+  - `'off'`: do not build an index or render the search box even if
+    `searchIndex` is `true`.
+  Placeholder text is pulled from the localization dictionary under the key
+  `searchPlaceholder` (see `l10n` options).
 
   The core index builder runs entirely at runtime when `initCMS()` is
   called.  It gathers slug information from three sources in order:
@@ -173,10 +179,10 @@ Recent behaviour fixes worth knowing:
   3. a directory crawl (`crawlAllMarkdown`) of the `contentPath`, which works
      even when the server does not expose directory listings.
 
-  Because the index is built on init, there is **no** build-time scanning or
-  embedding of content paths.  The crawler will traverse directory listings at
-  runtime to discover every `.md`/`.html` file in the `contentPath`.
-  Disable `searchIndex` to skip the work entirely.
+  There is **no** build-time scanning or embedding of content paths.  The
+  crawler traverses directory listings at runtime to discover every
+  `.md`/`.html` file in the `contentPath`.  Disable `searchIndex` or set
+  `searchIndexMode: 'off'` to skip this work entirely.
 - `defaultStyle` – `'light' | 'dark'` (default `'light'`). Controls initial
   theme; use `setStyle()` to toggle later.
 - `bulmaCustomize` – `'none' | 'local' | '{theme_name}'` (default `'none'`).

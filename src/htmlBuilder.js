@@ -323,7 +323,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
       const res = await fetchMarkdown(htmlPath, base)
       if (res && res.raw) {
         try {
-          const parser = new DOMParser()
+          const parser = HTML_PARSER || new DOMParser()
           const doc = parser.parseFromString(res.raw, 'text/html')
           const titleTag = doc.querySelector('title')
           const h1 = doc.querySelector('h1')
@@ -432,9 +432,11 @@ export async function preMapMdSlugs(linkEls, contentBase) {
  * @param {string} raw - HTML string to parse
  * @returns {{html:string,meta:Object,toc:Array<{level:number,text:string,id:string}>}}
  */
+const HTML_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+
 function parseHtml(raw) {
   try {
-    const parser = new DOMParser()
+    const parser = HTML_PARSER || new DOMParser()
     const doc = parser.parseFromString(raw || '', 'text/html')
     addHeadingIds(doc)
     try {
