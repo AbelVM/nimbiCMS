@@ -1,3 +1,5 @@
+import { normalizePath } from './utils/helpers.js'
+
 /**
  * Set or update a single meta tag or property in the document head.
  *

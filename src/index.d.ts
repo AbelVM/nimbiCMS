@@ -92,11 +92,11 @@ export function ensureSlug(decoded: string, contentBase: string, maxQueue: any):
 
 
 // --- from src/seoManager.js
+export function setTag(name: string, content: string): any
 export function setMetaTags(data: object, titleOverride: string, imageOverride: string, descOverride: string, initialDocumentTitle: string): void
 export function getSiteNameFromMeta(): string|null
 export function setStructuredData(data: object, pagePath: string, titleOverride: string, imageOverride: string, descOverride: string, initialDocumentTitle: string): void
 export function applyPageMeta(t: (...args:any[])=>any, initialDocumentTitle: string, parsed: object, toc: any, article: any, pagePath: string, anchor: string|null, topH1: HTMLElement|null, h1Text: string|null, slugKey: string|null, data: object): void
-
 
 // --- from src/router.js
 export function setResolutionCacheMax(n: number): any
