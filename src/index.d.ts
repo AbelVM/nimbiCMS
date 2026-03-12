@@ -22,6 +22,11 @@ export interface InitOptions {
    * @default '_home.md'
    */
   homePage?: string
+  /**
+   * Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, defaults to `'_404.md'`.
+   * @default '_404.md'
+   */
+  notFoundPage?: string
 }
 
 export interface PageContext {
@@ -77,12 +82,13 @@ export function slugify(s: string): string
 export function resolveSlugPath(slug: string): string|null
 export function clearFetchCache(): any
 export const fetchCache: any
-export const fetchMarkdown: any
+export function fetchMarkdown(path: string, base: string): Promise<{raw:string,isHtml?:boolean,status?:number}>
 export function buildSearchIndex(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
 export function setDefaultCrawlMaxQueue(n: number): void
 export const crawlForSlug: any
 export function crawlAllMarkdown(contentBase: string, maxQueue: number): Promise<string[]>
 export function ensureSlug(decoded: string, contentBase: string, maxQueue: any): Promise<string|null>
+export function setNotFoundPage(p: string): void
 
 
 

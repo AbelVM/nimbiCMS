@@ -1,5 +1,5 @@
 import 'highlight.js/styles/monokai.css'
-import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase, buildSearchIndex, searchIndex } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, setContentBase, buildSearchIndex, searchIndex, setNotFoundPage } from './filesManager.js'
 import * as router from './router.js'
 import { isExternalLink, normalizePath, trimTrailingSlash, safe } from './utils/helpers.js'
 import { createNavTree, preScanHtmlSlugs, preMapMdSlugs, prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton } from './htmlBuilder.js'
@@ -121,6 +121,7 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
  * @param {number} [options.cacheMaxEntries] - maximum number of resolution cache entries (defaults to module constant)
  * @param {Array<object>} [options.markdownExtensions] - list of marked extensions to register on init
  * @param {string} [options.homePage] - Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`.
+ * @param {string} [options.notFoundPage] - Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, defaults to `'_404.md'`.
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
 export async function initCMS(options = {}) {
@@ -142,7 +143,8 @@ export async function initCMS(options = {}) {
     cacheTtlMinutes = 5,
     cacheMaxEntries,
     markdownExtensions,
-    homePage = '_home.md'
+    homePage = '_home.md',
+    notFoundPage = '_404.md'
   } = options
 
   if (!el) {
@@ -199,6 +201,10 @@ export async function initCMS(options = {}) {
 
   if (homePage != null && (typeof homePage !== 'string' || !homePage.trim() || !/\.(md|html)$/.test(homePage))) {
     throw new TypeError('initCMS(options): "homePage" must be a non-empty string ending with .md or .html')
+  }
+
+  if (notFoundPage != null && (typeof notFoundPage !== 'string' || !notFoundPage.trim() || !/\.(md|html)$/.test(notFoundPage))) {
+    throw new TypeError('initCMS(options): "notFoundPage" must be a non-empty string ending with .md or .html')
   }
 
   const effectiveSearchEnabled = searchEnabled && searchIndexMode !== 'off'
@@ -300,6 +306,7 @@ export async function initCMS(options = {}) {
   // can be computed relative to the correct path instead of relying on
   // hardcoded segments.
   try { setContentBase(contentBase) } catch (_) { }
+  try { setNotFoundPage(notFoundPage) } catch (_) { }
   try {
     await fetchMarkdown(homePage, contentBase)
   } catch (e) {

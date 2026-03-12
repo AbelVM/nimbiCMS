@@ -168,6 +168,23 @@ let _allMd = {}
 
 export let allMarkdownPaths = []
 
+/**
+ * The path used for the site's not-found page (relative to content base).
+ * Consumers may override via `setNotFoundPage()`; defaults to `_404.md`.
+ * @type {string}
+ */
+export let notFoundPage = '_404.md'
+
+/**
+ * Set the not-found page path used when `fetchMarkdown` encounters a
+ * missing markdown file or an HTML response for a `.md` request.
+ * @param {string} p
+ */
+export function setNotFoundPage(p) {
+  if (p == null) return
+  notFoundPage = String(p || '')
+}
+
 // helper used by tests to simulate injection of markdown data
 /**
  * Replace internal manifest used by `setContentBase` with a custom object
@@ -344,7 +361,18 @@ export function clearFetchCache() { fetchCache.clear() }
 
 /**
  * Fetch a markdown (or HTML) file from the content base, caching the
- * promise.  Returns an object `{ raw, isHtml? }`.
+ * promise. Returns an object `{ raw, isHtml?, status? }`.
+ *
+ * Notes:
+ * - If the server responds with a non-OK status (e.g. 404) the function
+ *   will attempt to load `/_404.md` from the same `contentBase` and return
+ *   it with `status: 404` when available.
+ * - If a request for a `.md` path returns HTML (common when a static host
+ *   falls back to `index.html` for unknown routes), this is treated as a
+ *   missing markdown page rather than a successful fetch. In that case the
+ *   function will try to load `/_404.md` so the CMS can render a proper
+ *   404 page instead of showing the site's index HTML.
+ *
  * @param {string} path
  * @param {string} base
  * @returns {Promise<{raw:string,isHtml?:boolean,status?:number}>}
@@ -369,8 +397,8 @@ export let fetchMarkdown = async function(path, base) {
     const res = await fetch(url)
     if (!res.ok) {
       if (res.status === 404) {
-          try {
-          const p404 = `${baseClean}/_404.md`
+        try {
+          const p404 = `${baseClean}/${notFoundPage}`
           const r404 = await globalThis.fetch(p404)
           if (r404.ok) {
             const raw404 = await r404.text()
@@ -399,7 +427,7 @@ export let fetchMarkdown = async function(path, base) {
     // proper 404 page instead of showing the site's index HTML.
     if (looksLikeHtml && String(path || '').toLowerCase().endsWith('.md')) {
       try {
-        const p404 = `${baseClean}/_404.md`
+        const p404 = `${baseClean}/${notFoundPage}`
         const r404 = await globalThis.fetch(p404)
         if (r404.ok) {
           const raw404 = await r404.text()

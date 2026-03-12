@@ -430,17 +430,21 @@ static server that serves the files is sufficient.
 
 - Home page: by default, `_home.md` is required. You can override this with the `homePage` option to use a different `.md` or `.html` file as the home page.
 - `_navigation.md` – renders into the navbar; use Markdown links.
-- `_404.md` – optional fallback for 404 responses.
+- `_404.md` – optional fallback for 404 responses. When the server
+  responds to a requested `.md` path with an HTML document (for example
+  an SPA server that returns `index.html` for unknown routes), the CMS
+  treats that as a missing markdown page and will attempt to load
+  `/_404.md` from the configured content base so a proper 404 page can be
+  rendered instead of the site's index HTML.
 * `homePage` – **string** (optional, default `'_home.md'`). Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`. Example:
   ```js
   initCMS({ el: '#app', homePage: 'index.html' })
   ```
   This allows you to use either a Markdown or HTML file as the home page.
-* `homePage` – **string** (optional, default `'_home.md'`). Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`. Example:
+* `notFoundPage` – **string** (optional, default `'_404.md'`). Sets the site's not-found page. Can be a `.md` or `.html` file. When the CMS detects a missing markdown request or the server returns HTML for a `.md` path (common with SPA fallbacks), the configured `notFoundPage` will be used if available. Example:
   ```js
-  initCMS({ el: '#app', homePage: 'index.html' })
+  initCMS({ el: '#app', notFoundPage: '_404.md' })
   ```
-  This allows you to use either a Markdown or HTML file as the home page.
 
 Example nav markup:
 
