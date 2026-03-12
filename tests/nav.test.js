@@ -31,17 +31,25 @@ describe('nav module', () => {
     expect(renderSpy).toHaveBeenCalled()
   })
 
-  it('renders search input when enabled', async () => {
-    const navWrap = makeContainer()
-    const container = makeContainer()
-    const navHtml = '<a href="?page=foo.md">Foo</a>'
-    const renderSpy = vi.fn()
-    const { navbar } = await buildNav(navWrap, container, navHtml, 'http://example.com/base/', '_home.md', s => s, renderSpy, true, 'off')
-    const search = navbar.querySelector('input#nimbi-search')
-    expect(search).toBeInstanceOf(HTMLInputElement)
-    // search index mode off means it should remain disabled
-    expect(search.disabled).toBe(true)
-  })
+  it('does not render search input when searchIndexMode is off', async () => {
+    const navWrap = makeContainer();
+    const container = makeContainer();
+    const navHtml = '<a href="?page=foo.md">Foo</a>';
+    const renderSpy = vi.fn();
+    const { navbar } = await buildNav(navWrap, container, navHtml, 'http://example.com/base/', '_home.md', s => s, renderSpy, true, 'off');
+    const search = navbar.querySelector('input#nimbi-search');
+    expect(search).toBeNull();
+  });
+
+  it('does not render search input when effectiveSearchEnabled is false', async () => {
+    const navWrap = makeContainer();
+    const container = makeContainer();
+    const navHtml = '<a href="?page=foo.md">Foo</a>';
+    const renderSpy = vi.fn();
+    const { navbar } = await buildNav(navWrap, container, navHtml, 'http://example.com/base/', '_home.md', s => s, renderSpy, false, 'eager');
+    const search = navbar.querySelector('input#nimbi-search');
+    expect(search).toBeNull();
+  });
 
   it('search input is enabled once eager index resolves', async () => {
     // stub fetch so buildSearchIndex can complete without network
