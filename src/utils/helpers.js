@@ -55,7 +55,7 @@ export function setLazyload(img) {
     if (img && img.getAttribute && !img.getAttribute('loading')) {
       img.setAttribute('loading', 'lazy')
     }
-  } catch (_) { }
+  } catch (err) { console.warn('[helpers] setLazyload failed', err) }
 }
 
 /**
@@ -113,7 +113,7 @@ export function safe(fn) {
   try {
     return fn()
   } catch (_e) {
-    // ignore
+    console.warn('[helpers] safe swallowed error', _e)
   }
 }
 
@@ -122,4 +122,4 @@ export function safe(fn) {
 // `globalThis` when available.
 try {
   if (typeof globalThis !== 'undefined' && !globalThis.safe) globalThis.safe = safe
-} catch (_) { }
+} catch (err) { console.warn('[helpers] global attach failed', err) }

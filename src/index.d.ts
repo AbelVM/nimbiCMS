@@ -117,7 +117,7 @@ export function addHook(name: any, fn: any): any
 export function onPageLoad(fn: any): any
 export function onNavBuild(fn: (...args:any[])=>any): void
 export function transformHtml(fn: (...args:any[])=>any): void
-export function _clearHooks(): void
+export function _clearHooks(): Promise<void>
 
 
 

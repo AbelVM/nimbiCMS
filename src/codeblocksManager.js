@@ -134,7 +134,7 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
         try {
           const keys = Array.from(SUPPORTED_HLJS_MAP.keys()).sort()
         } catch (err) { console.warn('[codeblocksManager] compute supported keys failed', err) }
-      } catch (_) { }
+      } catch (_) { console.warn('[codeblocksManager] ignored error', _) }
     } catch (err) { console.warn('[codeblocksManager] loadSupportedLanguages failed', err) }
   })()
   return loadSupportedLanguagesPromise
@@ -254,7 +254,7 @@ export function observeCodeBlocks(root = document) {
   // make sure we have fetched supported languages list lazily when we start
   if (!loadSupportedLanguagesPromise) {
     ;(async () => {
-      try { await loadSupportedLanguages() } catch (_) { }
+      try { await loadSupportedLanguages() } catch (_) { console.warn('[codeblocksManager] loadSupportedLanguages (observer) failed', _) }
     })()
   }
   const aliasMapLocal = HLJS_ALIAS_MAP
@@ -310,7 +310,7 @@ export function observeCodeBlocks(root = document) {
 
   const obs = ensureObserver()
   const blocks = (root && root.querySelectorAll) ? root.querySelectorAll('pre code') : []
-    if (!obs) {
+  if (!obs) {
     // no IntersectionObserver - highlight immediately (but register languages non-blocking)
     blocks.forEach(async (el) => {
       try {
@@ -321,17 +321,16 @@ export function observeCodeBlocks(root = document) {
           const mapped = aliasMapLocal[l] || l
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
           try {
-          await registerLanguage(canonical)
-        } catch (err) { console.warn('[codeblocksManager] registerLanguage failed (no observer)', err) }
+            await registerLanguage(canonical)
+          } catch (err) { console.warn('[codeblocksManager] registerLanguage failed (no observer)', err) }
         }
         try { hljs.highlightElement(el) } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed (no observer)', err) }
-      } catch (_) { }
+      } catch (_) { console.warn('[codeblocksManager] loadSupportedLanguages fallback ignored error', _) }
     })
     return
   }
   blocks.forEach(b => { try { obs.observe(b) } catch (err) { console.warn('[codeblocksManager] observe failed', err) } })
 }
-
 /**
  * Change the highlight.js CSS theme by injecting a <link>.  If `theme` is
  * `'monokai'` nothing happens (it's the default bundle).  When `useCdn` is

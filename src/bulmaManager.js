@@ -41,8 +41,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
           document.head.appendChild(s)
           return
         }
-      } catch (_) {
-      }
+      } catch (_) { console.warn('[bulmaManager] fetch local bulma candidate failed', _) }
     }
     return
   }
@@ -52,8 +51,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
     if (!theme) return
     const href = `https://unpkg.com/bulmaswatch/${encodeURIComponent(theme)}/bulmaswatch.min.css`
     injectLink(href, { 'data-bulmaswatch-theme': theme })
-  } catch (_) {
-  }
+  } catch (_) { console.warn('[bulmaManager] ensureBulma failed', _) }
 }
 
 /**
@@ -86,6 +84,6 @@ export function setStyle(style) {
 export function setThemeVars(vars) {
   const root = document.documentElement
   for (const [k, v] of Object.entries(vars || {})) {
-    try { root.style.setProperty(`--${k}`, v) } catch (_) { }
+    try { root.style.setProperty(`--${k}`, v) } catch (_) { console.warn('[bulmaManager] setThemeVars failed for', k, _ ) }
   }
 }

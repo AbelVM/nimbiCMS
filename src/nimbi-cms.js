@@ -80,7 +80,7 @@ async function runHooks(name, ctx) {
     try {
       await fn(ctx)
     } catch (e) {
-      // swallow errors from plugin code to avoid crashing the host
+      console.warn('[nimbi-cms] runHooks callback failed', e)
     }
   }
 }
@@ -297,7 +297,7 @@ export async function initCMS(options = {}) {
     if (typeof crawlMaxQueue === 'number') {
        
       import('./filesManager.js').then(({ setDefaultCrawlMaxQueue }) => {
-        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { }
+        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { console.warn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
       })
     }
   } catch (err) { console.warn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
@@ -500,7 +500,7 @@ export async function initCMS(options = {}) {
                 if (titleText) {
                   const slugKey = slugify(titleText)
                   if (slugKey) {
-                    try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { }
+                    try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
                     item.href = '?page=' + encodeURIComponent(slugKey) + (frag ? '#' + encodeURIComponent(frag) : '')
                   } else {
                     item.href = '?page=' + encodeURIComponent(htmlPath) + (frag ? '#' + encodeURIComponent(frag) : '')
@@ -535,13 +535,13 @@ export async function initCMS(options = {}) {
                 const p = url.searchParams.get('page')
                 if (p) {
                   const decoded = decodeURIComponent(p)
-                  try { slugToMd.set(slugKey, decoded); mdToSlug.set(decoded, slugKey) } catch (ee) { }
+                  try { slugToMd.set(slugKey, decoded); mdToSlug.set(decoded, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
                 }
-              } catch (ee) { }
+              } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }
             }
-          } catch (ee) { }
+          } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }
         }
-      } catch (ee) { }
+      } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }
 
 
 
@@ -629,10 +629,10 @@ export async function initCMS(options = {}) {
           }
         })
       }
-    } catch (_) { }
+    } catch (_) { console.warn('[nimbi-cms] navbar/search setup inner failed', _) }
 
     // invoke nav-build hooks so plugins can tweak the DOM or track data
-    try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { }
+    try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { console.warn('[nimbi-cms] onNavBuild hooks failed', e) }
 
     // intercept internal query links in the navbar to perform SPA navigation
     try {
@@ -647,11 +647,11 @@ export async function initCMS(options = {}) {
           if (pageParam) {
             ev.preventDefault()
             history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
-            try { renderByQuery() } catch (e) { }
+            try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
           }
-        } catch (e) { }
+        } catch (e) { console.warn('[nimbi-cms] navbar click handler failed', e) }
       })
-    } catch (e) { }
+    } catch (e) { console.warn('[nimbi-cms] attach content click handler failed', e) }
 
     try {
       // intercept internal links inside the content area so they use SPA navigation
@@ -669,13 +669,13 @@ export async function initCMS(options = {}) {
           if (pageParam) {
             ev.preventDefault()
             history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
-            try { renderByQuery() } catch (e) { }
+            try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
           }
         } catch (e) {
           // ignore non-URL hrefs
         }
       })
-    } catch (e) { }
+    } catch (e) { console.warn('[nimbi-cms] build navbar failed', e) }
 
     burger.addEventListener('click', () => {
       const isActive = burger.classList.contains('is-active')
@@ -688,7 +688,7 @@ export async function initCMS(options = {}) {
         try {
           const h = navbarWrap.offsetHeight || 0
           container.style.height = `calc(100% - ${h}px)`
-        } catch (e) { }
+        } catch (e) { console.warn('[nimbi-cms] brand click handler failed', e) }
       }
       updateContainerHeight()
       if (typeof ResizeObserver !== 'undefined') {
@@ -697,7 +697,7 @@ export async function initCMS(options = {}) {
       } else {
         window.addEventListener('resize', updateContainerHeight)
       }
-    } catch (e) { }
+    } catch (e) { console.warn('[nimbi-cms] attach brand click handler failed', e) }
   } catch (e) {
   }
 
@@ -731,7 +731,7 @@ export async function initCMS(options = {}) {
     if (!anchor && hashAnchor) anchor = hashAnchor
     // reset scroll before inserting new page; if an anchor is present
     // the later scrollToAnchorOrTop call will position correctly.
-    try { scrollToAnchorOrTop(null) } catch (_) { }
+    try { scrollToAnchorOrTop(null) } catch (_) { console.warn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
     contentWrap.innerHTML = ''
 
     const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
@@ -744,7 +744,7 @@ export async function initCMS(options = {}) {
 
     // allow plugins to modify the generated article element before it is
     // placed in the document (e.g. for analytics, extra widgets, etc.)
-    try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { }
+    try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { console.warn('[nimbi-cms] transformHtml hooks failed', e) }
 
     contentWrap.appendChild(article)
 
@@ -752,7 +752,7 @@ export async function initCMS(options = {}) {
     ensureScrollTopButton(article, topH1, { mountOverlay, container, mountEl, navWrap, t })
 
     // fire the onPageLoad hooks after everything is in place
-    try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { }
+    try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { console.warn('[nimbi-cms] onPageLoad hooks failed', e) }
 
     currentPagePath = pagePath
   }
