@@ -60,6 +60,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   // declarations here ensures the bindings are initialized upfront.
   let searchIndexPromise = null
   let searchInput = null
+  let indexedCountLog = false
 
   const navbar = document.createElement('nav')
   navbar.className = 'navbar'
@@ -120,7 +121,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   start.className = 'navbar-start'
   // optional search UI container on right side
   let end, searchItem, resultsContainer
-  if (effectiveSearchEnabled) {
+  // Respect searchIndex and searchIndexMode options
+  if (!effectiveSearchEnabled || searchIndexMode === 'off') {
+    // skip search UI entirely
+    end = null
+    searchInput = null
+    resultsContainer = null
+  } else {
     end = document.createElement('div')
     end.className = 'navbar-end'
     searchItem = document.createElement('div')
@@ -141,12 +148,86 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchItem.appendChild(resultsContainer)
     end.appendChild(searchItem)
 
+    // Setup search event handlers immediately after creation
+    const showResults = (items) => {
+      resultsContainer.innerHTML = ''
+      if (!items.length) {
+        resultsContainer.style.display = 'none'
+        return
+      }
+      items.forEach(it => {
+        const a = document.createElement('a')
+        a.className = 'block'
+        a.href = '?page=' + encodeURIComponent(it.slug)
+        a.textContent = it.title
+        a.style.whiteSpace = 'nowrap'
+        a.style.overflow = 'hidden'
+        a.style.textOverflow = 'ellipsis'
+        a.addEventListener('click', () => { resultsContainer.style.display = 'none' })
+        resultsContainer.appendChild(a)
+      })
+      resultsContainer.style.display = 'block'
+      resultsContainer.style.right = '0'
+      resultsContainer.style.left = 'auto'
+    }
+
+    const debounce = (fn, delay) => {
+      let timer = null
+      return (...args) => {
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => fn(...args), delay)
+      }
+    }
+
+    if (searchInput) {
+      const handleInput = debounce(async () => {
+        const domInput = document.querySelector('input#nimbi-search');
+        const q = String(domInput && domInput.value || '').trim().toLowerCase();
+        if (!q) { showResults([]); return; }
+        try {
+          const fm = await import('./filesManager.js');
+          if (!searchIndexPromise) {
+            searchIndexPromise = (async () => {
+              try {
+                if (searchIndexMode === 'lazy' && fm.buildSearchIndexWorker) {
+                  return fm.buildSearchIndexWorker(contentBase);
+                }
+                return fm.buildSearchIndex(contentBase);
+              } catch (_) {
+                return [];
+              } finally {
+                if (domInput) {
+                  domInput.removeAttribute('disabled');
+                  domInput.classList.remove('is-loading');
+                }
+              }
+            })();
+          }
+          const idx = await searchIndexPromise;
+          const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)));
+          showResults(filtered.slice(0, 10));
+        } catch (_) { showResults([]); }
+      }, 50);
+
+      if (searchInput) searchInput.addEventListener('input', handleInput);
+      document.addEventListener('click', (ev) => {
+        const domInput = document.querySelector('input#nimbi-search');
+        if (domInput && !domInput.contains(ev.target) && resultsContainer && !resultsContainer.contains(ev.target)) {
+          resultsContainer.style.display = 'none';
+        }
+      });
+    }
+
     if (searchIndexMode === 'eager') {
       try {
         searchIndexPromise = (async () => {
           try {
             const fm = await import('./filesManager.js')
-            return fm.buildSearchIndex(contentBase)
+            const idx = await fm.buildSearchIndex(contentBase)
+            if (!indexedCountLog) {
+              indexedCountLog = true
+            }
+            return idx
           } catch (_) {
             return []
           }
@@ -155,13 +236,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         searchIndexPromise = Promise.resolve([])
       }
       searchIndexPromise.finally(() => {
-        // element reference may have been cleared during later DOM queries;
-        // fetch again if necessary so the callback always updates the real
-        // input node.
-        const inp = searchInput || document.getElementById('nimbi-search')
-        if (inp) {
-          inp.disabled = false
-          inp.classList.remove('is-loading')
+        const domInput = document.querySelector('input#nimbi-search');
+        if (domInput) {
+          domInput.removeAttribute('disabled');
+          domInput.classList.remove('is-loading');
         }
       })
     }
