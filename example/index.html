@@ -46,7 +46,8 @@
       box-sizing: border-box;
     }
   </style>
-  <link rel="stylesheet" href="/dist/nimbi-cms.css">
+  <link rel="preload" href="/dist/nimbi-cms.css" as="style" onload="this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/dist/nimbi-cms.css"></noscript>
 </head>
 
 <body>
@@ -56,8 +57,8 @@
   <script type="module">
     import initCMS from '/dist/nimbi-cms.js';
     const contentPath = './content';
-    initCMS({ el: '#app', contentPath })
-      .catch(e => console.error('initCMS failed', e));;
+    initCMS({ el: '#app', contentPath})
+      .catch(e => console.error('initCMS failed', e));
   </script>
 </body>
 

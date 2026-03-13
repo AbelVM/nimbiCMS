@@ -5,7 +5,7 @@
  * delegating navigation and UI behaviour to helper modules.
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage } from './slugManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages } from './slugManager.js'
 import * as router from './router.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
@@ -69,6 +69,7 @@ export async function initCMS(options = {}) {
     cacheTtlMinutes = 5,
     cacheMaxEntries,
     markdownExtensions,
+    availableLanguages,
     homePage = '_home.md',
     notFoundPage = '_404.md'
   } = options
@@ -125,6 +126,10 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "markdownExtensions" must be an array of extension objects when provided')
   }
 
+  if (availableLanguages != null && (!Array.isArray(availableLanguages) || availableLanguages.some(l => typeof l !== 'string' || !l.trim()))) {
+    throw new TypeError('initCMS(options): "availableLanguages" must be an array of non-empty strings when provided')
+  }
+
   if (homePage != null && (typeof homePage !== 'string' || !homePage.trim() || !/\.(md|html)$/.test(homePage))) {
     throw new TypeError('initCMS(options): "homePage" must be a non-empty string ending with .md or .html')
   }
@@ -157,10 +162,18 @@ export async function initCMS(options = {}) {
 
   const navCol = document.createElement('div')
   navCol.className = 'column is-full-mobile is-3-tablet nimbi-nav-wrap'
+  navCol.setAttribute('role', 'navigation')
+  try {
+    const label = (typeof t === 'function') ? t('navigation') : null
+    if (label) navCol.setAttribute('aria-label', label)
+  } catch (_) {
+    // ignore
+  }
   cols.appendChild(navCol)
 
   const contentCol = document.createElement('div')
   contentCol.className = 'column nimbi-content'
+  contentCol.setAttribute('role', 'main')
   cols.appendChild(contentCol)
 
   container.appendChild(cols)
@@ -192,6 +205,12 @@ export async function initCMS(options = {}) {
   if (!cp.endsWith('/')) cp = cp + '/'
   const contentBase = new URL(pageDir + cp, location.origin).toString()
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
+  if (availableLanguages && Array.isArray(availableLanguages)) {
+    // Set the list of languages used for slug resolution and navigation mapping.
+    // This controls whether paths like `en/foo.md` are treated as per-language
+    // variants of the same slug.
+    setLanguages(availableLanguages)
+  }
   if (lang) setLang(lang)
 
   const ui = createUI({ contentWrap, navWrap, container, mountOverlay, t, contentBase, homePage, initialDocumentTitle, runHooks })

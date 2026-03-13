@@ -174,8 +174,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchInput.type = 'search'
     searchInput.placeholder = t('searchPlaceholder') || ''
     searchInput.id = 'nimbi-search'
-    searchInput.disabled = true
-    searchInput.classList.add('is-loading')
+    if (searchIndexMode === 'eager') {
+      searchInput.disabled = true
+      searchInput.classList.add('is-loading')
+    }
     searchItem.appendChild(searchInput)
 
     resultsContainer = document.createElement('div')

@@ -39,7 +39,8 @@ the kind of lightweight site where you want live preview without any server.
 <!doctype html>
 <html><head><meta charset="utf-8">
 <script src="/dist/nimbi-cms.js"></script>
-<link rel="stylesheet" href="/dist/nimbi-cms.css">
+<link rel="preload" href="/dist/nimbi-cms.css" as="style" onload="this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="/dist/nimbi-cms.css"></noscript>
 </head><body>
 <div id="app" style="height:100vh"></div>
 <script>
@@ -100,7 +101,9 @@ Recent behaviour fixes worth knowing:
 - Prevents aggressive prefetching of linked markdown files.
 - Preserves URL hash anchors during navigation and improves scroll handling.
 - Intercepts navbar/content links to perform SPA navigation (no reloads).
-- Lazy-loads images and defers code highlighting via `IntersectionObserver`.
+- Lazily loads images by default and automatically marks above‑the‑fold images as eager (adds `fetchpriority="high"` where appropriate). A CSS custom property (`--nimbi-image-max-height-ratio`) lets you tune what counts as "above the fold".
+- Improves bfcache/back‑forward navigation: restores scroll position and reapplies eager image markers when a page is shown from cache.
+- Search box usability: `searchIndexMode: 'lazy'` enables the input immediately, builds the index on first query, and gracefully falls back to a main‑thread index build if the worker fails.
 - In-memory caching of fetched markdown and slug resolutions speeds up
   repeat navigations and reduces network traffic.  The router cache is
   subject to both a maximum entry count and a time‑to‑live (TTL) so a
@@ -127,6 +130,10 @@ Recent behaviour fixes worth knowing:
   `router.js`, `markdown.js`, etc.) to ease maintenance and testing.
 - Sticky per-page TOC and Bulma‑based UI components (navbar, menu).
 - Runtime updates for SEO, Open Graph and Twitter meta tags.
+- Lazily loads images by default, while heuristically marking above‑the‑fold
+  images as eager (adds `fetchpriority="high"` where appropriate). A CSS
+  custom property `--nimbi-image-max-height-ratio` lets you tune what counts
+  as "above the fold".
 - Syntax highlighting using `highlight.js` — only JS is bundled; other
   languages are auto-registered when detected.
 - Simple theming (light/dark) and Bulma customization options.
@@ -183,6 +190,9 @@ manager.terminate()
   `#app`). A DOM element is also accepted for compatibility.
 - `contentPath` – URL path to the content folder serving raw `.md` files
   (default `./content` or `/content`). The library normalizes trailing slashes.
+- `lang` – **string** (optional). UI language code (short form, e.g. `en`, `de`). Only affects UI strings (navigation labels, buttons, etc.); it does not change which folder the CMS loads content from.
+- `l10nFile` – **string** (optional). Path to a JSON localization file. Relative paths resolve against the current page directory.
+- `availableLanguages` – **string[]** (optional). When set, the CMS treats a leading path segment as a language code (e.g. `en/foo.md` or `fr/bar.md`) and maps slugs into a per-language bucket. This allows `setLang()` to resolve the correct language-specific page for a given slug.
 - `cacheTtlMinutes` – **number** (default `5`).  Time‑to‑live for slug resolution cache entries, expressed in minutes.  Internally this is converted to milliseconds and assigned to `RESOLUTION_CACHE_TTL` in the router module.  Setting this to `0` effectively turns off expiration (the cache is still size‑bounded by cacheMaxEntries).
 - `cacheMaxEntries` – **number** (optional).  Maximum number of entries the
   router will hold in its resolution cache.  If unspecified the built‑in
@@ -194,13 +204,12 @@ manager.terminate()
   traversal.  Setting this to `0` disables the guard; a lower value improves
   safety on deeply nested content trees but may prevent discovery of pages in
   extreme structures.
-- `languages` – **string[]** (optional). When provided, the CMS treats the first segment of each markdown path as a locale code and maintains separate slug mappings for every language. Supply the full set of supported codes (for example ['en','fr'] for content/en/... and content/fr/...). During navigation the slug resolver will prefer the mapping that matches the current UI language (see `setLang()`); if no match exists it falls back to a default or the first available translation. Leave this unset or use an empty array for a single-language site with all content at the root of `contentPath`.
 - `searchIndex` – **boolean** (default `true`). When enabled the CMS
   can build a lightweight index of page titles/excerpts and insert a search box
   into the navbar.
 - `searchIndexMode` – `'eager' | 'lazy'` (default `'eager'`). Controls when the index is built:
   - `'eager'`: build the index on init; the search input is initially disabled and shows a Bulma loading spinner until the index is ready.
-  - `'lazy'`: wait until the user types a query before building the index; the first non‑empty input triggers indexing, then results are debounced.
+  - `'lazy'`: the search input is usable right away; the index is built only after the user types a non-empty query. While the index is being built, the input shows a spinner and is temporarily disabled, then the results are debounced.
   If `searchIndex` is `false`, `searchIndexMode` is ignored and no search box or index is built.
   If `searchIndex` is `true`, only `'eager'` and `'lazy'` are valid modes.
   Placeholder text is pulled from the localization dictionary under the key `searchPlaceholder` (see `l10n` options).
@@ -242,9 +251,6 @@ manager.terminate()
 
   initCMS({ el: '#app', markdownExtensions: [upperExt] });
   ```
-
-> **Note:** the formerly available `languages` option has been removed. Fenced-
-> code detection handles language registration automatically.
 
 The `initCMS` export itself is returned when you call it; additional helpers
 are exposed (all are also available from the UMD bundle namespace).
@@ -404,12 +410,6 @@ extension when building slug mappings so that clicking or searching for the
 slug works regardless of whether the original link had the file name or not.
 
 
-## HTML links without extensions
-
-Navigation anchors pointing at HTML pages do not need to include the
-`.html` suffix.  During initialization the CMS will append the extension when
-creating slug mappings, ensuring both clicks and search resolve correctly.
-
 ## Theming & Customization
 
 Bulma is bundled by default. To alter styles at runtime, use
@@ -433,9 +433,29 @@ colors can be changed with `setHighlightTheme()` (CDN load if `useCdn=true`).
 - Built‑in defaults live in `DEFAULT_L10N`; loaded files merge on top and fall
   back to English.
 
-After initialization you can also change the UI language at any time by
+To localize content (e.g. `content/en/` and `content/fr/`), point `contentPath`
+at the desired language directory (for example, `contentPath: './content/en/'`).
+The `lang` option only affects UI strings, not which content directory is used.
+
+Example:
+
+```js
+// initial render (English content + UI)
+initCMS({ el: '#app', contentPath: './content/en/', lang: 'en', availableLanguages: ['en','fr'] })
+
+// later (French content + UI). This typically requires re-initializing the
+// CMS or reloading the page with the new configuration.
+initCMS({ el: '#app', contentPath: './content/fr/', lang: 'fr', availableLanguages: ['en','fr'] })
+```
+
+After initialization you can also change only the UI language at any time by
 calling the exported `setLang(code)` helper. This updates internal state so
 subsequent calls to `t()` return strings from the new dictionary.
+
+> Note: `setLang()` does **not** reload or re-initialize the CMS; it only
+> affects UI strings and the slug resolution logic when `availableLanguages` is
+> configured. To switch content folders (e.g. `content/en/` → `content/fr/`),
+> re-run `initCMS()` with a different `contentPath` (and `availableLanguages`).
 
 Example translation file:
 
@@ -489,23 +509,6 @@ Example nav markup:
 [About](about.md)
 ```
 
-> **Multilingual example**
->
-> When using the `languages` option you typically maintain separate
-> directories for each locale. A sample `_navigation.md` for English/
-> French might look like:
->
-> ```markdown
-> /en/:
-> - [Home](en/_home.md)
-> - [About](en/about.md)
->
-> /fr/:
-> - [Accueil](fr/_home.md)
-> - [À propos](fr/about.md)
-> ```
->
-> and you would initialize the CMS with `languages:['en','fr']`.
 
 Links are converted to hash‑based navigation (`?page=…`), preserving anchors.
 

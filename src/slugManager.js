@@ -59,8 +59,19 @@ function _sendToWorker(msg) {
  */
 export async function buildSearchIndexWorker(contentBase) {
   const w = initSlugWorker()
-  if (w) return _sendToWorker({ type: 'buildSearchIndex', contentBase })
-  return buildSearchIndex(contentBase)
+  if (!w) return buildSearchIndex(contentBase)
+
+  try {
+    return await _sendToWorker({ type: 'buildSearchIndex', contentBase })
+  } catch (err) {
+    // If the worker fails, fall back to main thread index build.
+    try {
+      return await buildSearchIndex(contentBase)
+    } catch (_) {
+      // If that also fails, propagate the original worker error.
+      throw err
+    }
+  }
 }
 
 /**

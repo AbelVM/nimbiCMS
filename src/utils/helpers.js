@@ -58,6 +58,170 @@ export function setLazyload(img) {
 }
 
 /**
+ * Add a preload link for an image URL to the document head.
+ *
+ * This is used to give browsers an early hint to fetch images that are
+ * determined to be above-the-fold (eager) by `setEagerForAboveFoldImages`.
+ *
+ * @param {string} url - Absolute or relative URL to preload.
+ */
+function preloadImage(url) {
+  try {
+    if (!url || typeof document === 'undefined' || !document.head) return
+    // Avoid preloading data URLs and updates that already exist
+    if (url.startsWith('data:')) return
+    const existing = document.head.querySelector(`link[rel="preload"][as="image"][href="${url}"]`)
+    if (existing) return
+    const link = document.createElement('link')
+    link.rel = 'preload'
+    link.as = 'image'
+    link.href = url
+    document.head.appendChild(link)
+  } catch (_) {
+    // ignore
+  }
+}
+
+/**
+ * Mark images that are above the fold as eager and high priority.
+ *
+ * This runs in a best-effort fashion: it scans all images within `container`,
+ * determines which ones appear (or will appear) within the visible portion of
+ * the container, and applies `loading="eager"` + `fetchpriority="high"`.
+ *
+ * The function also defaults every image to `loading="lazy"` unless
+ * otherwise marked eager.
+ *
+ * @param {HTMLElement} container - Root element containing the images.
+ * @param {number} [marginPx=0] - Extra pixels past the visible bottom that should still be considered above-the-fold.
+ * @param {boolean} [debug=false] - If true, logs debug info for each image.
+ */
+export function setEagerForAboveFoldImages(container, marginPx = 0, debug = false) {
+  try {
+    if (typeof window === 'undefined' || !container || !container.querySelectorAll) return
+
+    const imgs = Array.from(container.querySelectorAll('img'))
+    if (!imgs.length) return
+
+    const viewportEl = container
+    const viewportRect = viewportEl && viewportEl.getBoundingClientRect ? viewportEl.getBoundingClientRect() : null
+
+    const winTop = 0
+    const winBottom = (typeof window !== 'undefined') ? (window.innerHeight || document.documentElement.clientHeight || 0) : 0
+
+    const visibleTop = viewportRect ? Math.max(winTop, viewportRect.top) : winTop
+    const visibleBottomBase = viewportRect ? Math.min(winBottom, viewportRect.bottom) : winBottom
+    const visibleBottom = visibleBottomBase + Number(marginPx || 0)
+
+    let viewportHeight = 0
+    if (viewportEl) {
+      viewportHeight = viewportEl.clientHeight || (viewportRect ? viewportRect.height : 0)
+    }
+    if (!viewportHeight) {
+      viewportHeight = (winBottom - winTop)
+    }
+
+    let maxHeightRatio = 0.6
+    try {
+      const css = viewportEl && window.getComputedStyle ? window.getComputedStyle(viewportEl) : null
+      const ratio = css && css.getPropertyValue('--nimbi-image-max-height-ratio')
+      const parsed = ratio ? parseFloat(ratio) : NaN
+      if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 1) maxHeightRatio = parsed
+    } catch (_) {
+      // ignore
+    }
+
+    const maxImageHeight = Math.max(200, Math.floor(viewportHeight * maxHeightRatio))
+
+    let foundAboveFold = false
+    let firstVisibleImage = null
+
+    imgs.forEach(img => {
+      try {
+        const beforeLoading = img.getAttribute ? img.getAttribute('loading') : undefined
+        if (beforeLoading !== 'eager' && img.setAttribute) img.setAttribute('loading', 'lazy')
+
+        const rect = img.getBoundingClientRect ? img.getBoundingClientRect() : null
+        const src = img.src || (img.getAttribute && img.getAttribute('src'))
+
+        const effectiveHeight = rect && rect.height > 1 ? rect.height : maxImageHeight
+        const effectiveTop = rect ? rect.top : 0
+        const effectiveBottom = effectiveTop + effectiveHeight
+
+        const isAboveFold = Boolean(
+          rect &&
+          effectiveHeight > 0 &&
+          effectiveTop <= visibleBottom &&
+          effectiveBottom >= visibleTop
+        )
+
+        if (isAboveFold) {
+          if (img.setAttribute) {
+            img.setAttribute('loading', 'eager')
+            img.setAttribute('fetchpriority', 'high')
+            img.setAttribute('data-eager-by-nimbi', '1')
+          } else {
+            img.loading = 'eager'
+            img.fetchPriority = 'high'
+          }
+          preloadImage(src)
+          foundAboveFold = true
+        }
+
+        if (!firstVisibleImage && rect && rect.top <= visibleBottom) {
+          firstVisibleImage = { img, src, rect, beforeLoading }
+        }
+
+        if (debug) {
+          console.log('[helpers] setEagerForAboveFoldImages:', {
+            src,
+            rect,
+            marginPx,
+            visibleTop,
+            visibleBottom,
+            beforeLoading,
+            isAboveFold,
+            effectiveHeight,
+            maxImageHeight
+          })
+        }
+      } catch (_) {
+        // ignore per-image errors
+      }
+    })
+
+    if (!foundAboveFold && firstVisibleImage) {
+      const { img, src, rect, beforeLoading } = firstVisibleImage
+      try {
+        if (img.setAttribute) {
+          img.setAttribute('loading', 'eager')
+          img.setAttribute('fetchpriority', 'high')
+          img.setAttribute('data-eager-by-nimbi', '1')
+        } else {
+          img.loading = 'eager'
+          img.fetchPriority = 'high'
+        }
+        if (debug) {
+          console.log('[helpers] setEagerForAboveFoldImages (fallback first visible):', {
+            src,
+            rect,
+            marginPx,
+            visibleTop,
+            visibleBottom,
+            beforeLoading,
+            fallback: true
+          })
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+  } catch (err) {
+    console.warn('[helpers] setEagerForAboveFoldImages failed', err)
+  }
+}
+
+/**
  * Join multiple path segments ensuring there is exactly one slash between
  * them and no leading/trailing slashes on the result (unless the first
  * segment starts with a slash, in which case the result is absolute).

@@ -124,7 +124,7 @@ function lazyLoadImages(el, pagePath, contentBase) {
         try {
           const resolved = new URL(pageDirForImgs + src, contentBase).toString()
           img.src = resolved
-          try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (err) { console.warn('[htmlBuilder] set image loading attribute failed', err) }
+          try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (err) { console.warn('[htmlBuilder] set image loading attribute failed', err) }
         } catch (err) { console.warn('[htmlBuilder] resolve image src failed', err) }
       })
     }
@@ -454,7 +454,7 @@ function parseHtml(raw) {
     addHeadingIds(doc)
     try {
       const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (err) { console.warn('[htmlBuilder] parseHtml set image loading attribute failed', err) } })
+      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (err) { console.warn('[htmlBuilder] parseHtml set image loading attribute failed', err) } })
     } catch (err) { console.warn('[htmlBuilder] parseHtml query images failed', err) }
     const codes = doc.querySelectorAll('pre code, code[class]')
     codes.forEach(codeEl => {

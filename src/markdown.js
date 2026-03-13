@@ -94,7 +94,7 @@ export async function parseMarkdownToHtml(md) {
 
           try {
             const imgs = doc.querySelectorAll('img')
-            imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
+            imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
           } catch (e) { console.warn('[markdown] query images failed', e) }
 
           try {
@@ -163,7 +163,7 @@ export async function parseMarkdownToHtml(md) {
 
     try {
       const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
+      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
     } catch (e) { console.warn('[markdown] query images failed', e) }
 
     try {

@@ -332,6 +332,7 @@ export function isExternalLink(href: string): boolean
 export function normalizePath(p: string): string
 export function trimTrailingSlash(u: string): string
 export function ensureTrailingSlash(u: string): string
+export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): any
 export function encodeURL(u: string): string
 export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
 

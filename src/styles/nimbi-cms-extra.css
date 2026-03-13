@@ -62,8 +62,18 @@
     --nimbi-cms-height: calc(100% - var(--nimbi-site-navbar-height));
     /* fraction (number) used to limit menu-list height: default 0.8 = 80% */
     --nimbi-menu-max-ratio: 0.6;
+    /* fraction (number) used to limit image height: default 0.6 = 60% */
+    --nimbi-image-max-height-ratio: 0.6;
     height: var(--nimbi-cms-height);
     overflow: auto;
+}
+
+/* Ensure images don’t overflow the “above the fold” viewport area. */
+.nimbi-cms img {
+    max-height: calc(var(--nimbi-cms-height) * var(--nimbi-image-max-height-ratio, 0.6));
+    width: auto;
+    height: auto;
+    object-fit: contain;
 }
 
 .nimbi-content {

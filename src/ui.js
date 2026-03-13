@@ -10,6 +10,7 @@ export { addHook, onPageLoad, onNavBuild, transformHtml, runHooks, _clearHooks }
 
 import { fetchPageData } from './router.js'
 import { prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton, createNavTree } from './htmlBuilder.js'
+import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 
 /**
@@ -84,6 +85,14 @@ export function createUI(opts) {
 
     contentWrap.appendChild(article)
 
+    try {
+      setEagerForAboveFoldImages(container, 100, false)
+      requestAnimationFrame(() => setEagerForAboveFoldImages(container, 100, false))
+      setTimeout(() => setEagerForAboveFoldImages(container, 100, false), 250)
+    } catch (e) {
+      console.warn('[nimbi-cms] setEagerForAboveFoldImages failed', e)
+    }
+
     scrollToAnchorOrTop(anchor)
     ensureScrollTopButton(article, topH1, { mountOverlay, container, navWrap, t })
 
@@ -104,6 +113,59 @@ export function createUI(opts) {
   }
 
   window.addEventListener('popstate', renderByQuery)
+
+  const scrollStoreKey = () => `nimbi-cms-scroll:${location.pathname}${location.search}`
+
+  const saveScrollPosition = () => {
+    try {
+      const containerEl = container || document.querySelector('.nimbi-cms')
+      if (!containerEl) return
+      const data = {
+        top: containerEl.scrollTop || 0,
+        left: containerEl.scrollLeft || 0
+      }
+      sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data))
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  const restoreScrollPosition = () => {
+    try {
+      const containerEl = container || document.querySelector('.nimbi-cms')
+      if (!containerEl) return
+      const stored = sessionStorage.getItem(scrollStoreKey())
+      if (!stored) return
+      const data = JSON.parse(stored)
+      if (data && typeof data.top === 'number') {
+        containerEl.scrollTo({ top: data.top, left: (data.left || 0), behavior: 'auto' })
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // When the page is restored from bfcache, restore scroll position and re-run
+  // the eager-image marker so images keep the expected loading priority.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      try {
+        restoreScrollPosition()
+        setEagerForAboveFoldImages(container, 100, false)
+      } catch (e) {
+        console.warn('[nimbi-cms] bfcache restore failed', e)
+      }
+    }
+  })
+
+  // Store scroll position whenever the page is about to be hidden.
+  window.addEventListener('pagehide', () => {
+    try {
+      saveScrollPosition()
+    } catch (e) {
+      console.warn('[nimbi-cms] save scroll position failed', e)
+    }
+  })
 
   return { renderByQuery, siteNav, getCurrentPagePath: () => currentPagePath }
 }
