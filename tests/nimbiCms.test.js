@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import initCMS, { addHook, onPageLoad, onNavBuild, transformHtml, _clearHooks } from '../src/nimbi-cms.js'
 import * as slugMgr from '../src/slugManager.js'
 import * as router from '../src/router.js'
-import * as files from '../src/filesManager.js'
 import { t, setLang, currentLang } from '../src/l10nManager.js'
 
 // minimal DOM support
@@ -68,7 +67,6 @@ describe('initCMS option handling', () => {
     // reset any existing setting so tests don't interfere
     slugMgr.setDefaultCrawlMaxQueue(slugMgr.CRAWL_MAX_QUEUE)
     slugMgr.clearFetchCache()
-    files.clearFetchCache && files.clearFetchCache()
     document.body.innerHTML = ''
     global.fetch = vi.fn(async (url) => {
       // simple stub for _home.md and any other page

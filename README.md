@@ -124,7 +124,7 @@ Recent behaviour fixes worth knowing:
 - Client-side rendering of GitHub‑flavored Markdown.
 - Optional client-side search box built from H1 titles and excerpts (enabled by default).
 - Code is now organized into small modules (`router.js`, `markdown.js`,
-  `filesManager.js`, etc.) to ease maintenance and testing.
+  `router.js`, `markdown.js`, etc.) to ease maintenance and testing.
 - Sticky per-page TOC and Bulma‑based UI components (navbar, menu).
 - Runtime updates for SEO, Open Graph and Twitter meta tags.
 - Syntax highlighting using `highlight.js` — only JS is bundled; other

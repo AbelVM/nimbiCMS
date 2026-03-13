@@ -99,7 +99,7 @@ export { initCMS } from './init.js'
 export { initCMS as default } from './init.js'
 // TOC builder moved to src/htmlBuilder.js
 
-// slugify moved to src/filesManager.js
+// slugify moved to src/slugManager.js
 
 // SEO helpers moved to src/seoManager.js
 

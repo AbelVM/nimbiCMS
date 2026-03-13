@@ -16,9 +16,7 @@ import {
   rewriteAnchors as _rewriteAnchors,
   rewriteAnchorsWorker
 } from '../src/htmlBuilder.js'
-import { slugify, slugToMd, mdToSlug } from '../src/filesManager.js'
-import * as fm from '../src/filesManager.js'
-import * as filesManager from '../src/filesManager.js'
+import { slugify, slugToMd, mdToSlug, searchIndex } from '../src/slugManager.js'
 import * as slugMgr from '../src/slugManager.js'
 import initCMS from '../src/nimbi-cms.js'
 
@@ -42,6 +40,8 @@ describe('htmlBuilder utilities', () => {
     // clear maps before each test
     slugToMd.clear()
     mdToSlug.clear()
+    // clear any search index state from prior tests
+    searchIndex.splice(0)
     // remove any leftover container or scroll button elements from prior runs
     document.querySelectorAll('.nimbi-cms, .nimbi-scroll-top').forEach(el => el.remove())
   })
@@ -160,7 +160,7 @@ describe('htmlBuilder utilities', () => {
     // clear any previous indexing state
     slugToMd.clear()
     mdToSlug.clear()
-    fm.searchIndex.splice(0)
+    searchIndex.splice(0)
 
     const fakeNavMd = { raw: '- [Home](_home.md)\n- [Foo](foo.md)' }
     // stub global.fetch so both navigation and individual pages resolve
@@ -435,7 +435,7 @@ describe('htmlBuilder utilities', () => {
     const spy = vi.spyOn(htmlBuilder, 'initAnchorWorker').mockReturnValue(null)
     const article = document.createElement('article')
     article.innerHTML = '<a href="foo.md">x</a>'
-    const { slugToMd, mdToSlug } = await import('../src/filesManager.js')
+    const { slugToMd, mdToSlug } = await import('../src/slugManager.js')
     slugToMd.set('foo', 'foo.md')
     mdToSlug.set('foo.md', 'foo')
     await htmlBuilder.rewriteAnchorsWorker(article, 'http://base/', '')
@@ -449,7 +449,7 @@ describe('htmlBuilder utilities', () => {
     htmlBuilder.initAnchorWorker && htmlBuilder.initAnchorWorker()
     const article = document.createElement('article')
     article.innerHTML = '<a href="foo.md">x</a>'
-    const { slugToMd, mdToSlug } = await import('../src/filesManager.js')
+    const { slugToMd, mdToSlug } = await import('../src/slugManager.js')
     slugToMd.set('foo', 'foo.md')
     mdToSlug.set('foo.md', 'foo')
     await htmlBuilder.rewriteAnchorsWorker(article, 'http://base/', '')
@@ -485,10 +485,4 @@ describe('htmlBuilder utilities', () => {
     expect(document.querySelector('.nimbi-scroll-top')).toBeTruthy()
   })
 
-  it('filesManager is a thin re-export of slugManager', () => {
-    // fm already statically imported above
-    // slugMgr already statically imported above
-    expect(fm.slugify).toBe(slugMgr.slugify)
-    expect(fm.buildSearchIndex).toBe(slugMgr.buildSearchIndex)
-  })
 })

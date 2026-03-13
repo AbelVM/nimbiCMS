@@ -80,7 +80,7 @@ export function setMarkdownExtensions(plugins) {
   } catch (e) { console.warn('[markdown] failed to apply markdown extensions', e) }
 }
 import { parseFrontmatter } from './utils/frontmatter.js'
-import { slugify } from './filesManager.js'
+import { slugify } from './slugManager.js'
 import hljs from 'highlight.js/lib/core'
 import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
 

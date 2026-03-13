@@ -18,7 +18,7 @@ describe('anchor worker API (direct invocation)', () => {
     // simple HTML with one markdown link that should be rewritten to ?page=foo
     const html = '<a href="foo.md">x</a>'
     // ensure slug maps so rewriteAnchors can act
-    const { slugToMd, mdToSlug } = await import('../src/filesManager.js')
+    const { slugToMd, mdToSlug } = await import('../src/slugManager.js')
     slugToMd.set('foo', 'foo.md')
     mdToSlug.set('foo.md', 'foo')
     handler({ data: { type: 'rewriteAnchors', id: '1', html, contentBase: 'http://base/', pagePath: '' } })

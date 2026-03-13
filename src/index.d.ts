@@ -189,6 +189,7 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 // --- from src/slugManager.js
+export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): any
 
 
 
@@ -294,9 +295,6 @@ export function simpleUnion(): string|number
 export function recordExample(): Record<string, number[]>
 export function sum(opts: any): {sum:number}
 export function callIt(cb: (...args:any[])=>any): void
-
-// --- from src/filesManager.js
-
 
 // --- from src/codeblocksManager.js
 export const HLJS_ALIAS_MAP: Record<string,string>

@@ -1,38 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-// stub fetchMarkdown so tests do not make network requests
-vi.mock('../src/filesManager.js', async () => {
-  const actual = await vi.importActual('../src/filesManager.js')
-  // explicitly re-export helpers to avoid missing functions when the mock is used
-  return {
-    ...actual,
-    fetchMarkdown: vi.fn(),
-    slugToMd: actual.slugToMd,
-    mdToSlug: actual.mdToSlug,
-    allMarkdownPaths: actual.allMarkdownPaths,
-    fetchCache: actual.fetchCache,
-    clearFetchCache: actual.clearFetchCache || actual.clearCache,
-    slugify: actual.slugify,
-  }
-})
-
 import * as router from '../src/router.js'
-import * as files from '../src/filesManager.js'
 import * as slugMgr from '../src/slugManager.js'
 import { setLang } from '../src/l10nManager.js'
 
+const originalFetchMarkdown = slugMgr.fetchMarkdown
+
 describe('router module', () => {
   beforeEach(() => {
-    files.slugToMd.clear()
-    files.mdToSlug.clear()
+    slugMgr.slugToMd.clear()
+    slugMgr.mdToSlug.clear()
     // reset language to english to avoid bleed from other tests
     setLang('en')
     // also clear router's internal index cache so each test starts fresh
     router._clearIndexCache()
     // clear the resolution cache map
     router.resolutionCache.clear()
-    ;(files.fetchMarkdown).mockReset()
-    // stub network fetch to avoid real HTTP during tests
+
+    // restore original fetchMarkdown implementation and cache
+    slugMgr.setFetchMarkdown(originalFetchMarkdown)
+    slugMgr.fetchCache.clear()
+
+    // default fetchMarkdown stub rejects like a missing page; tests override when needed.
+    slugMgr.setFetchMarkdown(vi.fn().mockRejectedValue(new Error('failed to fetch md')))
+
+    // default network stub: 404 for any unexpected fetch call
     const stub = vi.fn((url) => {
       const res = { ok: false, status: 404, text: () => Promise.resolve('') }
       res.clone = () => res
@@ -74,12 +66,12 @@ describe('router module', () => {
   })
 
   it('buildPageCandidates returns slug mapping and handles missing extensions', () => {
-    files.slugToMd.set('foo', 'foo.md')
-    files.mdToSlug.set('foo.md', 'foo')
+    slugMgr.slugToMd.set('foo', 'foo.md')
+    slugMgr.mdToSlug.set('foo.md', 'foo')
     expect(router.buildPageCandidates('foo')).toEqual(['foo.md'])
     // when slugToMd value lacks extension we should still try .html
-    files.slugToMd.set('bar', 'bar')
-    files.mdToSlug.set('bar', 'bar')
+    slugMgr.slugToMd.set('bar', 'bar')
+    slugMgr.mdToSlug.set('bar', 'bar')
     expect(router.buildPageCandidates('bar')).toEqual(['bar', 'bar.html'])
     // when no mapping exists, a bare slug should probe common extensions
     expect(router.buildPageCandidates('baz')).toEqual(['baz.html', 'baz.md'])
@@ -88,7 +80,7 @@ describe('router module', () => {
   it('buildPageCandidates respects current language setting', () => {
     // simulate multilingual slug map object
     slugMgr.setLanguages(['en', 'fr'])
-    files.slugToMd.set('foo', { default: 'foo.md', langs: { en: 'en/foo.md', fr: 'fr/foo.md' } })
+    slugMgr.slugToMd.set('foo', { default: 'foo.md', langs: { en: 'en/foo.md', fr: 'fr/foo.md' } })
     // default Lang is en
     expect(router.buildPageCandidates('foo')).toEqual(['en/foo.md'])
     setLang('fr')
@@ -97,8 +89,10 @@ describe('router module', () => {
 
   it('fetchPageData respects language-aware slug mappings', async () => {
     slugMgr.setLanguages(['en', 'fr'])
-    files.slugToMd.set('foo', { default: 'foo.md', langs: { en: 'en/foo.md', fr: 'fr/foo.md' } })
-    files.fetchMarkdown.mockResolvedValue({ raw: '# Hi', isHtml: false })
+    slugMgr.slugToMd.set('foo', { default: 'foo.md', langs: { en: 'en/foo.md', fr: 'fr/foo.md' } })
+    const mockFetch = vi.fn().mockResolvedValue({ raw: '# Hi', isHtml: false })
+    slugMgr.setFetchMarkdown(mockFetch)
+
     const base = '/content/'
     // initial language en
     let result = await router.fetchPageData('foo', base)
@@ -110,21 +104,21 @@ describe('router module', () => {
   })
 
   it('fetchPageData resolves slugToMd entries, caches results, and uses supplied base without hardcoded paths', async () => {
-    files.slugToMd.set('slug', 'page.md')
+    slugMgr.slugToMd.set('slug', 'page.md')
     const fakeData = { raw: '# Hello', isHtml: false }
-    files.fetchMarkdown.mockResolvedValue(fakeData)
+    slugMgr.fetchMarkdown.mockResolvedValue(fakeData)
 
     const base = '/my/content/'
     const result = await router.fetchPageData('slug', base)
     expect(result.pagePath).toBe('page.md')
     expect(result.data).toBe(fakeData)
-    expect(files.fetchMarkdown).toHaveBeenCalledWith('page.md', base)
+    expect(slugMgr.fetchMarkdown).toHaveBeenCalledWith('page.md', base)
 
     // second call will use cached slug but still invoke fetchMarkdown for content
-    files.fetchMarkdown.mockClear()
+    slugMgr.fetchMarkdown.mockClear()
     const result2 = await router.fetchPageData('slug', base)
     expect(result2.pagePath).toBe('page.md')
-    expect(files.fetchMarkdown).toHaveBeenCalled()
+    expect(slugMgr.fetchMarkdown).toHaveBeenCalled()
   })
 
   it('tryDiscoverFromIndex falls back to scanning allMarkdownPaths', async () => {
@@ -133,7 +127,7 @@ describe('router module', () => {
     // inform router about the new path (mirrors what setContentBase does)
     router.refreshIndexPaths()
     const fakeMd = { raw: '# Test Page' }
-    files.fetchMarkdown.mockResolvedValue(fakeMd)
+    slugMgr.fetchMarkdown.mockResolvedValue(fakeMd)
 
     const result = await router.fetchPageData('test-page', '/content/')
     expect(result.pagePath).toBe('blog/test.md')
@@ -144,13 +138,13 @@ describe('router module', () => {
     router.allMarkdownPaths.splice(0, router.allMarkdownPaths.length, 'new/path.md')
     const fakeMd = { raw: '# New Path' }
     // only succeed for the exact normalized path; everything else fails
-    files.fetchMarkdown.mockImplementation((path, base) => {
+    slugMgr.fetchMarkdown.mockImplementation((path, base) => {
       if (path === 'new/path.md') return Promise.resolve(fakeMd)
       return Promise.reject(new Error('not found'))
     })
 
-    // without refresh we should still get not-found (candidates from extension fallback may exist)
-    await expect(router.fetchPageData('new-path', '/content/')).rejects.toThrow('not found')
+    // without refresh we should still get page-data-not-found (candidates from extension fallback may exist)
+    await expect(router.fetchPageData('new-path', '/content/')).rejects.toThrow('no page data')
 
     // clear cached result so lookup happens again, then tell router about
     // the updated paths and retry
@@ -168,7 +162,7 @@ describe('router module', () => {
     const base = '/content/'
     const fakeData = { raw: '# Yo' }
     // stub fetchMarkdown: succeed on first (.html) and later (for sanity)
-    files.fetchMarkdown
+    slugMgr.fetchMarkdown
       .mockImplementation((path) => {
         if (path === 'bare.html') return Promise.resolve(fakeData)
         return Promise.reject(new Error('not found'))
@@ -177,8 +171,8 @@ describe('router module', () => {
     expect(res.pagePath).toBe('bare.html')
     expect(res.data).toBe(fakeData)
     // verify we attempted at least the html variant first
-    expect(files.fetchMarkdown).toHaveBeenCalledWith('bare.html', base)
-    expect(files.fetchMarkdown).not.toHaveBeenCalledWith('bare.md', base)
+    expect(slugMgr.fetchMarkdown).toHaveBeenCalledWith('bare.html', base)
+    expect(slugMgr.fetchMarkdown).not.toHaveBeenCalledWith('bare.md', base)
   })
 
 })

@@ -1,4 +1,4 @@
-import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug, resolveSlugPath } from './filesManager.js'
+import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug, resolveSlugPath } from './slugManager.js'
 import * as l10n from './l10nManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 
@@ -209,7 +209,7 @@ export function _purgeExpiredEntries() {
  * programs that need to enumerate available pages.
  * @type {string[]}
  */
-export { allMarkdownPaths } from './filesManager.js'
+export { allMarkdownPaths } from './slugManager.js'
 
 // helpers scoped to this module ------------------------------------------------
 
@@ -447,7 +447,8 @@ export async function fetchPageData(raw, contentBase) {
 
   if (!data) {
     // throw here so caller can decide how to display not-found message
-    throw lastErr || new Error('no page data')
+    // Normalize errors to a consistent value for callers.
+    throw new Error('no page data')
   }
 
   return { data, pagePath, anchor }

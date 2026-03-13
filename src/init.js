@@ -5,7 +5,7 @@
  * delegating navigation and UI behaviour to helper modules.
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage } from './filesManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage } from './slugManager.js'
 import * as router from './router.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
@@ -227,7 +227,7 @@ export async function initCMS(options = {}) {
   try {
     if (typeof crawlMaxQueue === 'number') {
        
-      import('./filesManager.js').then(({ setDefaultCrawlMaxQueue }) => {
+      import('./slugManager.js').then(({ setDefaultCrawlMaxQueue }) => {
         try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { console.warn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
       })
     }

@@ -1,4 +1,4 @@
-import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './filesManager.js'
+import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './slugManager.js'
 import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'

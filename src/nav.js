@@ -9,7 +9,7 @@ import { createNavTree } from './htmlBuilder.js'
 import { t } from './l10nManager.js'
 import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
 import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
-import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './filesManager.js'
+import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './slugManager.js'
 
 /**
  * @typedef {{path:string,name:string,isIndex?:boolean,children?:NavTreeItem[]}} NavTreeItem
@@ -216,7 +216,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const q = String(domInput && domInput.value || '').trim().toLowerCase();
         if (!q) { showResults([]); return; }
         try {
-          const fm = await import('./filesManager.js');
+          const fm = await import('./slugManager.js');
           if (!searchIndexPromise) {
             searchIndexPromise = (async () => {
               try {
@@ -253,7 +253,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       try {
         searchIndexPromise = (async () => {
           try {
-            const fm = await import('./filesManager.js')
+            const fm = await import('./slugManager.js')
             const idx = await fm.buildSearchIndex(contentBase)
             if (!indexedCountLog) {
               indexedCountLog = true
@@ -397,7 +397,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const q = String(searchInput.value || '').trim().toLowerCase()
         if (!q) { showResults([]); return }
         try {
-          const fm = await import('./filesManager.js')
+          const fm = await import('./slugManager.js')
           if (!searchIndexPromise) {
             searchIndexPromise = (async () => {
               try {

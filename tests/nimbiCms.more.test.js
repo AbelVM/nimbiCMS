@@ -3,7 +3,7 @@ import { it, expect, vi } from 'vitest'
 // Ensure module mocks are set before importing nimbi-cms
 vi.resetModules()
 
-vi.mock('../src/filesManager.js', () => {
+vi.mock('../src/slugManager.js', () => {
   const slugToMd = new Map()
   const mdToSlug = new Map()
   return {
@@ -25,12 +25,18 @@ vi.mock('../src/filesManager.js', () => {
 
 vi.mock('../src/bulmaManager.js', () => ({ ensureBulma: async () => {}, setStyle: () => {} }))
 vi.mock('../src/markdown.js', async () => ({ parseMarkdownToHtml: async (md) => ({ html: String(md || '') }) }))
-vi.mock('../src/router.js', () => ({ setResolutionCacheTtl: () => {}, setResolutionCacheMax: () => {}, RESOLUTION_CACHE_TTL: 0, RESOLUTION_CACHE_MAX: 0 }))
+vi.mock('../src/router.js', () => ({
+  setResolutionCacheTtl: () => {},
+  setResolutionCacheMax: () => {},
+  RESOLUTION_CACHE_TTL: 0,
+  RESOLUTION_CACHE_MAX: 0,
+  fetchPageData: async () => ({ pagePath: '_home.md', data: { raw: '# home' } }),
+}))
 
 it('initCMS processes navigation html links and populates slug maps', async () => {
   // DOM container
   document.body.innerHTML = '<div id="app"></div>'
-  const fm = await import('../src/filesManager.js')
+  const fm = await import('../src/slugManager.js')
   const { default: initCMS } = await import('../src/nimbi-cms.js')
 
   await expect(initCMS({ el: '#app', searchIndex: false })).resolves.toBeUndefined()

@@ -379,20 +379,6 @@ export function clearFetchCache() { fetchCache.clear() }
  * @type {(path: string, base?: string) => Promise<FetchResult>}
  */
 export let fetchMarkdown = async function(path, base) {
-  // If tests or other code have mocked/re-exported `fetchMarkdown` from
-  // `filesManager.js`, prefer that implementation. This dynamic import
-  // allows the test-suite to mock `../src/filesManager.js` and have the
-  // mocked `fetchMarkdown` used even when calling slugManager functions
-  // directly.
-  try {
-    const mod = await import('./filesManager.js')
-    if (mod && typeof mod.fetchMarkdown === 'function' && mod.fetchMarkdown !== fetchMarkdown) {
-      return mod.fetchMarkdown(path, base)
-    }
-  } catch (e) {
-    // ignore and fall through to local implementation
-  }
-
   if (!path) throw new Error('path required')
   try {
     const o = (String(path || '').match(/([^\/]+)\.md(?:$|[?#])/) || [])[1]
@@ -484,6 +470,17 @@ export let fetchMarkdown = async function(path, base) {
 
   fetchCache.set(url, promise)
   return promise
+}
+
+/**
+ * Override the internal fetchMarkdown implementation. Useful for tests or when
+ * consumers want to provide a bespoke fetch strategy.
+ * @param {(path:string, base?:string)=>Promise<FetchResult>} fn
+ */
+export function setFetchMarkdown(fn) {
+  if (typeof fn === 'function') {
+    fetchMarkdown = fn
+  }
 }
 
 // Cache results from crawl attempts so we don't re-scan directories.
