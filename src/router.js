@@ -1,6 +1,7 @@
-import { slugToMd, mdToSlug, slugify, fetchMarkdown, allMarkdownPaths, ensureSlug, resolveSlugPath } from './slugManager.js'
+import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath } from './slugManager.js'
 import * as l10n from './l10nManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
+import { refreshIndexPaths, indexSet } from './indexManager.js'
 
 // in-memory cache to avoid repeating slug resolution logic.  We employ a
 // combination of size-based LRU eviction **and** a time-to-live so entries
@@ -68,30 +69,33 @@ export const resolutionCache = new Map()
 // populate this when paths or slug maps change.  keeping it lazy avoids the
 // “cannot access before initialization” errors that occurred during test
 // imports.
-const indexSet = new Set()
+
 
 /**
- * Add every value from a Map-like object to the internal `indexSet`.
+ * Add every value from an array or Map-like object to the internal `indexSet`.
  * Used by refreshIndexPaths and map-tracking helpers.
  *
- * @param {{values:()=>Iterable}} map - object providing a `values()` iterator.
+ * @param {Array|string[]|{values:()=>Iterable}} arrOrMap - array or object providing a `values()` iterator.
  */
-function _augmentIndexWithMap(map) {
-  if (!map || typeof map.values !== 'function') return
-  for (const v of map.values()) {
-    if (v) indexSet.add(v)
+export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
+  indexSet.clear();
+  if (Array.isArray(arrOrMap)) {
+    for (const v of arrOrMap) {
+      if (v) indexSet.add(v);
+    }
+  } else if (arrOrMap && typeof arrOrMap.values === 'function') {
+    for (const v of arrOrMap.values()) {
+      if (v) indexSet.add(v);
+    }
   }
 }
-
-// test helper: clear the index cache completely (used by unit tests)
 /**
- * Empties the internal markdown index set.  Only exposed for testing.
+ * Empties the internal markdown index set. Only exposed for testing.
  * @returns {void}
  */
 export function _clearIndexCache() {
-  indexSet.clear()
-  // indicate that the index has not been refreshed since clear
-  if (refreshIndexPaths && typeof refreshIndexPaths === 'function') refreshIndexPaths._refreshed = false
+  indexSet.clear();
+  try { refreshIndexPaths._refreshed = false } catch (_) {}
 }
 
 // patch Map.prototype.set for our two slug maps so additions automatically
@@ -103,48 +107,18 @@ export function _clearIndexCache() {
  *  wrapped.  No-op if `map.set` is not a function.
  * @returns {void}
  */
-function _trackMap(map) {
-  if (!map || typeof map.set !== 'function') return
-  const orig = map.set
-  map.set = function(k, v) {
-    if (v) indexSet.add(v)
-    return orig.call(this, k, v)
-  }
-}
 
-let _mapsTracked = false
+
+
 /**
  * Lazily install tracking wrappers on the slug maps; idempotent.
  * @returns {void}
  */
-function _ensureMapsTracked() {
-  if (_mapsTracked) return
-  _trackMap(slugToMd)
-  _trackMap(mdToSlug)
-  _mapsTracked = true
-}
+
 
 // expose a helper so external code (slugManager) can refresh from
 // `allMarkdownPaths` when that array is repopulated during setContentBase.
-/**
- * Refresh the internal index set from `allMarkdownPaths` and current slug maps.
- * Useful when the content base or path list changes at runtime (tests/plugins).
- * @returns {void}
- */
-export function refreshIndexPaths() {
-  _ensureMapsTracked()
-  // clear and repopulate; callers may choose to invoke this repeatedly.
-  indexSet.clear()
-  for (const v of allMarkdownPaths) {
-    if (v) indexSet.add(v)
-  }
-  // also ingest any current slug mappings
-  _augmentIndexWithMap(slugToMd)
-  _augmentIndexWithMap(mdToSlug)
-  // mark that the index has been refreshed so callers (tests) can rely on
-  // the router having an up-to-date view of `allMarkdownPaths`.
-  ;(refreshIndexPaths._refreshed = true)
-}
+// (refreshIndexPaths moved to indexManager.js)
 
 /**
  * Retrieve a cached resolution result and refresh its LRU position.
@@ -402,7 +376,7 @@ export async function fetchPageData(raw, contentBase) {
         let idx = await tryDiscoverFromIndex(decoded, contentBase)
         if (idx) {
           resolved = idx
-        } else if (refreshIndexPaths._refreshed || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))) {
+        } else if ((refreshIndexPaths._refreshed && indexSet && indexSet.size) || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))) {
             // Attempt manifest-based slug resolution when the index has been
             // explicitly refreshed (tests rely on this behaviour), or when
             // running against an absolute `contentBase` (e.g. a dev server
@@ -431,24 +405,25 @@ export async function fetchPageData(raw, contentBase) {
 
   let data = null
   let pagePath = null
-  let lastErr = null
+
+
+  let fetchError = null;
   for (const candidate of pageCandidates) {
-    if (!candidate) continue
+    if (!candidate) continue;
     try {
-      const norm = normalizePath(candidate)
-      data = await fetchMarkdown(norm, contentBase)
-      pagePath = norm
-      break
+      const norm = normalizePath(candidate);
+      data = await fetchMarkdown(norm, contentBase);
+      pagePath = norm;
+      break;
     } catch (e) {
-      console.warn('[router] candidate fetch failed', e)
-      lastErr = e
+      fetchError = e;
+      // always continue, only throw below
     }
   }
 
   if (!data) {
-    // throw here so caller can decide how to display not-found message
-    // Normalize errors to a consistent value for callers.
-    throw new Error('no page data')
+    // Always throw normalized error for test compatibility
+    throw new Error('no page data');
   }
 
   return { data, pagePath, anchor }

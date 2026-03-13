@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as router from '../src/router.js'
 import * as slugMgr from '../src/slugManager.js'
 import { setLang } from '../src/l10nManager.js'
+import { refreshIndexPaths } from '../src/indexManager.js'
 
 const originalFetchMarkdown = slugMgr.fetchMarkdown
 
@@ -125,7 +126,7 @@ describe('router module', () => {
     // simulate a markdown file whose H1 slug matches
     router.allMarkdownPaths.splice(0, router.allMarkdownPaths.length, 'blog/test.md')
     // inform router about the new path (mirrors what setContentBase does)
-    router.refreshIndexPaths()
+    refreshIndexPaths()
     const fakeMd = { raw: '# Test Page' }
     slugMgr.fetchMarkdown.mockResolvedValue(fakeMd)
 
@@ -146,10 +147,15 @@ describe('router module', () => {
     // without refresh we should still get page-data-not-found (candidates from extension fallback may exist)
     await expect(router.fetchPageData('new-path', '/content/')).rejects.toThrow('no page data')
 
-    // clear cached result so lookup happens again, then tell router about
-    // the updated paths and retry
+    // Reset fetchMarkdown stub and clear cached result so lookup happens again
+    slugMgr.fetchMarkdown.mockClear()
     router.resolutionCache.clear()
-    router.refreshIndexPaths()
+    refreshIndexPaths()
+    // Ensure fetchMarkdown stub is still correct after cache clear
+    slugMgr.fetchMarkdown.mockImplementation((path, base) => {
+      if (path === 'new/path.md') return Promise.resolve(fakeMd)
+      return Promise.reject(new Error('not found'))
+    })
     const result = await router.fetchPageData('new-path', '/content/')
     expect(result.pagePath).toBe('new/path.md')
   })

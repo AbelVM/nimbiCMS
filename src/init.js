@@ -11,7 +11,7 @@ import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
 import { createUI } from './ui.js'
-import { runHooks } from './nimbi-cms.js'
+import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
 import { ensureBulma, setStyle } from './bulmaManager.js'
 

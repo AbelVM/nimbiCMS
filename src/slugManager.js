@@ -223,7 +223,7 @@ function _deriveCommonPrefix(paths) {
  * @param {string} [contentBase]
  * @returns {void}
  */
-import { refreshIndexPaths } from './router.js'
+import { refreshIndexPaths, indexSet } from './indexManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 
 export function setContentBase(contentBase) {

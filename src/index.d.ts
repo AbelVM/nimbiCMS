@@ -233,7 +233,7 @@ export function getSiteNameFromMeta(): string|null
 
 
 // --- from src/router.js
-
+export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array|string[]|{values:()=>Iterable}): any
 
 
 
@@ -247,11 +247,6 @@ export function getSiteNameFromMeta(): string|null
 
 
 // --- from src/nimbi-cms.js
-
-
-
-
-
 
 // --- from src/nav.js
 
@@ -276,6 +271,10 @@ export const currentHighlightTheme: string
 export const initialDocumentTitle: string
 
 
+// --- from src/indexManager.js
+export const indexSet: Set<string>
+
+
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
 export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
@@ -283,6 +282,14 @@ export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorE
 
 
 
+
+
+
+
+
+
+// --- from src/hookManager.js
+export function runHooks(name: string, ctx: object): Promise<void>
 
 
 
