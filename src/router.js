@@ -48,12 +48,6 @@ export function setResolutionCacheTtl(ms) {
 }
 
 /**
- * Modify the resolution cache time‑to‑live at runtime.
- * @param {number} ms
- * @returns {void}
- */
-
-/**
  * Resolution cache entry shape.
  * @typedef {{value:{resolved:string,anchor:string|null},ts:number}} ResolutionRecord
  */
@@ -101,19 +95,6 @@ export function _clearIndexCache() {
 // patch Map.prototype.set for our two slug maps so additions automatically
 // update the index set.  We only care about values (markdown paths);
 // keys are slugs which are not needed in the fallback search.
-/**
- * Instrument a map so that any value inserted also populates the index set.
- * @param {{set:function}} map - a Map-like object whose `set` method will be
- *  wrapped.  No-op if `map.set` is not a function.
- * @returns {void}
- */
-
-
-
-/**
- * Lazily install tracking wrappers on the slug maps; idempotent.
- * @returns {void}
- */
 
 
 // expose a helper so external code (slugManager) can refresh from

@@ -1,8 +1,19 @@
 {
-  "entryPoints": ["src"],
+  "entryPoints": [
+    "src"
+  ],
   "entryPointStrategy": "expand",
   "out": "docs",
-  "exclude": ["**/tests/**"],
+  "exclude": [
+    "**/tests/**"
+  ],
   "json": "docs-typedoc.json",
-  "disableSources": true
+  "disableSources": true,
+  "highlightLanguages": [
+    "javascript",
+    "typescript",
+    "html",
+    "markdown",
+    "bash"
+  ]
 }

@@ -36,4 +36,5 @@ coverage/
 *.tgz
 *.bak
 notes.md
+notes.txt
 docs-typedoc.json
