@@ -51,7 +51,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
   const title = (titleOverride && String(titleOverride).trim()) ? titleOverride : (meta.title || document.title)
   upsertMeta('property', 'og:title', title)
   const desc = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description || '')
-  upsertMeta('property', 'og:description', desc)
+  if (desc && String(desc).trim()) upsertMeta('property', 'og:description', desc)
   upsertMeta('name', 'twitter:card', meta.twitter_card || 'summary_large_image')
   const img = imageOverride || meta.image
   if (img) {
@@ -75,8 +75,8 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
 export function setMetaTags(data, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   const meta = data.meta || {}
   const existingHtmlDesc = (document && document.querySelector) ? (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '' : ''
-  const finalDesc = descOverride || meta.description || existingHtmlDesc || ''
-  setTag('description', finalDesc)
+  const finalDesc = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description && String(meta.description).trim()) ? meta.description : (existingHtmlDesc && String(existingHtmlDesc).trim()) ? existingHtmlDesc : ''
+  if (finalDesc && String(finalDesc).trim()) setTag('description', finalDesc)
   setTag('robots', meta.robots || 'index,follow')
   setOgTwitter(meta, titleOverride, imageOverride, finalDesc)
 }
@@ -204,20 +204,26 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
       let descOverride = ''
       try {
         let found = ''
-        if (h1Text) {
-          let sib = article.querySelector('h1')?.nextElementSibling
-          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
-            if (sib.tagName && sib.tagName.toLowerCase() === 'p') {
+        try {
+          // Prefer the text between the first H1 and the first H2
+          const h1El = topH1 || (article && article.querySelector ? article.querySelector('h1') : null)
+          if (h1El) {
+            let sib = h1El.nextElementSibling
+            const parts = []
+            while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
               const txt = (sib.textContent || '').trim()
-              if (txt) { found = txt; break }
+              if (txt) parts.push(txt)
+              sib = sib.nextElementSibling
             }
-            sib = sib.nextElementSibling
+            if (parts.length) {
+              found = parts.join(' ').replace(/\s+/g, ' ').trim()
+            }
+            // if no text between h1 and h2, fallback to the h1 text
+            if (!found && h1Text) found = String(h1Text).trim()
           }
-        }
-        if (!found) {
-          const existingDescTag = document.querySelector('meta[name="description"]')
-          found = existingDescTag && existingDescTag.getAttribute ? (existingDescTag.getAttribute('content') || '') : ''
-        }
+        } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
+        // limit length to a reasonable snippet
+        if (found && String(found).length > 160) found = String(found).slice(0, 157).trim() + '...'
         descOverride = found
       } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
 
