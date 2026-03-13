@@ -113,17 +113,16 @@ git fetch origin && git checkout main && git reset --hard origin/main
 
 * remove excess of inline comments
 
-
-
-
 * Replace silent catches with structured logging or rethrow where appropriate. Replace broad empty catch {} 
   blocks with catch (e) { /* log or comment */ } so future debuggers have context.
 
 
 
-* nimbi-cms is higher than nimbi-mount because the nav bar height is not taken into account
+* in the rendered page, nimbi-cms is higher than nimbi-mount because the nav bar height is not taken into account
 
 * toc should have max height and be scrollable if overflown
+
+* in the mobile view, the hamburger nav bar should close after one menu item is clicked
 
 * generate proper UMD, taking into account inline workers, dynamic imports, etc.
 
@@ -134,7 +133,12 @@ git fetch origin && git checkout main && git reset --hard origin/main
 * allow URL parameters
 
 
+* remove excess of inline comments in src but index.d.ts
 
+* Replace silent catches with structured logging or rethrow where appropriate. Replace broad empty catch {} 
+  blocks with catch (e) { /* log or comment */ } so future debuggers have context. (nav.js al final)
+
+* Add a bundle analysis (e.g., rollup-plugin-visualizer / Vite analyzer) if shipping to browser.
 
 
 Add lint rule(s):

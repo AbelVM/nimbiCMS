@@ -24,7 +24,6 @@ async function ensureHljs() {
     const mod = await import(HLJS_CDN_BASE + '/lib/core.js')
     hljs = mod.default || mod
   } catch (e) {
-    // if the CDN import fails we fall back to leaving `hljs` null and render code blocks without syntax highlighting.
     hljs = null
   }
   return hljs
@@ -47,7 +46,6 @@ marked.setOptions({
     highlighted: (code, lang) => {
     try {
       if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value
-      // Prefer plaintext if available; otherwise return raw code
       if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
         return hljs.highlight(code, { language: 'plaintext' }).value
       }

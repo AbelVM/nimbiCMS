@@ -1,8 +1,6 @@
 import 'bulma/css/bulma.min.css'
-// project-specific extra rules that should override/augment Bulma
 import './styles/nimbi-cms-extra.css'
 
-// track current theme style for Bulma overrides
 /** @type {'light'|'dark'} */
 let currentStyle = 'light'
 

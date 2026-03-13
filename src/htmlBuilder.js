@@ -1,5 +1,5 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './slugManager.js'
-import { detectFenceLanguages, parseMarkdownToHtml } from './markdown.js'
+import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 
@@ -387,7 +387,6 @@ export async function preMapMdSlugs(linkEls, contentBase) {
     try {
       const href = a.getAttribute('href') || ''
       if (!href) continue
-      // look for any markdown filename in the href (may include fragments & dirs)
       const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
       if (mdMatch) {
         let mdPathRaw = normalizePath(mdMatch[1])
@@ -472,8 +471,6 @@ function parseHtml(raw) {
           } catch (err) { console.warn('[htmlBuilder] schedule registerLanguage failed', err) }
         } else {
           try {
-            // no explicit language: prefer plaintext rendering if
-            // available, otherwise avoid auto-detection.
             if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
               const out = hljs.highlight ? hljs.highlight(codeEl.textContent || '', { language: 'plaintext' }) : null
               if (out && out.value) codeEl.innerHTML = out.value
@@ -499,7 +496,7 @@ function parseHtml(raw) {
  * @param {string} raw - markdown text to scan
  */
 async function ensureLanguages(raw) {
-  const langsArray = detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP)
+  const langsArray = (md.detectFenceLanguages ? md.detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP) : new Set())
   const langs = new Set(langsArray)
   const promises = []
   for (const l of langs) {
@@ -527,7 +524,14 @@ async function ensureLanguages(raw) {
  */
 async function parseMarkdown(raw) {
   await ensureLanguages(raw)
-  return await parseMarkdownToHtml(raw || '')
+  if (md.parseMarkdownToHtml) {
+    const parsed = await md.parseMarkdownToHtml(raw || '')
+    if (!parsed || typeof parsed !== 'object') return { html: String(raw || ''), meta: {}, toc: [] }
+    if (!Array.isArray(parsed.toc)) parsed.toc = []
+    if (!parsed.meta) parsed.meta = {}
+    return parsed
+  }
+  return { html: String(raw || ''), meta: {}, toc: [] }
 }
 
 /**
@@ -574,7 +578,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       await rewriteAnchorsWorker(article, contentBase, pagePath)
     } catch (err) {
       console.warn('[htmlBuilder] rewriteAnchorsWorker failed, falling back to main thread', err)
-      // fallback to in-thread implementation if worker fails
       await rewriteAnchors(article, contentBase, pagePath)
     }
 
@@ -584,7 +587,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     return { article, parsed, toc, topH1, h1Text, slugKey }
   }
 
-    // render an error page for unresolved queries
 export function renderNotFound(contentWrap, t, e) {
     if (contentWrap) contentWrap.innerHTML = ''
     const notFound = document.createElement('article')

@@ -91,10 +91,10 @@ export function joinPaths(...parts) {
 export function encodeURL(u) {
   try {
     const s = String(u || '')
-      // if the string already contains percent escapes, avoid double-encoding
     if (s.includes('%')) return s
     return encodeURI(s)
   } catch (_) {
+    console.warn('[helpers] encodeURL failed', _)
     return String(u || '')
   }
 }
@@ -111,11 +111,9 @@ export function encodeURL(u) {
 export function safe(fn) {
   try {
     const result = fn()
-    // if result is a promise, attach a catch handler so errors are swallowed
     if (result && typeof result.then === 'function') {
       return result.catch(e => {
         console.warn('[helpers] safe swallowed error', e)
-        // resolve to undefined so callers can await without throwing
         return undefined
       })
     }
@@ -125,7 +123,6 @@ export function safe(fn) {
   }
 }
 
-// make `safe` available globally in test environments that call it without importing
 try {
   if (typeof globalThis !== 'undefined' && !globalThis.safe) globalThis.safe = safe
 } catch (err) { console.warn('[helpers] global attach failed', err) }

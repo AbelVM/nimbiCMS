@@ -1,4 +1,8 @@
 /** Responsible for slug ↔ markdown mappings, slug generation, and runtime discovery. */
+/**
+ * Responsible for slug ↔ markdown mappings, slug generation,
+ * and runtime discovery.
+ */
 
 /**
  * Mapping from a slug (generated from title/H1) to a markdown path or a
@@ -15,10 +19,8 @@ export const slugToMd = new Map()
  * @typedef {{raw:string,isHtml?:boolean,status?:number}} FetchResult
  */
 
-// list of available language codes when running in a multilingual site.
 export let availableLanguages = []
 
-// helper for tests and plugins
 /**
  * Set available language codes for multilingual sites.
  * @param {string[]} list
@@ -29,22 +31,19 @@ export function setLanguages(list) {
 }
 export function getLanguages() { return availableLanguages }
 
-// import current UI language; slug resolution prefers this when available.
 import * as l10n from './l10nManager.js'
 
-// ------------------ worker support ----------------------------------------
-// Slug worker runs from inlined source so the published bundle remains a single JS file.
 let _slugWorker = null
 import slugWorkerCode from './worker/slugWorker.js?raw'
 
-/**
- * lazily create or return a singleton worker instance
- * @returns {Worker|null}
- */
 import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
 
 const _slugWorkerManager = makeWorkerManager(() => createWorkerFromRaw(slugWorkerCode), 'slugManager')
 
+/**
+ * Lazily return a worker instance used for slug-related background tasks.
+ * @returns {Worker|null}
+ */
 export function initSlugWorker() {
   return _slugWorkerManager.get()
 }
@@ -54,7 +53,7 @@ function _sendToWorker(msg) {
 }
 
 /**
- * Build search index using worker if available.
+ * Build the search index using the slug worker when available.
  * @param {string} contentBase
  * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>}
  */
@@ -65,7 +64,8 @@ export async function buildSearchIndexWorker(contentBase) {
 }
 
 /**
- * Crawl for slug using worker when possible.
+ * Attempt to resolve a slug via the worker when available, otherwise fallback
+ * to the main-thread `crawlForSlug` implementation.
  * @param {string} slug
  * @param {string} base
  * @param {number} maxQueue
@@ -77,10 +77,6 @@ export async function crawlForSlugWorker(slug, base, maxQueue) {
   return crawlForSlug(slug, base, maxQueue)
 }
 
-
-// helper used internally to add slug ↔ path mappings respecting
-// `availableLanguages`.  Normalizes existing entries to object form as
-// needed.  Exposed here only for tests.
 export function _storeSlugMapping(slug, rel) {
   if (!slug) return
   if (availableLanguages && availableLanguages.length) {
@@ -102,14 +98,17 @@ export function _storeSlugMapping(slug, rel) {
   }
 }
 
-// external slug resolver hooks.  Plugins can register async functions that
-// return a markdown path for a given slug.  These are checked before any
-// fallback logic.
 export const slugResolvers = new Set()
 /**
  * Register a custom resolver function.  The function should accept a slug
  * string and return a markdown path (or promise thereof) or `null` if not
  * resolved.
+ * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn
+ * @returns {void}
+ */
+/**
+ * Register a custom slug resolver function. The function should accept a
+ * slug (string) and return a markdown path (or promise thereof) or `null`.
  * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn
  * @returns {void}
  */
@@ -125,24 +124,6 @@ export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResol
  * @type {Map<string,string>}
  */
 export const mdToSlug = new Map()
-
-// build-time glob placeholder.  In a library build we intentionally keep
-// this empty to avoid bundling actual markdown; the `allMarkdownPaths`
-// array may still be populated by the build when running the example
-// application, which gives us a cheap way to resolve slugs for pages that
-// aren't linked in the navigation.
-//
-// build-time glob placeholder.  In a library build we intentionally keep
-// this empty to avoid bundling actual markdown; the `allMarkdownPaths`
-// array may still be populated by the build when running the example
-// application, which gives us a cheap way to resolve slugs for pages that
-// aren't linked in the navigation.
-//
-// Historically the example harness used a Vite plugin to embed the list of
-// all content files into the bundle so that the search index could be
-// pre‑populated at startup.  The user has opted to perform indexing at
-// runtime only, so that plugin is no longer used; `_allMd` stays empty in
-// normal operation.
 
 let _allMd = {}
 
@@ -165,38 +146,26 @@ export function setNotFoundPage(p) {
   notFoundPage = String(p || '')
 }
 
-// helper used by tests to simulate injection of markdown data
 /**
  * Replace internal manifest used by `setContentBase` with a custom object
  * (keyed by full path).  Intended for unit tests.
+ * @param {Object<string,string>} obj
+ */
+/**
+ * Replace internal manifest used by `setContentBase` with a custom object
+ * (keyed by full path). Intended for unit tests.
  * @param {Object<string,string>} obj
  */
 export function _setAllMd(obj) {
   _allMd = obj || {}
 }
 
-// Cache mapping discovered slugs from the `allMarkdownPaths` manifest to
-// their markdown path. Populated lazily when we fetch titles from the
-// manifest entries; storing it avoids repeated fetches during tests or
-// runtime lookups.
 /** @type {Map<string,string>} */
 export const listSlugCache = new Map()
-// Set of manifest paths we've already inspected and recorded in
-// `listSlugCache` so we don't re-fetch them.
 /** @type {Set<string>} */
 export const listPathsFetched = new Set()
-/**
- * Clear any cached slug lookups derived from the build-time manifest.
- * Useful in tests when `_allMd` is re‑injected.
- * @returns {void}
- */
 export function clearListCaches() { listSlugCache.clear(); listPathsFetched.clear() }
 
-/**
- * Derive the longest common directory prefix from an array of paths.
- * @param {string[]} paths
- * @returns {string}
- */
 function _deriveCommonPrefix(paths) {
   if (!paths || paths.length === 0) return ''
   let prefix = paths[0]
@@ -211,15 +180,15 @@ function _deriveCommonPrefix(paths) {
   return lastSlash === -1 ? prefix : prefix.slice(0, lastSlash + 1)
 }
 
+import { refreshIndexPaths, indexSet } from './indexManager.js'
+import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
+
 /**
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
  * maps and `allMarkdownPaths` relative to that base.
  * @param {string} [contentBase]
  * @returns {void}
  */
-import { refreshIndexPaths, indexSet } from './indexManager.js'
-import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
-
 export function setContentBase(contentBase) {
   slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
   availableLanguages = availableLanguages || []
@@ -231,15 +200,12 @@ export function setContentBase(contentBase) {
   try {
     if (contentBase) {
       try {
-        // If contentBase looks like an absolute URL, use its pathname
         if (/^[a-z][a-z0-9+.-]*:/i.test(String(contentBase))) {
           prefix = new URL(String(contentBase)).pathname
         } else {
-          // Treat path-like values ("/content/" or "content/") as-is
           prefix = String(contentBase || '')
         }
       } catch (err) {
-        // Fallback to the raw string when URL parsing fails
         prefix = String(contentBase || '')
         console.warn('[slugManager] parse contentBase failed', err)
       }
@@ -257,7 +223,6 @@ export function setContentBase(contentBase) {
       rel = normalizePath(fullPath)
     }
     allMarkdownPaths.push(rel)
-    // keep router index up to date with newly discovered markdown
     try { refreshIndexPaths() } catch (err) { console.warn('[slugManager] refreshIndexPaths failed', err) }
 
     const val = _allMd[fullPath]
@@ -292,19 +257,8 @@ export function setContentBase(contentBase) {
   }
 }
 
-// run an initial populate using whatever information is available at module
-// load time.  This avoids breaking tests that expect `allMarkdownPaths` to be
-// populated even if `initCMS` hasn't been called yet.
 try { setContentBase() } catch (err) { console.warn('[slugManager] initial setContentBase failed', err) }
 
-/**
- * Convert a string to a URL-friendly slug (lowercase, dashes).  In
- * addition to removing illegal characters we also strip any trailing
- * "md" or "html" segment to ensure that slugs never resemble filenames
- * (see tests and user documentation).
- * @param {string} s
- * @returns {string}
- */
 export function slugify(s) {
   let slug = String(s || '')
     .toLowerCase()
@@ -316,7 +270,7 @@ export function slugify(s) {
 
 /**
  * Given a slug, return the most appropriate markdown path taking the
- * current UI language and available language list into account.  If no
+ * current UI language and available language list into account. If no
  * mapping exists the return value is `null`.
  *
  * @param {string} slug
@@ -327,7 +281,6 @@ export function resolveSlugPath(slug) {
   const entry = slugToMd.get(slug)
   if (!entry) return null
   if (typeof entry === 'string') return entry
-  // entry is object with {default?, langs?}
   if (availableLanguages && availableLanguages.length && l10n.currentLang) {
     if (entry.langs && entry.langs[l10n.currentLang]) {
       return entry.langs[l10n.currentLang]
@@ -341,36 +294,11 @@ export function resolveSlugPath(slug) {
   return null
 }
 
-// Simple in-memory cache of `fetchMarkdown` responses keyed by the resolved URL.
-/** @type {Map<string, Promise<FetchResult>>} */
 export const fetchCache = new Map()
-/**
- * Empty the in-memory markdown fetch cache.  Useful for tests or when the
- * consumer knows the underlying files have changed.
- * @returns {void}
- */
 export function clearFetchCache() { fetchCache.clear() }
 
 /**
- * Fetch a markdown (or HTML) file from the content base, caching the
- * promise. Returns an object `{ raw, isHtml?, status? }`.
- *
- * Notes:
- * - If the server responds with a non-OK status (e.g. 404) the function
- *   will attempt to load `/_404.md` from the same `contentBase` and return
- *   it with `status: 404` when available.
- * - If a request for a `.md` path returns HTML (common when a static host
- *   falls back to `index.html` for unknown routes), this is treated as a
- *   missing markdown page rather than a successful fetch. In that case the
- *   function will try to load `/_404.md` so the CMS can render a proper
- *   404 page instead of showing the site's index HTML.
- *
- * @param {string} path
- * @param {string} base
- * @returns {Promise<{raw:string,isHtml?:boolean,status?:number}>}
- */
-/**
- * @type {(path: string, base?: string) => Promise<FetchResult>}
+ * @type {(path: string, base?: string) => Promise<FetchResult>
  */
 export let fetchMarkdown = async function(path, base) {
   if (!path) throw new Error('path required')
@@ -383,21 +311,17 @@ export let fetchMarkdown = async function(path, base) {
       }
     }
   } catch (err) { console.warn('[slugManager] slug mapping normalization failed', err) }
-  // defensively handle missing/various `base` shapes used by tests and callers
   const baseClean = base == null ? '' : trimTrailingSlash(String(base))
   let url = ''
   try {
     if (baseClean) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
-        // absolute URL base
         url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
       } else {
-        // path-like base ("/content" or "content")
         const leading = baseClean.startsWith('/') ? '' : '/'
         url = leading + baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
       }
     } else {
-      // no base provided -> treat as root-relative
       url = '/' + path.replace(/^\//, '')
     }
   } catch (err) {
@@ -441,11 +365,6 @@ export let fetchMarkdown = async function(path, base) {
     const looksLikeHtml = trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')
     const isHtml = looksLikeHtml || String(path || '').toLowerCase().endsWith('.html')
 
-    // If the request was for a `.md` file but the server returned HTML (often
-    // due to a SPA fallback like index.html), treat this as a missing markdown
-    // page rather than a successful fetch. In that case, try to load the
-    // site's `_404.md` and return it if available so the CMS can render a
-    // proper 404 page instead of showing the site's index HTML.
     if (looksLikeHtml && String(path || '').toLowerCase().endsWith('.md')) {
       try {
         const p404 = `${baseClean}/${notFoundPage}`
@@ -467,8 +386,8 @@ export let fetchMarkdown = async function(path, base) {
 }
 
 /**
- * Override the internal fetchMarkdown implementation. Useful for tests or when
- * consumers want to provide a bespoke fetch strategy.
+ * Override the internal fetchMarkdown implementation. Useful for tests
+ * or when consumers want to provide a bespoke fetch strategy.
  * @param {(path:string, base?:string)=>Promise<FetchResult>} fn
  */
 export function setFetchMarkdown(fn) {
@@ -477,193 +396,137 @@ export function setFetchMarkdown(fn) {
   }
 }
 
-// Cache results from crawl attempts so we don't re-scan directories.
-/**
- * Cache of crawl results keyed by decoded slug. Values are the discovered
- * relative markdown path or `null`, or a promise resolving to that.
- * @type {Map<string, Promise<string|null>|string|null>}
- */
 export const crawlCache = new Map()
 
-// Simple client-side search index generated from headings. Populated by
-// `buildSearchIndex`; stored here so UI components can query it directly.
 /** @type {Array<{slug:string,title:string,excerpt:string,path:string}>} */
 export let searchIndex = []
 
-/**
- * Build a lightweight search index by fetching every markdown page and
- * extracting the first H1 title plus a brief excerpt (first non-heading
- * paragraph).  Results are cached in `searchIndex` for subsequent queries.
- *
- * `contentBase` should be the same URL passed to `fetchMarkdown`.
- *
- * @param {string} contentBase
- * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>}
- */
 let _indexPromise = null
 export async function buildSearchIndex(contentBase) {
-  // if we've already built the index, just return it
   if (searchIndex && searchIndex.length) return searchIndex
-  // if a build is in progress, reuse its promise
   if (_indexPromise) return _indexPromise
 
   _indexPromise = (async () => {
-    // compile list of markdown paths to index.  normally this comes from
-  // `allMarkdownPaths`, which is populated at build time for the example and
-  // test harness.  library consumers ship without embedded content, so the
-  // array is empty; fall back to any paths we've learned via the slug maps
-  // (populated during navigation or crawling).
-  let paths = []
-  if (allMarkdownPaths && allMarkdownPaths.length) {
-    paths = Array.from(allMarkdownPaths)
-  }
-  if (!paths.length) {
-    for (const v of slugToMd.values()) {
-      if (v) paths.push(v)
+    let paths = []
+    if (allMarkdownPaths && allMarkdownPaths.length) {
+      paths = Array.from(allMarkdownPaths)
     }
-  }
-  // always crawl the content directory as a fallback.  this handles cases
-  // where navigation is empty or the site has pages that aren’t linked.
-  try {
-    const crawled = await crawlAllMarkdown(contentBase)
-    if (crawled && crawled.length) {
-      paths = paths.concat(crawled)
-    }
-  } catch (err) { console.warn('[slugManager] crawlAllMarkdown during buildSearchIndex failed', err) }
-
-  // now attempt to discover additional pages by following links in the
-  // content paths we already know about.  this allows the index to grow
-  // beyond the strict navigation list while still respecting the caller's
-  // `crawlMaxQueue` limit (default 1000).
-  try {
-    const visited = new Set(paths)
-    const queue = [...paths]
-    if (visited.size === 0) {
-      // nothing to crawl
-    }
-      while (queue.length && visited.size <= defaultCrawlMaxQueue) {
-      const p = queue.shift()
-      try {
-        const md = await fetchMarkdown(p, contentBase)
-        if (md && md.raw) {
-          let raw = md.raw
-          const hrefs = []
-          const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
-          let m
-          while ((m = mdLinkRe.exec(raw))) {
-            hrefs.push(m[1])
-          }
-          const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
-          while ((m = htmlLinkRe.exec(raw))) {
-            hrefs.push(m[1])
-          }
-          for (let href of hrefs) {
-            if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue
-            href = normalizePath(href)
-            if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
-            href = href.split(/[?#]/)[0]
-            if (!visited.has(href)) {
-              visited.add(href)
-              queue.push(href)
-              paths.push(href)
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[slugManager] discovery fetch failed for', p, e)
+    if (!paths.length) {
+      for (const v of slugToMd.values()) {
+        if (v) paths.push(v)
       }
     }
-  } catch (e) {
-    console.warn('[slugManager] discovery loop failed', e)
-  }
-  // dedupe in-case the same file appears multiple times
-  const seen = new Set()
-  paths = paths.filter(p => {
-    if (!p || seen.has(p)) return false
-    seen.add(p)
-    return true
-  })
-
-  const idx = []
-  for (const path of paths) {
-    // only process markdown or html pages
-    if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue
     try {
-      const md = await fetchMarkdown(path, contentBase)
-      if (md && md.raw) {
-        let title = ''
-        let excerpt = ''
-        if (md.isHtml) {
-          try {
-            const parser = new DOMParser()
-            const doc = parser.parseFromString(md.raw, 'text/html')
-            const titleEl = doc.querySelector('title') || doc.querySelector('h1')
-            if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
-            const p = doc.querySelector('p')
-            if (p && p.textContent) excerpt = p.textContent.trim()
-          } catch (err) { console.warn('[slugManager] parsing HTML for index failed', err) }
-        } else {
-          const raw = md.raw
-          const h1m = raw.match(/^#\s+(.+)$/m)
-          title = h1m ? h1m[1].trim() : ''
-          const parts = raw.split(/\r?\n\s*\r?\n/)
-          // first paragraph after the heading
-          if (parts.length > 1) {
-            for (let i = 1; i < parts.length; i++) {
-              const p = parts[i].trim()
-              if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
+      const crawled = await crawlAllMarkdown(contentBase)
+      if (crawled && crawled.length) {
+        paths = paths.concat(crawled)
+      }
+    } catch (err) { console.warn('[slugManager] crawlAllMarkdown during buildSearchIndex failed', err) }
+
+    try {
+      const visited = new Set(paths)
+      const queue = [...paths]
+      if (visited.size === 0) {
+      }
+      while (queue.length && visited.size <= defaultCrawlMaxQueue) {
+        const p = queue.shift()
+        try {
+          const md = await fetchMarkdown(p, contentBase)
+          if (md && md.raw) {
+            let raw = md.raw
+            const hrefs = []
+            const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
+            let m
+            while ((m = mdLinkRe.exec(raw))) {
+              hrefs.push(m[1])
+            }
+            const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
+            while ((m = htmlLinkRe.exec(raw))) {
+              hrefs.push(m[1])
+            }
+            for (let href of hrefs) {
+              if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue
+              href = normalizePath(href)
+              if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
+              href = href.split(/[?#]/)[0]
+              if (!visited.has(href)) {
+                visited.add(href)
+                queue.push(href)
+                paths.push(href)
+              }
             }
           }
+        } catch (e) {
+          console.warn('[slugManager] discovery fetch failed for', p, e)
         }
-        let slug = ''
-        try {
-          if (mdToSlug.has(path)) slug = mdToSlug.get(path)
-        } catch (err) { console.warn('[slugManager] mdToSlug access failed', err) }
-        if (!slug) slug = slugify(title || path)
-        idx.push({ slug, title, excerpt, path })
       }
-    } catch (err) {
-      console.warn('[slugManager] buildSearchIndex: entry fetch failed', err)
+    } catch (e) {
+      console.warn('[slugManager] discovery loop failed', e)
     }
-  }
-  searchIndex = idx
-  return searchIndex
-})()
-  // once finished, clear the promise so subsequent calls can rebuild if
-  // the cache is cleared externally.
+
+    const seen = new Set()
+    paths = paths.filter(p => {
+      if (!p || seen.has(p)) return false
+      seen.add(p)
+      return true
+    })
+
+    const idx = []
+    for (const path of paths) {
+      if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue
+      try {
+        const md = await fetchMarkdown(path, contentBase)
+        if (md && md.raw) {
+          let title = ''
+          let excerpt = ''
+          if (md.isHtml) {
+            try {
+              const parser = new DOMParser()
+              const doc = parser.parseFromString(md.raw, 'text/html')
+              const titleEl = doc.querySelector('title') || doc.querySelector('h1')
+              if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
+              const p = doc.querySelector('p')
+              if (p && p.textContent) excerpt = p.textContent.trim()
+            } catch (err) { console.warn('[slugManager] parsing HTML for index failed', err) }
+          } else {
+            const raw = md.raw
+            const h1m = raw.match(/^#\s+(.+)$/m)
+            title = h1m ? h1m[1].trim() : ''
+            const parts = raw.split(/\r?\n\s*\r?\n/)
+            if (parts.length > 1) {
+              for (let i = 1; i < parts.length; i++) {
+                const p = parts[i].trim()
+                if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
+              }
+            }
+          }
+          let slug = ''
+          try {
+            if (mdToSlug.has(path)) slug = mdToSlug.get(path)
+          } catch (err) { console.warn('[slugManager] mdToSlug access failed', err) }
+          if (!slug) slug = slugify(title || path)
+          idx.push({ slug, title, excerpt, path })
+        }
+      } catch (err) {
+        console.warn('[slugManager] buildSearchIndex: entry fetch failed', err)
+      }
+    }
+    searchIndex = idx
+    return searchIndex
+  })()
   try { await _indexPromise } catch (err) { console.warn('[slugManager] awaiting _indexPromise failed', err) }
   _indexPromise = null
   return searchIndex
 }
 
-// maximum number of pending directories we'll track during a crawl.  a
-// pathological site could expose an infinite or very deep tree, so we guard
-// against runaway memory usage by aborting once the queue grows past this
-// threshold.  callers can override by passing a lower value to
-// `crawlForSlug`.
 export const CRAWL_MAX_QUEUE = 1000
-
-// runtime-configurable default for the maximum queue length used by
-// `crawlForSlug`.  Consumers (e.g. initCMS) may override this via
-// `setDefaultCrawlMaxQueue()`; tests can modify it as well for edge cases.
 export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
 
-/**
- * Change the default queue limit used by `crawlForSlug` when no explicit
- * `maxQueue` argument is provided.  Useful for controlling memory usage from
- * application code (e.g. via `initCMS` options).
- * @param {number} n
- * @returns {void}
- */
 export function setDefaultCrawlMaxQueue(n) {
   if (typeof n === 'number' && n >= 0) defaultCrawlMaxQueue = n
 }
 
-// performance micro-optimizations used by crawlForSlug
-// a single DOMParser can be reused safely across calls and avoids allocating
-// a fresh one on every directory listing.
 const _crawlParser = new DOMParser()
-// predefine selector string so we don't rebuild it each time
 const _crawlLinkSelector = 'a[href]'
 
 /**
@@ -686,8 +549,6 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
 
   while (queue.length && !found) {
     if (queue.length > maxQueue) {
-      // abort early to avoid excessive memory use; record failure so
-      // subsequent calls won't replay the same expensive crawl.
       break
     }
     const relDir = queue.shift()
@@ -713,15 +574,10 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
           }
           if (href.toLowerCase().endsWith('.md')) {
             const path = normalizePath(relDir + href)
-            // avoid re-fetching files we already know the slug for; if the
-            // recorded slug doesn't match the one we're seeking there is no
-            // reason to load the file again.  the mapping might exist either
-            // as a key in mdToSlug or as a value in slugToMd, so check both.
             try {
               if (mdToSlug.has(path)) {
                 continue
               }
-              // also skip if slugToMd contains this path as one of its values
               for (const v of slugToMd.values()) {
                 if (v === path) { continue }
               }
@@ -737,25 +593,19 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
               }
             } catch (err) { console.warn('[slugManager] crawlForSlug: fetchMarkdown failed', err) }
           }
-            } catch (err) { console.warn('[slugManager] crawlForSlug: link iteration failed', err) }
+        } catch (err) { console.warn('[slugManager] crawlForSlug: link iteration failed', err) }
       }
-          } catch (err) { console.warn('[slugManager] crawlForSlug: directory fetch failed', err) }
+    } catch (err) { console.warn('[slugManager] crawlForSlug: directory fetch failed', err) }
   }
   crawlCache.set(decoded, found)
   return found
 }
 
 /**
- * Crawl the content directory collecting all markdown and HTML pages.  Uses
- * the same directory‑listing traversal logic as `crawlForSlug` but does not
- * stop early; it simply records any links ending in `.md` or `.html`.
- *
- * This is useful for building a search index over the entire site when the
- * navigation only covers a subset of pages.
- *
+ * Crawl the content directory collecting all markdown and HTML pages.
  * @param {string} contentBase
  * @param {number} [maxQueue]
- * @returns {Promise<string[]>} list of relative paths
+ * @returns {Promise<string[]>}
  */
 export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQueue) {
   const result = new Set()
@@ -786,7 +636,6 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
             if (!seenDirs.has(sub)) queue.push(sub)
             continue
           }
-          // record markdown or html pages
           const path = (relDir + href).replace(/^\/+/, '')
           if (/\.(md|html?)$/i.test(path)) {
             result.add(path)
@@ -800,24 +649,14 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
 }
 
 /**
- * Ensure the given slug is mapped to a markdown path.  This will return an
- * existing mapping if one is available, otherwise it will attempt discovery
- * via navigation index, crawling, and finally the home file as a special
- * case.
- *
- * @param {string} decoded
- * @param {string} contentBase
- * @returns {Promise<string|null>}
- */
-/**
- * Ensure the given slug is mapped to a markdown path.
+ * Ensure the given slug is mapped to a markdown path. Attempts manifest
+ * lookup, search-index, crawling, and other fallbacks in order.
  * @param {string} decoded
  * @param {string} contentBase
  * @param {number} [maxQueue]
  * @returns {Promise<string|null>}
  */
 export async function ensureSlug(decoded, contentBase, maxQueue) {
-  // strip leading/trailing slashes which may come from URL path fragments
   if (decoded && typeof decoded === 'string') {
     decoded = normalizePath(decoded)
     decoded = trimTrailingSlash(decoded)
@@ -826,7 +665,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     return resolveSlugPath(decoded) || slugToMd.get(decoded)
   }
 
-  // allow external resolvers to override the slug before crawling
   for (const resolver of slugResolvers) {
     try {
       const res = await resolver(decoded, contentBase)
@@ -838,7 +676,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     } catch (err) { console.warn('[slugManager] slug resolver failed', err) }
   }
 
-  // manifest-based title lookup (lazy)
   if (allMarkdownPaths && allMarkdownPaths.length) {
     if (listSlugCache.has(decoded)) {
       const p = listSlugCache.get(decoded)
@@ -865,7 +702,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     }
   }
 
-  // search-index lookup (may await ongoing build)
   try {
     const idx = await buildSearchIndex(contentBase)
     if (idx && idx.length) {
@@ -878,7 +714,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     }
   } catch (err) { console.warn('[slugManager] buildSearchIndex lookup failed', err) }
 
-  // breadth-first crawl of directories
   try {
     const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue)
     if (foundCrawl) {
@@ -888,10 +723,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     }
   } catch (err) { console.warn('[slugManager] crawlForSlug lookup failed', err) }
 
-  // attempt to resolve using an obvious filename guess (runtime-only)
-  // Do not guess directory index files (index.md/index.html) for unknown
-  // slugs; doing so caused unknown slugs to resolve to index.html and
-  // prevented 404 handling. Only try direct filename guesses.
   const candidates = [`${decoded}.html`, `${decoded}.md`]
   for (const cand of candidates) {
     try {
@@ -904,7 +735,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     } catch (err) { console.warn('[slugManager] candidate fetch failed', err) }
   }
 
-  // optional build-time filename match
   if (allMarkdownPaths && allMarkdownPaths.length) {
     for (const p of allMarkdownPaths) {
       try {
@@ -918,7 +748,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     }
   }
 
-  // last-ditch attempt via home page
   try {
     const home = await fetchMarkdown('_home.md', contentBase)
     if (home && home.raw) {

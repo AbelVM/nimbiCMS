@@ -4,7 +4,6 @@ import { makeWorkerManager } from './worker-manager.js'
 
 const _rendererManager = makeWorkerManager(() => new RendererWorker(), 'markdown')
 
-// Reuse a shared DOMParser in long‑running contexts to avoid repeated construction; fall back when unavailable.
 const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
 
 /**
@@ -82,13 +81,11 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
  * @returns {Promise<ParseResult>}
  */
 export async function parseMarkdownToHtml(md) {
-  // attempt to offload to worker if available
   const w = initRendererWorker && initRendererWorker()
   if (w) {
     try {
       const res = await _sendToRenderer({ type: 'render', md })
       if (res && res.html !== undefined) {
-        // post-process worker HTML the same as inline path so tests and runtime behavior match.
           try {
           const parser = SHARED_DOM_PARSER || new DOMParser()
           const doc = parser.parseFromString(res.html, 'text/html')
@@ -141,19 +138,18 @@ export async function parseMarkdownToHtml(md) {
       }
     } catch (e) {
       console.warn('[markdown] worker render failed', e)
-      // fall through to inline parsing
+      
     }
   }
 
   const { content, data } = parseFrontmatter(md || '')
-  // configure marked options here if needed
   marked.setOptions({
     gfm: true,
     mangle: false,
     headerIds: false,
     headerPrefix: ''
   })
-  // ensure any registered plugins are applied; marked ignores duplicates
+  
   if (markdownPlugins && markdownPlugins.length) {
     try { markdownPlugins.forEach(p=>marked.use(p)) } catch (e) { console.warn('[markdown] apply plugins failed', e) }
   }
@@ -165,21 +161,15 @@ export async function parseMarkdownToHtml(md) {
     const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
     heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
 
-    // prefer lazy-loading images to reduce initial network pressure
     try {
       const imgs = doc.querySelectorAll('img')
       imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
     } catch (e) { console.warn('[markdown] query images failed', e) }
 
-    // don't block: leave language-tagged blocks for the IntersectionObserver
     try {
       const codes = doc.querySelectorAll('pre code')
       codes.forEach(codeEl => {
         try {
-          // strip any accidental "undefined" tokens that some markdown
-          // renderers attach when no language was provided.  Prefer an
-          // empty class rather than `language-undefined` which later
-          // confuses dynamic loaders.
           const rawCls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
           const cleanedCls = String(rawCls || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
           if (cleanedCls) {
@@ -193,10 +183,6 @@ export async function parseMarkdownToHtml(md) {
             try {
               const code = codeEl.textContent || ''
               try {
-                // Prefer rendering as plain text without auto-detection.
-                // If the runtime includes a registered 'plaintext' language
-                // use it; otherwise avoid `highlightAuto` and leave the
-                // code unchanged so no dynamic language import is attempted.
                 if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
                   const out = hljs.highlight(code, { language: 'plaintext' })
                   if (out && out.value) codeEl.innerHTML = out.value
@@ -221,7 +207,6 @@ export async function parseMarkdownToHtml(md) {
   return { html, meta: data || {}, toc: [] }
 }
 
-// shallow TOC extraction; used in worker earlier but exported for reuse
 function extractToc(md) {
   const lines = md.split('\n')
   const toc = []
@@ -232,7 +217,11 @@ function extractToc(md) {
   return toc
 }
 
-// identify fenced-code languages in raw markdown
+/**
+ * Scan markdown text for fenced code blocks and return a set of language
+ * identifiers.  Uses heuristics to discard false positives and can consult
+ * a map of supported languages to be stricter.
+ */
 /**
  * Scan markdown text for fenced code blocks and return a set of language
  * identifiers.  Uses heuristics to discard false positives and can consult
@@ -245,7 +234,6 @@ function extractToc(md) {
 export function detectFenceLanguages(md, supportedMap) {
   const set = new Set()
   const re = /```\s*([a-zA-Z0-9_\-+]+)?/g
-  // words unlikely to be languages
   const STOP = new Set([
     'then', 'now', 'if', 'once', 'so', 'and', 'or', 'but', 'when', 'the', 'a', 'an', 'as',
     'let', 'const', 'var', 'export', 'import', 'from', 'true', 'false', 'null', 'npm',
@@ -261,13 +249,9 @@ export function detectFenceLanguages(md, supportedMap) {
   while ((m = re.exec(md))) {
     if (m[1]) {
       const name = m[1].toLowerCase()
-      // skip anything we've explicitly banned
+      
       if (BAD_LANGUAGES.has(name)) continue
-      // if we were given a map of supported names, only apply the
-      // length check when the map has already been populated; this
-      // avoids dropping common two-letter names like "js" during
-      // initial page load when the asynchronous language list hasn't
-      // arrived yet.
+      
       if (supportedMap && supportedMap.size && name.length < 3 && !supportedMap.has(name) && !(HLJS_ALIAS_MAP && HLJS_ALIAS_MAP[name] && supportedMap.has(HLJS_ALIAS_MAP[name]))) continue
       if (supportedMap && supportedMap.size) {
         if (supportedMap.has(name)) {
@@ -275,8 +259,7 @@ export function detectFenceLanguages(md, supportedMap) {
           if (canonical) set.add(canonical)
           continue
         }
-        // handle common short aliases (e.g. 'js' -> 'javascript') using
-        // the alias map from the codeblocks manager
+        
         if (HLJS_ALIAS_MAP && HLJS_ALIAS_MAP[name]) {
           const mapped = HLJS_ALIAS_MAP[name]
           if (supportedMap.has(mapped)) {

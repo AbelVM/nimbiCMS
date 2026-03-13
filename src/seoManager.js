@@ -124,7 +124,6 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
     const title = (titleOverride && String(titleOverride).trim()) ? titleOverride : (meta.title || initialDocumentTitle || document.title)
     const description = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description || (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '')
     const image = imageOverride || meta.image || null
-    // build canonical URL: prefer a path-based pagePath when available
     let canonical = ''
     try {
       if (pagePath) {

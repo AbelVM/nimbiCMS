@@ -1,10 +1,8 @@
 .nimbi-site-navbar {
+    --nimbi-site-navbar-height: 4rem;
     position: sticky;
     top: 0;
-    z-index: 50
-}
-
-.nimbi-site-navbar {
+    z-index: 50;
     width: 100%;
     left: 0;
     right: 0;
@@ -45,8 +43,8 @@
     max-width: 260px;
     width: 100%;
     position: sticky;
-    top: 4rem;
-    max-height: calc(100% - 4rem);
+    top: var(--nimbi-site-navbar-height);
+    max-height: calc(100% - var(--nimbi-site-navbar-height));
     overflow: auto;
     margin-right: 1rem;
 }
@@ -59,7 +57,15 @@
 .nimbi-cms .nimbi-nav-wrap {
     position: -webkit-sticky;
     position: sticky;
-    top: 4rem;
+    top: var(--nimbi-site-navbar-height);
+}
+
+/* when a navbar is present immediately before the CMS container, make
+   the CMS container height equal to mount minus navbar height so the
+   sticky header doesn't overlap content */
+.nimbi-site-navbar + .nimbi-cms {
+    height: calc(100% - var(--nimbi-site-navbar-height));
+    overflow: auto;
 }
 
 .nimbi-content {

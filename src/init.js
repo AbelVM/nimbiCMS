@@ -187,7 +187,6 @@ export async function initCMS(options = {}) {
   const pageDir = pagePath.endsWith('/') ? pagePath : pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
   try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; console.warn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
-  // remove any leading './' or '/' to avoid creating protocol-relative URLs
   if (cp.startsWith('./')) cp = cp.slice(2)
   if (cp.startsWith('/')) cp = cp.slice(1)
   if (!cp.endsWith('/')) cp = cp + '/'
@@ -195,23 +194,18 @@ export async function initCMS(options = {}) {
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (lang) setLang(lang)
 
-  // set up UI helpers early so we can supply the render callback to nav builder
   const ui = createUI({ contentWrap, navWrap, container, mountOverlay, t, contentBase, homePage, initialDocumentTitle, runHooks })
 
-  // configure router cache TTL if user supplied minutes
   if (typeof cacheTtlMinutes === 'number' && cacheTtlMinutes >= 0) {
-    // use the exported setter to avoid namespace immutability errors
     if (typeof router.setResolutionCacheTtl === 'function') {
       router.setResolutionCacheTtl(cacheTtlMinutes * 60 * 1000)
     }
   }
-  // configure router max entries if given
   if (typeof cacheMaxEntries === 'number' && cacheMaxEntries >= 0) {
     if (typeof router.setResolutionCacheMax === 'function') {
       router.setResolutionCacheMax(cacheMaxEntries)
     }
   }
-  // register any markdown extensions passed on init
   if (markdownExtensions && Array.isArray(markdownExtensions) && markdownExtensions.length) {
     try {
       markdownExtensions.forEach(ext => {
@@ -230,21 +224,18 @@ export async function initCMS(options = {}) {
     }
   } catch (err) { console.warn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
 
-  // Inform filesManager of the runtime content base so slug -> md mapping
-  // can be computed relative to the correct path instead of relying on
-  // hardcoded segments.
   try { setContentBase(contentBase) } catch (err) { console.warn('[nimbi-cms] setContentBase failed', err) }
   try { setNotFoundPage(notFoundPage) } catch (err) { console.warn('[nimbi-cms] setNotFoundPage failed', err) }
-  try {
-    await fetchMarkdown(homePage, contentBase)
-  } catch (e) {
-    // Preserve historical error message when using the default home
-    // page so unit tests depending on the exact wording still pass.
-    if (homePage === '_home.md') {
-      throw new Error('Required _home.md not found')
+  try { setContentBase(contentBase) } catch (err) { console.warn('[nimbi-cms] setContentBase failed', err) }
+  try { setNotFoundPage(notFoundPage) } catch (err) { console.warn('[nimbi-cms] setNotFoundPage failed', err) }
+    try {
+      await fetchMarkdown(homePage, contentBase)
+    } catch (e) {
+      if (homePage === '_home.md') {
+        throw new Error('Required _home.md not found')
+      }
+      throw new Error(`Required ${homePage} not found at ${contentBase}${homePage}: ${e.message}`)
     }
-    throw new Error(`Required ${homePage} not found at ${contentBase}${homePage}: ${e.message}`)
-  }
 
   setStyle(defaultStyle)
   await ensureBulma(bulmaCustomize, pageDir)
@@ -257,15 +248,41 @@ export async function initCMS(options = {}) {
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
     const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode)
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { console.warn('[nimbi-cms] onNavBuild hooks failed', e) }
+    
+    try {
+      const computeAndSet = () => {
+        const navHeight = (navbarWrap && navbarWrap.getBoundingClientRect && Math.round(navbarWrap.getBoundingClientRect().height)) || (navbarWrap && navbarWrap.offsetHeight) || 0
+        if (navHeight > 0) {
+          try { mountEl.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { console.warn('[nimbi-cms] set CSS var failed', err) }
+          try { container.style.paddingTop = '' } catch (err) { /* ignore */ }
+          try {
+            // set explicit pixel height to avoid layout differences across browsers
+            const mountH = (mountEl && mountEl.getBoundingClientRect && Math.round(mountEl.getBoundingClientRect().height)) || (mountEl && mountEl.clientHeight) || 0
+            if (mountH > 0) {
+              const explicit = Math.max(0, mountH - navHeight)
+              try { container.style.boxSizing = 'border-box' } catch (_) {}
+              try { container.style.height = `${explicit}px` } catch (err) { console.warn('[nimbi-cms] set container height failed', err) }
+            } else {
+              try { container.style.height = `calc(100% - var(--nimbi-site-navbar-height))` } catch (err) { console.warn('[nimbi-cms] set container height failed', err) }
+            }
+          } catch (err) { console.warn('[nimbi-cms] compute container height failed', err) }
+          try { navbarWrap.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { /* best-effort */ }
+        }
+      }
+      computeAndSet()
+      try {
+        if (typeof ResizeObserver !== 'undefined') {
+          const ro = new ResizeObserver(() => computeAndSet())
+          try { ro.observe(navbarWrap) } catch (err) { /* ignore observe errors */ }
+        }
+      } catch (err) { /* ignore ResizeObserver failures */ }
+    } catch (err) { console.warn('[nimbi-cms] compute navbar height failed', err) }
+    
   } catch (e) {
     console.warn('[nimbi-cms] build navigation failed', e)
   }
-  // initial render once navigation is in place
   await ui.renderByQuery()
-
-  // supported languages list will be fetched lazily when we first
-  // encounter a code block or register a language.  preloading here is
-  // optional and no longer necessary.
+  
 
 
 }

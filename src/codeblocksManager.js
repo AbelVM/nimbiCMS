@@ -38,10 +38,8 @@ export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
 
-// Cache for candidate import attempts: candidate -> { promise, module, ok, ts }
 const languageImportCache = new Map()
-// Negative cache TTL (ms) - avoid retrying failing CDN imports for this duration
-const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
 
 /**
  * Load the list of supported highlight.js languages from the canonical
@@ -147,7 +145,6 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
           const sepKey = ':---------------------'
           if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
         } catch (err) { console.warn('[codeblocksManager] remove sep key failed', err) }
-        // Log the supported languages list for debugging/visibility.
         try {
           const keys = Array.from(SUPPORTED_HLJS_MAP.keys()).sort()
         } catch (err) { console.warn('[codeblocksManager] compute supported keys failed', err) }
@@ -169,27 +166,20 @@ const registeredLangs = new Set()
  * @returns {Promise<boolean>}
  */
 export async function registerLanguage(name, modulePath) {
-  // ensure supported list is fetched lazily the first time we attempt
-  // any registration (useful when initCMS didn't pre-load it).
   if (!loadSupportedLanguagesPromise) {
-    // fire-and-forget, swallow errors using async IIFE
     ;(async () => {
       try {
         await loadSupportedLanguages()
       } catch (err) { console.warn('[codeblocksManager] loadSupportedLanguages (IIFE) failed', err) }
     })()
   }
-  // normalize missing values to an empty string so callers that pass
-  // `undefined` don't end up attempting to import the literal
-  // 'undefined' module.
+  
   name = (name === undefined || name === null) ? '' : String(name)
   name = name.trim()
   if (!name) return false
   const low = name.toLowerCase()
   if (BAD_LANGUAGES.has(low)) return false
-  // if we have a populated list of supported languages and the requested
-  // one isn't in it (and isn't an alias), skip early to avoid needless
-  // dynamic imports that will 404.
+  
   if (SUPPORTED_HLJS_MAP.size && !SUPPORTED_HLJS_MAP.has(low)) {
     const aliasMap = HLJS_ALIAS_MAP
     if (!aliasMap[low] && !aliasMap[name]) {
@@ -200,9 +190,7 @@ export async function registerLanguage(name, modulePath) {
   const aliasMap = HLJS_ALIAS_MAP
   try {
     const base = (modulePath || name || '').toString().replace(/\.js$/i, '').trim()
-    // Try the explicit name/module first, then aliases.  This ensures
-    // valid names like `pgsql` are attempted before falling back to
-    // broader aliases such as `sql`.
+    
     const candidates = Array.from(new Set([
       base,
       name,
@@ -213,11 +201,11 @@ export async function registerLanguage(name, modulePath) {
     let lastErr = null
     for (const candidate of candidates) {
       try {
-        // Reuse cached import attempts (including in-flight promises)
+        
         const now = Date.now()
         const cached = languageImportCache.get(candidate)
         if (cached) {
-          // If negative cache still valid, skip retrying this candidate
+          
           if (cached.ok === false && (now - (cached.ts || 0) < NEGATIVE_CACHE_TTL_MS)) {
             mod = null
           } else if (cached.module) {
@@ -230,8 +218,7 @@ export async function registerLanguage(name, modulePath) {
             }
           }
         } else {
-          // create a cache entry and perform the import; store in entry so
-          // concurrent requests share the same promise
+          
           const entry = { promise: null, module: null, ok: null, ts: 0 }
           languageImportCache.set(candidate, entry)
           entry.promise = (async () => {
@@ -278,14 +265,14 @@ export async function registerLanguage(name, modulePath) {
             return true
           } catch (_e) {
             lastErr = _e
-                    // registration failed for this candidate
+                    
           }
         } else {
-          // negative result cached; proceed to next candidate
+          
         }
       } catch (_e) {
         lastErr = _e
-        // import attempt failed for this candidate
+        
       }
     }
     if (lastErr) {
@@ -297,7 +284,7 @@ export async function registerLanguage(name, modulePath) {
   }
 }
 
-// IntersectionObserver-based lazy highlighter for code blocks
+ 
 let __hlObserver = null
 /**
  * Lazy-highlight `<pre><code>` blocks using IntersectionObserver.  The
@@ -307,7 +294,7 @@ let __hlObserver = null
  * @returns {void}
  */
 export function observeCodeBlocks(root = document) {
-  // make sure we have fetched supported languages list lazily when we start
+  
   if (!loadSupportedLanguagesPromise) {
     ;(async () => {
       try { await loadSupportedLanguages() } catch (_) { console.warn('[codeblocksManager] loadSupportedLanguages (observer) failed', _) }
@@ -334,20 +321,14 @@ export function observeCodeBlocks(root = document) {
                 await registerLanguage(canonical)
               } catch (err) { console.warn('[codeblocksManager] registerLanguage failed', err) }
               try {
-                // highlightElement may mutate the element's class (adding
-                // language-<name>). Only use highlightElement when an
-                // explicit language class is present. For auto-detection we
-                // use highlightAuto and write the HTML without changing
-                // the element's language class.
+                
                 hljs.highlightElement(el)
               } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed', err) }
             } else {
               try {
                 const code = el.textContent || ''
                 try {
-                  // Do not run auto-detection. Prefer `plaintext` if
-                  // available; otherwise skip highlighting to avoid
-                  // unnecessary imports or mis-detections.
+                  
                   if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
                     const out = hljs.highlight(code, { language: 'plaintext' })
                     if (out && out.value) el.innerHTML = out.value
@@ -367,7 +348,7 @@ export function observeCodeBlocks(root = document) {
   const obs = ensureObserver()
   const blocks = (root && root.querySelectorAll) ? root.querySelectorAll('pre code') : []
   if (!obs) {
-    // no IntersectionObserver - highlight immediately (but register languages non-blocking)
+    
     blocks.forEach(async (el) => {
       try {
         const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''

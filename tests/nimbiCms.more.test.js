@@ -24,7 +24,7 @@ vi.mock('../src/slugManager.js', () => {
 })
 
 vi.mock('../src/bulmaManager.js', () => ({ ensureBulma: async () => {}, setStyle: () => {} }))
-vi.mock('../src/markdown.js', async () => ({ parseMarkdownToHtml: async (md) => ({ html: String(md || '') }) }))
+vi.mock('../src/markdown.js', async () => ({ parseMarkdownToHtml: async (md) => ({ html: String(md || '') }), detectFenceLanguages: (raw) => new Set() }))
 vi.mock('../src/router.js', () => ({
   setResolutionCacheTtl: () => {},
   setResolutionCacheMax: () => {},

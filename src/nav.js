@@ -60,15 +60,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   const linkEls = navDoc ? navDoc.querySelectorAll('a') : []
 
 
-  // ensure slug maps are populated for links inside the navigation
   await safe(() => preScanHtmlSlugs(linkEls, contentBase))
   await safe(() => preMapMdSlugs(linkEls, contentBase))
 
-  // search-related state variables must be declared before they are
-  // referenced.  earlier versions placed these near the end of the function
-  // which meant the eager-search branch hit the TDZ when the page build ran
-  // (only encountered in the example app; tests disable search).  Moving the
-  // declarations here ensures the bindings are initialized upfront.
+  
   let searchIndexPromise = null
   let searchInput = null
   let indexedCountLog = false
@@ -114,7 +109,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   }
   brand.appendChild(brandItem)
 
-  // Add SPA navigation handler for home link
   brandItem.addEventListener('click', function (ev) {
     const href = brandItem.getAttribute('href') || '';
     if (href.startsWith('?page=')) {
@@ -128,7 +122,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   });
 
 
-  // mobile hamburger
+  
   const burger = document.createElement('a')
   burger.className = 'navbar-burger'
   burger.setAttribute('role', 'button')
@@ -144,11 +138,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   menu.id = targetId
   const start = document.createElement('div')
   start.className = 'navbar-start'
-  // optional search UI container on right side
   let end, searchItem, resultsContainer
-  // Respect searchIndex and searchIndexMode options
   if (!effectiveSearchEnabled) {
-    // Search globally disabled by consumer; do not render search UI.
     end = null
     searchInput = null
     resultsContainer = null
@@ -173,7 +164,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchItem.appendChild(resultsContainer)
     end.appendChild(searchItem)
 
-    // Setup search event handlers immediately after creation
+    
     const showResults = (items) => {
       resultsContainer.innerHTML = ''
       if (!items.length) {
@@ -270,7 +261,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     }
   }
 
-  // iterate through parsed nav links to build start menu items
+  
   for (let i = 0; i < linkEls.length; i++) {
     const a = linkEls[i]
     if (i === 0) continue
@@ -349,7 +340,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     start.appendChild(item)
   }
 
-  // search-related state (declared earlier to avoid TDZ)
+  
 
   try {
     searchInput = document.getElementById('nimbi-search')
@@ -464,7 +455,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
         }
       } catch (e) {
-        // ignore non-URL hrefs
       }
     })
   } catch (e) { console.warn('[nimbi-cms] build navbar failed', e) }

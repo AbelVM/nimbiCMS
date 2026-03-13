@@ -1,6 +1,5 @@
-// helper module used by the declaration generator tests; exporting a handful of
-// contrived functions that exercise JSDoc parsing, unions, generics, records, and
-// callbacks.
+/** helper module used by the declaration generator tests; exporting a handful of
+  contrived functions that exercise JSDoc parsing, unions, generics, records, and callbacks. */
 
 /**
  * @param {{a:number,b:string}} opts

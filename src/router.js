@@ -76,7 +76,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
  */
 export function _clearIndexCache() {
   indexSet.clear();
-  try { refreshIndexPaths._refreshed = false } catch (_) {}
+  try { refreshIndexPaths._refreshed = false } catch (e) { console.warn('[router] _clearIndexCache: refreshIndexPaths reset failed', e) }
 }
 
  
@@ -94,7 +94,7 @@ export function resolutionCacheGet(key) {
     resolutionCache.delete(key)
     return undefined
   }
-  // refresh order by reinserting
+  
   resolutionCache.delete(key)
   resolutionCache.set(key, record)
   return record.value
@@ -119,7 +119,7 @@ export function resolutionCacheSet(key, value) {
 
 
 
-// internal helpers --------------------------------------------------------
+ 
 
 /**
  * Remove any stale entries from the cache based on TTL.  Called by
@@ -143,7 +143,7 @@ export function _purgeExpiredEntries() {
  */
 export { allMarkdownPaths } from './slugManager.js'
 
-// helpers scoped to this module ------------------------------------------------
+ 
 
  
 /**
@@ -210,16 +210,10 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
  * @returns {string[]}
  */
 export function buildPageCandidates(resolved) {
-  // Given a resolved identifier, return exactly the candidates that make
-  // sense under the current policy.  We no longer invent filenames out of
-  // thin air: slugs must be explicitly mapped via `slugToMd` or discovered
-  // from the index.  There is **no** fallback that appends `.md` or
-  // `_home` prefixes, and literal `content` segments are not injected here
-  // (the caller provides the full `contentBase`).
+  
   const pageCandidates = []
   if (String(resolved).includes('.md') || String(resolved).includes('.html')) {
-    // caller already supplied an explicit path; use it verbatim
-    // Prevent index.html from being considered unless explicitly requested
+    
     if (!/index\.html$/i.test(resolved)) {
       pageCandidates.push(resolved)
     }
@@ -256,7 +250,7 @@ export function buildPageCandidates(resolved) {
   return pageCandidates
 }
 
-// public API ---------------------------------------------------------------
+ 
 
 /**
  * Resolve a raw `page` query value, fetch the corresponding markdown/html,
@@ -275,16 +269,14 @@ export async function fetchPageData(raw, contentBase) {
   let resolved = raw || ''
   let anchor = null
 
-  // legacy anchor syntax
+  
   if (resolved && String(resolved).includes('::')) {
     const parts = String(resolved).split('::', 2)
     resolved = parts[0]
     anchor = parts[1] || null
   }
 
-  // incorporate current UI language into cache key so that
-  // switching languages yields different entries.  We use a separator
-  // unlikely to appear in slugs.
+  
   const lang = (typeof l10n !== 'undefined' && l10n.currentLang) ? l10n.currentLang : ''
   const cacheKey = `${raw}|||${lang}`
   const cached = resolutionCacheGet(cacheKey)
@@ -294,7 +286,7 @@ export async function fetchPageData(raw, contentBase) {
   } else {
     if (!String(resolved).includes('.md') && !String(resolved).includes('.html')) {
       let decoded = decodeURIComponent(String(resolved || ''))
-      // strip leading/trailing slashes to match slugManager normalization
+      
       if (decoded && typeof decoded === 'string') {
         decoded = normalizePath(decoded)
         decoded = trimTrailingSlash(decoded)
@@ -318,7 +310,7 @@ export async function fetchPageData(raw, contentBase) {
 
   const pageCandidates = buildPageCandidates(resolved)
 
-  // If the only candidate is index.html and the slug is unknown, trigger 404
+  
   if (
     pageCandidates.length === 1 &&
     /index\.html$/i.test(pageCandidates[0]) &&
@@ -345,13 +337,12 @@ export async function fetchPageData(raw, contentBase) {
   }
 
   if (!data) {
-    // Always throw normalized error for test compatibility
+    
     throw new Error('no page data');
   }
 
   return { data, pagePath, anchor }
 }
 
-// helpers exposed for unit tests
-// Export internals used by the test-suite and other modules.
+ 
 

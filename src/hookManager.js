@@ -9,9 +9,9 @@
  * @type {{onPageLoad:Array<function(object):void|Promise<void>>,onNavBuild:Array<function(object):void|Promise<void>>,transformHtml:Array<function(object):void|Promise<void>>}}
  */
 const hooks = {
-  onPageLoad: [],      // called after a page has been rendered
-  onNavBuild: [],      // called after the navigation DOM is constructed
-  transformHtml: []    // allow modification of the article DOM before insertion
+  onPageLoad: [],
+  onNavBuild: [],
+  transformHtml: []
 };
 
 /**
