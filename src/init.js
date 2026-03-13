@@ -16,7 +16,16 @@ import { t, loadL10nFile, setLang } from './l10nManager.js'
 import { ensureBulma, setStyle } from './bulmaManager.js'
 
 // persisted state used during init/render operations
+/**
+ * Currently selected highlight theme name. Mutable export for runtime
+ * customization; changes affect subsequent codeblock rendering.
+ * @type {string}
+ */
 export let currentHighlightTheme = 'monokai'
+/**
+ * Document title at initialization time. Useful for restoring title on navigation.
+ * @type {string}
+ */
 export let initialDocumentTitle = ''
 
 /**

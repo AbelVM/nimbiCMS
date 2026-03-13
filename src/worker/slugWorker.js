@@ -1,5 +1,14 @@
 import { buildSearchIndex, crawlForSlug } from '../slugManager.js'
 
+/**
+ * Worker entrypoint for slug-related background tasks.
+ *
+ * Accepted messages (via `postMessage`):
+ * - `{ type: 'buildSearchIndex', id: string, contentBase: string }` -> posts `{id, result}`
+ * - `{ type: 'crawlForSlug', id: string, slug: string, base?: string, maxQueue?: number }` -> posts `{id, result}`
+ *
+ * On error the worker posts `{id, error: string}`.
+ */
 onmessage = async (ev) => {
   const msg = ev.data || {}
   console.debug('[slugWorker] received message', msg)

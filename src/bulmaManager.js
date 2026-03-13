@@ -3,8 +3,19 @@ import 'bulma/css/bulma.min.css'
 import './styles/nimbi-cms-extra.css'
 
 // track current theme style for Bulma overrides
+/** @type {'light'|'dark'} */
 let currentStyle = 'light'
 
+/**
+ * @typedef {Record<string,string>} ThemeVars
+ */
+
+/**
+ * Insert a stylesheet link into the document head if not already present.
+ * @param {string} href
+ * @param {Record<string,string>} [attrs]
+ * @returns {void}
+ */
 function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return
   const l = document.createElement('link')
@@ -13,7 +24,6 @@ function injectLink(href, attrs = {}) {
   Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v))
   document.head.appendChild(l)
 }
-
 /**
  * Ensure that Bulma or a Bulmaswatch theme is loaded.  Supports local
  * overrides or named themes fetched from unpkg.
@@ -68,15 +78,9 @@ export function setStyle(style) {
 }
 
 /**
- * Apply an object of CSS custom properties to the document root.  This makes
+ * Apply an object of CSS custom properties to the document root. This makes
  * it easy for consumers to theme colors/fonts/etc. without touching Bulma
- * directly.  Property names should be provided without the leading `--`.
- *
- * @param {Record<string,string>} vars
- * @returns {void}
- */
-/**
- * Apply custom CSS variables on :root for theming.
+ * directly. Property names should be provided without the leading `--`.
  *
  * @param {Record<string,string>} vars
  * @returns {void}

@@ -12,9 +12,18 @@ import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './filesManager.js'
 
 /**
+ * @typedef {{path:string,name:string,isIndex?:boolean,children?:NavTreeItem[]}} NavTreeItem
+ */
+
+/**
+ * @typedef {{slug:string,title:string,excerpt?:string}} SearchIndexEntry
+ * @typedef {{navbar:HTMLElement,linkEls:NodeListOf<Element>}} NavBuildResult
+ */
+
+/**
  * Create a minimal site nav structure rooted at the provided home page.
  * @param {string} homePage
- * @returns {object} nav tree
+ * @returns {NavTreeItem[]}
  */
 export function createSiteNav(homePage) {
   return createNavTree(t, [{ path: homePage, name: t('home'), isIndex: true, children: [] }])
@@ -36,9 +45,10 @@ export function createSiteNav(homePage) {
  * @param {Function} renderByQuery - callback invoked when the user navigates
  *   via the navbar or content links.  This allows the UI layer to render the
  *   requested page without creating a circular dependency.
+ * @param {boolean} effectiveSearchEnabled - whether search UI should be rendered
  * @param {('eager'|'lazy'|'off')} searchIndexMode - search index option
  *   forwarded from `initCMS`; only relevant if a search input is present.
- * @returns {Promise<Object>} resolves with an object containing `navbar` and `linkEls`
+ * @returns {Promise<NavBuildResult>} resolves with an object containing `navbar` and `linkEls`
  */
 export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager') {
   if (!navbarWrap || !(navbarWrap instanceof HTMLElement)) {
@@ -48,7 +58,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   const parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null
   const navDoc = parser ? parser.parseFromString(navHtml || '', 'text/html') : null
   const linkEls = navDoc ? navDoc.querySelectorAll('a') : []
-  
+
 
   // ensure slug maps are populated for links inside the navigation
   await safe(() => preScanHtmlSlugs(linkEls, contentBase))
@@ -103,19 +113,19 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     brandItem.textContent = t('home')
   }
   brand.appendChild(brandItem)
-  
-      // Add SPA navigation handler for home link
-    brandItem.addEventListener('click', function(ev) {
-      const href = brandItem.getAttribute('href') || '';
-      if (href.startsWith('?page=')) {
-        ev.preventDefault();
-        const url = new URL(href, location.href);
-        const pageParam = url.searchParams.get('page');
-        const hash = url.hash ? url.hash.replace(/^#/, '') : null;
-        history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''));
-        try { renderByQuery(); } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e); }
-      }
-    });
+
+  // Add SPA navigation handler for home link
+  brandItem.addEventListener('click', function (ev) {
+    const href = brandItem.getAttribute('href') || '';
+    if (href.startsWith('?page=')) {
+      ev.preventDefault();
+      const url = new URL(href, location.href);
+      const pageParam = url.searchParams.get('page');
+      const hash = url.hash ? url.hash.replace(/^#/, '') : null;
+      history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''));
+      try { renderByQuery(); } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e); }
+    }
+  });
 
 
   // mobile hamburger
@@ -138,14 +148,17 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   let end, searchItem, resultsContainer
   // Respect searchIndex and searchIndexMode options
   if (!effectiveSearchEnabled) {
-    // Ignore searchIndexMode, do not render search box or index
-    end = null;
-    searchInput = null;
-    resultsContainer = null;
+    // Search globally disabled by consumer; do not render search UI.
+    end = null
+    searchInput = null
+    resultsContainer = null
+  } else if (searchIndexMode === 'off') {
+    // Consumer explicitly disabled the index even though search support
+    // is available; do not render the search UI in this case.
+    end = null
+    searchInput = null
+    resultsContainer = null
   } else {
-    // Only allow 'eager' or 'lazy' modes when search is enabled
-    const mode = (searchIndexMode === 'off') ? 'eager' : searchIndexMode;
-    searchIndexMode = mode;
     end = document.createElement('div')
     end.className = 'navbar-end'
     searchItem = document.createElement('div')

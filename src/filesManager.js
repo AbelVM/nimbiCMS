@@ -1,6 +1,9 @@
-// legacy module maintained for backwards compatibility.  All slug-related
-// and markdown-fetching logic now lives in `slugManager.js`.  We re-export
-// the entirety of that module here so existing imports continue to work.
+/**
+ * Backwards-compatibility re-export shim for the previous `filesManager`
+ * module surface.  The functional implementations live in
+ * `src/slugManager.js`; this module re-exports them so older imports
+ * continue to work without breaking consumers.
+ */
 
 export * from './slugManager.js'
 

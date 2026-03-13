@@ -10,11 +10,17 @@ import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/h
 // maximum number of entries before the oldest are dropped.  Can be
 // adjusted at runtime via `setResolutionCacheMax`; useful if a host page has
 // known memory constraints or wants a larger cache for a high‑traffic site.
+/**
+ * Maximum number of entries stored in the resolution cache before oldest
+ * entries are evicted. Mutable at runtime via `setResolutionCacheMax`.
+ * @type {number}
+ */
 export let RESOLUTION_CACHE_MAX = 100
 
 /**
  * Change maximum cache size at runtime.
  * @param {number} n
+ * @returns {void}
  */
 export function setResolutionCacheMax(n) {
   RESOLUTION_CACHE_MAX = n
@@ -25,6 +31,7 @@ export function setResolutionCacheMax(n) {
  * fresh lookup.  Setting to a non‑positive number disables expiration.
  * This value is exported as a `let` so that callers (such as `initCMS`) can
  * override it dynamically if they need a different cache lifetime.
+ * @type {number}
  */
 export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000 // five minutes
 
@@ -40,8 +47,20 @@ export function setResolutionCacheTtl(ms) {
 }
 
 /**
+ * Modify the resolution cache time‑to‑live at runtime.
+ * @param {number} ms
+ * @returns {void}
+ */
+
+/**
+ * Resolution cache entry shape.
+ * @typedef {{value:{resolved:string,anchor:string|null},ts:number}} ResolutionRecord
+ */
+
+/**
  * Runtime cache for recent page-resolution results.
- * Map<string, {value:{resolved:string,anchor:string|null},ts:number}>
+ * Maps cacheKey -> {@link ResolutionRecord}
+ * @type {Map<string, ResolutionRecord>}
  */
 export const resolutionCache = new Map()
 

@@ -1,6 +1,13 @@
 import { normalizePath } from './utils/helpers.js'
 
 /**
+ * Page data shape passed around the renderer.
+ * @typedef {Object} PageData
+ * @property {Object} [meta]
+ * @property {string} [raw]
+ */
+
+/**
  * Set or update a single meta tag or property in the document head.
  *
  * @param {string} name
@@ -58,7 +65,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
  * the provided page metadata.  Overrides allow caller to supply alternate
  * values.
  *
- * @param {object} data
+ * @param {PageData} data
  * @param {string} [titleOverride]
  * @param {string} [imageOverride]
  * @param {string} [descOverride]
@@ -103,7 +110,7 @@ export function getSiteNameFromMeta() {
 /**
  * Inject JSON-LD structured data based on page metadata and defaults.
  *
- * @param {object} data
+ * @param {PageData} data
  * @param {string} pagePath
  * @param {string} [titleOverride]
  * @param {string} [imageOverride]
@@ -167,16 +174,20 @@ import readingTime from 'reading-time/lib/reading-time'
  * freshly parsed page.
  *
  * @param {Function} t - localization function
+ * @typedef {Object} ParsedPage
+ * @property {Object} [meta]
+
+ * @param {function(string, Object=): string} t - localization function
  * @param {string} initialDocumentTitle
- * @param {object} parsed
- * @param {Array} toc
+ * @param {ParsedPage} parsed
+ * @param {HTMLElement} toc
  * @param {HTMLElement} article
  * @param {string} pagePath
  * @param {string|null} anchor
  * @param {HTMLElement|null} topH1
  * @param {string|null} h1Text
  * @param {string|null} slugKey
- * @param {object} data
+ * @param {PageData} data
  * @returns {void}
  */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {

@@ -5,8 +5,12 @@ import 'highlight.js/styles/monokai.css'
 // --- plugin/hook subsystem -------------------------------------------------
 
 /**
- * Built-in hook names and their callback lists.  External code can register
- * handlers to be invoked at key events in the CMS lifecycle.
+ * Built-in hook names and their callback lists.
+ * External code can register handlers to be invoked at key events in the
+ * CMS lifecycle. Each callback receives a `ctx` object and may be
+ * synchronous or return a Promise.
+ *
+ * @type {{onPageLoad:Array<function(object):void|Promise<void>>,onNavBuild:Array<function(object):void|Promise<void>>,transformHtml:Array<function(object):void|Promise<void>>}}
  */
 const hooks = {
   onPageLoad: [],      // called after a page has been rendered
@@ -15,9 +19,12 @@ const hooks = {
 }
 
 /**
- * Register a hook by name.  Throws if the name is not recognised.
- * @param {string} name
- * @param {Function} fn
+ * Register a hook by name. Throws if the name is not recognised.
+ * The callback receives a single `ctx` object and may be synchronous or
+ * return a Promise.
+ *
+ * @param {string} name - hook name ("onPageLoad", "onNavBuild", "transformHtml")
+ * @param {(ctx:object)=>void|Promise<void>} fn - callback invoked for the hook
  * @returns {void}
  */
 export function addHook(name, fn) {
@@ -35,20 +42,20 @@ export function addHook(name, fn) {
  */
 /**
  * Register a callback to be invoked after each page is rendered.
- * @param {Function} fn
+ * @param {(ctx:object)=>void|Promise<void>} fn
  * @returns {void}
  */
 export function onPageLoad(fn) { addHook('onPageLoad', fn) }
 /**
  * Register a callback once the navigation DOM has been built.
- * @param {Function} fn
+ * @param {(ctx:object)=>void|Promise<void>} fn
  * @returns {void}
  */
 export function onNavBuild(fn) { addHook('onNavBuild', fn) }
 /**
  * Register a callback that can mutate the article element before it is
- * appended to the document.
- * @param {Function} fn
+ * appended to the document. The callback receives the render context.
+ * @param {(ctx:object)=>void|Promise<void>} fn
  * @returns {void}
  */
 export function transformHtml(fn) { addHook('transformHtml', fn) }

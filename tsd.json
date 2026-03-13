@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "lib": ["es2020", "dom"],
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "target": "ES2020",
+    "skipLibCheck": true,
+    "strict": false
+  },
+  "testFiles": ["src/index.test-d.ts"]
+}

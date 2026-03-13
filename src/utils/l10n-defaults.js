@@ -1,3 +1,16 @@
+/**
+ * Localization defaults for supported languages.
+ *
+ * @typedef {Object} L10nEntry
+ * @property {string} navigation
+ * @property {string} onThisPage
+ * @property {string} home
+ * @property {string} scrollToTop
+ * @property {string} readingTime - Template using `{minutes}` placeholder.
+ * @property {string} searchPlaceholder
+ */
+
+/** @type {Record<string, L10nEntry>} */
 export const DEFAULT_L10N = {
   en: {
     navigation: 'Navigation',

@@ -1,5 +1,15 @@
 import { _rewriteAnchors } from '../htmlBuilder.js'
 
+/**
+ * Worker entrypoint for rewriting anchor hrefs inside rendered HTML.
+ *
+ * Accepted messages:
+ * - `{ type: 'rewriteAnchors', id: string, html: string, contentBase?: string, pagePath?: string }`
+ *   -> posts `{ id, result: string }` where `result` is the rewritten HTML string.
+ *
+ * On error the worker posts `{ id, error: string }`.
+ */
+
 onmessage = async (ev) => {
   const msg = ev.data || {}
   console.debug('[anchorWorker] received message', msg)

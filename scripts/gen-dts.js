@@ -58,7 +58,7 @@ function jsdocTypeToTs(t) {
 
 let decls = []
 // track names we've declared globally to avoid duplicates
-const seen = new Set()
+const globalSeen = new Set()
 
 // manual header definitions (kept in sync by script)
 decls.push(`// Type definitions for nimbiCMS_pre`
@@ -85,7 +85,7 @@ export interface InitOptions {
 }
 
 export interface PageContext {
-  data: any
+  data: Record<string, any>
   pagePath: string
   anchor: string | null
 }
@@ -99,7 +99,7 @@ export interface HookContext {
   topH1?: HTMLElement | null
   h1Text?: string | null
   slugKey?: string | null
-  data?: any
+  data?: Record<string, any>
   contentWrap?: HTMLElement | null
   navWrap?: HTMLElement | null
   // nav-build specific
@@ -108,20 +108,171 @@ export interface HookContext {
   contentBase?: string
 }
 
+// UI helper option and return shapes (mirrors src/ui.js typedefs)
+export type UIOptions = {
+  contentWrap: HTMLElement,
+  navWrap: HTMLElement,
+  container: HTMLElement,
+  mountOverlay?: HTMLElement | null,
+  t: (key: string, vars?: Object)=>string,
+  contentBase: string,
+  homePage: string,
+  initialDocumentTitle: string,
+  runHooks: (name: string, ctx?: Object)=>void|Promise<void>
+}
+
+export type UIReturn = {
+  renderByQuery: () => Promise<void>,
+  siteNav: object,
+  getCurrentPagePath: () => string | null
+}
+
+// Router resolution cache types
+export type ResolutionRecord = { value: { resolved: string, anchor: string | null }, ts: number }
+export const RESOLUTION_CACHE_MAX: number
+export const RESOLUTION_CACHE_TTL: number
+export function setResolutionCacheMax(n: number): void
+export function setResolutionCacheTtl(ms: number): void
+export const resolutionCache: Map<string, ResolutionRecord>
+
+// Fetch result and localization entry shapes (from slugManager and l10n defaults)
+export type FetchResult = { raw: string, isHtml?: boolean, status?: number }
+export type L10nEntry = { navigation: string, onThisPage: string, home: string, scrollToTop: string, readingTime: string, searchPlaceholder: string }
+
 // primary entrypoint – options object is strongly typed above
 export function initCMS(options: InitOptions): Promise<void>
 export default initCMS
 
 // hook / plugin API definitions
-export function addHook(name: string, fn: (...args:any[])=>any): void
-export function onPageLoad(fn: (...args:any[])=>any): void
-export function onNavBuild(fn: (...args:any[])=>any): void
-export function transformHtml(fn: (...args:any[])=>any): void
+export function addHook(name: string, fn: (ctx:HookContext)=>void|Promise<void>): void
+export function onPageLoad(fn: (ctx:HookContext)=>void|Promise<void>): void
+export function onNavBuild(fn: (ctx:HookContext)=>void|Promise<void>): void
+export function transformHtml(fn: (ctx:HookContext)=>void|Promise<void>): void
 export function _clearHooks(): void
+
+export type WorkerManager = {
+  get: () => Worker | null
+  send: (msg: any, timeout?: number) => Promise<unknown>
+  terminate: () => void
+}
+
+// Worker manager helpers
+export function makeWorkerManager(createWorker: () => Worker|null, name?: string): WorkerManager
+export function createWorkerFromRaw(code: string): Worker|null
+
+// UI helper (opaque options for now)
+export function createUI(opts: UIOptions): UIReturn
+
+// Slug manager shared maps
+export const slugToMd: Map<string, string|{default?:string,langs?:Record<string,string>}>
+export const mdToSlug: Map<string,string>
+export const availableLanguages: string[]
+export const listPathsFetched: Set<string>
+export const listSlugCache: Map<string,string>
+export const searchIndex: Array<{slug:string,title:string,excerpt:string,path:string}>
+
+// Codeblocks
+export const SUPPORTED_HLJS_MAP: Map<string,string>
+
+// Additional explicit declarations to reduce remaining any entries
+export function setLanguages(list: string[]): void
+export function buildSearchIndexWorker(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
+export function crawlForSlugWorker(slug: string, base: string, maxQueue: number): Promise<string|null>
+export function removeSlugResolver(fn: (slug:string)=>unknown): void
+export function setNotFoundPage(p: string): void
+export function _setAllMd(obj: Record<string,string>): void
+export function clearListCaches(): void
+export function clearFetchCache(): void
+export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
+
 `
+// Additional manual augmentations for htmlBuilder, nav, markdown, and seo
+const extraManual = `
+export type NavTreeItem = { path: string, name: string, isIndex?: boolean, children?: NavTreeItem[] }
+export type NavBuildResult = { navbar: HTMLElement, linkEls: NodeListOf<Element> }
+export function createSiteNav(homePage: string): NavTreeItem[]
+export function buildNav(navbarWrap: HTMLElement, container: HTMLElement, navHtml: string, contentBase: string, homePage: string, t: (key:string, vars?:Record<string,unknown>)=>string, renderByQuery: ()=>void, effectiveSearchEnabled: boolean, searchIndexMode: 'eager'|'lazy'|'off'): Promise<NavBuildResult>
+
+export type NavItem = { path: string, name: string, children?: NavItem[] }
+export type TocEntry = { level:number, text:string, id?:string }
+export type ParsedPage = { html: string, meta: object, toc: TocEntry[] }
+export type ArticleResult = { article: HTMLElement, parsed: ParsedPage, toc: HTMLElement, topH1: HTMLElement | null, h1Text: string | null, slugKey: string | null }
+export function createNavTree(t: (key:string, vars?:Record<string,unknown>)=>string, tree: NavItem[]): HTMLElement
+export function buildTocElement(t: (key:string)=>string, toc: TocEntry[], pagePath?: string): HTMLElement
+export function prepareArticle(t: (key:string)=>string, data: {raw:string,isHtml?:boolean}, pagePath: string, anchor: string|null, contentBase: string): Promise<ArticleResult>
+export function initAnchorWorker(): Worker|null
+export function rewriteAnchorsWorker(article: HTMLElement, contentBase: string, pagePath?: string): Promise<void>
+export function attachTocClickHandler(toc: HTMLElement): void
+export function scrollToAnchorOrTop(anchor: string|null): void
+export function ensureScrollTopButton(article: HTMLElement, topH1: HTMLElement|null, opts?: { mountOverlay?: HTMLElement|null, container?: HTMLElement|null, mountEl?: HTMLElement|null, navWrap?: HTMLElement|null, t?: Function }): void
+
+export type MarkdownPlugin = { tokenizer?: Function, renderer?: object, walkTokens?: Function, transform?: Function }
+export const markdownPlugins: MarkdownPlugin[]
+export function addMarkdownExtension(plugin: MarkdownPlugin): void
+export function setMarkdownExtensions(plugins: MarkdownPlugin[]): void
+export function initRendererWorker(): Worker|null
+export function parseMarkdownToHtml(md: string): Promise<ParsedPage>
+export function detectFenceLanguages(md: string, supportedMap?: Map<string,string>): Set<string>
+
+export const currentLang: string
+export function t(key: string, replacements?: Record<string,string>): string
+
+export function setTag(name: string, content: string): void
+export function setMetaTags(data: Record<string,unknown>, titleOverride?: string, imageOverride?: string, descOverride?: string, initialDocumentTitle?: string): void
+export function setStructuredData(data: Record<string,unknown>, pagePath: string, titleOverride?: string, imageOverride?: string, descOverride?: string, initialDocumentTitle?: string): void
+export function applyPageMeta(t: (key:string, vars?:Record<string,unknown>)=>string, initialDocumentTitle: string, parsed: ParsedPage, toc: TocEntry[], article: HTMLElement, pagePath: string, anchor: string|null, topH1: HTMLElement|null, h1Text: string|null, slugKey: string|null, data: Record<string,unknown>): void
+
+export function setLazyload(img: HTMLImageElement): void
+export function joinPaths(...parts: string[]): string
+
+`
+// add router and slug-manager explicit types to reduce `any` residues
+const extraRouterSlug = `
+export function _clearIndexCache(): void
+export function refreshIndexPaths(): void
+export function _purgeExpiredEntries(): void
+export function buildPageCandidates(resolved: string): string[]
+export function fetchPageData(raw: string, contentBase: string): Promise<{data: Record<string, any>, pagePath: string, anchor: string | null}>
+
+export function initSlugWorker(): Worker|null
+export function addSlugResolver(fn: (slug:string,contentBase?:string)=>Promise<string|null>|string|null): void
+export const notFoundPage: string
+export function setContentBase(contentBase: string): void
+export function slugify(s: string): string
+export function resolveSlugPath(slug: string): string|null
+export const crawlCache: Map<string, Promise<string|null>|string|null>
+export function buildSearchIndex(contentBase: string): Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>
+export function setDefaultCrawlMaxQueue(n: number): void
+export const crawlForSlug: (decoded: string, contentBase: string, maxQueue?: number) => Promise<string|null>
+export function crawlAllMarkdown(contentBase: string, maxQueue: number): Promise<string[]>
+export function ensureSlug(decoded: string, contentBase: string, maxQueue: any): Promise<string|null>
+`
+
+decls.push(extraManual);
+decls.push(extraRouterSlug);
 decls.push(manualTypes);
-// record that we've already declared initCMS (and hook helpers) to avoid later duplicates
-['initCMS','addHook','onPageLoad','onNavBuild','transformHtml','_clearHooks'].forEach(n=>seen.add(n))
+// record that we've already declared these manual symbols to avoid later duplicates
+[
+  'initCMS','addHook','onPageLoad','onNavBuild','transformHtml','_clearHooks',
+  'makeWorkerManager','createWorkerFromRaw','createUI',
+  // slug/paths/search helpers
+  'slugToMd','mdToSlug','availableLanguages','listPathsFetched','listSlugCache','searchIndex',
+  'SUPPORTED_HLJS_MAP','fetchMarkdown','fetchCache','resolutionCache','RESOLUTION_CACHE_TTL',
+  'RESOLUTION_CACHE_MAX',
+  'setResolutionCacheMax','setResolutionCacheTtl','resolutionCacheGet','resolutionCacheSet',
+  // htmlBuilder/nav/manual extras
+  'createSiteNav','buildNav','createNavTree','buildTocElement','prepareArticle',
+  'initAnchorWorker','rewriteAnchorsWorker','attachTocClickHandler','scrollToAnchorOrTop','ensureScrollTopButton',
+  // markdown extras
+  'MarkdownPlugin','markdownPlugins','addMarkdownExtension','setMarkdownExtensions','initRendererWorker','parseMarkdownToHtml','detectFenceLanguages',
+  // l10n/seo helpers
+  'currentLang','t','setTag','setMetaTags','setStructuredData','applyPageMeta','setLazyload','joinPaths',
+  // router & slug manager
+  '_clearIndexCache','refreshIndexPaths','_purgeExpiredEntries','buildPageCandidates','fetchPageData',
+  'initSlugWorker','addSlugResolver','notFoundPage','setContentBase','slugify','resolveSlugPath','crawlCache','buildSearchIndex','setDefaultCrawlMaxQueue','crawlForSlug','crawlAllMarkdown','ensureSlug',
+  // slug manager runtime helpers
+  'setLanguages','buildSearchIndexWorker','crawlForSlugWorker','removeSlugResolver','setNotFoundPage','_setAllMd','clearListCaches','clearFetchCache'
+].forEach(n=>globalSeen.add(n))
 
 globSync('src/**/*.js').forEach(file => {
   // add a header comment so users can see where these symbols originate
@@ -130,13 +281,15 @@ globSync('src/**/*.js').forEach(file => {
   const src = fs.readFileSync(file, 'utf8')
   const comments = parse(src, { spacing: 'preserve' })
 
-  // we track names we've declared to avoid duplicates
+  // we track names we've declared to avoid duplicates (per-file), and
+  // consult `globalSeen` to avoid duplicates across files/manual types
   const seen = new Set()
 
   // helper to add a declaration if not already present
   function addDecl(name, d) {
-    if (!seen.has(name)) {
+    if (!seen.has(name) && !globalSeen.has(name)) {
       seen.add(name)
+      globalSeen.add(name)
       decls.push(d)
     }
   }
@@ -245,7 +398,14 @@ globSync('src/**/*.js').forEach(file => {
     const constMatch = after.match(/export\s+(?:const|let|var)\s+(\w+)\s*=/)
     if (constMatch) {
       const name = constMatch[1]
-      addDecl(name, `export const ${name}: any`)
+      // check for an @type tag on the preceding JSDoc comment
+      const typeTag = c.tags.find(t => t.tag === 'type')
+      if (typeTag && typeTag.type) {
+        const tsType = jsdocTypeToTs(typeTag.type)
+        addDecl(name, `export const ${name}: ${tsType}`)
+      } else {
+        addDecl(name, `export const ${name}: any`)
+      }
     }
   })
 

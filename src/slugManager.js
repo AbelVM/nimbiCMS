@@ -4,12 +4,19 @@
 // slugs or markdown path resolution.
 
 /**
- * mapping from a slug (generated from title/H1) to a markdown path.
+ * Mapping from a slug (generated from title/H1) to a markdown path or a
+ * localized mapping object when `availableLanguages` is used. Values may be
+ * a string (direct path) or an object with `{ default?: string, langs?: { [lang:string]: string } }`.
  * Populated during nav construction, anchor rewriting, or on demand via
  * crawling.
- * @type {Map<string,string>}
+ * @type {Map<string, string|{default?:string,langs?:Object.<string,string>}>}
  */
 export const slugToMd = new Map()
+
+/**
+ * Result returned from `fetchMarkdown`.
+ * @typedef {{raw:string,isHtml?:boolean,status?:number}} FetchResult
+ */
 
 // list of available language codes when running in a multilingual site.
 // When non-empty, slug-to-path mappings are stored in a nested object
@@ -18,6 +25,11 @@ export const slugToMd = new Map()
 export let availableLanguages = []
 
 // helper for tests and plugins
+/**
+ * Set available language codes for multilingual sites.
+ * @param {string[]} list
+ * @returns {void}
+ */
 export function setLanguages(list) {
   availableLanguages = Array.isArray(list) ? list.slice() : []
 }
@@ -49,6 +61,8 @@ function _sendToWorker(msg) {
 
 /**
  * Build search index using worker if available.
+ * @param {string} contentBase
+ * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>}
  */
 export async function buildSearchIndexWorker(contentBase) {
   const w = initSlugWorker()
@@ -58,6 +72,10 @@ export async function buildSearchIndexWorker(contentBase) {
 
 /**
  * Crawl for slug using worker when possible.
+ * @param {string} slug
+ * @param {string} base
+ * @param {number} maxQueue
+ * @returns {Promise<string|null>}
  */
 export async function crawlForSlugWorker(slug, base, maxQueue) {
   const w = initSlugWorker()
@@ -109,7 +127,7 @@ export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolver
  */
 export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.delete(fn) }
 /**
- * reverse mapping of `slugToMd` (markdown path -> slug).
+ * Reverse mapping of `slugToMd` (markdown path -> slug).
  * @type {Map<string,string>}
  */
 export const mdToSlug = new Map()
@@ -163,13 +181,15 @@ export function _setAllMd(obj) {
   _allMd = obj || {}
 }
 
-// cache mapping discovered slugs from the `allMarkdownPaths` manifest to
-// their markdown path.  This is populated lazily when we fetch titles from
-// the manifest entries; storing it avoids repeated fetches during tests or
+// Cache mapping discovered slugs from the `allMarkdownPaths` manifest to
+// their markdown path. Populated lazily when we fetch titles from the
+// manifest entries; storing it avoids repeated fetches during tests or
 // runtime lookups.
+/** @type {Map<string,string>} */
 export const listSlugCache = new Map()
-// set of manifest paths we've already inspected and recorded in
+// Set of manifest paths we've already inspected and recorded in
 // `listSlugCache` so we don't re-fetch them.
+/** @type {Set<string>} */
 export const listPathsFetched = new Set()
 /**
  * Clear any cached slug lookups derived from the build-time manifest.
@@ -327,10 +347,8 @@ export function resolveSlugPath(slug) {
   return null
 }
 
-// simple in-memory cache of fetchMarkdown responses keyed by the resolved URL
-/**
- * @type {Map<string,Promise<any>>}
- */
+// Simple in-memory cache of `fetchMarkdown` responses keyed by the resolved URL.
+/** @type {Map<string, Promise<FetchResult>>} */
 export const fetchCache = new Map()
 /**
  * Empty the in-memory markdown fetch cache.  Useful for tests or when the
@@ -356,6 +374,9 @@ export function clearFetchCache() { fetchCache.clear() }
  * @param {string} path
  * @param {string} base
  * @returns {Promise<{raw:string,isHtml?:boolean,status?:number}>}
+ */
+/**
+ * @type {(path: string, base?: string) => Promise<FetchResult>}
  */
 export let fetchMarkdown = async function(path, base) {
   // If tests or other code have mocked/re-exported `fetchMarkdown` from
@@ -465,11 +486,17 @@ export let fetchMarkdown = async function(path, base) {
   return promise
 }
 
-// cache results from crawl attempts so we don't re-scan directories
+// Cache results from crawl attempts so we don't re-scan directories.
+/**
+ * Cache of crawl results keyed by decoded slug. Values are the discovered
+ * relative markdown path or `null`, or a promise resolving to that.
+ * @type {Map<string, Promise<string|null>|string|null>}
+ */
 export const crawlCache = new Map()
 
-// simple client-side search index generated from headings.  Populated by
+// Simple client-side search index generated from headings. Populated by
 // `buildSearchIndex`; stored here so UI components can query it directly.
+/** @type {Array<{slug:string,title:string,excerpt:string,path:string}>} */
 export let searchIndex = []
 
 /**
@@ -658,9 +685,7 @@ const _crawlLinkSelector = 'a[href]'
  * router and `ensureSlug` call the mutable binding instead of a fixed
  * function so mocks take effect.
  *
- * @param {string} decoded
- * @param {string} contentBase
- * @returns {Promise<string|null>} relative markdown path or null
+ * @type {(decoded: string, contentBase: string, maxQueue?: number) => Promise<string|null>}
  */
 export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaultCrawlMaxQueue) {
   if (crawlCache.has(decoded)) return crawlCache.get(decoded)
@@ -791,6 +816,13 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
  *
  * @param {string} decoded
  * @param {string} contentBase
+ * @returns {Promise<string|null>}
+ */
+/**
+ * Ensure the given slug is mapped to a markdown path.
+ * @param {string} decoded
+ * @param {string} contentBase
+ * @param {number} [maxQueue]
  * @returns {Promise<string|null>}
  */
 export async function ensureSlug(decoded, contentBase, maxQueue) {

@@ -12,25 +12,52 @@ const _rendererManager = makeWorkerManager(() => new RendererWorker(), 'markdown
 const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
 
 /**
+ * @typedef {{level:number,text:string,id?:string}} TocEntry
+ */
+
+/**
+ * @typedef {{html:string,meta:Object,toc:Array<TocEntry>}} ParseResult
+ */
+
+/**
+ * @typedef {Object} MarkdownPlugin
+ * @property {Function} [tokenizer]
+ * @property {Object} [renderer]
+ * @property {Function} [walkTokens]
+ * @property {Function} [transform]
+ */
+
+/**
+ * @typedef {{html:string,meta?:Object}} RendererResult
+ */
+
+/**
  * lazily return or create a renderer worker instance (may return null)
+ */
+/**
+ * Lazily return or create a renderer worker instance (may return null).
+ * @returns {Worker|null}
  */
 export function initRendererWorker() {
   return _rendererManager.get()
 }
 
 function _sendToRenderer(msg) {
+  /** @returns {Promise<RendererResult>} */
   return _rendererManager.send(msg, 1000)
 }
 
 // user-provided marked plugin objects will be stored here; each entry is an
 // object that can contain `tokenizer`, `renderer`, `walkTokens`, etc., as
 // defined by the marked plugin API.
+/** Registered marked plugins. */
+/** @type {Array<MarkdownPlugin>} */
 export const markdownPlugins = []
 
 /**
  * Register a new marked plugin.  The object is passed directly to
  * `marked.use()` which merges its fields into the global parser.
- * @param {object} plugin
+ * @param {MarkdownPlugin} plugin
  */
 export function addMarkdownExtension(plugin) {
     if (plugin && typeof plugin === 'object') {
@@ -41,7 +68,7 @@ export function addMarkdownExtension(plugin) {
 
 /**
  * Replace the full plugin list.  Existing list is cleared first.
- * @param {Array<object>} plugins
+ * @param {MarkdownPlugin[]} plugins
  */
 export function setMarkdownExtensions(plugins) {
   markdownPlugins.length = 0
@@ -63,7 +90,7 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
  * Preserves frontmatter metadata.
  *
  * @param {string} md
- * @returns {Promise<{html:string,meta:Object,toc:Array<{level:number,text:string,id:string}>}>}
+ * @returns {Promise<ParseResult>}
  */
 export async function parseMarkdownToHtml(md) {
   // attempt to offload to worker if available

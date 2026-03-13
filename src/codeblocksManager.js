@@ -2,14 +2,31 @@ import hljs from 'highlight.js/lib/core'
 
 export { hljs }
 
+/**
+ * @typedef {{name?:string,aliases?:string[]}} HLJSLangEntry
+ */
+
+/**
+ * Explicit alias type for the supported languages map so the d.ts generator
+ * can emit a useful signature.
+ * @typedef {Map<string,string>} SupportedHljsMap
+ */
+
+/**
+ * Map of supported highlight.js language keys to canonical module name.
+ * @type {Map<string,string>}
+ */
+/** @type {SupportedHljsMap} */
+export const SUPPORTED_HLJS_MAP = new Map()
+
 // constants & configuration ---------------------------------------------------
 const DEFAULT_HLJS_SUPPORTED_URL =
   'https://raw.githubusercontent.com/highlightjs/highlight.js/main/SUPPORTED_LANGUAGES.md'
-export const SUPPORTED_HLJS_MAP = new Map()
 
 // alias shortcuts used when translating a fence language or registration name
 // into the highlight.js module name.  Keep this in sync with any logic that
 // constructs `candidates` in `registerLanguage`.
+/** @type {Record<string,string>} */
 export const HLJS_ALIAS_MAP = {
   shell: 'bash',
   sh: 'bash',

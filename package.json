@@ -12,6 +12,7 @@
     "test": "npx vitest run",
     "gen-dts": "node scripts/gen-dts.js",
     "check-dts": "npx tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck",
+    "type-test": "npx tsd",
     "docs": "typedoc --options typedoc.json"
   },
   "dependencies": {
@@ -30,14 +31,17 @@
     "terser": "^5.17.0",
     "typedoc": "^0.28.17",
     "typescript": "^5.9.3",
+    "tsd": "^0.33.0",
     "vite": "^7.3.1",
     "vite-plugin-restart": "^2.0.0",
     "vitest": "^4.0.18"
   },
   "main": "dist/nimbi-cms.cjs.js",
   "module": "dist/nimbi-cms.es.js",
+  "types": "src/index.d.ts",
   "unpkg": "dist/nimbi-cms.js",
   "files": [
-    "dist"
+    "dist",
+    "src/index.d.ts"
   ]
 }

@@ -102,12 +102,13 @@ export function encodeURL(u) {
 }
 
 /**
- * Execute the given function and silently ignore any exceptions.  Returns
- * the result of `fn` or `undefined` if an error occurred.  Useful for
- * replacing frequent `try { ... } catch (_) {}` patterns.
+ * Execute the given function and silently ignore any exceptions. Returns
+ * the result of `fn` or `undefined` if an error occurred. If `fn` returns
+ * a Promise, the returned Promise will resolve to `undefined` on rejection.
+ * Useful for replacing frequent `try { ... } catch (_) {}` patterns.
  *
- * @param {Function} fn
- * @returns {any}
+ * @param {() => any|Promise<any>} fn
+ * @returns {any|Promise<any>|undefined}
  */
 export function safe(fn) {
   try {

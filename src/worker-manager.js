@@ -10,14 +10,20 @@
  *
  * @param {function(): (Worker|null)} createWorker - Function that returns a new Worker instance when called.
  * @param {string} [name='worker'] - Friendly name used in console warnings.
- * @returns {{get: function(): (Worker|null), send: function(object, number=): Promise<any>, terminate: function(): void}}
+ * @returns {{get: function(): (Worker|null), send: function(object, number=): Promise<unknown>, terminate: function(): void}}
  *   - `get()` returns the Worker instance or null.
  *   - `send(msg, timeoutMs?)` sends a message and returns a Promise that resolves with the worker reply or rejects on timeout/error.
  *   - `terminate()` forcefully terminates the worker and clears internal state.
+ *
+ * @typedef {{get: function(): (Worker|null), send: function(object, number=): Promise<unknown>, terminate: function(): void}} WorkerManager
  */
 export function makeWorkerManager(createWorker, name = 'worker') {
   let _w = null
 
+  /**
+   * Return the underlying Worker instance, creating it lazily.
+   * @returns {(Worker|null)}
+   */
   function get() {
     if (!_w) {
       try {
@@ -43,6 +49,10 @@ export function makeWorkerManager(createWorker, name = 'worker') {
     return _w
   }
 
+  /**
+   * Terminate and clear the managed worker.
+   * @returns {void}
+   */
   function terminate() {
     try {
       if (_w) {
@@ -54,6 +64,12 @@ export function makeWorkerManager(createWorker, name = 'worker') {
     }
   }
 
+  /**
+   * Send a message to the worker and wait for a response.
+   * @param {object} msg
+   * @param {number} [timeout=1000]
+   * @returns {Promise<unknown>}
+   */
   function send(msg, timeout = 1000) {
     return new Promise((resolve, reject) => {
       const w = get()
@@ -98,7 +114,9 @@ export function makeWorkerManager(createWorker, name = 'worker') {
     })
   }
 
-  return { get, send, terminate }
+  /** @type {WorkerManager} */
+  const api = { get, send, terminate }
+  return api
 }
 
 /**

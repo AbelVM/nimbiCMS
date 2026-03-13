@@ -13,31 +13,44 @@ import { prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOr
 import { applyPageMeta } from './seoManager.js'
 
 /**
- * Initialize UI rendering helpers for a mounted CMS instance.
- *
- * @param {object} opts
- * @param {HTMLElement} opts.contentWrap
- * @param {HTMLElement} opts.navWrap
- * @param {HTMLElement} opts.container
- * @param {HTMLElement|null} opts.mountOverlay
- * @param {Function} opts.t
- * @param {string} opts.contentBase
- * @param {string} opts.homePage
- * @param {string} opts.initialDocumentTitle
- * @param {Function} opts.runHooks - hook runner from nimbi-cms
- * @returns {{renderByQuery: function():Promise<void>, siteNav: object, getCurrentPagePath: function():string|null}}
+ * Options passed to `createUI`.
+ * @typedef {Object} UIOptions
+ * @property {HTMLElement} contentWrap
+ * @property {HTMLElement} navWrap
+ * @property {HTMLElement} container
+ * @property {HTMLElement|null} mountOverlay
+ * @property {(key:string, vars?:Object)=>string} t
+ * @property {string} contentBase
+ * @property {string} homePage
+ * @property {string} initialDocumentTitle
+ * @property {(name:string, ctx?:Object)=>void|Promise<void>} runHooks
  */
-export function createUI({
-  contentWrap,
-  navWrap,
-  container,
-  mountOverlay = null,
-  t,
-  contentBase,
-  homePage,
-  initialDocumentTitle,
-  runHooks
-}) {
+
+/**
+ * Return shape from `createUI`.
+ * @typedef {Object} UIReturn
+ * @property {function():Promise<void>} renderByQuery
+ * @property {Object} siteNav
+ * @property {function():string|null} getCurrentPagePath
+ */
+
+/**
+ * Initialize UI rendering helpers for a mounted CMS instance.
+ * @param {UIOptions} opts
+ * @returns {UIReturn}
+ */
+export function createUI(opts) {
+  const {
+    contentWrap,
+    navWrap,
+    container,
+    mountOverlay = null,
+    t,
+    contentBase,
+    homePage,
+    initialDocumentTitle,
+    runHooks
+  } = opts || {}
   if (!contentWrap || !(contentWrap instanceof HTMLElement)) {
     throw new TypeError('contentWrap must be an HTMLElement')
   }

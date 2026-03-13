@@ -1,6 +1,20 @@
 import { marked } from 'marked'
 import { parseFrontmatter } from '../utils/frontmatter.js'
 
+/**
+ * Worker entrypoint for rendering markdown to HTML and registering
+ * highlight.js languages on demand.
+ *
+ * Accepted messages:
+ * - `{ type: 'register', name: string, url: string }` — dynamically import
+ *   a highlight.js language module and register it. Replies with
+ *   `{ type: 'registered', name }` or `{ type: 'register-error', name, error }`.
+ * - `{ id: string, md: string }` — render `md` (which may contain frontmatter)
+ *   and reply with `{ id, result: { html: string, meta: Record<string,string>, toc: Array<{level:number,text:string}> } }`.
+ *
+ * On error the worker posts `{ id, error: string }`.
+ */
+
 let hljs = null
 const HLJS_CDN_BASE = 'https://cdn.jsdelivr.net/npm/highlight.js@11.8.0'
 

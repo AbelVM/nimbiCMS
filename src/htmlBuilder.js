@@ -4,6 +4,15 @@ import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from '.
 import { isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 
 /**
+ * @typedef {{path:string,name:string,children?:NavItem[]}} NavItem
+ * @typedef {{html:string,meta:Object,toc:Array<{level:number,text:string,id?:string}>}} ParsedPage
+ */
+
+/**
+ * @typedef {{article:HTMLElement,parsed:ParsedPage,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}} ArticleResult
+ */
+
+/**
  * Build a navigation tree DOM element from a simple tree description.
  * @param {Function} t - localization function that returns translated strings
  * @param {Array<{path:string,name:string,children?:Array}>} tree - nav items
@@ -287,6 +296,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
  *
  * @param {NodeListOf<HTMLAnchorElement>} linkEls
  * @param {string} base - base URL for fetchMarkdown
+ * @returns {Promise<void>}
  */
 export async function preScanHtmlSlugs(linkEls, base) {
   if (!linkEls || !linkEls.length) return
@@ -529,7 +539,7 @@ async function parseMarkdown(raw) {
  * @param {string} pagePath - normalized path of the page (for link rewriting)
  * @param {string|null} anchor - optional anchor to scroll to
  * @param {string} contentBase - base URL for resolving links and images
- * @returns {Promise<{article:HTMLElement,parsed:Object,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}>}
+ * @returns {Promise<ArticleResult>}
  */
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     let parsed = null
@@ -636,6 +646,16 @@ function _sendToAnchorWorker(msg) {
   })
 }
 
+/**
+ * Try to rewrite anchors using a dedicated worker. If the worker is not
+ * available this is a thin wrapper that falls back to the in-thread
+ * `rewriteAnchors` implementation.
+ *
+ * @param {HTMLElement} article
+ * @param {string} contentBase
+ * @param {string} [pagePath]
+ * @returns {Promise<void>}
+ */
 export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   return rewriteAnchors(article, contentBase, pagePath)
 }

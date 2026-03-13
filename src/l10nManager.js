@@ -4,6 +4,14 @@ import { DEFAULT_L10N } from './utils/l10n-defaults.js'
 // the original object defined in utils.
 const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))
 
+/**
+ * @typedef {Object.<string,string>} LocaleDict
+ */
+
+/**
+ * @typedef {{[locale:string]: LocaleDict}} L10NMap
+ */
+
 let detectedLang = 'en'
 if (typeof navigator !== 'undefined') {
   const navLang = navigator.language || (navigator.languages && navigator.languages[0]) || 'en'
