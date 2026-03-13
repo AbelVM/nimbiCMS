@@ -598,7 +598,7 @@ export function renderNotFound(contentWrap, t, e) {
     if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(notFound)
   }
 
-// ---------------- worker support for anchor rewriting ------------------
+ 
 let _anchorWorker = null
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
 
@@ -660,7 +660,7 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   return rewriteAnchors(article, contentBase, pagePath)
 }
 
-// test helpers (not part of public API)
+ 
 export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages, rewriteAnchors, rewriteAnchors as _rewriteAnchors, computeSlug as _computeSlug, rewriteAnchorsWorker as _rewriteAnchorsWorker }
 
 
@@ -682,15 +682,14 @@ export function attachTocClickHandler(toc) {
           const hash = url.hash ? url.hash.replace(/^#/, '') : null
           if (!pageParam && !hash) return
           ev.preventDefault()
-          // If the requested page equals the current page (or no `page` param),
-          // don't re-render — just update the URL/hash and scroll to the anchor.
+          
           let currentPage = null
           try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (err) { currentPage = null; console.warn('[htmlBuilder] access history.state failed', err) }
           try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (err) { console.warn('[htmlBuilder] parse current location failed', err) }
 
           if ((!pageParam && hash) || (pageParam && currentPage && String(pageParam) === String(currentPage))) {
             try {
-              // For anchor-only clicks, preserve existing search and only set hash.
+              
               if (!pageParam && hash) {
                 try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               } else {
@@ -702,7 +701,7 @@ export function attachTocClickHandler(toc) {
             return
           }
 
-          // Otherwise perform SPA navigation as before.
+          
           history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
           try {
             if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') {

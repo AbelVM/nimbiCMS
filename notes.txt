@@ -111,10 +111,15 @@ git fetch origin && git checkout main && git reset --hard origin/main
 
 >> searchIndexMode=off was removed as an option: update the code, jsdoc and readme if needed
 
-
-* remove dynamic imports when theres already a static import for the same module
-
 * remove excess of inline comments
+
+
+
+
+* Replace silent catches with structured logging or rethrow where appropriate. Replace broad empty catch {} 
+  blocks with catch (e) { /* log or comment */ } so future debuggers have context.
+
+
 
 * nimbi-cms is higher than nimbi-mount because the nav bar height is not taken into account
 
@@ -122,10 +127,11 @@ git fetch origin && git checkout main && git reset --hard origin/main
 
 * generate proper UMD, taking into account inline workers, dynamic imports, etc.
 
-* Replace silent catches with structured logging or rethrow where appropriate. Replace broad empty catch {} 
-  blocks with catch (e) { /* log or comment */ } so future debuggers have context.
+* remove dynamic imports when theres already a static import for the same module
 
 * import 'highlight.js/styles/monokai.css' in ninbi-cms?
+
+* allow URL parameters
 
 
 

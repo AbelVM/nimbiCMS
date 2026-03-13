@@ -1,5 +1,3 @@
-// hookManager.js
-// Extracted from nimbi-cms.js to break circular dependency with init.js
 
 
 /**

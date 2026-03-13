@@ -233,7 +233,7 @@ export function getSiteNameFromMeta(): string|null
 
 
 // --- from src/router.js
-export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array|string[]|{values:()=>Iterable}): any
+export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
 
 
 

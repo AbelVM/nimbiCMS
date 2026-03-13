@@ -1,7 +1,5 @@
 import { DEFAULT_L10N } from './utils/l10n-defaults.js'
 
-// start with a deep copy of defaults so runtime modifications don't affect
-// the original object defined in utils.
 const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))
 
 /**
@@ -60,7 +58,6 @@ export async function loadL10nFile(path, pageDir) {
       L10N[lang] = Object.assign({}, L10N[lang] || {}, json[lang])
     }
   } catch (e) {
-    // silently ignore load errors
   }
 }
 

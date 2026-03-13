@@ -15,7 +15,6 @@ import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
 import { ensureBulma, setStyle } from './bulmaManager.js'
 
-// persisted state used during init/render operations
 /**
  * Currently selected highlight theme name. Mutable export for runtime
  * customization; changes affect subsequent codeblock rendering.
@@ -223,10 +222,8 @@ export async function initCMS(options = {}) {
     } catch (err) { console.warn('[nimbi-cms] applying markdownExtensions failed', err) }
   }
 
-  // allow crawling behavior to be tuned by consumer
   try {
     if (typeof crawlMaxQueue === 'number') {
-       
       import('./slugManager.js').then(({ setDefaultCrawlMaxQueue }) => {
         try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { console.warn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
       })

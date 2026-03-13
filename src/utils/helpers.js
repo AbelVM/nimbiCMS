@@ -1,5 +1,4 @@
-// generic helpers reused throughout the codebase
-
+/** Generic helpers reused throughout the codebase */
 /**
  * Return true if the href points to an external or special link.  This
  * matches absolute URLs and mailto/tel schemes.
@@ -76,7 +75,6 @@ export function joinPaths(...parts) {
       return p.replace(/^\/+|\/+$/g, '')
     })
   let joined = segs.join('/')
-  // if first part started with slash, make absolute
   if (String(parts[0] || '').startsWith('/')) {
     if (!joined.startsWith('/')) joined = '/' + joined
   }
@@ -93,7 +91,7 @@ export function joinPaths(...parts) {
 export function encodeURL(u) {
   try {
     const s = String(u || '')
-    // if the string already contains percent escapes, avoid double-encoding
+      // if the string already contains percent escapes, avoid double-encoding
     if (s.includes('%')) return s
     return encodeURI(s)
   } catch (_) {
@@ -127,9 +125,7 @@ export function safe(fn) {
   }
 }
 
-// make `safe` available globally in test environments that call it
-// without importing (some tests expect a global helper). Attach to
-// `globalThis` when available.
+// make `safe` available globally in test environments that call it without importing
 try {
   if (typeof globalThis !== 'undefined' && !globalThis.safe) globalThis.safe = safe
 } catch (err) { console.warn('[helpers] global attach failed', err) }

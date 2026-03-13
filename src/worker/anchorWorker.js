@@ -17,7 +17,7 @@ onmessage = async (ev) => {
     if (msg.type === 'rewriteAnchors') {
       const { id, html, contentBase, pagePath } = msg
       try {
-        // parse the HTML string into a temporary document body
+        
         const parser = new DOMParser()
         const doc = parser.parseFromString(html || '', 'text/html')
         const article = doc.body

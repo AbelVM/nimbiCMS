@@ -19,13 +19,9 @@ export { hljs }
 /** @type {SupportedHljsMap} */
 export const SUPPORTED_HLJS_MAP = new Map()
 
-// constants & configuration ---------------------------------------------------
 const DEFAULT_HLJS_SUPPORTED_URL =
   'https://raw.githubusercontent.com/highlightjs/highlight.js/main/SUPPORTED_LANGUAGES.md'
 
-// alias shortcuts used when translating a fence language or registration name
-// into the highlight.js module name.  Keep this in sync with any logic that
-// constructs `candidates` in `registerLanguage`.
 /** @type {Record<string,string>} */
 export const HLJS_ALIAS_MAP = {
   shell: 'bash',
@@ -38,7 +34,6 @@ export const HLJS_ALIAS_MAP = {
   'c#': 'cs'
 }
 
-// words that should never be treated as valid highlight.js languages
 export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
@@ -191,7 +186,6 @@ export async function registerLanguage(name, modulePath) {
   name = name.trim()
   if (!name) return false
   const low = name.toLowerCase()
-  // drop explicitly banned languages
   if (BAD_LANGUAGES.has(low)) return false
   // if we have a populated list of supported languages and the requested
   // one isn't in it (and isn't an alias), skip early to avoid needless
@@ -284,7 +278,7 @@ export async function registerLanguage(name, modulePath) {
             return true
           } catch (_e) {
             lastErr = _e
-            // registration failed for this candidate
+                    // registration failed for this candidate
           }
         } else {
           // negative result cached; proceed to next candidate

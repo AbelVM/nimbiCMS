@@ -1,14 +1,10 @@
 import { marked } from 'marked'
-// Renderer worker is inlined so the library ships as a single JS file.
 import RendererWorker from './worker/renderer.js?worker&inline'
 import { makeWorkerManager } from './worker-manager.js'
 
 const _rendererManager = makeWorkerManager(() => new RendererWorker(), 'markdown')
 
-// Reuse a shared DOMParser in long‑running contexts to avoid repeated
-// construction (DOMParser is relatively cheap but can be called thousands
-// of times during heavy indexing or render loops). If DOMParser is not
-// available (e.g. some test runners) fall back to creating one per call.
+// Reuse a shared DOMParser in long‑running contexts to avoid repeated construction; fall back when unavailable.
 const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
 
 /**
@@ -32,9 +28,6 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
  */
 
 /**
- * lazily return or create a renderer worker instance (may return null)
- */
-/**
  * Lazily return or create a renderer worker instance (may return null).
  * @returns {Worker|null}
  */
@@ -47,9 +40,6 @@ function _sendToRenderer(msg) {
   return _rendererManager.send(msg, 1000)
 }
 
-// user-provided marked plugin objects will be stored here; each entry is an
-// object that can contain `tokenizer`, `renderer`, `walkTokens`, etc., as
-// defined by the marked plugin API.
 /** Registered marked plugins. */
 /** @type {Array<MarkdownPlugin>} */
 export const markdownPlugins = []
@@ -84,7 +74,6 @@ import { slugify } from './slugManager.js'
 import hljs from 'highlight.js/lib/core'
 import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
 
-// parse markdown into HTML and gather TOC data
 /**
  * Convert markdown string to HTML and extract a table-of-contents list.
  * Preserves frontmatter metadata.
@@ -99,9 +88,7 @@ export async function parseMarkdownToHtml(md) {
     try {
       const res = await _sendToRenderer({ type: 'render', md })
       if (res && res.html !== undefined) {
-        // post-process worker HTML the same as inline path so tests and
-        // runtime behavior match (assign heading ids, lazy-load images,
-        // clean code classes, and allow hljs fallback behavior).
+        // post-process worker HTML the same as inline path so tests and runtime behavior match.
           try {
           const parser = SHARED_DOM_PARSER || new DOMParser()
           const doc = parser.parseFromString(res.html, 'text/html')

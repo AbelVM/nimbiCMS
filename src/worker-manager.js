@@ -135,7 +135,6 @@ export function createWorkerFromRaw(code) {
       return new Worker(workerUrl, { type: 'module' })
     }
   } catch (err) {
-    // fall through to null
     console.warn('[worker-manager] createWorkerFromRaw failed', err)
   }
   return null

@@ -2,15 +2,6 @@ import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath } from '.
 import * as l10n from './l10nManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 import { refreshIndexPaths, indexSet } from './indexManager.js'
-
-// in-memory cache to avoid repeating slug resolution logic.  We employ a
-// combination of size-based LRU eviction **and** a time-to-live so entries
-// cannot remain in memory indefinitely during long‑running sessions.  This
-// mirrors the behaviour of a small in‑browser store with sensible limits.
-
-// maximum number of entries before the oldest are dropped.  Can be
-// adjusted at runtime via `setResolutionCacheMax`; useful if a host page has
-// known memory constraints or wants a larger cache for a high‑traffic site.
 /**
  * Maximum number of entries stored in the resolution cache before oldest
  * entries are evicted. Mutable at runtime via `setResolutionCacheMax`.
@@ -59,10 +50,6 @@ export function setResolutionCacheTtl(ms) {
  */
 export const resolutionCache = new Map()
 
-// incremental index of known markdown paths for fallback lookups.  we
-// populate this when paths or slug maps change.  keeping it lazy avoids the
-// “cannot access before initialization” errors that occurred during test
-// imports.
 
 
 /**
@@ -92,14 +79,7 @@ export function _clearIndexCache() {
   try { refreshIndexPaths._refreshed = false } catch (_) {}
 }
 
-// patch Map.prototype.set for our two slug maps so additions automatically
-// update the index set.  We only care about values (markdown paths);
-// keys are slugs which are not needed in the fallback search.
-
-
-// expose a helper so external code (slugManager) can refresh from
-// `allMarkdownPaths` when that array is repopulated during setContentBase.
-// (refreshIndexPaths moved to indexManager.js)
+ 
 
 /**
  * Retrieve a cached resolution result and refresh its LRU position.
@@ -111,7 +91,6 @@ export function resolutionCacheGet(key) {
   const record = resolutionCache.get(key)
   const now = Date.now()
   if (record.ts + RESOLUTION_CACHE_TTL < now) {
-    // expired, drop and signal miss
     resolutionCache.delete(key)
     return undefined
   }
@@ -128,8 +107,7 @@ export function resolutionCacheGet(key) {
  * @returns {void}
  */
 export function resolutionCacheSet(key, value) {
-  // optionally purge expired items on every write.  this keeps the map from
-  // growing with stale entries if the TTL is enabled.
+  _purgeExpiredEntries()
   _purgeExpiredEntries()
   resolutionCache.delete(key)
   resolutionCache.set(key, {value, ts: Date.now()})
@@ -158,7 +136,6 @@ export function _purgeExpiredEntries() {
   }
 }
 
-// re-export for testing convenience and user access
 /**
  * List of all markdown file paths collected at build time.  Useful for
  * programs that need to enumerate available pages.
@@ -168,9 +145,7 @@ export { allMarkdownPaths } from './slugManager.js'
 
 // helpers scoped to this module ------------------------------------------------
 
-// `tryFindInNav` removed: slugToMd map is populated when the navbar
-// is built, so scanning the DOM again is redundant.  The map will already
-// contain any navigable markdown slug.
+ 
 /**
  * Search the navigation and site index for a page whose H1 slugifies to the
  * provided value.  This is a fallback when a slug doesn't directly map via
@@ -181,11 +156,7 @@ export { allMarkdownPaths } from './slugManager.js'
  * @returns {Promise<string|null>} path of the discovered markdown or null
  */
 async function tryDiscoverFromIndex(decoded, contentBase) {
-  // attempt to locate a markdown file whose H1 slugifies to `decoded`
-  // start with the pre-populated indexSet and clone it so we can add any
-  // links discovered in the DOM without mutating the shared cache.
   const localCandidates = new Set(indexSet)
-  // gather candidates from navbar links; this is not expected to fail
   const anchorsForIndex = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
   for (const linkEl of Array.from(anchorsForIndex || [])) {
     const href = linkEl.getAttribute('href') || ''
@@ -201,10 +172,6 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
       }
       const p = u.pathname || ''
       if (p) {
-        // if the link points into the content base we can normalize it and
-        // treat it as a candidate.  we do **not** attempt to guess
-        // sibling/index filenames; the content build should always reference
-        // the correct markdown path or rely on slug-based navigation.
         const contentBaseUrl = new URL(contentBase)
         const contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
         if (p.indexOf(contentBasePath) !== -1) {
@@ -214,15 +181,10 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
         }
       }
     } catch (e) {
-      // ignore malformed URLs
       console.warn('[router] malformed URL while discovering index candidates', e)
     }
   }
 
-  // iterate through every candidate we collected; for modest numbers
-  // of nav entries this is very cheap, and it ensures we can resolve
-  // slugs that differ from the link text (e.g. 'tech-experiments' →
-  // projects.md via its H1).
   for (const candidate of localCandidates) {
     try {
       if (!candidate || !String(candidate).includes('.md')) continue
@@ -267,9 +229,6 @@ export function buildPageCandidates(resolved) {
       if (slugToMd.has(dec)) {
         const val = resolveSlugPath(dec) || slugToMd.get(dec)
         if (val) {
-          // If mapping lacks an explicit extension, also try the .html
-          // variant after the mapped value so callers can fetch either a
-          // raw path or an HTML file with the same base.
           if (!/\.(md|html?)$/i.test(val)) {
             pageCandidates.push(val)
             pageCandidates.push(val + '.html')
@@ -278,11 +237,6 @@ export function buildPageCandidates(resolved) {
           }
         }
       } else {
-        // try to find a matching path anywhere in the indexed set of
-        // markdown paths.  `refreshIndexPaths()` must be called to update
-        // the internal `indexSet` from `allMarkdownPaths`; this prevents
-        // accidental discovery when the external list changes but the
-        // router has not been refreshed (tests rely on this behavior).
         if (indexSet && indexSet.size) {
           for (const p of indexSet) {
             const base = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
@@ -292,17 +246,11 @@ export function buildPageCandidates(resolved) {
             }
           }
         }
-        // If we didn't discover any candidate from the manifest or slug
-        // maps, probe common extensions for a bare slug.  Try `.html` first
-        // for friendliness, then `.md`.  Do not add directory index variants
-        // here (e.g. `foo/index.html`).
         if (!pageCandidates.length && dec && !/\.(md|html?)$/i.test(dec)) {
           pageCandidates.push(dec + '.html')
           pageCandidates.push(dec + '.md')
         }
       }
-      // otherwise leave the list empty; fetchPageData will treat that as
-      // a not-found condition rather than guessing a filename.
     } catch (e) { console.warn('[router] buildPageCandidates failed during slug handling', e) }
   }
   return pageCandidates
@@ -358,14 +306,9 @@ export async function fetchPageData(raw, contentBase) {
         if (idx) {
           resolved = idx
         } else if ((refreshIndexPaths._refreshed && indexSet && indexSet.size) || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))) {
-            // Attempt manifest-based slug resolution when the index has been
-            // explicitly refreshed (tests rely on this behaviour), or when
-            // running against an absolute `contentBase` (e.g. a dev server
-            // such as http://localhost:5173/) where crawling the live server
-            // may succeed even without an embedded manifest.
-            const found = await ensureSlug(decoded, contentBase)
-            if (found) resolved = found
-          }
+          const found = await ensureSlug(decoded, contentBase)
+          if (found) resolved = found
+        }
       }
     }
     resolutionCacheSet(cacheKey, { resolved, anchor })
@@ -398,7 +341,6 @@ export async function fetchPageData(raw, contentBase) {
       break;
     } catch (e) {
       fetchError = e;
-      // always continue, only throw below
     }
   }
 

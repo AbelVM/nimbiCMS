@@ -1,7 +1,4 @@
-// responsible for slug ↔ markdown mappings, slug generation, and related
-// utilities such as on‑the‑fly discovery of slugs by crawling the content
-// directory.  This module is the canonical home for anything dealing with
-// slugs or markdown path resolution.
+/** Responsible for slug ↔ markdown mappings, slug generation, and runtime discovery. */
 
 /**
  * Mapping from a slug (generated from title/H1) to a markdown path or a
@@ -19,9 +16,6 @@ export const slugToMd = new Map()
  */
 
 // list of available language codes when running in a multilingual site.
-// When non-empty, slug-to-path mappings are stored in a nested object
-// so that each language can have its own file.  The option is populated by
-// `setLanguages()` called from `initCMS()`.
 export let availableLanguages = []
 
 // helper for tests and plugins

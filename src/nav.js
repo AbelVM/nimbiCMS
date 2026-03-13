@@ -349,10 +349,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     start.appendChild(item)
   }
 
-  // search-related state (declared earlier to avoid TDZ) - retained for
-  // clarity but should already be initialized above
-  // let searchIndexPromise = null
-  // let searchInput = null
+  // search-related state (declared earlier to avoid TDZ)
 
   try {
     searchInput = document.getElementById('nimbi-search')
