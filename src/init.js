@@ -39,7 +39,7 @@ export let initialDocumentTitle = ''
  * @param {string} [options.contentPath='/content'] - URL path to content
  * @param {number} [options.crawlMaxQueue=1000] - maximum directory queue length for slug crawling (see docs)
  * @param {boolean} [options.searchIndex=true] - build a client-side search index (adds search box to navbar)
- * @param {('eager'|'lazy'|'off')} [options.searchIndexMode='eager'] - when to build the search index
+ * @param {('eager'|'lazy')} [options.searchIndexMode='eager'] - when to build the search index
  * @param {('light'|'dark')} [options.defaultStyle='light'] - initial light/dark mode
  * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
  * @param {string} [options.lang] - UI language code
@@ -94,8 +94,8 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "searchIndex" must be a boolean when provided')
   }
 
-  if (searchIndexMode != null && searchIndexMode !== 'eager' && searchIndexMode !== 'lazy' && searchIndexMode !== 'off') {
-    throw new TypeError('initCMS(options): "searchIndexMode" must be "eager", "lazy", or "off" when provided')
+  if (searchIndexMode != null && searchIndexMode !== 'eager' && searchIndexMode !== 'lazy') {
+    throw new TypeError('initCMS(options): "searchIndexMode" must be "eager" or "lazy" when provided')
   }
 
   if (defaultStyle !== 'light' && defaultStyle !== 'dark') {
@@ -134,7 +134,7 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "notFoundPage" must be a non-empty string ending with .md or .html')
   }
 
-  const effectiveSearchEnabled = searchEnabled && searchIndexMode !== 'off'
+  const effectiveSearchEnabled = !!searchEnabled
 
   try {
     mountEl.classList.add('nimbi-mount')

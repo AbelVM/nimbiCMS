@@ -5,7 +5,7 @@
 export type NavTreeItem = { path: string, name: string, isIndex?: boolean, children?: NavTreeItem[] }
 export type NavBuildResult = { navbar: HTMLElement, linkEls: NodeListOf<Element> }
 export function createSiteNav(homePage: string): NavTreeItem[]
-export function buildNav(navbarWrap: HTMLElement, container: HTMLElement, navHtml: string, contentBase: string, homePage: string, t: (key:string, vars?:Record<string,unknown>)=>string, renderByQuery: ()=>void, effectiveSearchEnabled: boolean, searchIndexMode: 'eager'|'lazy'|'off'): Promise<NavBuildResult>
+export function buildNav(navbarWrap: HTMLElement, container: HTMLElement, navHtml: string, contentBase: string, homePage: string, t: (key:string, vars?:Record<string,unknown>)=>string, renderByQuery: ()=>void, effectiveSearchEnabled: boolean, searchIndexMode: 'eager'|'lazy'): Promise<NavBuildResult>
 
 export type NavItem = { path: string, name: string, children?: NavItem[] }
 export type TocEntry = { level:number, text:string, id?:string }

@@ -198,12 +198,11 @@ manager.terminate()
 - `searchIndex` – **boolean** (default `true`). When enabled the CMS
   can build a lightweight index of page titles/excerpts and insert a search box
   into the navbar.
-- `searchIndexMode` – `'eager' | 'lazy' | 'off'` (default `'eager'`). Controls
-  `searchIndexMode` – `'eager' | 'lazy'` (default `'eager'`). Controls when the index is built:
+- `searchIndexMode` – `'eager' | 'lazy'` (default `'eager'`). Controls when the index is built:
   - `'eager'`: build the index on init; the search input is initially disabled and shows a Bulma loading spinner until the index is ready.
   - `'lazy'`: wait until the user types a query before building the index; the first non‑empty input triggers indexing, then results are debounced.
   If `searchIndex` is `false`, `searchIndexMode` is ignored and no search box or index is built.
-  If `searchIndex` is `true`, only `'eager'` and `'lazy'` are valid modes; `'off'` is not supported.
+  If `searchIndex` is `true`, only `'eager'` and `'lazy'` are valid modes.
   Placeholder text is pulled from the localization dictionary under the key `searchPlaceholder` (see `l10n` options).
 
   The core index builder runs entirely at runtime when `initCMS()` is
@@ -218,7 +217,7 @@ manager.terminate()
   There is **no** build-time scanning or embedding of content paths.  The
   crawler traverses directory listings at runtime to discover every
   `.md`/`.html` file in the `contentPath`.  Disable `searchIndex` or set
-  `searchIndexMode: 'off'` to skip this work entirely.
+  `searchIndex` to skip this work entirely.
 - `defaultStyle` – `'light' | 'dark'` (default `'light'`). Controls initial
   theme; use `setStyle()` to toggle later.
 - `bulmaCustomize` – `'none' | 'local' | '{theme_name}'` (default `'none'`).

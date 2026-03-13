@@ -176,8 +176,7 @@ can build a lightweight index of page titles/excerpts and insert a search box
 into the navbar.</p>
 </li>
 <li>
-<p><code>searchIndexMode</code> – <code>'eager' | 'lazy' | 'off'</code> (default <code>'eager'</code>). Controls
-<code>searchIndexMode</code> – <code>'eager' | 'lazy'</code> (default <code>'eager'</code>). Controls when the index is built:</p>
+<p><code>searchIndexMode</code> – <code>'eager' | 'lazy'</code> (default <code>'eager'</code>). Controls when the index is built:</p>
 <ul>
 <li><code>'eager'</code>: build the index on init; the search input is initially disabled and shows a Bulma loading spinner until the index is ready.</li>
 <li><code>'lazy'</code>: wait until the user types a query before building the index; the first non‑empty input triggers indexing, then results are debounced.
@@ -197,7 +196,7 @@ even when the server does not expose directory listings.</li>
 <p>There is <strong>no</strong> build-time scanning or embedding of content paths.  The
 crawler traverses directory listings at runtime to discover every
 <code>.md</code>/<code>.html</code> file in the <code>contentPath</code>.  Disable <code>searchIndex</code> or set
-<code>searchIndexMode: 'off'</code> to skip this work entirely.</p>
+<code>searchIndex</code> to skip this work entirely.</p>
 </li>
 <li>
 <p><code>defaultStyle</code> – <code>'light' | 'dark'</code> (default <code>'light'</code>). Controls initial

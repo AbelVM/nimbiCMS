@@ -105,14 +105,14 @@ git fetch origin && git checkout main && git reset --hard origin/main
 >> Update README.md to remove mention of filesManager.js if it still exists there
 >> Run a quick grep to ensure nothing else imports filesManager.js (excluding docs/coverage)
 
+>> Run a static analysis pass for unused exports / dead code, remove circular imports
 
-* Run a static analysis pass for unused exports / dead code, remove circular imports
+>> add jsdoc blocks to hookmanager
 
-* add jsdoc blocks to hookmanager
+>> searchIndexMode=off was removed as an option: update the code, jsdoc and readme if needed
+
 
 * remove dynamic imports when theres already a static import for the same module
-
-* searchIndexMode=off was removed as an option: update the code, jsdoc and readme if needed
 
 * remove excess of inline comments
 

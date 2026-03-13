@@ -31,15 +31,7 @@ describe('nav module', () => {
     expect(renderSpy).toHaveBeenCalled()
   })
 
-  it('does not render search input when searchIndexMode is off', async () => {
-    const navWrap = makeContainer();
-    const container = makeContainer();
-    const navHtml = '<a href="?page=foo.md">Foo</a>';
-    const renderSpy = vi.fn();
-    const { navbar } = await buildNav(navWrap, container, navHtml, 'http://example.com/base/', '_home.md', s => s, renderSpy, true, 'off');
-    const search = navbar.querySelector('input#nimbi-search');
-    expect(search).toBeNull();
-  });
+  
 
   it('does not render search input when effectiveSearchEnabled is false', async () => {
     const navWrap = makeContainer();

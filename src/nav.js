@@ -46,7 +46,7 @@ export function createSiteNav(homePage) {
  *   via the navbar or content links.  This allows the UI layer to render the
  *   requested page without creating a circular dependency.
  * @param {boolean} effectiveSearchEnabled - whether search UI should be rendered
- * @param {('eager'|'lazy'|'off')} searchIndexMode - search index option
+ * @param {('eager'|'lazy')} searchIndexMode - search index option
  *   forwarded from `initCMS`; only relevant if a search input is present.
  * @returns {Promise<NavBuildResult>} resolves with an object containing `navbar` and `linkEls`
  */
@@ -149,12 +149,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   // Respect searchIndex and searchIndexMode options
   if (!effectiveSearchEnabled) {
     // Search globally disabled by consumer; do not render search UI.
-    end = null
-    searchInput = null
-    resultsContainer = null
-  } else if (searchIndexMode === 'off') {
-    // Consumer explicitly disabled the index even though search support
-    // is available; do not render the search UI in this case.
     end = null
     searchInput = null
     resultsContainer = null
