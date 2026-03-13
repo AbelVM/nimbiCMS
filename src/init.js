@@ -262,8 +262,10 @@ export async function initCMS(options = {}) {
               const explicit = Math.max(0, mountH - navHeight)
               try { container.style.boxSizing = 'border-box' } catch (_) {}
               try { container.style.height = `${explicit}px` } catch (err) { console.warn('[nimbi-cms] set container height failed', err) }
+              try { container.style.setProperty('--nimbi-cms-height', `${explicit}px`) } catch (err) { console.warn('[nimbi-cms] set --nimbi-cms-height failed', err) }
             } else {
               try { container.style.height = `calc(100% - var(--nimbi-site-navbar-height))` } catch (err) { console.warn('[nimbi-cms] set container height failed', err) }
+              try { container.style.setProperty('--nimbi-cms-height', 'calc(100% - var(--nimbi-site-navbar-height))') } catch (err) { console.warn('[nimbi-cms] set --nimbi-cms-height failed', err) }
             }
           } catch (err) { console.warn('[nimbi-cms] compute container height failed', err) }
           try { navbarWrap.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { /* best-effort */ }

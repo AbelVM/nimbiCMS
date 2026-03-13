@@ -17,7 +17,9 @@
     display: block;
     padding: 0;
     margin: 0;
-    overflow-x: hidden;
+    background: var(--bulma-body-background-color, #fff);
+    position: relative;
+    overflow-x: hidden !important;
 }
 
 .nimbi-cms .columns {
@@ -32,11 +34,6 @@
 
 .nimbi-cms .columns {
     align-items: flex-start;
-}
-
-.nimbi-cms {
-    background: var(--bulma-body-background-color, #fff);
-    position: relative;
 }
 
 .nimbi-nav-wrap {
@@ -60,11 +57,12 @@
     top: var(--nimbi-site-navbar-height);
 }
 
-/* when a navbar is present immediately before the CMS container, make
-   the CMS container height equal to mount minus navbar height so the
-   sticky header doesn't overlap content */
 .nimbi-site-navbar + .nimbi-cms {
-    height: calc(100% - var(--nimbi-site-navbar-height));
+    /* expose the computed cms height so other components can reference it */
+    --nimbi-cms-height: calc(100% - var(--nimbi-site-navbar-height));
+    /* fraction (number) used to limit menu-list height: default 0.8 = 80% */
+    --nimbi-menu-max-ratio: 0.6;
+    height: var(--nimbi-cms-height);
     overflow: auto;
 }
 
@@ -143,11 +141,11 @@
     height: 44px;
     border-radius: 50%;
     background: var(--nimbi-accent, #3273dc);
-    color: white;
+    color: var(--bulma-button-text-color, #fff);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 6px 18px var(--bulma-shadow-color, rgba(0, 0, 0, 0.12));
     cursor: pointer;
     z-index: 60;
     opacity: 0;
@@ -184,7 +182,7 @@
 }
 
 .nimbi-scroll-top:focus {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--bulma-focus-outline-color, #fff);
     outline-offset: 2px
 }
 
@@ -193,9 +191,9 @@
     height: 18px
 }
 
-.nimbi-cms, .nimbi-nav-wrap {
+.nimbi-cms, .nimbi-nav-wrap, .menu-list {
     scrollbar-width: thin; 
-    scrollbar-color: rgba(0,0,0,0.28) transparent;
+    scrollbar-color: var(--bulma-scrollbar-thumb-color, rgba(0,0,0,0.28)) transparent;
 }
 
 .nimbi-cms::-webkit-scrollbar, .nimbi-nav-wrap::-webkit-scrollbar {
@@ -235,11 +233,50 @@
 #nimbi-search-results a:hover { background: #f5f5f5; }
 
 .nimbi-cms::-webkit-scrollbar-thumb, .nimbi-nav-wrap::-webkit-scrollbar-thumb {
-    background-color: rgba(0,0,0,0.28);
+    background-color: var(--bulma-scrollbar-thumb-color, rgba(0,0,0,0.28));
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 .nimbi-cms::-webkit-scrollbar-thumb:hover, .nimbi-nav-wrap::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(0,0,0,0.36);
+    background-color: var(--bulma-scrollbar-thumb-hover-color, rgba(0,0,0,0.36));
+}
+
+/* Make HTML tables horizontally scrollable when they're wider than the article */
+.nimbi-article {
+    /* ensure article doesn't clip the table's scroll container */
+    overflow-x: visible;
+}
+.nimbi-article table {
+    display: block;
+    width: max-content; /* keep intrinsic table width */
+    max-width: 100%;    /* but never exceed the article width */
+    overflow-x: auto;   /* show horizontal scrollbar when needed */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bulma-scrollbar-thumb-color, rgba(0,0,0,0.28)) transparent;
+}
+.nimbi-article table::-webkit-scrollbar {
+    height: 8px;
+}
+.nimbi-article table::-webkit-scrollbar-track {
+    background: transparent;
+}
+.nimbi-article table::-webkit-scrollbar-thumb {
+    background-color: var(--bulma-scrollbar-thumb-color, rgba(0,0,0,0.28));
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.nimbi-article table::-webkit-scrollbar-thumb:hover {
+    background-color: var(--bulma-scrollbar-thumb-hover-color, rgba(0,0,0,0.36));
+}
+
+/* Desktop: limit long menu-lists to 80% of the visible CMS area */
+@media (min-width: 801px) {
+    .nimbi-nav-wrap .menu-list {
+        /* number * length: ratio first, then computed cms height */
+        max-height: calc(var(--nimbi-menu-max-ratio) * var(--nimbi-cms-height));
+        overflow: auto;
+    }
 }

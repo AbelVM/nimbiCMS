@@ -111,16 +111,14 @@ git fetch origin && git checkout main && git reset --hard origin/main
 
 >> searchIndexMode=off was removed as an option: update the code, jsdoc and readme if needed
 
+>> in the rendered page, nimbi-cms is higher than nimbi-mount because the nav bar height is not taken into account
+
 * remove excess of inline comments
 
 * Replace silent catches with structured logging or rethrow where appropriate. Replace broad empty catch {} 
   blocks with catch (e) { /* log or comment */ } so future debuggers have context.
 
-
-
-* in the rendered page, nimbi-cms is higher than nimbi-mount because the nav bar height is not taken into account
-
-* toc should have max height and be scrollable if overflown
+>> toc should have max height and be scrollable if overflown
 
 * in the mobile view, the hamburger nav bar should close after one menu item is clicked
 

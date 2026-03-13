@@ -133,6 +133,26 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   burger.innerHTML = '<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>'
   brand.appendChild(burger)
 
+  // Toggle navbar menu on mobile when burger is clicked
+  try {
+    burger.addEventListener('click', (ev) => {
+      try {
+        const targetId = burger.dataset && burger.dataset.target ? burger.dataset.target : null
+        const target = targetId ? document.getElementById(targetId) : null
+        const isActive = burger.classList.contains('is-active')
+        if (isActive) {
+          burger.classList.remove('is-active')
+          burger.setAttribute('aria-expanded', 'false')
+          if (target) target.classList.remove('is-active')
+        } else {
+          burger.classList.add('is-active')
+          burger.setAttribute('aria-expanded', 'true')
+          if (target) target.classList.add('is-active')
+        }
+      } catch (err) { console.warn('[nimbi-cms] navbar burger toggle failed', err) }
+    })
+  } catch (err) { /* ignore if addEventListener not supported */ }
+
   const menu = document.createElement('div')
   menu.className = 'navbar-menu'
   menu.id = targetId
@@ -435,6 +455,17 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
         }
       } catch (e) { console.warn('[nimbi-cms] navbar click handler failed', e) }
+        // On mobile, close the burger/menu after a navigation click
+        try {
+          const burgerEl = navbar && navbar.querySelector ? navbar.querySelector('.navbar-burger') : null
+          const targetId = burgerEl && burgerEl.dataset ? burgerEl.dataset.target : null
+          const target = targetId ? document.getElementById(targetId) : null
+          if (burgerEl && burgerEl.classList.contains('is-active')) {
+            burgerEl.classList.remove('is-active')
+            burgerEl.setAttribute('aria-expanded', 'false')
+            if (target) target.classList.remove('is-active')
+          }
+        } catch (err) { /* best-effort close; ignore errors */ }
     })
   } catch (e) { console.warn('[nimbi-cms] attach content click handler failed', e) }
 
