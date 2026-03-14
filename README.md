@@ -276,90 +276,73 @@ manager.terminate()
 
 ## Options & API
 
-`initCMS(options)` mounts the CMS into a page. Options:
+`initCMS(options)` mounts the CMS into a page. Options are grouped below by functionality.
 
-- `el` **(required)** – CSS selector string for the mount element (e.g.
-  `#app`). A DOM element is also accepted for compatibility.
-- `contentPath` – URL path to the content folder serving raw `.md` files
-  (default `./content` or `/content`). The library normalizes trailing slashes.
-  
-  **Security note:** For safety, `contentPath`, `homePage` and `notFoundPage`
-  are not accepted from the page URL query string by default. Allowing these
-  values via URL can enable path traversal or exposure of files if the server
-  is not locked down. To intentionally enable URL-based overrides the host
-  page must pass `allowUrlPathOverrides: true` to `initCMS()` — this opt-in
-  must be set in script code, not via the URL itself.
-- `lang` – **string** (optional). UI language code (short form, e.g. `en`, `de`). Only affects UI strings (navigation labels, buttons, etc.); it does not change which folder the CMS loads content from.
-- `l10nFile` – **string** (optional). Path to a JSON localization file. Relative paths resolve against the current page directory.
-- `availableLanguages` – **string[]** (optional). When set, the CMS treats a leading path segment as a language code (e.g. `en/foo.md` or `fr/bar.md`) and maps slugs into a per-language bucket. This allows `setLang()` to resolve the correct language-specific page for a given slug.
-- `cacheTtlMinutes` – **number** (default `5`).  Time‑to‑live for slug resolution cache entries, expressed in minutes.  Internally this is converted to milliseconds and assigned to `RESOLUTION_CACHE_TTL` in the router module.  Setting this to `0` effectively turns off expiration (the cache is still size‑bounded by cacheMaxEntries).
-- `cacheMaxEntries` – **number** (optional).  Maximum number of entries the
-  router will hold in its resolution cache.  If unspecified the built‑in
-  constant `RESOLUTION_CACHE_MAX` (currently 100) is used.  Fine‑tune this
-  when targeting devices with limited memory or when you want a larger cache
-  for a heavy traffic site.
-- `crawlMaxQueue` – **number** (default `1000`). Upper bound on the number of
-  directories the internal slug crawler will queue during a breadth‑first
-  traversal.  Setting this to `0` disables the guard; a lower value improves
-  safety on deeply nested content trees but may prevent discovery of pages in
-  extreme structures.
-- `searchIndex` – **boolean** (default `true`). When enabled the CMS
-  can build a lightweight index of page titles/excerpts and insert a search box
-  into the navbar.
-- `searchIndexMode` – `'eager' | 'lazy'` (default `'eager'`). Controls when the index is built:
-  - `'eager'`: build the index on init; the search input is initially disabled and shows a Bulma loading spinner until the index is ready.
-  - `'lazy'`: the search input is usable right away; the index is built only after the user types a non-empty query. While the index is being built, the input shows a spinner and is temporarily disabled, then the results are debounced.
-  If `searchIndex` is `false`, `searchIndexMode` is ignored and no search box or index is built.
-  If `searchIndex` is `true`, only `'eager'` and `'lazy'` are valid modes.
-  Placeholder text is pulled from the localization dictionary under the key `searchPlaceholder` (see `l10n` options).
+**Core**
 
-- `indexDepth` – `1 | 2 | 3` (default `1`). Controls how deep the runtime search index should go:
-  - `1`: index only page H1 titles and excerpts (default).
-  - `2`: also index H2 headings; H2 results include a subtle parent label showing the H1 for context.
-  - `3`: also index H3 headings; H3 results include a subtle parent label showing the H1 for context. This can be set via the init option or the URL query string (`?indexDepth=3`).
+| Option | Type | Default | Description |
+|---|---:|:---:|---|
+| `el` | `string` \\ `Element` | required | CSS selector or DOM element used as the mount target. |
+| `contentPath` | `string` | `./content` | URL path to the content folder serving `.md`/`.html` files; trailing slashes are normalized. |
+| `allowUrlPathOverrides` | `boolean` | `false` | When `true` allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via URL query parameters (opt-in; use with caution for security). |
 
-  - `noIndexing` – `string[]` (optional). Array of relative paths to exclude from the runtime search index and discovery crawl. Useful to avoid indexing heavy pages or large directories. Example: `noIndexing: ['large-manual.md','blog/drafts/']`.
+**Indexing**
 
-- `skipRootReadme` – **boolean** (default `false`). When `true`, the indexer will skip link discovery inside a repository-root `README.md`. Set to `false` (the default) to treat the root `README.md` like any other content page so its links may be discovered during indexing.
+| Option | Type | Default | Description |
+|---|---:|:---:|---|
+| `searchIndex` | `boolean` | `true` | Enable the runtime search index and render a search box in the navbar. |
+| `searchIndexMode` | `'eager' \| 'lazy'` | `'eager'` | When to build the index (`'eager'` on init, `'lazy'` on first query). |
+| `indexDepth` | `1 \| 2 \| 3` | `1` | How deep headings are indexed (H1, H2, H3). |
+| `noIndexing` | `string[]` | — | Paths (relative) to exclude from discovery and indexing. |
+| `skipRootReadme` | `boolean` | `false` | When `true`, skip link discovery inside repository-root `README.md`. |
 
+**Styling & Theming**
 
-  The core index builder runs entirely at runtime when `initCMS()` is
-  called.  It gathers slug information from three sources in order:
+| Option | Type | Default | Description |
+|---|---:|:---:|---|
+| `defaultStyle` | `'light' \| 'dark'` | `'light'` | Initial UI theme. |
+| `bulmaCustomize` | `'none' \| 'local' \| string` | `'none'` | Bulma customization source: `'none'` bundled, `'local'` loads `<contentPath>/bulma.css`, or a Bulmaswatch theme name to load from unpkg. |
+| `highlightTheme` | `string` | `monokai` | Initial highlight.js theme. |
 
-  1. the `allMarkdownPaths` array, which is populated at build time only by the
-     example harness; library consumers ship with an empty list.
-  2. slug mappings inferred from navigation links or previously visited pages.
-  3. a directory crawl (`crawlAllMarkdown`) of the `contentPath`, which works
-     even when the server does not expose directory listings.
+**Localization**
 
-  There is **no** build-time scanning or embedding of content paths.  The
-  crawler traverses directory listings at runtime to discover every
-  `.md`/`.html` file in the `contentPath`.  Disable `searchIndex` or set
-  `searchIndex` to skip this work entirely.
-- `defaultStyle` – `'light' | 'dark'` (default `'light'`). Controls initial
-  theme; use `setStyle()` to toggle later.
-- `bulmaCustomize` – `'none' | 'local' | '{theme_name}'` (default `'none'`).
-  - `'none'`: bundled Bulma.
-  - `'local'`: load `<contentPath>/bulma.css` or `/bulma.css` and inject it.
-  - `'{theme_name}'`: load from `https://unpkg.com/bulmaswatch/{theme_name}`.
-- `highlightTheme` – initial highlight.js theme (default `monokai`).
-- `markdownExtensions` – **Array&lt;object&gt;** (optional). A list of [marked](https://github.com/markedjs/marked) extension/plugin objects to register during initialization. These will be added via `addMarkdownExtension()` before any content is rendered; useful for custom syntax, link transformations, or other parser tweaks. Theres a big list of off-the-shelf extensions [here](https://marked.js.org/using_advanced#extensions).
+| Option | Type | Default | Description |
+|---|---:|:---:|---|
+| `lang` | `string` | — | UI language code (short form, e.g. `en`, `de`). |
+| `l10nFile` | `string` | — | Path to a JSON localization file (relative paths resolve against the page). |
+| `availableLanguages` | `string[]` | — | When set, the CMS treats a leading path segment as a language code and maps slugs per-language. |
 
-  ```js
-  // add a custom inline tokenizer that uppercases text
-  const upperExt = {
-    name: 'upper',
-    level: 'inline',
-    start(src) { return src.search(/[A-Z]{2,}/); },
-    tokenizer(src) {
-      const match = /^[A-Z]{2,}/.exec(src);
-      if (match) return { type: 'upper', raw: match[0], text: match[0].toLowerCase() };
-    },
-    renderer(token) { return `<span class="upper">${token.text}</span>`; }
-  };
+**Caching & Performance**
 
-  initCMS({ el: '#app', markdownExtensions: [upperExt] });
-  ```
+| Option | Type | Default | Description |
+|---|---:|:---:|---|
+| `cacheTtlMinutes` | `number` | `5` | TTL for slug-resolution cache entries (minutes). Set to `0` to disable expiration. |
+| `cacheMaxEntries` | `number` | — | Maximum entries in the router resolution cache. |
+| `crawlMaxQueue` | `number` | `1000` | Upper bound on directories queued during breadth-first crawl. Set to `0` to disable the guard. |
+
+**Advanced & Extensions**
+
+| Option | Type | Default | Description |
+|---|---:|:---:|---|
+| `markdownExtensions` | `Array<object>` | — | `marked`-style extension/plugin objects registered at init via `addMarkdownExtension()`. Useful for custom tokenizers, renderers, and link transforms. |
+
+The `markdownExtensions` example (registering a simple inline tokenizer):
+
+```js
+// add a custom inline tokenizer that uppercases text
+const upperExt = {
+  name: 'upper',
+  level: 'inline',
+  start(src) { return src.search(/[A-Z]{2,}/); },
+  tokenizer(src) {
+    const match = /^[A-Z]{2,}/.exec(src);
+    if (match) return { type: 'upper', raw: match[0], text: match[0].toLowerCase() };
+  },
+  renderer(token) { return `<span class="upper">${token.text}</span>`; }
+};
+
+initCMS({ el: '#app', markdownExtensions: [upperExt] });
+```
 
 The `initCMS` export itself is returned when you call it; additional helpers
 are exposed (all are also available from the UMD bundle namespace).
