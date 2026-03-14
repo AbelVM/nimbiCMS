@@ -9,8 +9,7 @@ Lightweight client-side CMS used for local editing and testing.
 
 1. [Quick start](#quick-start)
 2. [Problem statement](#problem-statement)
-3. [Development notes](#development-notes)
-4. [Features](#features)
+3. [Features](#features)
 5. [Options & API](#options--api)
 6. [Theming & Customization](#theming--customization)
 7. [Localization](#localization)
@@ -135,8 +134,6 @@ npm run dev
 
 and open the example at `http://localhost:5173/example/index.html`.
 
-## Development notes
-
 ## Search indexing depth
 
 You can control how deep the client-side search index should go with the `indexDepth` option passed to `initCMS()` or via the URL query parameter `indexDepth` (values `1`, `2`, or `3`).
@@ -180,38 +177,15 @@ Example of how a deeper-heading result may be rendered in the search UI (simplif
 - The SPA uses `?page=` query parameters internally.
 - Build output is written to `example/dist` when targeting the example case.
 
-Recent behaviour fixes worth knowing:
+Notes and recent fixes
 
-- Avoids hardcoded `.md` appends, `_home` prefixes, or index fallbacks; slugs
-  resolve only via explicit mappings and derived H1 values (no guessing).  The
-  CMS now pre-computes the slug for the home page during initialization and
-  populates every nav-linked page's slug ahead of the first render, so
-  direct linking to a slug works even on a cold start.
-- Supports raw `.html` content (parses title/H1 and maps to a slug) without
-  forcing Markdown rendering.
-- Prevents aggressive prefetching of linked markdown files.
-- Preserves URL hash anchors during navigation and improves scroll handling.
-- Intercepts navbar/content links to perform SPA navigation (no reloads).
-- Lazily loads images by default and automatically marks above‑the‑fold images as eager (adds `fetchpriority="high"` where appropriate). A CSS custom property (`--nimbi-image-max-height-ratio`) lets you tune what counts as "above the fold".
-- Improves bfcache/back‑forward navigation: restores scroll position and reapplies eager image markers when a page is shown from cache.
-- Search box usability: `searchIndexMode: 'lazy'` enables the input immediately, builds the index on first query, and gracefully falls back to a main‑thread index build if the worker fails.
-- In-memory caching of fetched markdown and slug resolutions speeds up
-  repeat navigations and reduces network traffic.  The router cache is
-  subject to both a maximum entry count and a time‑to‑live (TTL) so a
-  long‑running page won't accumulate stale lookups; the TTL is configurable
-  via the `cacheTtlMinutes` option passed to `initCMS()`.
-- URL slug fallback **no longer** appends `.md`/`.html`; passing an
-  unmapped slug produces a 404 rather than assuming a filename.  Slugs are
-  sanitized to strip any accidental `.md`/`.html` text from headers.  To
-  keep direct links working even before any page has loaded, the router will
-  perform a one-time check of the home page’s H1 slug and map it if it
-  matches the requested slug; this means cold-start requests to the home
-  slug yield the expected content rather than an error.  When a slug isn't
-  found in the navigation we fall back to crawling the `contentPath` using
-  directory listings, looking for a markdown file whose title slug matches
-  the requested value.  This on‑demand traversal means arbitrary files in
-  arbitrarily deep subfolders resolve correctly on static servers, with the
-  results cached for subsequent lookups.
+- Slug resolution no longer guesses filenames: unmapped slugs return 404
+  unless matched by an explicit nav or a discovered title slug.
+- Improved caching and navigation handling (bfcache, scroll restore, and
+  eager image marking heuristics) to reduce perceptible reloads and layout
+  shifts.
+- Search can be built lazily (`searchIndexMode: 'lazy'`) and falls back to
+  a main-thread build if the worker is unavailable.
 
 ## Features
 
@@ -235,44 +209,14 @@ Recent behaviour fixes worth knowing:
   thread. Anchor rewriting currently runs in‑thread for portability, with a
   worker implementation kept in the source for future experimentation.
 
-**Worker Manager**
+Worker manager (brief)
 
-For consumers and contributors: the repository contains a small helper that
-centralizes Worker lifecycle and messaging. It exposes two helpers:
-
-- `makeWorkerManager(createWorker, name)` — returns a manager object with:
-  - `get()` — lazily create and return the underlying `Worker` instance.
-  - `send(msg, timeoutMs?)` — send a message and await a response with an
-    optional timeout (rejects on timeout or worker error). This method cleans
-    up a bad worker instance if a timeout or error occurs and logs a
-    module‑prefixed warning.
-  - `terminate()` — forcefully terminate the worker and clear internal state.
-
-- `createWorkerFromRaw(codeString)` — convenience helper that builds a
-  `Blob` URL from the provided raw worker source string and returns a function
-  suitable for passing as `createWorker` to `makeWorkerManager`.
-
-Guidance:
-
-- Prefer `manager.send(...)` for short request/response interactions so
-  timeouts and errors are handled consistently.
-- If you require a long‑lived worker for streaming data, call `manager.get()`
-  and hold the returned `Worker` reference; remember to call `manager.terminate()`
-  during teardown.
-- The manager logs conservative `console.warn('[<module>] ...', err)`
-  messages instead of throwing, preserving existing runtime behavior while
-  surfacing previously swallowed failures during development and testing.
-
-Example:
-
-```js
-import { makeWorkerManager, createWorkerFromRaw } from './src/worker-manager.js'
-// workerCode is a string containing the worker source
-const manager = makeWorkerManager(createWorkerFromRaw(workerCode), 'slugWorker')
-await manager.send({ type: 'init' }, 2000)
-// later
-manager.terminate()
-```
+The repo includes a small `worker-manager` helper to standardize Worker
+lifecycle and request/response messaging. Use `makeWorkerManager(createWorker, name)`
+for a safe, cancellable request helper and `createWorkerFromRaw()` to build
+Blob-backed workers for inline bundling. Prefer `manager.send(...)` for
+short-lived RPC-style interactions and call `manager.terminate()` during
+teardown for long-lived workers.
 
 ## Options & API
 
@@ -468,7 +412,7 @@ setStyle('dark')                    // switch mode
 setThemeVars({ '--primary': '#06c' }) // tweak colors/fonts
 ```
 
-### Plugin Hooks (new)
+### Plugin Hooks
 
 A minimal plugin/extension API lets you run custom code at key moments. The
 following convenience functions are exported; they all accept a callback which
