@@ -222,6 +222,8 @@ async function rewriteAnchors(article, contentBase, pagePath) {
 
     const pending = new Set()
     const anchorInfo = []
+    const htmlPending = new Set()
+    const htmlAnchorInfo = []
 
     for (const a of Array.from(anchors)) {
       try {
@@ -276,18 +278,37 @@ async function rewriteAnchors(article, contentBase, pagePath) {
           }
           const full = new URL(toResolve, contentBase)
           const p = full.pathname || ''
-          if (p && p.indexOf(contentBasePath) !== -1) {
+            if (p && p.indexOf(contentBasePath) !== -1) {
             let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p
             rel = normalizePath(rel)
             rel = trimTrailingSlash(rel)
             if (!rel) rel = '_home'
             if (!rel.endsWith('.md')) {
-              if (slugToMd.has(rel)) {
-                const mapped = slugToMd.get(rel)
-                const slug = mdToSlug.get(mapped) || rel
-                a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+              let slugKey = null
+              try {
+                if (mdToSlug && mdToSlug.has && mdToSlug.has(rel)) {
+                  slugKey = mdToSlug.get(rel)
+                } else {
+                  try {
+                    const baseName = String(rel || '').replace(/^.*\//, '')
+                    if (baseName && mdToSlug.has && mdToSlug.has(baseName)) slugKey = mdToSlug.get(baseName)
+                  } catch (e) { /* ignore */ }
+                }
+              } catch (err) { /* ignore */ }
+              if (!slugKey) {
+                try {
+                  const baseName = String(rel || '').replace(/^.*\//, '')
+                  for (const [k, v] of slugToMd || []) {
+                    if (v === rel || v === baseName) { slugKey = k; break }
+                  }
+                } catch (err) { /* ignore iteration errors */ }
+              }
+              if (slugKey) {
+                a.setAttribute('href', `?page=${encodeURIComponent(slugKey)}`)
               } else {
-                a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+                // Defer fetching HTML title to resolve slug if possible
+                htmlPending.add(rel)
+                htmlAnchorInfo.push({ node: a, rel })
               }
             }
           }
@@ -326,6 +347,31 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       }))
     }
 
+    if (htmlPending.size) {
+      await Promise.all(Array.from(htmlPending).map(async rel => {
+        try {
+          const res = await fetchMarkdown(rel, contentBase)
+          if (res && res.raw) {
+            try {
+              const parser = HTML_PARSER || new DOMParser()
+              const doc = parser.parseFromString(res.raw, 'text/html')
+              const titleTag = doc.querySelector('title')
+              const h1 = doc.querySelector('h1')
+              const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
+                ? titleTag.textContent.trim()
+                : (h1 && h1.textContent ? h1.textContent.trim() : null)
+              if (titleText) {
+                const slugKey = slugify(titleText)
+                if (slugKey) {
+                  try { slugToMd.set(slugKey, rel); mdToSlug.set(rel, slugKey) } catch (err) { console.warn('[htmlBuilder] setting html slug mapping failed', err) }
+                }
+              }
+            } catch (err) { console.warn('[htmlBuilder] parse fetched HTML failed', err) }
+          }
+        } catch (err) { console.warn('[htmlBuilder] fetchMarkdown for htmlPending failed', err) }
+      }))
+    }
+
     for (const info of anchorInfo) {
       const { node: a, frag, rel } = info
       let slug = null
@@ -337,6 +383,17 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
         else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
       }
+    }
+    // Now handle any HTML anchors that were deferred for title extraction
+    for (const info of htmlAnchorInfo) {
+      const { node: a, rel } = info
+      let slug = null
+      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { /* ignore */ }
+      if (!slug) {
+        try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { /* ignore */ }
+      }
+      if (slug) a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+      else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
     }
   } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
 }

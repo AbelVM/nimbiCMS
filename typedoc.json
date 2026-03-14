@@ -4,10 +4,15 @@
   ],
   "entryPointStrategy": "expand",
   "out": "docs",
+  "cleanOutputDir": true,
   "exclude": [
     "**/tests/**"
   ],
   "json": "docs-typedoc.json",
+  "readme": "none",
+  "plugin": [
+    "typedoc-plugin-markdown"
+  ],
   "disableSources": true,
   "highlightLanguages": [
     "javascript",

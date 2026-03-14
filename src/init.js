@@ -93,7 +93,7 @@ export function parseInitOptionsFromQuery(queryString) {
     }
     if (params.has('indexDepth')) {
       const n = Number(params.get('indexDepth'))
-      if (Number.isInteger(n) && (n === 1 || n === 2)) out.indexDepth = n
+      if (Number.isInteger(n) && (n === 1 || n === 2 || n === 3)) out.indexDepth = n
     }
     if (params.has('noIndexing')) {
       const v = params.get('noIndexing') || ''
@@ -283,8 +283,8 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "searchIndexMode" must be "eager" or "lazy" when provided')
   }
 
-  if (indexDepth != null && (indexDepth !== 1 && indexDepth !== 2)) {
-    throw new TypeError('initCMS(options): "indexDepth" must be 1 or 2 when provided')
+  if (indexDepth != null && (indexDepth !== 1 && indexDepth !== 2 && indexDepth !== 3)) {
+    throw new TypeError('initCMS(options): "indexDepth" must be 1, 2, or 3 when provided')
   }
 
   if (defaultStyle !== 'light' && defaultStyle !== 'dark') {

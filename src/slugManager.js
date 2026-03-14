@@ -575,8 +575,8 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
               if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
               const p = doc.querySelector('p')
               if (p && p.textContent) excerpt = p.textContent.trim()
-              // If indexing H2s, collect them as separate entries with parentTitle
-              if (indexDepth === 2) {
+              // If indexing H2s (indexDepth >= 2), collect them as separate entries with parentTitle
+                if (indexDepth >= 2) {
                 try {
                   const topH1 = doc.querySelector('h1')
                   const parentTitle = topH1 && topH1.textContent ? topH1.textContent.trim() : (title || '')
@@ -599,6 +599,25 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                       idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
                     } catch (err) { console.warn('[slugManager] indexing H2 failed', err) }
                   }
+                  // If indexing H3s as well, collect them too
+                  if (indexDepth === 3) {
+                    try {
+                      const h3s = Array.from(doc.querySelectorAll('h3'))
+                      for (const h3 of h3s) {
+                        try {
+                          const h3Text = (h3.textContent || '').trim()
+                          if (!h3Text) continue
+                          const anchor3 = h3.id ? h3.id : slugify(h3Text)
+                          const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
+                          let h3Excerpt = ''
+                          let sib3 = h3.nextElementSibling
+                          while (sib3 && sib3.tagName && sib3.tagName.toLowerCase() === 'script') sib3 = sib3.nextElementSibling
+                          if (sib3 && sib3.textContent) h3Excerpt = String(sib3.textContent).trim()
+                          idx.push({ slug: h3Slug, title: h3Text, excerpt: h3Excerpt, path, parentTitle })
+                        } catch (err) { console.warn('[slugManager] indexing H3 failed', err) }
+                      }
+                    } catch (err) { console.warn('[slugManager] collect H3s failed', err) }
+                  }
                 } catch (err) { console.warn('[slugManager] collect H2s failed', err) }
               }
             } catch (err) { console.warn('[slugManager] parsing HTML for index failed', err) }
@@ -613,12 +632,14 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                 if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
               }
             }
-            // If markdown and indexDepth === 2, extract H2 sections
-            if (indexDepth === 2) {
+            // If markdown and indexDepth >= 2, extract H2 sections
+            if (indexDepth >= 2) {
+              let parentTitle = ''
+              let pageSlug = ''
               try {
                 const h1 = (raw.match(/^#\s+(.+)$/m) || [])[1]
-                const parentTitle = h1 ? h1.trim() : ''
-                const pageSlug = (function() { try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { } return slugify(title || path) })()
+                parentTitle = h1 ? h1.trim() : ''
+                pageSlug = (function() { try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { } return slugify(title || path) })()
                 const h2re = /^##\s+(.+)$/gm
                 let m2
                 while ((m2 = h2re.exec(raw))) {
@@ -635,6 +656,25 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                   } catch (err) { console.warn('[slugManager] indexing markdown H2 failed', err) }
                 }
               } catch (err) { console.warn('[slugManager] collect markdown H2s failed', err) }
+              // If markdown and indexDepth === 3, extract H3 sections
+              if (indexDepth === 3) {
+                try {
+                  const h3re = /^###\s+(.+)$/gm
+                  let m3
+                  while ((m3 = h3re.exec(raw))) {
+                    try {
+                      const h3Text = (m3[1] || '').trim()
+                      if (!h3Text) continue
+                      const anchor3 = slugify(h3Text)
+                      const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
+                      const after3 = raw.slice(h3re.lastIndex)
+                      const paraMatch3 = after3.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
+                      const h3Excerpt = paraMatch3 && paraMatch3[1] ? String(paraMatch3[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
+                      idx.push({ slug: h3Slug, title: h3Text, excerpt: h3Excerpt, path, parentTitle })
+                    } catch (err) { console.warn('[slugManager] indexing markdown H3 failed', err) }
+                  }
+                } catch (err) { console.warn('[slugManager] collect markdown H3s failed', err) }
+              }
             }
           }
           let slug = ''
@@ -648,7 +688,19 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         console.warn('[slugManager] buildSearchIndex: entry fetch failed', err)
       }
     }
-    searchIndex = idx
+    // Ensure any entries matching the caller-provided `noIndexing` excludes
+    // are removed from the final index. This covers cases where entries
+    // were discovered or generated before exclusions were applied.
+    try {
+      const finalIdx = idx.filter(entry => {
+        try { return !isExcluded(String(entry.path || '')) } catch (_) { return true }
+      })
+      searchIndex = finalIdx
+    } catch (err) {
+      // On any unexpected error during filtering, fall back to the raw index.
+      console.warn('[slugManager] filtering index by excludes failed', err)
+      searchIndex = idx
+    }
     return searchIndex
   })()
   try { await _indexPromise } catch (err) { console.warn('[slugManager] awaiting _indexPromise failed', err) }

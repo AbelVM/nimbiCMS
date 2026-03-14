@@ -48,7 +48,7 @@ export function createSiteNav(homePage) {
  * @param {boolean} effectiveSearchEnabled - whether search UI should be rendered
  * @param {('eager'|'lazy')} searchIndexMode - search index option
  *   forwarded from `initCMS`; only relevant if a search input is present.
- * @param {1|2} indexDepth - include H2 headings in the search index when 2
+ * @param {1|2|3} indexDepth - include H2 headings in the search index when 2; include H3 when 3
  * @returns {Promise<NavBuildResult>} resolves with an object containing `navbar` and `linkEls`
  */
 export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager', indexDepth = 1, noIndexing = undefined) {

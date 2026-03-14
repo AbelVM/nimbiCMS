@@ -139,28 +139,29 @@ and open the example at `http://localhost:5173/example/index.html`.
 
 ## Search indexing depth
 
-You can control how deep the client-side search index should go with the `indexDepth` option passed to `initCMS()` or via the URL query parameter `indexDepth` (values `1` or `2`).
+You can control how deep the client-side search index should go with the `indexDepth` option passed to `initCMS()` or via the URL query parameter `indexDepth` (values `1`, `2`, or `3`).
 
 - `indexDepth: 1` (default) — index only H1 titles and excerpts.
 - `indexDepth: 2` — also index H2 headings; H2 results include a subtle parent label showing the page's H1.
+- `indexDepth: 3` — also index H3 headings; H3 results include a subtle parent label showing the page's H1 for context.
 
-Example (URL param): `?indexDepth=2`
+Example (URL param): `?indexDepth=3`
 
 Example (init option):
 
 ```js
-nimbiCMS.initCMS({ el: '#app', indexDepth: 2 })
+nimbiCMS.initCMS({ el: '#app', indexDepth: 3 })
 ```
 
-Behavior notes for `indexDepth=2`:
+Behavior notes for `indexDepth=2` and `indexDepth=3`:
 
-- Search results for H2 headings will include a subtle parent label showing the containing page's H1. This helps users understand H2 results' context at-a-glance.
+- Search results for H2 (when `indexDepth>=2`) and H3 (when `indexDepth=3`) headings include a subtle parent label showing the containing page's H1. This helps users understand deeper-heading results' context at-a-glance.
 
-Example of how an H2 result may be rendered in the search UI (simplified):
+Example of how a deeper-heading result may be rendered in the search UI (simplified):
 
 ```html
 <div class="search-result">
-  <div class="result-parent">My Page Title</div> <!-- shown only for H2 results when indexDepth=2 -->
+  <div class="result-parent">My Page Title</div> <!-- shown for H2/H3 results when configured -->
   <div class="result-title">Section A</div>
   <div class="result-excerpt">A short excerpt from the section...</div>
 </div>
@@ -303,9 +304,10 @@ manager.terminate()
   If `searchIndex` is `true`, only `'eager'` and `'lazy'` are valid modes.
   Placeholder text is pulled from the localization dictionary under the key `searchPlaceholder` (see `l10n` options).
 
-- `indexDepth` – `1 | 2` (default `1`). Controls how deep the runtime search index should go:
+- `indexDepth` – `1 | 2 | 3` (default `1`). Controls how deep the runtime search index should go:
   - `1`: index only page H1 titles and excerpts (default).
-  - `2`: also index H2 headings; H2 results include a subtle parent label showing the H1 for context. This can be set via the init option or the URL query string (`?indexDepth=2`).
+  - `2`: also index H2 headings; H2 results include a subtle parent label showing the H1 for context.
+  - `3`: also index H3 headings; H3 results include a subtle parent label showing the H1 for context. This can be set via the init option or the URL query string (`?indexDepth=3`).
 
   - `noIndexing` – `string[]` (optional). Array of relative paths to exclude from the runtime search index and discovery crawl. Useful to avoid indexing heavy pages or large directories. Example: `noIndexing: ['large-manual.md','blog/drafts/']`.
 
