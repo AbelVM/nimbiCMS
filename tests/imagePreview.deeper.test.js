@@ -1,3 +1,34 @@
+import { describe, it, expect } from 'vitest'
+import { attachImagePreview } from '../src/imagePreview.js'
+
+describe('imagePreview deeper interactions', () => {
+  it('opens modal on image click and toggles zoom on dblclick', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const img = document.createElement('img')
+    img.src = '/img.png'
+    // set width/height so openPreview can capture sizes in jsdom
+    img.width = 800
+    img.height = 600
+    root.appendChild(img)
+
+    attachImagePreview(root)
+
+    // click to open
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    const modal = document.querySelector('.nimbi-image-preview')
+    expect(modal).toBeTruthy()
+    expect(modal.classList.contains('is-active')).toBe(true)
+
+    // dblclick toggles zoom (should set to 2 or back to 1)
+    img.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 10, clientY: 10 }))
+    const zoomLabel = modal.querySelector('[data-nimbi-preview-zoom-label]')
+    expect(zoomLabel).toBeTruthy()
+    // label should be set to some percent string
+    expect(/%$/.test(zoomLabel.textContent)).toBe(true)
+  })
+})
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { attachImagePreview } from '../src/imagePreview.js'
 
