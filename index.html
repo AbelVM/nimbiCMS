@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nimbi CMS Example</title>
+  <meta name="description" content="Example site for Nimbi CMS — client-side Markdown CMS">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Nimbi CMS Example">
+  <meta property="og:description" content="Example site for Nimbi CMS — client-side Markdown CMS">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/assets/logo.png">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Nimbi CMS Example">
+  <meta name="twitter:description" content="Example site for Nimbi CMS — client-side Markdown CMS">
+  <meta name="twitter:image" content="/assets/logo.png">
+
+  <link rel="icon" href="/assets/logo.png">
+  <style>
+    html,body,#app { height: 100%; margin: 0; }
+    #app { min-height: 100vh; display: block; }
+  </style>
+  <link rel="preload" href="/dist/nimbi-cms.css" as="style" onload="this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/dist/nimbi-cms.css"></noscript>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- UMD bundle (assumes /dist/nimbi-cms.js is present) -->
+  <script src="/dist/nimbi-cms.js" defer></script>
+  <script defer>
+    window.addEventListener('DOMContentLoaded', function(){
+      if (!window.nimbiCMS) {
+        console.warn('nimbiCMS UMD bundle not found at /dist/nimbi-cms.js');
+        return;
+      }
+
+      // The library exports the initializer as the default export in builds,
+      // so support both named `initCMS` and `default` global shapes.
+      const initializer = window.nimbiCMS.initCMS || window.nimbiCMS.default || window.nimbiCMS
+      if (typeof initializer !== 'function') {
+        console.warn('nimbiCMS found but initializer is not a function', initializer)
+        return
+      }
+
+        try {
+          initializer({
+            el: '#app',
+            contentPath: '.',
+            indexDepth: 2,
+            searchIndex: false,
+            homePage: 'README.md',
+            noIndexing: ['docs/index.html']
+          });
+        } catch (e) {
+          // Initialization error — show minimal feedback in console
+          console.error('[index.html] initCMS failed', e);
+        }
+    });
+  </script>
+</body>
+</html>
+    

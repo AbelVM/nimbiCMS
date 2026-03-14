@@ -265,6 +265,7 @@ export function buildPageCandidates(resolved) {
  * @returns {Promise<{data:object,pagePath:string,anchor:string|null}>}
  */
 export async function fetchPageData(raw, contentBase) {
+  const originalRaw = raw || ''
   const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
   let resolved = raw || ''
   let anchor = null
@@ -310,11 +311,30 @@ export async function fetchPageData(raw, contentBase) {
 
   const pageCandidates = buildPageCandidates(resolved)
 
+  // If the caller provided an explicit path (contains .md or .html) we should
+  // respect it even if it points to an `index.html`.  `buildPageCandidates`
+  // historically filtered out `index.html` to prefer directory slugs, which
+  // caused explicit links like `docs/index.html` to produce no candidates and
+  // later throw `no page data`.  Allow explicit originals to be fetched.
+  const originalWasExplicit = String(originalRaw || '').includes('.md') || String(originalRaw || '').includes('.html')
+  if (originalWasExplicit && pageCandidates.length === 0 && (String(resolved).includes('.md') || String(resolved).includes('.html'))) {
+    pageCandidates.push(resolved)
+  }
+
+  // If resolution produced an explicit markdown/html path (for example a
+  // slug resolved to `docs/index.html`), ensure we attempt to fetch that
+  // path even when the original request was a slug without an extension.
+  // This handles cases where `ensureSlug()` or index discovery returns an
+  // explicit file path.
+  if (pageCandidates.length === 0 && (String(resolved).includes('.md') || String(resolved).includes('.html'))) {
+    pageCandidates.push(resolved)
+  }
+
   
   if (
     pageCandidates.length === 1 &&
     /index\.html$/i.test(pageCandidates[0]) &&
-    (!slugToMd.has(resolved) && !slugToMd.has(decodeURIComponent(String(resolved || ''))))
+    (!originalWasExplicit && !slugToMd.has(resolved) && !slugToMd.has(decodeURIComponent(String(resolved || ''))) && !String(resolved || '').includes('/'))
   ) {
     throw new Error('Unknown slug: index.html fallback prevented')
   }
@@ -333,11 +353,128 @@ export async function fetchPageData(raw, contentBase) {
       break;
     } catch (e) {
       fetchError = e;
+      try { console.warn('[router] candidate fetch failed', { candidate, contentBase, err: (e && e.message) || e }) } catch (_e) {}
     }
   }
 
   if (!data) {
-    
+    try { console.error('[router] fetchPageData: no page data for', { originalRaw, resolved, pageCandidates, contentBase, fetchError: (fetchError && (fetchError.message || String(fetchError))) || null }) } catch (_e) {}
+    // If the original request was an explicit HTML path (e.g. "docs/index.html")
+    // and fetching via the configured `contentBase` failed, try fetching the
+    // absolute URL relative to the current page. This covers cases where the
+    // nav links point to top-level HTML pages (like docs/index.html) that are
+    // not served from the `contentBase` directory.
+    try {
+      if (originalWasExplicit && String(originalRaw || '').toLowerCase().includes('.html')) {
+        try {
+          const abs = new URL(String(originalRaw || ''), location.href).toString()
+          console.warn('[router] attempting absolute HTML fetch fallback', abs)
+          const res = await fetch(abs)
+          if (res && res.ok) {
+            const raw = await res.text()
+            const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
+            const rawLower = (raw || '').toLowerCase()
+            const looksLikeHtml = (ct && ct.indexOf && ct.indexOf('text/html') !== -1) || rawLower.indexOf('<!doctype') !== -1 || rawLower.indexOf('<html') !== -1
+            if (!looksLikeHtml) console.warn('[router] absolute fetch returned non-HTML', { abs, contentType: ct, snippet: rawLower.slice(0, 200) })
+            if (looksLikeHtml) {
+              try {
+                const absUrl = abs
+                const baseHref = new URL('.', absUrl).toString()
+                try {
+                  const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+                  if (parser) {
+                    const doc = parser.parseFromString(raw || '', 'text/html')
+                    // Rewrite asset URLs (src, srcset, link[href]) that are relative
+                    const rewrite = (attr, el) => {
+                      try {
+                        const val = el.getAttribute(attr) || ''
+                        if (!val) return
+                        if (/^(https?:)?\/\//i.test(val)) return
+                        if (val.startsWith('/')) return
+                        if (val.startsWith('#')) return
+                        // Resolve relative to the fetched document location
+                        try {
+                          const resolved = new URL(val, absUrl).toString()
+                          el.setAttribute(attr, resolved)
+                        } catch (err) { /* ignore */ }
+                      } catch (err) { /* ignore */ }
+                    }
+                    const els = doc.querySelectorAll('[src],[href],[srcset],[xlink\:href],[poster]')
+                    const rewritten = []
+                    for (const el of Array.from(els || [])) {
+                      try {
+                        const tag = el.tagName ? el.tagName.toLowerCase() : ''
+                        // Skip normal anchor links; those are handled by the SPA rewrite
+                        if (tag === 'a') continue
+                        if (el.hasAttribute('src')) {
+                          const before = el.getAttribute('src')
+                          rewrite('src', el)
+                          const after = el.getAttribute('src')
+                          if (before !== after) rewritten.push({ attr: 'src', tag, before, after })
+                        }
+                        if (el.hasAttribute('href') && tag === 'link') {
+                          const before = el.getAttribute('href')
+                          rewrite('href', el)
+                          const after = el.getAttribute('href')
+                          if (before !== after) rewritten.push({ attr: 'href', tag, before, after })
+                        }
+                        if (el.hasAttribute('href') && tag !== 'link') {
+                          const before = el.getAttribute('href')
+                          rewrite('href', el)
+                          const after = el.getAttribute('href')
+                          if (before !== after) rewritten.push({ attr: 'href', tag, before, after })
+                        }
+                        if (el.hasAttribute('xlink:href')) {
+                          const before = el.getAttribute('xlink:href')
+                          rewrite('xlink:href', el)
+                          const after = el.getAttribute('xlink:href')
+                          if (before !== after) rewritten.push({ attr: 'xlink:href', tag, before, after })
+                        }
+                        if (el.hasAttribute('poster')) {
+                          const before = el.getAttribute('poster')
+                          rewrite('poster', el)
+                          const after = el.getAttribute('poster')
+                          if (before !== after) rewritten.push({ attr: 'poster', tag, before, after })
+                        }
+                        if (el.hasAttribute('srcset')) {
+                          const rawSs = el.getAttribute('srcset') || ''
+                          const parts = rawSs.split(',').map(s => s.trim()).filter(Boolean)
+                          const mapped = parts.map(p => {
+                            const [urlPart, size] = p.split(/\s+/, 2)
+                            if (!urlPart) return p
+                            if (/^(https?:)?\/\//i.test(urlPart) || urlPart.startsWith('/')) return p
+                            try { const r = new URL(urlPart, absUrl).toString(); return size ? `${r} ${size}` : r } catch (err) { return p }
+                          }).join(', ')
+                          el.setAttribute('srcset', mapped)
+                        }
+                      } catch (err) { /* ignore per-element failures */ }
+                    }
+                    const modified = doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : raw
+                    try { if (rewritten && rewritten.length) console.warn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
+                    return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
+                  }
+                } catch (e) { /* parsing failed, fall back */ }
+                // Fallback: inject base tag so relative URLs without leading slash resolve
+                let rawWithBase = raw
+                if (!/<base\s+[^>]*>/i.test(raw)) {
+                  if (/<head[^>]*>/i.test(raw)) {
+                    rawWithBase = raw.replace(/(<head[^>]*>)/i, `$1<base href="${baseHref}">`)
+                  } else {
+                    rawWithBase = `<base href="${baseHref}">` + raw
+                  }
+                }
+                return { data: { raw: rawWithBase, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
+              } catch (e) {
+                return { data: { raw, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[router] absolute HTML fetch fallback failed', err)
+        }
+      }
+    } catch (_) { /* ignore fallback errors */ }
+
     throw new Error('no page data');
   }
 

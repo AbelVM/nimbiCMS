@@ -34,6 +34,11 @@ export const HLJS_ALIAS_MAP = {
   'c#': 'cs'
 }
 
+// Common HTML/markup aliases map to the `xml` language in highlight.js
+HLJS_ALIAS_MAP.html = 'xml'
+HLJS_ALIAS_MAP.xhtml = 'xml'
+HLJS_ALIAS_MAP.markup = 'xml'
+
 export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
@@ -166,12 +171,20 @@ const registeredLangs = new Set()
  * @returns {Promise<boolean>}
  */
 export async function registerLanguage(name, modulePath) {
+  // Ensure the supported-languages list is loaded (if available) so we can
+  // filter requests to only known language modules and avoid spurious CDN
+  // hits for names like `links` or `example` which may appear in user docs.
   if (!loadSupportedLanguagesPromise) {
     ;(async () => {
       try {
         await loadSupportedLanguages()
       } catch (err) { console.warn('[codeblocksManager] loadSupportedLanguages (IIFE) failed', err) }
     })()
+  }
+  if (loadSupportedLanguagesPromise) {
+    try {
+      await loadSupportedLanguagesPromise
+    } catch (_) { /* ignore load failures; fallback behavior below */ }
   }
   
   name = (name === undefined || name === null) ? '' : String(name)
@@ -191,12 +204,28 @@ export async function registerLanguage(name, modulePath) {
   try {
     const base = (modulePath || name || '').toString().replace(/\.js$/i, '').trim()
     
-    const candidates = Array.from(new Set([
+    // Prefer canonical/alias-mapped names first to avoid attempting imports
+    // for short aliases like `js` when the canonical module is `javascript`.
+    const mappedName = (aliasMap[name] || name || '').toString()
+    const mappedBase = (aliasMap[base] || base || '').toString()
+    let candidates = Array.from(new Set([
+      mappedName,
+      mappedBase,
       base,
       name,
       aliasMap[base],
       aliasMap[name]
     ].filter(Boolean))).map(c => String(c).toLowerCase()).filter(c => c && c !== 'undefined')
+    // If we have a populated SUPPORTED_HLJS_MAP, restrict candidates to
+    // entries that are known to be supported (or map via alias).
+    if (SUPPORTED_HLJS_MAP.size) {
+      candidates = candidates.filter(c => {
+        if (SUPPORTED_HLJS_MAP.has(c)) return true
+        const ali = HLJS_ALIAS_MAP[c]
+        if (ali && SUPPORTED_HLJS_MAP.has(ali)) return true
+        return false
+      })
+    }
     let mod = null
     let lastErr = null
     for (const candidate of candidates) {

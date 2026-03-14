@@ -10,7 +10,7 @@
  * delegating navigation and UI behaviour to helper modules.
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages } from './slugManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage } from './slugManager.js'
 import * as router from './router.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
@@ -392,10 +392,16 @@ export async function initCMS(options = {}) {
   const pageDir = pagePath.endsWith('/') ? pagePath : pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
   try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; console.warn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
+  // treat '.' or './' as "current directory root" (no extra path)
+  if (cp === '.' || cp === './') cp = ''
   if (cp.startsWith('./')) cp = cp.slice(2)
   if (cp.startsWith('/')) cp = cp.slice(1)
-  if (!cp.endsWith('/')) cp = cp + '/'
+  // Normalize `cp` so that:
+  // - an empty string means "same directory as the current page" (no extra '/'),
+  // - non-empty values always end with a trailing '/'.
+  if (cp !== '' && !cp.endsWith('/')) cp = cp + '/'
   const contentBase = new URL(pageDir + cp, location.origin).toString()
+  try { setHomePage && setHomePage(homePage) } catch (e) { /* ignore */ }
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (availableLanguages && Array.isArray(availableLanguages)) {
     // Set the list of languages used for slug resolution and navigation mapping.

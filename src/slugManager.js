@@ -150,6 +150,13 @@ export let allMarkdownPaths = []
 export let notFoundPage = '_404.md'
 
 /**
+ * The path used for the site's home page (relative to content base).
+ * Consumers may override via `setHomePage()`; defaults to `_home.md`.
+ * @type {string}
+ */
+export let homePage = '_home.md'
+
+/**
  * Set the not-found page path used when `fetchMarkdown` encounters a
  * missing markdown file or an HTML response for a `.md` request.
  * @param {string} p
@@ -157,6 +164,16 @@ export let notFoundPage = '_404.md'
 export function setNotFoundPage(p) {
   if (p == null) return
   notFoundPage = String(p || '')
+}
+
+/**
+ * Set the home page path used when trying home-page fallbacks during
+ * slug resolution. If unset, `_home.md` is used.
+ * @param {string} p
+ */
+export function setHomePage(p) {
+  if (p == null) return
+  homePage = String(p || '')
 }
 
 /**
@@ -824,16 +841,26 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   }
 
   try {
-    const home = await fetchMarkdown('_home.md', contentBase)
-    if (home && home.raw) {
-      const mhome = (home.raw || '').match(/^#\s+(.+)$/m)
-      if (mhome && mhome[1]) {
-        const homeSlug = slugify(mhome[1].trim())
-        if (homeSlug === decoded) {
-          _storeSlugMapping(decoded, '_home.md')
-          mdToSlug.set('_home.md', decoded)
-          return '_home.md'
+    // Prefer configured `homePage` when available, falling back to `_home.md`.
+    const homeCandidates = []
+    if (homePage && typeof homePage === 'string' && homePage.trim()) homeCandidates.push(homePage)
+    if (!homeCandidates.includes('_home.md')) homeCandidates.push('_home.md')
+    for (const hp of homeCandidates) {
+      try {
+        const home = await fetchMarkdown(hp, contentBase)
+        if (home && home.raw) {
+          const mhome = (home.raw || '').match(/^#\s+(.+)$/m)
+          if (mhome && mhome[1]) {
+            const homeSlug = slugify(mhome[1].trim())
+            if (homeSlug === decoded) {
+              _storeSlugMapping(decoded, hp)
+              mdToSlug.set(hp, decoded)
+              return hp
+            }
+          }
         }
+      } catch (e) {
+        // try next candidate
       }
     }
   } catch (e) {

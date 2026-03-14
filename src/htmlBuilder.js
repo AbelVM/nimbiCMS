@@ -131,6 +131,54 @@ function lazyLoadImages(el, pagePath, contentBase) {
   } catch (err) { console.warn('[htmlBuilder] lazyLoadImages failed', err) }
 }
 
+/**
+ * Rewrite relative asset URLs inside an article so they resolve against the
+ * fetched page's directory. Handles `src`, `href` (for scripts/links),
+ * `srcset`, `poster`, and SVG `use` (`href`/`xlink:href`).
+ * @param {HTMLElement} el
+ * @param {string} pagePath
+ * @param {string} contentBase
+ */
+function rewriteRelativeAssets(el, pagePath, contentBase) {
+  try {
+    const pageDir = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+    const baseForPage = new URL(pageDir || '.', contentBase).toString()
+    const sel = el.querySelectorAll('*')
+    for (const node of Array.from(sel || [])) {
+      try {
+        const tag = node.tagName ? node.tagName.toLowerCase() : ''
+        const rewriteAttr = (attr) => {
+          try {
+            const val = node.getAttribute(attr) || ''
+            if (!val) return
+            if (/^(https?:)?\/\//i.test(val) || val.startsWith('/')) return
+            if (val.startsWith('#')) return
+            try { node.setAttribute(attr, new URL(val, baseForPage).toString()) } catch (err) { /* ignore */ }
+          } catch (err) { /* ignore */ }
+        }
+        if (node.hasAttribute && node.hasAttribute('src')) rewriteAttr('src')
+        if (node.hasAttribute && node.hasAttribute('href')) {
+          // prefer not to rewrite anchor links
+          if (tag !== 'a') rewriteAttr('href')
+        }
+        if (node.hasAttribute && node.hasAttribute('xlink:href')) rewriteAttr('xlink:href')
+        if (node.hasAttribute && node.hasAttribute('poster')) rewriteAttr('poster')
+        if (node.hasAttribute('srcset')) {
+          const rawSs = node.getAttribute('srcset') || ''
+          const parts = rawSs.split(',').map(s => s.trim()).filter(Boolean)
+          const mapped = parts.map(p => {
+            const [urlPart, size] = p.split(/\s+/, 2)
+            if (!urlPart) return p
+            if (/^(https?:)?\/\//i.test(urlPart) || urlPart.startsWith('/')) return p
+            try { const r = new URL(urlPart, baseForPage).toString(); return size ? `${r} ${size}` : r } catch (err) { return p }
+          }).join(', ')
+          node.setAttribute('srcset', mapped)
+        }
+      } catch (err) { /* ignore per-node failures */ }
+    }
+  } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed', err) }
+}
+
 let _lastContentBase = ''
 let _lastContentBaseUrl = null
 let _lastContentBasePath = ''
@@ -548,7 +596,18 @@ async function parseMarkdown(raw) {
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     let parsed = null
     if (data.isHtml) {
-      parsed = parseHtml(data.raw || '')
+      try {
+        const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+        if (parser) {
+          const doc = parser.parseFromString(data.raw || '', 'text/html')
+          try { rewriteRelativeAssets(doc.body, pagePath, contentBase) } catch (err) { /* ignore */ }
+          parsed = parseHtml(doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : data.raw || '')
+        } else {
+          parsed = parseHtml(data.raw || '')
+        }
+      } catch (err) {
+        parsed = parseHtml(data.raw || '')
+      }
     } else {
       parsed = await parseMarkdown(data.raw || '')
     }
@@ -556,6 +615,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const article = document.createElement('article')
     article.className = 'nimbi-article content'
     article.innerHTML = parsed.html
+    try { rewriteRelativeAssets(article, pagePath, contentBase) } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle', err) }
     try { addHeadingIds(article) } catch (err) { console.warn('[htmlBuilder] addHeadingIds failed', err) }
     try {
       const codeEls = article.querySelectorAll('pre code, code[class]')

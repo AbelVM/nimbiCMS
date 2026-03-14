@@ -192,6 +192,8 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 // --- from src/slugManager.js
+export const homePage: string
+export function setHomePage(p: string): any
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): any
 
 
