@@ -55,8 +55,8 @@ export function createNavTree(t, tree) {
  * Build a table-of-contents DOM element from parsed TOC entries.
  * @param {Function} t - localization function
  * @param {Array<{level:number,text:string,id?:string}>} toc - TOC entries
- * @param {string} [pagePath]
- * @returns {HTMLElement}
+ * @param {string} [pagePath] - optional page path used for relative href normalization
+ * @returns {HTMLElement} - return value
  */
 export function buildTocElement(t, toc, pagePath = '') {
   const aside = document.createElement('aside')
@@ -95,8 +95,8 @@ export function buildTocElement(t, toc, pagePath = '') {
 
 /**
  * Ensure every heading in the document has an id (slugified from text).
- * @param {Document|HTMLElement} doc
- * @returns {void}
+ * @param {Document|HTMLElement} doc - Document or element to scan and add heading ids to.
+ * @returns {void} - No return value.
  */
 function addHeadingIds(doc) {
   const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
@@ -106,10 +106,10 @@ function addHeadingIds(doc) {
 /**
  * Resolve relative image `src` attributes against the content base and
  * mark them for lazy loading where appropriate.
- * @param {HTMLElement} el - container element to search for images
- * @param {string} pagePath
- * @param {string} contentBase
- * @returns {void}
+ * @param {HTMLElement} el - Container element to search for images.
+ * @param {string} pagePath - Page path used to compute relative image URLs.
+ * @param {string} contentBase - Base URL or path for site content.
+ * @returns {void} - No return value.
  */
 function lazyLoadImages(el, pagePath, contentBase) {
   try {
@@ -134,9 +134,9 @@ function lazyLoadImages(el, pagePath, contentBase) {
  * Rewrite relative asset URLs inside an article so they resolve against the
  * fetched page's directory. Handles `src`, `href` (for scripts/links),
  * `srcset`, `poster`, and SVG `use` (`href`/`xlink:href`).
- * @param {HTMLElement} el
- * @param {string} pagePath
- * @param {string} contentBase
+ * @param {HTMLElement} el - Article/container element whose assets will be rewritten.
+ * @param {string} pagePath - Page path used to resolve relative asset URLs.
+ * @param {string} contentBase - Base URL or path for site content.
  */
 function rewriteRelativeAssets(el, pagePath, contentBase) {
   try {
@@ -192,10 +192,10 @@ let _lastContentBasePath = ''
 /**
  * Rewrite anchor hrefs in an article element to SPA `?page=` links where
  * applicable. Performs slug lookups and may fetch markdown titles.
- * @param {HTMLElement} article
- * @param {string} contentBase
- * @param {string} [pagePath]
- * @returns {Promise<void>}
+ * @param {HTMLElement} article - Article element containing page HTML and anchors.
+ * @param {string} contentBase - Base URL or path for site content.
+ * @param {string} [pagePath] - Optional page path used for relative link resolution.
+ * @returns {Promise<void>} - Resolves when anchor rewriting and any async title fetches complete.
  */
 async function rewriteAnchors(article, contentBase, pagePath) {
   try {
@@ -412,9 +412,9 @@ async function rewriteAnchors(article, contentBase, pagePath) {
  * Returns the detected top H1, its text, and the chosen slug key.
  *
  * @param {Object} parsed - parsed page metadata
- * @param {HTMLElement} article
- * @param {string} [pagePath]
- * @param {string|null} [anchor]
+ * @param {HTMLElement} article - article parameter
+ * @param {string} [pagePath] - pagePath parameter
+ * @param {string|null} [anchor] - anchor parameter
  * @returns {{topH1:HTMLElement|null,h1Text:string|null,slugKey:string}}
  */
 function computeSlug(parsed, article, pagePath, anchor) {
@@ -447,9 +447,9 @@ function computeSlug(parsed, article, pagePath, anchor) {
  * slug-to-path mappings up front so clicks on HTML links behave like
  * Markdown URLs.
  *
- * @param {NodeListOf<HTMLAnchorElement>} linkEls
- * @param {string} base - base URL for fetchMarkdown
- * @returns {Promise<void>}
+ * @param {NodeListOf<HTMLAnchorElement>} linkEls - Anchors to inspect for HTML titles.
+ * @param {string} base - Base URL used for `fetchMarkdown` when resolving links.
+ * @returns {Promise<void>} - Resolves when all title fetches and slug mappings have completed.
  */
 export async function preScanHtmlSlugs(linkEls, base) {
   if (!linkEls || !linkEls.length) return
@@ -521,9 +521,9 @@ export async function preScanHtmlSlugs(linkEls, base) {
 
 /**
  * Map referenced markdown links to slugs by fetching titles where needed.
- * @param {NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[]} linkEls
- * @param {string} contentBase
- * @returns {Promise<void>}
+ * @param {NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[]} linkEls - Anchors to inspect for markdown links.
+ * @param {string} contentBase - Base URL used when resolving relative markdown paths.
+ * @returns {Promise<void>} - Resolves once mapping and any title fetches are complete.
  */
 export async function preMapMdSlugs(linkEls, contentBase) {
   if (!linkEls || !linkEls.length) return
@@ -691,12 +691,12 @@ async function parseMarkdown(raw) {
  * Given a page's fetched data, produce an <article> element, a TOC,
  * and slug calculations.  Handles HTML vs Markdown transparently.
  *
- * @param {Function} t - localization function
- * @param {{raw:string,isHtml?:boolean}} data - data returned by fetchMarkdown
- * @param {string} pagePath - normalized path of the page (for link rewriting)
- * @param {string|null} anchor - optional anchor to scroll to
- * @param {string} contentBase - base URL for resolving links and images
- * @returns {Promise<ArticleResult>}
+ * @param {Function} t - Localization function.
+ * @param {{raw:string,isHtml?:boolean}} data - Data returned by `fetchMarkdown`.
+ * @param {string} pagePath - Normalized path of the page (for link rewriting).
+ * @param {string|null} anchor - Optional anchor to scroll to.
+ * @param {string} contentBase - Base URL for resolving links and images.
+ * @returns {Promise<ArticleResult>} - Promise resolving to the `ArticleResult` (article element, parsed data, toc, and slug info).
  */
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     let parsed = null
@@ -758,25 +758,11 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
   }
 
 /**
- * Render a simple not-found message into the provided content wrapper.
- * @param {HTMLElement|null} contentWrap - Container to render the message into
- * @param {Function|null} t - localization function (optional)
- * @param {Error|null} e - optional error providing details
- * @returns {void}
- */
-/**
- * Render a simple not-found message into the provided content wrapper.
- * @param {HTMLElement|null} contentWrap - Container to render the message into
- * @param {Function|null} t - localization function (optional)
- * @param {Error|null} e - optional error providing details
- * @returns {void}
- */
-/**
  * Render a simple "not found" message into the provided container.
  * Placed immediately above export for TypeDoc.
- * @param {HTMLElement|null} contentWrap
- * @param {Function|null} t
- * @param {Error|null} e
+ * @param {HTMLElement|null} contentWrap - contentWrap parameter
+ * @param {Function|null} t - t parameter
+ * @param {Error|null} e - e parameter
  */
 export function renderNotFound(contentWrap, t, e) {
     if (contentWrap) contentWrap.innerHTML = ''
@@ -796,7 +782,7 @@ let _anchorWorker = null
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
 
 /**
- * @returns {Worker|null}
+ * @returns {Worker|null} - A Worker instance used for anchor processing, or null if unsupported.
  */
 export function initAnchorWorker() {
   if (!_anchorWorker) {
@@ -844,10 +830,10 @@ function _sendToAnchorWorker(msg) {
  * available this is a thin wrapper that falls back to the in-thread
  * `rewriteAnchors` implementation.
  *
- * @param {HTMLElement} article
- * @param {string} contentBase
- * @param {string} [pagePath]
- * @returns {Promise<void>}
+ * @param {HTMLElement} article - Article element to process.
+ * @param {string} contentBase - Base URL or path for site content.
+ * @param {string} [pagePath] - Optional page path for relative resolution.
+ * @returns {Promise<void>} - Resolves when anchor rewriting completes (or falls back to sync implementation).
  */
 export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   return rewriteAnchors(article, contentBase, pagePath)
@@ -860,8 +846,8 @@ export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguag
 
 /**
  * Attach a click handler to a generated TOC so clicks perform SPA navigation.
- * @param {HTMLElement} toc
- * @returns {void}
+ * @param {HTMLElement} toc - Table-of-contents element to attach SPA navigation handlers to.
+ * @returns {void} - No return value.
  */
 export function attachTocClickHandler(toc) {
     try {
@@ -924,8 +910,8 @@ export function attachTocClickHandler(toc) {
  */
 /**
  * Scroll to a specific anchor ID inside the CMS container or to top.
- * @param {string|null} anchor - element id (without '#') or null to scroll to top
- * @returns {void}
+ * @param {string|null} anchor - Element id (without '#') or null to scroll to top.
+ * @returns {void} - No return value.
  */
 export function scrollToAnchorOrTop(anchor) {
     const containerEl = document.querySelector('.nimbi-cms') || null
@@ -961,22 +947,22 @@ export function scrollToAnchorOrTop(anchor) {
  * visibility.  Observes the supplied `topH1` element if present; on pages
  * without a top heading we fall back to a simple scroll-position listener.
  *
- * @param {HTMLElement} article
- * @param {HTMLElement|null} topH1
- * @param {object} opts
+ * @param {HTMLElement} article - Article element to monitor for scroll/top visibility.
+ * @param {HTMLElement|null} topH1 - Top-level H1 element for intersection observation.
+ * @param {object} opts - Options object for mounting and container overrides.
  */
 /**
  * Create or update a scroll-to-top button and toggle TOC visibility.
- * @param {HTMLElement} article
- * @param {HTMLElement|null} topH1
- * @param {object} opts
- * @returns {void}
+ * @param {HTMLElement} article - Article element to monitor for scroll/top visibility.
+ * @param {HTMLElement|null} topH1 - Top-level H1 element for intersection observation.
+ * @param {object} opts - Options object for mounting and container overrides.
+ * @returns {void} - No return value.
  */
 /**
  * Create or update a scroll-to-top button and toggle TOC/menu label visibility.
- * @param {HTMLElement} article
- * @param {HTMLElement|null} topH1
- * @param {object} opts
+ * @param {HTMLElement} article - article parameter
+ * @param {HTMLElement|null} topH1 - topH1 parameter
+ * @param {object} opts - opts parameter
  */
 export function ensureScrollTopButton(article, topH1, { mountOverlay = null, container = null, mountEl = null, navWrap = null, t = null } = {}) {
   try {

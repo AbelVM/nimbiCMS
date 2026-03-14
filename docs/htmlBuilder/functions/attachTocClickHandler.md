@@ -16,6 +16,10 @@ Attach a click handler to a generated TOC so clicks perform SPA navigation.
 
 `HTMLElement`
 
+Table-of-contents element to attach SPA navigation handlers to.
+
 ## Returns
 
 `void`
+
+- No return value.

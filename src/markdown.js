@@ -28,7 +28,7 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
 
 /**
  * Lazily return or create a renderer worker instance (may return null).
- * @returns {Worker|null}
+ * @returns {Worker|null} - A Worker instance or null if workers are unavailable.
  */
 export function initRendererWorker() {
   return _rendererManager.get()
@@ -46,7 +46,7 @@ export const markdownPlugins = []
 /**
  * Register a new marked plugin.  The object is passed directly to
  * `marked.use()` which merges its fields into the global parser.
- * @param {MarkdownPlugin} plugin
+ * @param {MarkdownPlugin} plugin - Markdown plugin object to register with `marked`.
  */
 export function addMarkdownExtension(plugin) {
     if (plugin && typeof plugin === 'object') {
@@ -57,7 +57,7 @@ export function addMarkdownExtension(plugin) {
 
 /**
  * Replace the full plugin list.  Existing list is cleared first.
- * @param {MarkdownPlugin[]} plugins
+ * @param {MarkdownPlugin[]} plugins - array of markdown plugins to register
  */
 export function setMarkdownExtensions(plugins) {
   markdownPlugins.length = 0
@@ -77,8 +77,8 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
  * Convert markdown string to HTML and extract a table-of-contents list.
  * Preserves frontmatter metadata.
  *
- * @param {string} md
- * @returns {Promise<ParseResult>}
+ * @param {string} md - markdown source string to convert
+ * @returns {Promise<ParseResult>} - Promise resolving to the parsed HTML, metadata, and table-of-contents.
  */
 export async function parseMarkdownToHtml(md) {
   const w = initRendererWorker && initRendererWorker()

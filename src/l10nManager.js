@@ -20,18 +20,12 @@ if (!DEFAULT_L10N[detectedLang]) detectedLang = 'en'
 export let currentLang = detectedLang
 
 /**
- * Translate a key using the current language.  Replacement tokens of the
+ * Translate a key using the current language. Replacement tokens of the
  * form `{name}` are interpolated from the `replacements` object.
  *
- * @param {string} key
- * @param {Object} [replacements]
- * @returns {string}
- */
-/**
- * Translate a key using the current language, interpolating replacements.
- * @param {string} key
- * @param {Object} [replacements]
- * @returns {string}
+ * @param {string} key - Translation key to look up in the current locale.
+ * @param {Object} [replacements] - Optional replacements for token interpolation.
+ * @returns {string} - The translated string, or an empty string when not found.
  */
 export function t(key, replacements = {}) {
   const dict = L10N[currentLang] || L10N.en
@@ -46,9 +40,9 @@ export function t(key, replacements = {}) {
  * Load a JSON localization file and merge its contents into the runtime
  * dictionary.
  *
- * @param {string} path
- * @param {string} pageDir
- * @returns {Promise<void>}
+ * @param {string} path - URL or relative path to the JSON localization file.
+ * @param {string} pageDir - Base page directory used to resolve relative paths.
+ * @returns {Promise<void>} - Resolves when the file has been fetched and merged.
  */
 export async function loadL10nFile(path, pageDir) {
   if (!path) return
@@ -68,16 +62,10 @@ export async function loadL10nFile(path, pageDir) {
 }
 
 /**
- * Switch the current UI language.  Falls back to English if the requested
+ * Switch the current UI language. Falls back to English if the requested
  * language is not available.
- *
- * @param {string} lang
- * @returns {void}
- */
-/**
- * Switch the current UI language; falls back to English if unknown.
- * @param {string} lang
- * @returns {void}
+ * @param {string} lang - Language code to switch to (e.g. 'en', 'es').
+ * @returns {void} - No return value.
  */
 export function setLang(lang) {
   const short = String(lang).split('-')[0].toLowerCase()

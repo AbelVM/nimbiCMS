@@ -18,6 +18,10 @@ once at startup and caches the promise.
 
 `string` = `DEFAULT_HLJS_SUPPORTED_URL`
 
+URL to the supported-languages markdown file to fetch.
+
 ## Returns
 
 `Promise`\<`void`\>
+
+- Resolves once the supported languages map has been populated.

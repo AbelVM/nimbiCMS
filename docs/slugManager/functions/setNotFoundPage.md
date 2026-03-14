@@ -17,6 +17,8 @@ missing markdown file or an HTML response for a `.md` request.
 
 `string`
 
+path to use as the not-found page (relative to content base)
+
 ## Returns
 
 `void`

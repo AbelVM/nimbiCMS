@@ -33,22 +33,22 @@ export let skipRootReadme = false
 /**
  * Configure whether README files at the repository root should be
  * excluded from link discovery during crawling/index building.
- * @param {boolean} v - truthy to skip root README files, falsy to include
- * @returns {void}
+ * @param {boolean} v - Truthy to skip root README files, falsy to include.
+ * @returns {void} - No return value.
  */
 export function setSkipRootReadme(v) { skipRootReadme = !!v }
 
 /**
  * Set available language codes for multilingual sites.
- * @param {string[]} list
- * @returns {void}
+ * @param {string[]} list - Array of language codes (e.g. ['en','fr']).
+ * @returns {void} - No return value.
  */
 export function setLanguages(list) {
   availableLanguages = Array.isArray(list) ? list.slice() : []
 }
 /**
  * Return the current list of configured available language codes.
- * @returns {string[]}
+ * @returns {string[]} - Array of available language codes.
  */
 export function getLanguages() { return availableLanguages }
 
@@ -63,7 +63,7 @@ const _slugWorkerManager = makeWorkerManager(() => createWorkerFromRaw(slugWorke
 
 /**
  * Lazily return a worker instance used for slug-related background tasks.
- * @returns {Worker|null}
+ * @returns {Worker|null} - A Worker instance or null if workers are unavailable.
  */
 export function initSlugWorker() {
   return _slugWorkerManager.get()
@@ -75,8 +75,9 @@ function _sendToWorker(msg) {
 
 /**
  * Build the search index using the slug worker when available.
- * @param {string} contentBase
- * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>}
+ * @param {string} contentBase - contentBase parameter
+ * @param {string} contentBase - base URL where markdown content is hosted
+ * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>} - resolved search index entries
  */
 export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
   const w = initSlugWorker()
@@ -100,10 +101,10 @@ export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noInde
 /**
  * Attempt to resolve a slug via the worker when available, otherwise fallback
  * to the main-thread `crawlForSlug` implementation.
- * @param {string} slug
- * @param {string} base
- * @param {number} maxQueue
- * @returns {Promise<string|null>}
+ * @param {string} slug - slug to resolve
+ * @param {string} base - base content URL used for discovery
+ * @param {number} maxQueue - maximum concurrency/queue length for worker
+ * @returns {Promise<string|null>} - resolved markdown path or null if not found
  */
 export async function crawlForSlugWorker(slug, base, maxQueue) {
   const w = initSlugWorker()
@@ -113,9 +114,9 @@ export async function crawlForSlugWorker(slug, base, maxQueue) {
 
 /**
  * Store a slug -> markdown path mapping, respecting configured languages.
- * @param {string} slug
- * @param {string} rel
- * @returns {void}
+ * @param {string} slug - Slug key to associate with a markdown path.
+ * @param {string} rel - Markdown path (relative to content base) to associate with the slug.
+ * @returns {void} - No return value.
  */
 export function _storeSlugMapping(slug, rel) {
   if (!slug) return
@@ -143,20 +144,20 @@ export const slugResolvers = new Set()
  * Register a custom resolver function.  The function should accept a slug
  * string and return a markdown path (or promise thereof) or `null` if not
  * resolved.
- * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn
- * @returns {void}
+ * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn - Resolver function to add.
+ * @returns {void} - No return value.
  */
 /**
  * Register a custom slug resolver function. The function should accept a
  * slug (string) and return a markdown path (or promise thereof) or `null`.
- * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn
- * @returns {void}
+ * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn - fn parameter
+ * @returns {void} - return value
  */
 export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.add(fn) }
 /**
  * Unregister a previously added resolver.
- * @param {(slug:string)=>any} fn
- * @returns {void}
+ * @param {(slug:string)=>any} fn - Previously registered resolver to remove.
+ * @returns {void} - No return value.
  */
 export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.delete(fn) }
 /**
@@ -169,24 +170,14 @@ let _allMd = {}
 
 export let allMarkdownPaths = []
 
-/**
- * The path used for the site's not-found page (relative to content base).
- * Consumers may override via `setNotFoundPage()`; defaults to `_404.md`.
- * @type {string}
- */
 export let notFoundPage = '_404.md'
 
-/**
- * The path used for the site's home page (relative to content base).
- * Consumers may override via `setHomePage()`; defaults to `_home.md`.
- * @type {string}
- */
 export let homePage = '_home.md'
 
 /**
  * Set the not-found page path used when `fetchMarkdown` encounters a
  * missing markdown file or an HTML response for a `.md` request.
- * @param {string} p
+ * @param {string} p - path to use as the not-found page (relative to content base)
  */
 export function setNotFoundPage(p) {
   if (p == null) return
@@ -196,23 +187,13 @@ export function setNotFoundPage(p) {
 /**
  * Set the home page path used when trying home-page fallbacks during
  * slug resolution. If unset, `_home.md` is used.
- * @param {string} p
+ * @param {string} p - path to use as the home page (relative to content base)
  */
 export function setHomePage(p) {
   if (p == null) return
   homePage = String(p || '')
 }
 
-/**
- * Replace internal manifest used by `setContentBase` with a custom object
- * (keyed by full path).  Intended for unit tests.
- * @param {Object<string,string>} obj
- */
-/**
- * Replace internal manifest used by `setContentBase` with a custom object
- * (keyed by full path). Intended for unit tests.
- * @param {Object<string,string>} obj
- */
 export function _setAllMd(obj) {
   _allMd = obj || {}
 }
@@ -221,6 +202,12 @@ export function _setAllMd(obj) {
 export const listSlugCache = new Map()
 /** @type {Set<string>} */
 export const listPathsFetched = new Set()
+
+/**
+ * Clear caches used for directory list -> slug mappings and path fetch
+ * tracking. Useful for tests and when rebuilding indexes.
+ * @returns {void} - No return value.
+ */
 export function clearListCaches() { listSlugCache.clear(); listPathsFetched.clear() }
 
 function _deriveCommonPrefix(paths) {
@@ -243,8 +230,8 @@ import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/h
 /**
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
  * maps and `allMarkdownPaths` relative to that base.
- * @param {string} [contentBase]
- * @returns {void}
+ * @param {string} [contentBase] - contentBase parameter
+ * @returns {void} - No return value.
  */
 export function setContentBase(contentBase) {
   slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
@@ -318,8 +305,8 @@ try { setContentBase() } catch (err) { console.warn('[slugManager] initial setCo
 
 /**
  * Generate a URL-friendly slug from a text string.
- * @param {string} s
- * @returns {string}
+ * @param {string} s - s parameter
+ * @returns {string} - The generated slug string.
  */
 export function slugify(s) {
   let slug = String(s || '')
@@ -334,14 +321,14 @@ export function slugify(s) {
  * Return true for links that point outside the site content (absolute
  * schemes, protocol-relative `//`, etc.). Centralizing this check avoids
  * inconsistencies across crawlers and indexers.
- * @param {string} href
- * @returns {boolean}
+ * @param {string} href - href parameter
+ * @returns {boolean} - True when the href points outside the site content.
  */
 /**
  * Return true for links that point outside the site content (absolute
  * schemes, protocol-relative `//`, etc.). Centralized helper.
- * @param {string} href
- * @returns {boolean}
+ * @param {string} href - href parameter
+ * @returns {boolean} - return value
  */
 export function isExternalLink(href) {
   return isExternalLinkWithBase(href, undefined)
@@ -352,15 +339,15 @@ export function isExternalLink(href) {
  * If `contentBase` is omitted, this falls back to a conservative check
  * (protocol or protocol-relative URLs are considered external).
  *
- * @param {string} href
+ * @param {string} href - href parameter
  * @param {string} [contentBase] - optional absolute or relative content base
- * @returns {boolean}
+ * @returns {boolean} - return value
  */
 /**
  * Determine whether an href points outside of the provided contentBase.
- * @param {string} href
- * @param {string} [contentBase]
- * @returns {boolean}
+ * @param {string} href - href parameter
+ * @param {string} [contentBase] - contentBase parameter
+ * @returns {boolean} - True when the href points outside the provided content base.
  */
 export function isExternalLinkWithBase(href, contentBase) {
   if (!href) return false
@@ -403,13 +390,13 @@ export function isExternalLinkWithBase(href, contentBase) {
  * Unescape Markdown-escaped characters so search titles/excerpts show
  * natural text (e.g. "\\_clearHooks" -> "_clearHooks"). Only a small
  * set of escapable characters per CommonMark is handled here.
- * @param {string} s
- * @returns {string}
+ * @param {string} s - s parameter
+ * @returns {string} - The unescaped string.
  */
 /**
  * Unescape a small set of Markdown-escaped characters.
- * @param {string} s
- * @returns {string}
+ * @param {string} s - s parameter
+ * @returns {string} - return value
  */
 export function unescapeMarkdown(s) {
   if (s == null) return s
@@ -424,14 +411,14 @@ export function unescapeMarkdown(s) {
  * current UI language and available language list into account. If no
  * mapping exists the return value is `null`.
  *
- * @param {string} slug
- * @returns {string|null}
+ * @param {string} slug - slug parameter
+ * @returns {string|null} - The resolved markdown path for the slug, or `null` if not found.
  */
 /**
  * Given a slug, return the most appropriate markdown path taking the
  * current UI language into account.
- * @param {string} slug
- * @returns {string|null}
+ * @param {string} slug - slug parameter
+ * @returns {string|null} - return value
  */
 export function resolveSlugPath(slug) {
   if (!slug || !slugToMd.has(slug)) return null
@@ -454,7 +441,7 @@ export function resolveSlugPath(slug) {
 export const fetchCache = new Map()
 /**
  * Clear internal fetch cache used by `fetchMarkdown`.
- * @returns {void}
+ * @returns {void} - No return value.
  */
 export function clearFetchCache() { fetchCache.clear() }
 
@@ -549,7 +536,7 @@ export let fetchMarkdown = async function(path, base) {
 /**
  * Override the internal fetchMarkdown implementation. Useful for tests
  * or when consumers want to provide a bespoke fetch strategy.
- * @param {(path:string, base?:string)=>Promise<FetchResult>} fn
+ * @param {(path:string, base?:string)=>Promise<FetchResult>} fn - fn parameter
  */
 export function setFetchMarkdown(fn) {
   if (typeof fn === 'function') {
@@ -562,8 +549,8 @@ export const crawlCache = new Map()
 /**
  * Remove code blocks, inline code, and HTML comments from markdown
  * to avoid extracting links that appear only inside code or comments.
- * @param {string} raw
- * @returns {string}
+ * @param {string} raw - raw parameter
+ * @returns {string} - return value
  */
 function _stripCodeAndComments(raw) {
   if (!raw || typeof raw !== 'string') return ''
@@ -881,8 +868,8 @@ export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
 
 /**
  * Set the default maximum crawl queue size used by crawlers.
- * @param {number} n
- * @returns {void}
+ * @param {number} n - n parameter
+ * @returns {void} - return value
  */
 export function setDefaultCrawlMaxQueue(n) {
   if (typeof n === 'number' && n >= 0) defaultCrawlMaxQueue = n
@@ -968,9 +955,9 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
 
 /**
  * Crawl the content directory collecting all markdown and HTML pages.
- * @param {string} contentBase
- * @param {number} [maxQueue]
- * @returns {Promise<string[]>}
+ * @param {string} contentBase - contentBase parameter
+ * @param {number} [maxQueue] - maxQueue parameter
+ * @returns {Promise<string[]>} - return value
  */
 export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQueue) {
   const result = new Set()
@@ -1018,10 +1005,10 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
 /**
  * Ensure the given slug is mapped to a markdown path. Attempts manifest
  * lookup, search-index, crawling, and other fallbacks in order.
- * @param {string} decoded
- * @param {string} contentBase
- * @param {number} [maxQueue]
- * @returns {Promise<string|null>}
+ * @param {string} decoded - decoded parameter
+ * @param {string} contentBase - contentBase parameter
+ * @param {number} [maxQueue] - maxQueue parameter
+ * @returns {Promise<string|null>} - return value
  */
 export async function ensureSlug(decoded, contentBase, maxQueue) {
   if (decoded && typeof decoded === 'string') {

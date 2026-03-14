@@ -11,3 +11,5 @@
 ## Returns
 
 `Record`\<`string`, `number`[]\>
+
+- A record mapping string keys to arrays of numbers.

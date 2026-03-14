@@ -14,8 +14,12 @@ Toggle light/dark styling by setting `data-theme` and `is-dark`.
 
 ### style
 
+'light' or 'dark' to toggle theme
+
 `"light"` | `"dark"`
 
 ## Returns
 
 `void`
+
+- return value

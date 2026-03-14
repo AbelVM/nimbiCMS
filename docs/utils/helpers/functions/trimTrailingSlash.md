@@ -16,6 +16,8 @@ Remove trailing slashes from a path or URL.
 
 `string`
 
+input path or URL to ensure a trailing slash on
+
 ## Returns
 
 `string`

@@ -17,6 +17,8 @@ Register a new marked plugin.  The object is passed directly to
 
 [`MarkdownPlugin`](../interfaces/MarkdownPlugin.md)
 
+Markdown plugin object to register with `marked`.
+
 ## Returns
 
 `void`

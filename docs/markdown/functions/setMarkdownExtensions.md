@@ -16,6 +16,8 @@ Replace the full plugin list.  Existing list is cleared first.
 
 [`MarkdownPlugin`](../interfaces/MarkdownPlugin.md)[]
 
+array of markdown plugins to register
+
 ## Returns
 
 `void`

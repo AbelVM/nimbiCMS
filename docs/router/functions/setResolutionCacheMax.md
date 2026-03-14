@@ -16,6 +16,10 @@ Change maximum cache size at runtime.
 
 `number`
 
+Maximum number of cached resolution entries.
+
 ## Returns
 
 `void`
+
+- No return value.

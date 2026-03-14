@@ -51,8 +51,8 @@ const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
  * GitHub markdown file and populate `SUPPORTED_HLJS_MAP`.  This is called
  * once at startup and caches the promise.
  *
- * @param {string} [url]
- * @returns {Promise<void>}
+ * @param {string} [url] - URL to the supported-languages markdown file to fetch.
+ * @returns {Promise<void>} - Resolves once the supported languages map has been populated.
  */
 export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
   if (!url) return
@@ -166,9 +166,9 @@ const registeredLangs = new Set()
  * Safe to call multiple times; returns `true` if the language is loaded or
  * already registered.
  *
- * @param {string} name
- * @param {string} [modulePath]
- * @returns {Promise<boolean>}
+ * @param {string} name - Language name or alias to register (e.g. 'javascript').
+ * @param {string} [modulePath] - Optional explicit module path to import for the language.
+ * @returns {Promise<boolean>} - Resolves to `true` when the language is registered.
  */
 export async function registerLanguage(name, modulePath) {
   // Ensure the supported-languages list is loaded (if available) so we can
@@ -319,13 +319,13 @@ let __hlObserver = null
  * Lazy-highlight `<pre><code>` blocks using IntersectionObserver.  The
  * observer will register necessary languages as elements become visible.
  *
- * @param {ParentNode} [root=document]
- * @returns {void}
+ * @param {ParentNode} [root=document] - Root node in which to observe `<pre><code>` blocks.
+ * @returns {void} - No return value.
  */
 /**
  * Observe and lazy-highlight `<pre><code>` blocks, registering languages as needed.
- * @param {ParentNode} [root=document]
- * @returns {void}
+ * @param {ParentNode} [root=document] - Root node in which to observe code blocks.
+ * @returns {void} - No return value.
  */
 export function observeCodeBlocks(root = document) {
   
@@ -407,15 +407,15 @@ export function observeCodeBlocks(root = document) {
  * `'monokai'` nothing happens (it's the default bundle).  When `useCdn` is
  * true the stylesheet is fetched from jsdelivr.
  *
- * @param {string} theme
- * @param {{useCdn?:boolean}} [opts]
- * @returns {void}
+ * @param {string} theme - Name of the highlight.js CSS theme to apply.
+ * @param {{useCdn?:boolean}} [opts] - Options object; set `useCdn` to true to load theme from CDN.
+ * @returns {void} - No return value.
  */
 /**
  * Switch highlight.js CSS theme, optionally loading from CDN.
- * @param {string} theme
- * @param {{useCdn?:boolean}} [opts]
- * @returns {void}
+ * @param {string} theme - Name of the highlight.js theme to apply.
+ * @param {{useCdn?:boolean}} [opts] - Options object; `useCdn` controls CDN loading.
+ * @returns {void} - No return value.
  */
 export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = document.querySelector('link[data-hl-theme]')

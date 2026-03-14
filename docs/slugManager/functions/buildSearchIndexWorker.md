@@ -16,6 +16,8 @@ Build the search index using the slug worker when available.
 
 `string`
 
+contentBase parameter
+
 ### indexDepth?
 
 `number` = `1`
@@ -27,3 +29,5 @@ Build the search index using the slug worker when available.
 ## Returns
 
 `Promise`\<`object`[]\>
+
+- resolved search index entries

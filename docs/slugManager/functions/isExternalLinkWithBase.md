@@ -16,10 +16,16 @@ Determine whether an href points outside of the provided contentBase.
 
 `string`
 
+href parameter
+
 ### contentBase?
 
 `string`
 
+contentBase parameter
+
 ## Returns
 
 `boolean`
+
+- True when the href points outside the provided content base.

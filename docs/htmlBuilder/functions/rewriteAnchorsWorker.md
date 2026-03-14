@@ -18,14 +18,22 @@ available this is a thin wrapper that falls back to the in-thread
 
 `HTMLElement`
 
+Article element to process.
+
 ### contentBase
 
 `string`
+
+Base URL or path for site content.
 
 ### pagePath?
 
 `string`
 
+Optional page path for relative resolution.
+
 ## Returns
 
 `Promise`\<`void`\>
+
+- Resolves when anchor rewriting completes (or falls back to sync implementation).

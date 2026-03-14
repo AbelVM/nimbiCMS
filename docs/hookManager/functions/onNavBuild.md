@@ -16,6 +16,10 @@ Register a callback once the navigation DOM has been built.
 
 (`ctx`) => `void` \| `Promise`\<`void`\>
 
+Callback invoked with the navigation context.
+
 ## Returns
 
 `void`
+
+- No return value.

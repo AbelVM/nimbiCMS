@@ -17,6 +17,10 @@ appended to the document. The callback receives the render context.
 
 (`ctx`) => `void` \| `Promise`\<`void`\>
 
+Callback which can modify the render context or DOM.
+
 ## Returns
 
 `void`
+
+- No return value.

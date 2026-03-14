@@ -3,7 +3,7 @@
  * Return true if the href points to an external or special link.  This
  * matches absolute URLs and mailto/tel schemes.
  *
- * @param {string} href
+ * @param {string} href - URL or href string to evaluate
  * @returns {boolean}
  */
 /**
@@ -20,7 +20,7 @@ export function isExternalLink(href) {
  * Normalize a path by stripping leading dots and slashes.  Useful for
  * converting user-supplied paths into canonical relative identifiers.
  *
- * @param {string} p
+ * @param {string} p - input path to normalize (remove leading ./ or /)
  * @returns {string}
  */
 /**
@@ -36,12 +36,12 @@ export function normalizePath(p) {
  * Remove one or more trailing slashes from a URL or path.  This is handy
  * when composing base paths to avoid the dreaded `//` sequence.
  *
- * @param {string} u
+ * @param {string} u - input path or URL to trim trailing slashes from
  * @returns {string}
  */
 /**
  * Remove trailing slashes from a path or URL.
- * @param {string} u
+ * @param {string} u - input path or URL to ensure a trailing slash on
  * @returns {string}
  */
 export function trimTrailingSlash(u) {
@@ -67,7 +67,7 @@ export function ensureTrailingSlash(u) {
 /**
  * Apply the lazy-loading attribute to an <img> element if not already set.
  *
- * @param {HTMLImageElement} img
+ * @param {HTMLImageElement} img - image element to mark for lazy loading
  */
 export function setLazyload(img) {
   try {
@@ -280,7 +280,7 @@ export function joinPaths(...parts) {
  * Safely encode a URL or URL component using encodeURI.  Falls back to the
  * original string if encoding fails.
  *
- * @param {string} u
+ * @param {string} u - URL or component to encode safely
  * @returns {string}
  */
 /**

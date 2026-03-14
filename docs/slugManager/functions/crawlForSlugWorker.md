@@ -17,14 +17,22 @@ to the main-thread `crawlForSlug` implementation.
 
 `string`
 
+slug to resolve
+
 ### base
 
 `string`
+
+base content URL used for discovery
 
 ### maxQueue
 
 `number`
 
+maximum concurrency/queue length for worker
+
 ## Returns
 
 `Promise`\<`string` \| `null`\>
+
+- resolved markdown path or null if not found

@@ -17,10 +17,16 @@ overrides or named themes fetched from unpkg.
 
 `string` = `'none'`
 
+'none' | 'local' | theme name to load from unpkg
+
 ### pageDir?
 
 `string` = `'/'`
 
+directory to probe for a local `bulma.css` when using 'local'
+
 ## Returns
 
 `Promise`\<`void`\>
+
+- return value

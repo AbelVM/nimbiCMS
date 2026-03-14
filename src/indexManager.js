@@ -1,24 +1,19 @@
 
 import { slugToMd, mdToSlug, allMarkdownPaths } from './slugManager.js';
 
-/**
- * Internal set tracking all indexed markdown paths and slug mappings.
- * Used by refreshIndexPaths and map-tracking helpers.
- * @type {Set<string>}
- */
 export const indexSet = new Set();
 
 /**
  * Refresh the internal index set from `allMarkdownPaths` and current slug maps.
  * Useful when the content base or path list changes at runtime (tests/plugins).
  *
- * @param {string} contentBase - The base path for content (not used directly, but for API symmetry)
- * @returns {void}
+ * @param {string} contentBase - The base path for content (used for API symmetry).
+ * @returns {void} - No return value.
  */
 /**
  * Refresh the internal index set from available markdown paths and slug maps.
- * @param {string} contentBase
- * @returns {void}
+ * @param {string} contentBase - Base path for content used by the indexer.
+ * @returns {void} - No return value.
  */
 export function refreshIndexPaths(contentBase) {
   _ensureMapsTracked();
@@ -31,13 +26,6 @@ export function refreshIndexPaths(contentBase) {
   refreshIndexPaths._refreshed = true;
 }
 
-/**
- * Add every value from a Map-like object to the internal `indexSet`.
- * Used by refreshIndexPaths and map-tracking helpers.
- *
- * @param {{values:()=>Iterable}} map - object providing a `values()` iterator.
- * @returns {void}
- */
 function _augmentIndexWithMap(map) {
   if (!map || typeof map.values !== 'function') return;
   for (const v of map.values()) {
@@ -48,7 +36,7 @@ function _augmentIndexWithMap(map) {
 /**
  * Instrument a map so that any value inserted also populates the index set.
  * @param {{set:function}} map - a Map-like object whose `set` method will be wrapped.
- * @returns {void}
+ * @returns {void} - No return value.
  */
 function _trackMap(map) {
   if (!map || typeof map.set !== 'function') return;
@@ -61,7 +49,7 @@ function _trackMap(map) {
 
 /**
  * Lazily install tracking wrappers on the slug maps; idempotent.
- * @returns {void}
+ * @returns {void} - No return value.
  */
 let _mapsTracked = false;
 function _ensureMapsTracked() {

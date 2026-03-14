@@ -16,6 +16,10 @@ Observe and lazy-highlight `<pre><code>` blocks, registering languages as needed
 
 `ParentNode` = `document`
 
+Root node in which to observe code blocks.
+
 ## Returns
 
 `void`
+
+- No return value.

@@ -1,10 +1,3 @@
-/**
- * Navigation helpers shim.
- *
- * Small helper used by the initializer to construct the site navigation
- * structure. Consumers can import `createSiteNav` from `./nav.js` as a
- * clearer separation point for nav-related logic.
- */
 import { createNavTree } from './htmlBuilder.js'
 import { t } from './l10nManager.js'
 import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
@@ -22,8 +15,8 @@ import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './slugManager.js'
 
 /**
  * Create a minimal site nav structure rooted at the provided home page.
- * @param {string} homePage
- * @returns {NavTreeItem[]}
+ * @param {string} homePage - Home page path or slug to use for the nav root.
+ * @returns {NavTreeItem[]} - Array of navigation tree items for the site.
  */
 export function createSiteNav(homePage) {
   return createNavTree(t, [{ path: homePage, name: t('home'), isIndex: true, children: [] }])

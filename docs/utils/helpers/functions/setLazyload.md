@@ -16,6 +16,8 @@ Apply the lazy-loading attribute to an <img> element if not already set.
 
 `HTMLImageElement`
 
+image element to mark for lazy loading
+
 ## Returns
 
 `void`

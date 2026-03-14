@@ -39,3 +39,5 @@ optional query string (for tests); defaults to window.location.search
 ## Returns
 
 `Object`
+
+- Parsed options object containing any recognized and parsed query parameters.

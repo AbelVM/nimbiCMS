@@ -16,6 +16,8 @@ Store a resolution in the runtime cache and evict oldest entries if needed.
 
 `string`
 
+key parameter
+
 ### value
 
 #### anchor

@@ -17,14 +17,22 @@ applicable. Performs slug lookups and may fetch markdown titles.
 
 `HTMLElement`
 
+Article element containing page HTML and anchors.
+
 ### contentBase
 
 `string`
+
+Base URL or path for site content.
 
 ### pagePath?
 
 `string`
 
+Optional page path used for relative link resolution.
+
 ## Returns
 
 `Promise`\<`void`\>
+
+- Resolves when anchor rewriting and any async title fetches complete.

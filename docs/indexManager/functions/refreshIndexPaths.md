@@ -16,6 +16,10 @@ Refresh the internal index set from available markdown paths and slug maps.
 
 `string`
 
+Base path for content used by the indexer.
+
 ## Returns
 
 `void`
+
+- No return value.

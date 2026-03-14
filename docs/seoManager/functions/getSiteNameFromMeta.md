@@ -6,10 +6,12 @@
 
 # Function: getSiteNameFromMeta()
 
-> **getSiteNameFromMeta**(): `string` \| `null`
+> **getSiteNameFromMeta**(): `string`
 
 Read the site name from existing meta tags, if present.
 
 ## Returns
 
-`string` \| `null`
+`string`
+
+- The site name from meta tags, or empty string if not found.

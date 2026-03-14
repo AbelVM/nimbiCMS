@@ -196,7 +196,6 @@ export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
 export function getLanguages(): string[]
 export function _storeSlugMapping(slug: string, rel: string): void
-export const homePage: string
 export function setHomePage(p: string): any
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
@@ -235,8 +234,9 @@ export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchR
 
 
 
+
 // --- from src/seoManager.js
-export function getSiteNameFromMeta(): string|null
+export function getSiteNameFromMeta(): string
 
 
 
@@ -283,7 +283,7 @@ export const initialDocumentTitle: string
 
 
 // --- from src/indexManager.js
-export const indexSet: Set<string>
+
 
 
 // --- from src/imagePreview.js

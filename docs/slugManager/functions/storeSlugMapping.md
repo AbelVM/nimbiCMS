@@ -16,10 +16,16 @@ Store a slug -> markdown path mapping, respecting configured languages.
 
 `string`
 
+Slug key to associate with a markdown path.
+
 ### rel
 
 `string`
 
+Markdown path (relative to content base) to associate with the slug.
+
 ## Returns
 
 `void`
+
+- No return value.

@@ -17,11 +17,11 @@ and slug calculations.  Handles HTML vs Markdown transparently.
 
 `Function`
 
-localization function
+Localization function.
 
 ### data
 
-data returned by fetchMarkdown
+Data returned by `fetchMarkdown`.
 
 #### isHtml?
 
@@ -35,11 +35,11 @@ data returned by fetchMarkdown
 
 `string`
 
-normalized path of the page (for link rewriting)
+Normalized path of the page (for link rewriting).
 
 ### anchor
 
-optional anchor to scroll to
+Optional anchor to scroll to.
 
 `string` | `null`
 
@@ -47,8 +47,10 @@ optional anchor to scroll to
 
 `string`
 
-base URL for resolving links and images
+Base URL for resolving links and images.
 
 ## Returns
 
 `Promise`\<[`ArticleResult`](../type-aliases/ArticleResult.md)\>
+
+- Promise resolving to the `ArticleResult` (article element, parsed data, toc, and slug info).

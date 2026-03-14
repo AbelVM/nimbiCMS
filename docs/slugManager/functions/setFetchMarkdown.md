@@ -17,6 +17,8 @@ or when consumers want to provide a bespoke fetch strategy.
 
 (`path`, `base?`) => `Promise`\<[`FetchResult`](../type-aliases/FetchResult.md)\>
 
+fn parameter
+
 ## Returns
 
 `void`

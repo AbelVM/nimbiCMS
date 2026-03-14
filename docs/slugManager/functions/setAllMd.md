@@ -8,12 +8,11 @@
 
 > **\_setAllMd**(`obj`): `void`
 
-Replace internal manifest used by `setContentBase` with a custom object
-(keyed by full path). Intended for unit tests.
-
 ## Parameters
 
 ### obj
+
+`any`
 
 ## Returns
 

@@ -16,6 +16,10 @@ Register a callback to be invoked after each page is rendered.
 
 (`ctx`) => `void` \| `Promise`\<`void`\>
 
+Callback invoked with the render context.
+
 ## Returns
 
 `void`
+
+- No return value.

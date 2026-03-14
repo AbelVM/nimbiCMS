@@ -8,7 +8,8 @@
 
 > **setLang**(`lang`): `void`
 
-Switch the current UI language; falls back to English if unknown.
+Switch the current UI language. Falls back to English if the requested
+language is not available.
 
 ## Parameters
 
@@ -16,6 +17,10 @@ Switch the current UI language; falls back to English if unknown.
 
 `string`
 
+Language code to switch to (e.g. 'en', 'es').
+
 ## Returns
 
 `void`
+
+- No return value.

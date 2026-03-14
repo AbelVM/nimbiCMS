@@ -6,7 +6,4 @@
 
 # Variable: indexSet
 
-> `const` **indexSet**: `Set`\<`string`\>
-
-Internal set tracking all indexed markdown paths and slug mappings.
-Used by refreshIndexPaths and map-tracking helpers.
+> `const` **indexSet**: `Set`\<`any`\>

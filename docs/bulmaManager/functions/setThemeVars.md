@@ -16,6 +16,10 @@ Apply CSS custom properties to the document root (keys without `--`).
 
 `Record`\<`string`, `string`\>
 
+Map of CSS variable names (without `--`) to values.
+
 ## Returns
 
 `void`
+
+- No return value.

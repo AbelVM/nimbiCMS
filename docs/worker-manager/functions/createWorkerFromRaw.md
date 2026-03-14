@@ -22,3 +22,5 @@ JavaScript source for the worker
 ## Returns
 
 `Worker` \| `null`
+
+- A Worker instance configured with `type: 'module'`, or `null` if creation failed.

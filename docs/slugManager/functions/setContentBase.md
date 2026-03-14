@@ -17,6 +17,10 @@ maps and `allMarkdownPaths` relative to that base.
 
 `string`
 
+contentBase parameter
+
 ## Returns
 
 `void`
+
+- No return value.

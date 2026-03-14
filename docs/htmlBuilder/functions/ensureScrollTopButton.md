@@ -16,13 +16,19 @@ Create or update a scroll-to-top button and toggle TOC/menu label visibility.
 
 `HTMLElement`
 
+article parameter
+
 ### topH1
+
+topH1 parameter
 
 `HTMLElement` | `null`
 
 ### opts?
 
 `object` = `{}`
+
+opts parameter
 
 ## Returns
 

@@ -16,6 +16,10 @@ Set available language codes for multilingual sites.
 
 `string`[]
 
+Array of language codes (e.g. ['en','fr']).
+
 ## Returns
 
 `void`
+
+- No return value.

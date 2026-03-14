@@ -2,17 +2,12 @@ import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath } from '.
 import * as l10n from './l10nManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 import { refreshIndexPaths, indexSet } from './indexManager.js'
-/**
- * Maximum number of entries stored in the resolution cache before oldest
- * entries are evicted. Mutable at runtime via `setResolutionCacheMax`.
- * @type {number}
- */
 export let RESOLUTION_CACHE_MAX = 100
 
 /**
  * Change maximum cache size at runtime.
- * @param {number} n
- * @returns {void}
+ * @param {number} n - Maximum number of cached resolution entries.
+ * @returns {void} - No return value.
  */
 export function setResolutionCacheMax(n) {
   RESOLUTION_CACHE_MAX = n
@@ -32,11 +27,11 @@ export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000 // five minutes
  * Accepts a value in milliseconds; passing a non‑positive value disables
  * expiration.  This is the recommended API for external code rather than
  * mutating the namespace object directly (which is read‑only in ESM).
- * @param {number} ms
+ * @param {number} ms - Time-to-live (milliseconds) for cached resolution entries.
  */
 /**
  * Modify the resolution cache time-to-live (milliseconds).
- * @param {number} ms
+ * @param {number} ms - Time-to-live (milliseconds) for cached resolution entries.
  */
 export function setResolutionCacheTtl(ms) {
   RESOLUTION_CACHE_TTL = ms
@@ -76,7 +71,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
 }
 /**
  * Empties the internal markdown index set. Only exposed for testing.
- * @returns {void}
+ * @returns {void} - return value
  */
 export function _clearIndexCache() {
   indexSet.clear();
@@ -87,7 +82,7 @@ export function _clearIndexCache() {
 
 /**
  * Retrieve a cached resolution result and refresh its LRU position.
- * @param {string} key
+ * @param {string} key - key parameter
  * @returns {{resolved:string,anchor:string|null}|undefined}
  */
 export function resolutionCacheGet(key) {
@@ -106,13 +101,13 @@ export function resolutionCacheGet(key) {
 /**
  * Store a resolution result in the runtime resolution cache. Evicts oldest
  * entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
- * @param {string} key
+ * @param {string} key - key parameter
  * @param {{resolved:string,anchor:string|null}} value
- * @returns {void}
+ * @returns {void} - return value
  */
 /**
  * Store a resolution in the runtime cache and evict oldest entries if needed.
- * @param {string} key
+ * @param {string} key - key parameter
  * @param {{resolved:string,anchor:string|null}} value
  */
 export function resolutionCacheSet(key, value) {
@@ -130,11 +125,6 @@ export function resolutionCacheSet(key, value) {
 
  
 
-/**
- * Remove any stale entries from the cache based on TTL.  Called by
- * `resolutionCacheSet` and exposed for tests.
- * @returns {void}
- */
 export function _purgeExpiredEntries() {
   if (!RESOLUTION_CACHE_TTL || RESOLUTION_CACHE_TTL <= 0) return
   const now = Date.now()
@@ -215,13 +205,13 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
  * Given a resolved identifier (possibly slug, path, or HTML), produce an
  * ordered list of candidate markdown/html filenames to attempt fetching.
  *
- * @param {string} resolved
- * @returns {string[]}
+ * @param {string} resolved - resolved parameter
+ * @returns {string[]} - return value
  */
 /**
  * Given a resolved identifier, return ordered candidate filenames to fetch.
- * @param {string} resolved
- * @returns {string[]}
+ * @param {string} resolved - resolved parameter
+ * @returns {string[]} - return value
  */
 export function buildPageCandidates(resolved) {
   

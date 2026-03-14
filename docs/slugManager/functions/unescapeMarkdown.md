@@ -16,6 +16,10 @@ Unescape a small set of Markdown-escaped characters.
 
 `string`
 
+s parameter
+
 ## Returns
 
 `string`
+
+- return value

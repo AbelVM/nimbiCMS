@@ -16,6 +16,10 @@ Create a minimal site nav structure rooted at the provided home page.
 
 `string`
 
+Home page path or slug to use for the nav root.
+
 ## Returns
 
 [`NavTreeItem`](../type-aliases/NavTreeItem.md)[]
+
+- Array of navigation tree items for the site.

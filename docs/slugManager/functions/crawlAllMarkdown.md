@@ -16,10 +16,16 @@ Crawl the content directory collecting all markdown and HTML pages.
 
 `string`
 
+contentBase parameter
+
 ### maxQueue?
 
 `number` = `defaultCrawlMaxQueue`
 
+maxQueue parameter
+
 ## Returns
 
 `Promise`\<`string`[]\>
+
+- return value

@@ -8,21 +8,15 @@
 
 > **addHook**(`name`, `fn`): `void`
 
-Register a hook callback by name.
-
 ## Parameters
 
 ### name
 
-`string`
-
-hook name (e.g. 'onPageLoad')
+`any`
 
 ### fn
 
-(`ctx`) => `void` \| `Promise`\<`void`\>
-
-callback function
+`any`
 
 ## Returns
 

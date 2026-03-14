@@ -1,34 +1,11 @@
 
 
-/**
- * Built-in hook names and their callback lists.
- * External code can register handlers to be invoked at key events in the
- * CMS lifecycle. Each callback receives a `ctx` object and may be
- * synchronous or return a Promise.
- *
- * @type {{onPageLoad:Array<function(object):void|Promise<void>>,onNavBuild:Array<function(object):void|Promise<void>>,transformHtml:Array<function(object):void|Promise<void>>}}
- */
 const hooks = {
   onPageLoad: [],
   onNavBuild: [],
   transformHtml: []
 };
 
-/**
- * Register a hook by name. Throws if the name is not recognised.
- * The callback receives a single `ctx` object and may be synchronous or
- * return a Promise.
- *
- * @param {string} name - hook name ("onPageLoad", "onNavBuild", "transformHtml")
- * @param {(ctx:object)=>void|Promise<void>} fn - callback invoked for the hook
- * @returns {void}
- */
-/**
- * Register a hook callback by name.
- * @param {string} name - hook name (e.g. 'onPageLoad')
- * @param {(ctx:object)=>void|Promise<void>} fn - callback function
- * @returns {void}
- */
 export function addHook(name, fn) {
   if (!Object.prototype.hasOwnProperty.call(hooks, name)) {
     throw new Error('Unknown hook "' + name + '"');
@@ -41,23 +18,23 @@ export function addHook(name, fn) {
 
 /**
  * Register a callback to be invoked after each page is rendered.
- * @param {(ctx:object)=>void|Promise<void>} fn
- * @returns {void}
+ * @param {(ctx:object)=>void|Promise<void>} fn - Callback invoked with the render context.
+ * @returns {void} - No return value.
  */
 export function onPageLoad(fn) { addHook('onPageLoad', fn); }
 
 /**
  * Register a callback once the navigation DOM has been built.
- * @param {(ctx:object)=>void|Promise<void>} fn
- * @returns {void}
+ * @param {(ctx:object)=>void|Promise<void>} fn - Callback invoked with the navigation context.
+ * @returns {void} - No return value.
  */
 export function onNavBuild(fn) { addHook('onNavBuild', fn); }
 
 /**
  * Register a callback that can mutate the article element before it is
  * appended to the document. The callback receives the render context.
- * @param {(ctx:object)=>void|Promise<void>} fn
- * @returns {void}
+ * @param {(ctx:object)=>void|Promise<void>} fn - Callback which can modify the render context or DOM.
+ * @returns {void} - No return value.
  */
 export function transformHtml(fn) { addHook('transformHtml', fn); }
 
@@ -65,9 +42,9 @@ export function transformHtml(fn) { addHook('transformHtml', fn); }
  * Invoke all registered hook callbacks for the given hook `name` with a
  * supplied context object. Errors from individual callbacks are swallowed.
  *
- * @param {string} name - hook name
- * @param {object} ctx - context passed to callbacks
- * @returns {Promise<void>}
+ * @param {string} name - Hook name to invoke (e.g. 'onPageLoad').
+ * @param {object} ctx - Context object passed to each callback.
+ * @returns {Promise<void>} - Resolves once all registered callbacks have completed.
  */
 export async function runHooks(name, ctx) {
   const list = hooks[name] || [];
@@ -80,10 +57,6 @@ export async function runHooks(name, ctx) {
   }
 }
 
-/**
- * Clear all hooks registered via `addHook` (testing use only).
- * @returns {void}
- */
 export function _clearHooks() {
   Object.keys(hooks).forEach(k => { hooks[k].length = 0 });
 }

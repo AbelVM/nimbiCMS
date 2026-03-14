@@ -17,10 +17,16 @@ dictionary.
 
 `string`
 
+URL or relative path to the JSON localization file.
+
 ### pageDir
 
 `string`
 
+Base page directory used to resolve relative paths.
+
 ## Returns
 
 `Promise`\<`void`\>
+
+- Resolves when the file has been fetched and merged.

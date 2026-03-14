@@ -17,14 +17,22 @@ lookup, search-index, crawling, and other fallbacks in order.
 
 `string`
 
+decoded parameter
+
 ### contentBase
 
 `string`
+
+contentBase parameter
 
 ### maxQueue?
 
 `number`
 
+maxQueue parameter
+
 ## Returns
 
 `Promise`\<`string` \| `null`\>
+
+- return value

@@ -13,3 +13,5 @@ Return the current list of configured available language codes.
 ## Returns
 
 `string`[]
+
+- Array of available language codes.

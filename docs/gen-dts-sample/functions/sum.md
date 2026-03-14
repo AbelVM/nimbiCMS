@@ -14,9 +14,13 @@
 
 `any`
 
+Options object with numeric fields `a` and `b` used to compute the sum.
+
 ## Returns
 
 `object`
+
+- Object containing the computed sum.
 
 ### sum
 

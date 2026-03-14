@@ -16,6 +16,10 @@ Unregister a previously added resolver.
 
 (`slug`) => `any`
 
+Previously registered resolver to remove.
+
 ## Returns
 
 `void`
+
+- No return value.

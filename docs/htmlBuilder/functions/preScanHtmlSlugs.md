@@ -19,12 +19,16 @@ Markdown URLs.
 
 `NodeListOf`\<`HTMLAnchorElement`\>
 
+Anchors to inspect for HTML titles.
+
 ### base
 
 `string`
 
-base URL for fetchMarkdown
+Base URL used for `fetchMarkdown` when resolving links.
 
 ## Returns
 
 `Promise`\<`void`\>
+
+- Resolves when all title fetches and slug mappings have completed.

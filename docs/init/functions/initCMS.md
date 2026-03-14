@@ -17,6 +17,8 @@ mistakes are surfaced early (e.g. passing a number for `contentPath`).
 
 ### options?
 
+options parameter
+
 #### allowUrlPathOverrides?
 
 `boolean`

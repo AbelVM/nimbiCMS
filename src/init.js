@@ -3,12 +3,6 @@
  * responsible for validating options, constructing the DOM scaffolding, and
  * delegating navigation and UI behaviour to helper modules.
  */
-/**
- * Initialization logic extracted from nimbi-cms.js to keep the top-level
- * entrypoint small.  This module exports the `initCMS` function which is
- * responsible for validating options, constructing the DOM scaffolding, and
- * delegating navigation and UI behaviour to helper modules.
- */
 
 import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, setSkipRootReadme } from './slugManager.js'
 import * as router from './router.js'
@@ -42,7 +36,7 @@ import { ensureBulma, setStyle } from './bulmaManager.js'
  * successfully parsed.
  *
  * @param {string} [queryString] optional query string (for tests); defaults to window.location.search
- * @returns {Object}
+ * @returns {Object} - Parsed options object containing any recognized and parsed query parameters.
  */
 export function parseInitOptionsFromQuery(queryString) {
   try {
@@ -163,7 +157,7 @@ export let initialDocumentTitle = ''
  * Throws a `TypeError` when options are of the wrong type so configuration
  * mistakes are surfaced early (e.g. passing a number for `contentPath`).
  *
- * @param {Object} options
+ * @param {Object} options - options parameter
  * @param {boolean} [options.allowUrlPathOverrides=false] - advanced opt-in that
  *   allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via
  *   URL query parameters. This is disabled by default for security; enabling

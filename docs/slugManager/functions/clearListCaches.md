@@ -8,6 +8,11 @@
 
 > **clearListCaches**(): `void`
 
+Clear caches used for directory list -> slug mappings and path fetch
+tracking. Useful for tests and when rebuilding indexes.
+
 ## Returns
 
 `void`
+
+- No return value.

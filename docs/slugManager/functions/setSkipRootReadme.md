@@ -17,8 +17,10 @@ excluded from link discovery during crawling/index building.
 
 `boolean`
 
-truthy to skip root README files, falsy to include
+Truthy to skip root README files, falsy to include.
 
 ## Returns
 
 `void`
+
+- No return value.

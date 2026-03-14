@@ -14,32 +14,12 @@ import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 import { attachImagePreview } from './imagePreview.js'
 
-/**
- * Options passed to `createUI`.
- * @typedef {Object} UIOptions
- * @property {HTMLElement} contentWrap
- * @property {HTMLElement} navWrap
- * @property {HTMLElement} container
- * @property {HTMLElement|null} mountOverlay
- * @property {(key:string, vars?:Object)=>string} t
- * @property {string} contentBase
- * @property {string} homePage
- * @property {string} initialDocumentTitle
- * @property {(name:string, ctx?:Object)=>void|Promise<void>} runHooks
- */
 
-/**
- * Return shape from `createUI`.
- * @typedef {Object} UIReturn
- * @property {function():Promise<void>} renderByQuery
- * @property {Object} siteNav
- * @property {function():string|null} getCurrentPagePath
- */
 
 /**
  * Initialize UI rendering helpers for a mounted CMS instance.
- * @param {UIOptions} opts
- * @returns {UIReturn}
+ * @param {UIOptions} opts - configuration options and DOM mounts for the UI
+ * @returns {UIReturn} - helpers and entrypoints for rendering the site
  */
 export function createUI(opts) {
   const {

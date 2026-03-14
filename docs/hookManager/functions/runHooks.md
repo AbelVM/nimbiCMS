@@ -17,14 +17,16 @@ supplied context object. Errors from individual callbacks are swallowed.
 
 `string`
 
-hook name
+Hook name to invoke (e.g. 'onPageLoad').
 
 ### ctx
 
 `object`
 
-context passed to callbacks
+Context object passed to each callback.
 
 ## Returns
 
 `Promise`\<`void`\>
+
+- Resolves once all registered callbacks have completed.

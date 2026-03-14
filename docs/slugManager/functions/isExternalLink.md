@@ -17,6 +17,10 @@ schemes, protocol-relative `//`, etc.). Centralized helper.
 
 `string`
 
+href parameter
+
 ## Returns
 
 `boolean`
+
+- return value

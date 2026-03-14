@@ -18,10 +18,16 @@ already registered.
 
 `string`
 
+Language name or alias to register (e.g. 'javascript').
+
 ### modulePath?
 
 `string`
 
+Optional explicit module path to import for the language.
+
 ## Returns
 
 `Promise`\<`boolean`\>
+
+- Resolves to `true` when the language is registered.

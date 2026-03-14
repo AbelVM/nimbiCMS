@@ -11,3 +11,5 @@
 ## Returns
 
 `Worker` \| `null`
+
+- A Worker instance used for anchor processing, or null if unsupported.

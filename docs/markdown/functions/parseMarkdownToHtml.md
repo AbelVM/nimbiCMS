@@ -17,6 +17,10 @@ Preserves frontmatter metadata.
 
 `string`
 
+markdown source string to convert
+
 ## Returns
 
 `Promise`\<[`ParseResult`](../type-aliases/ParseResult.md)\>
+
+- Promise resolving to the parsed HTML, metadata, and table-of-contents.

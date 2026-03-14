@@ -16,6 +16,8 @@ Retrieve a cached resolution result and refresh its LRU position.
 
 `string`
 
+key parameter
+
 ## Returns
 
 \{ `anchor`: `string` \| `null`; `resolved`: `string`; \} \| `undefined`

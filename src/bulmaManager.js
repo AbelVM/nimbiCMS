@@ -10,9 +10,9 @@ let currentStyle = 'light'
 
 /**
  * Insert a stylesheet link into the document head if not already present.
- * @param {string} href
- * @param {Record<string,string>} [attrs]
- * @returns {void}
+ * @param {string} href - stylesheet URL to insert
+ * @param {Record<string,string>} [attrs] - optional attributes to set on the link element
+ * @returns {void} - return value
  */
 function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return
@@ -26,9 +26,9 @@ function injectLink(href, attrs = {}) {
  * Ensure that Bulma or a Bulmaswatch theme is loaded.  Supports local
  * overrides or named themes fetched from unpkg.
  *
- * @param {string} bulmaCustomize
- * @param {string} pageDir
- * @returns {Promise<void>}
+ * @param {string} bulmaCustomize - 'none' | 'local' | theme name to load from unpkg
+ * @param {string} pageDir - directory to probe for a local `bulma.css` when using 'local'
+ * @returns {Promise<void>} - return value
  */
 export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
   if (!bulmaCustomize || bulmaCustomize === 'none') return
@@ -65,8 +65,8 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
 /**
  * Toggle light/dark styling by setting `data-theme` and `is-dark`.
  *
- * @param {'light'|'dark'} style
- * @returns {void}
+ * @param {'light'|'dark'} style - 'light' or 'dark' to toggle theme
+ * @returns {void} - return value
  */
 export function setStyle(style) {
   currentStyle = style === 'dark' ? 'dark' : 'light'
@@ -80,13 +80,13 @@ export function setStyle(style) {
  * it easy for consumers to theme colors/fonts/etc. without touching Bulma
  * directly. Property names should be provided without the leading `--`.
  *
- * @param {Record<string,string>} vars
- * @returns {void}
+ * @param {Record<string,string>} vars - Map of CSS variable names (without `--`) to values.
+ * @returns {void} - No return value.
  */
 /**
  * Apply CSS custom properties to the document root (keys without `--`).
- * @param {Record<string,string>} vars
- * @returns {void}
+ * @param {Record<string,string>} vars - Map of CSS variable names (without `--`) to values.
+ * @returns {void} - No return value.
  */
 export function setThemeVars(vars) {
   const root = document.documentElement

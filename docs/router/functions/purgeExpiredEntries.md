@@ -8,9 +8,6 @@
 
 > **\_purgeExpiredEntries**(): `void`
 
-Remove any stale entries from the cache based on TTL.  Called by
-`resolutionCacheSet` and exposed for tests.
-
 ## Returns
 
 `void`

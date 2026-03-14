@@ -14,10 +14,12 @@ Scroll to a specific anchor ID inside the CMS container or to top.
 
 ### anchor
 
-element id (without '#') or null to scroll to top
+Element id (without '#') or null to scroll to top.
 
 `string` | `null`
 
 ## Returns
 
 `void`
+
+- No return value.

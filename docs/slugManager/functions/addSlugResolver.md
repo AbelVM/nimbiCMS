@@ -17,6 +17,10 @@ slug (string) and return a markdown path (or promise thereof) or `null`.
 
 (`slug`, `contentBase?`) => `string` \| `Promise`\<`string` \| `null`\> \| `null`
 
+fn parameter
+
 ## Returns
 
 `void`
+
+- return value

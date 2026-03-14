@@ -16,6 +16,10 @@ Set the default maximum crawl queue size used by crawlers.
 
 `number`
 
+n parameter
+
 ## Returns
 
 `void`
+
+- return value

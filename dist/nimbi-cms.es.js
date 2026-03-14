@@ -5423,7 +5423,7 @@ function La(t, e, r = "") {
   const n = document.createElement("p");
   n.className = "menu-label", n.textContent = t("onThisPage"), i.appendChild(n);
   const s = document.createElement("ul");
-  return s.className = "menu-list"(e || []).forEach((a) => {
+  return s.className = "menu-list", (e || []).forEach((a) => {
     try {
       if (!a || a.level === 1) return;
       const h = document.createElement("li"), l = document.createElement("a"), o = a.id || re(a.text || "");

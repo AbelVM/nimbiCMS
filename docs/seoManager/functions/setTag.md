@@ -16,9 +16,13 @@ Set or update a single meta tag in the document head.
 
 `string`
 
+Meta tag name (e.g. 'description').
+
 ### content
 
 `string`
+
+Meta tag content value.
 
 ## Returns
 

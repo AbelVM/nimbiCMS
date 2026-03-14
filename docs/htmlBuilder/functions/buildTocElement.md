@@ -28,6 +28,10 @@ TOC entries
 
 `string` = `''`
 
+optional page path used for relative href normalization
+
 ## Returns
 
 `HTMLElement`
+
+- return value

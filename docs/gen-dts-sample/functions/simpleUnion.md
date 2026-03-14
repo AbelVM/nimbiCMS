@@ -11,3 +11,5 @@
 ## Returns
 
 `string` \| `number`
+
+- A string or number selected by the function.

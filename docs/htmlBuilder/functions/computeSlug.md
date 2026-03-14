@@ -23,11 +23,17 @@ parsed page metadata
 
 `HTMLElement`
 
+article parameter
+
 ### pagePath?
 
 `string`
 
+pagePath parameter
+
 ### anchor?
+
+anchor parameter
 
 `string` | `null`
 

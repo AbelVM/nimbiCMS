@@ -17,6 +17,10 @@ current UI language into account.
 
 `string`
 
+slug parameter
+
 ## Returns
 
 `string` \| `null`
+
+- return value

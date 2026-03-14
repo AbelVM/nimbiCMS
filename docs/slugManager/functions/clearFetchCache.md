@@ -13,3 +13,5 @@ Clear internal fetch cache used by `fetchMarkdown`.
 ## Returns
 
 `void`
+
+- No return value.

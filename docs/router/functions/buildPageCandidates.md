@@ -16,6 +16,10 @@ Given a resolved identifier, return ordered candidate filenames to fetch.
 
 `string`
 
+resolved parameter
+
 ## Returns
 
 `string`[]
+
+- return value

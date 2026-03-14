@@ -15,13 +15,19 @@ Placed immediately above export for TypeDoc.
 
 ### contentWrap
 
+contentWrap parameter
+
 `HTMLElement` | `null`
 
 ### t
 
+t parameter
+
 `Function` | `null`
 
 ### e
+
+e parameter
 
 `Error` | `null`
 

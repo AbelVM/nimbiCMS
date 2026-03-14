@@ -10,8 +10,8 @@ import readingTime from 'reading-time/lib/reading-time'
 
 /**
  * Set or update a single meta tag in the document head.
- * @param {string} name
- * @param {string} content
+ * @param {string} name - Meta tag name (e.g. 'description').
+ * @param {string} content - Meta tag content value.
  */
 export function setTag(name, content) {
   let tag = document.querySelector(`meta[name="${name}"]`)
@@ -62,12 +62,12 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
 
 /**
  * Populate standard meta tags (title, description, open-graph, twitter, etc.)
- * @param {PageData} data
- * @param {string} [titleOverride]
- * @param {string} [imageOverride]
- * @param {string} [descOverride]
- * @param {string} [initialDocumentTitle]
- * @returns {void}
+ * @param {PageData} data - Parsed page data including `meta` and `raw`.
+ * @param {string} [titleOverride] - Optional title to use instead of `meta.title`.
+ * @param {string} [imageOverride] - Optional image URL for Open Graph/Twitter.
+ * @param {string} [descOverride] - Optional description override.
+ * @param {string} [initialDocumentTitle] - Fallback site/document title.
+ * @returns {void} - No return value.
  */
 export function setMetaTags(data, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   const meta = data.meta || {}
@@ -80,7 +80,7 @@ export function setMetaTags(data, titleOverride, imageOverride, descOverride, in
 
 /**
  * Read the site name from existing meta tags, if present.
- * @returns {string|null}
+ * @returns {string} - The site name from meta tags, or empty string if not found.
  */
 export function getSiteNameFromMeta() {
   try {
@@ -106,13 +106,13 @@ export function getSiteNameFromMeta() {
 
 /**
  * Inject JSON-LD structured data for the provided page metadata.
- * @param {PageData} data
- * @param {string} pagePath
- * @param {string} [titleOverride]
- * @param {string} [imageOverride]
- * @param {string} [descOverride]
- * @param {string} [initialDocumentTitle]
- * @returns {void}
+ * @param {PageData} data - Parsed page data used to build structured data.
+ * @param {string} pagePath - Page path used to compute the canonical URL.
+ * @param {string} [titleOverride] - Optional override for the title.
+ * @param {string} [imageOverride] - Optional override for the image.
+ * @param {string} [descOverride] - Optional override for the description.
+ * @param {string} [initialDocumentTitle] - Fallback document title.
+ * @returns {void} - No return value.
  */
 export function setStructuredData(data, pagePath, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   try {
@@ -163,18 +163,18 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
 
 /**
  * Apply page-level SEO metadata: meta tags, structured data, and document title.
- * @param {Function} t - localization function
- * @param {string} initialDocumentTitle
- * @param {Object} parsed
- * @param {HTMLElement} toc
- * @param {HTMLElement} article
- * @param {string} pagePath
- * @param {string|null} anchor
- * @param {HTMLElement|null} topH1
- * @param {string|null} h1Text
- * @param {string|null} slugKey
- * @param {PageData} data
- * @returns {void}
+ * @param {Function} t - Localization function used for labels.
+ * @param {string} initialDocumentTitle - Fallback title when none present.
+ * @param {Object} parsed - Parsed page object with `meta` and other fields.
+ * @param {HTMLElement} toc - Table-of-contents element for the page.
+ * @param {HTMLElement} article - Article element containing the page HTML.
+ * @param {string} pagePath - The path of the page being rendered.
+ * @param {string|null} anchor - Optional anchor fragment to consider.
+ * @param {HTMLElement|null} topH1 - Top H1 element for the page (if any).
+ * @param {string|null} h1Text - Text of the top H1.
+ * @param {string|null} slugKey - Computed slug key for the page.
+ * @param {PageData} data - Full page data, including raw markdown for reading time.
+ * @returns {void} - No return value.
  */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
   try {

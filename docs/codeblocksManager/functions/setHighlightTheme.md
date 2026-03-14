@@ -16,7 +16,11 @@ Switch highlight.js CSS theme, optionally loading from CDN.
 
 `string`
 
+Name of the highlight.js theme to apply.
+
 ### opts?
+
+Options object; `useCdn` controls CDN loading.
 
 #### useCdn?
 
@@ -25,3 +29,5 @@ Switch highlight.js CSS theme, optionally loading from CDN.
 ## Returns
 
 `void`
+
+- No return value.

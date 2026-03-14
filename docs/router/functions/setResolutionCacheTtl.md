@@ -16,6 +16,8 @@ Modify the resolution cache time-to-live (milliseconds).
 
 `number`
 
+Time-to-live (milliseconds) for cached resolution entries.
+
 ## Returns
 
 `void`

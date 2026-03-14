@@ -28,3 +28,5 @@ Friendly name used in console warnings.
 ## Returns
 
 [`WorkerManager`](../interfaces/WorkerManager.md)
+
+- The worker manager API with `get`, `send`, and `terminate` methods.

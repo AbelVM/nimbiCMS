@@ -14,6 +14,10 @@
 
 `Function`
 
+Callback to invoke.
+
 ## Returns
 
 `void`
+
+- No return value.

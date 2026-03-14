@@ -8,8 +8,6 @@
 
 > **\_clearHooks**(): `void`
 
-Clear all hooks registered via `addHook` (testing use only).
-
 ## Returns
 
 `void`

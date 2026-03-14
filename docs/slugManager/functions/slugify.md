@@ -16,6 +16,10 @@ Generate a URL-friendly slug from a text string.
 
 `string`
 
+s parameter
+
 ## Returns
 
 `string`
+
+- The generated slug string.

@@ -17,6 +17,8 @@ slug resolution. If unset, `_home.md` is used.
 
 `string`
 
+path to use as the home page (relative to content base)
+
 ## Returns
 
 `void`
