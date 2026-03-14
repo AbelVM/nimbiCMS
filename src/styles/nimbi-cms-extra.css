@@ -45,7 +45,9 @@
     width: 100%;
     position: sticky;
     top: var(--nimbi-site-navbar-height);
-    max-height: calc(100% - var(--nimbi-site-navbar-height));
+    /* Use viewport-based height to avoid scrollbars when parent heights
+       are not explicitly set. */
+    max-height: calc(100vh - var(--nimbi-site-navbar-height));
     overflow: auto;
     margin-right: 1rem;
 }
@@ -63,7 +65,9 @@
 
 .nimbi-site-navbar + .nimbi-cms {
     /* expose the computed cms height so other components can reference it */
-    --nimbi-cms-height: calc(100% - var(--nimbi-site-navbar-height));
+    /* Use viewport height to avoid persistent scrollbars caused by
+       percentage heights when html/body are not 100%. */
+    --nimbi-cms-height: calc(100vh - var(--nimbi-site-navbar-height));
     /* fraction (number) used to limit menu-list height: default 0.8 = 80% */
     --nimbi-menu-max-ratio: 0.6;
     /* fraction (number) used to limit image height: default 0.6 = 60% */
