@@ -142,7 +142,14 @@ function lazyLoadImages(el, pagePath, contentBase) {
 function rewriteRelativeAssets(el, pagePath, contentBase) {
   try {
     const pageDir = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
-    const baseForPage = new URL(pageDir || '.', contentBase).toString()
+    let baseForPage = null
+    try {
+      const contentBaseUrl = new URL(contentBase, location.href)
+      baseForPage = new URL(pageDir || '.', contentBaseUrl).toString()
+    } catch (err) {
+      // fallback: join as plain path relative to current location
+      try { baseForPage = new URL(pageDir || '.', location.href).toString() } catch (e) { baseForPage = pageDir || './' }
+    }
     const sel = el.querySelectorAll('*')
     for (const node of Array.from(sel || [])) {
       try {
@@ -201,8 +208,13 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       contentBaseUrl = _lastContentBaseUrl
       contentBasePath = _lastContentBasePath
     } else {
-      contentBaseUrl = new URL(contentBase)
-      contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
+      try {
+        contentBaseUrl = new URL(contentBase, location.href)
+        contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
+      } catch (err) {
+        // fallback to resolving against current page
+        try { contentBaseUrl = new URL(contentBase, location.href); contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname) } catch (e) { contentBaseUrl = null; contentBasePath = '/'; }
+      }
       _lastContentBase = contentBase
       _lastContentBaseUrl = contentBaseUrl
       _lastContentBasePath = contentBasePath
@@ -216,6 +228,26 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         const href = a.getAttribute('href') || ''
         if (!href) continue
         if (isExternalLink(href)) continue
+        // If the link is a query-only `?page=...` link, ensure the page
+        // value is resolved relative to the current page directory when
+        // appropriate. E.g., on `docs/index.html` convert `?page=modules.html`
+        // -> `?page=docs/modules.html`.
+        try {
+          if (href.startsWith('?') || href.indexOf('?') !== -1) {
+            try {
+              const tmpUrl = new URL(href, contentBase || location.href)
+              const pageParam = tmpUrl.searchParams.get('page')
+              if (pageParam && pageParam.indexOf('/') === -1 && pagePath) {
+                const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+                if (dir) {
+                  const newRel = normalizePath(dir + pageParam)
+                  a.setAttribute('href', '?page=' + encodeURIComponent(newRel) + (tmpUrl.hash || ''))
+                  continue
+                }
+              }
+            } catch (err) { /* ignore URL parse errors */ }
+          }
+        } catch (err) { /* ignore pre-check errors */ }
         if (href.startsWith('/') && !href.endsWith('.md')) continue
         const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
           if (mdMatch) {
@@ -235,7 +267,14 @@ async function rewriteAnchors(article, contentBase, pagePath) {
           continue
         }
         try {
-          const full = new URL(href, contentBase)
+          // Resolve relative HTML anchors against the current page directory
+          // so that `modules.html` on `docs/index.html` becomes `docs/modules.html`.
+          let toResolve = href
+          if (!href.startsWith('/') && pagePath) {
+            const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+            toResolve = dir + href
+          }
+          const full = new URL(toResolve, contentBase)
           const p = full.pathname || ''
           if (p && p.indexOf(contentBasePath) !== -1) {
             let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p

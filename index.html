@@ -6,13 +6,11 @@
   <title>Nimbi CMS Example</title>
   <meta name="description" content="Example site for Nimbi CMS — client-side Markdown CMS">
 
-  <!-- Open Graph -->
   <meta property="og:title" content="Nimbi CMS Example">
   <meta property="og:description" content="Example site for Nimbi CMS — client-side Markdown CMS">
   <meta property="og:type" content="website">
   <meta property="og:image" content="/assets/logo.png">
 
-  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Nimbi CMS Example">
   <meta name="twitter:description" content="Example site for Nimbi CMS — client-side Markdown CMS">
@@ -29,7 +27,6 @@
 <body>
   <div id="app"></div>
 
-  <!-- UMD bundle (assumes /dist/nimbi-cms.js is present) -->
   <script src="/dist/nimbi-cms.js" defer></script>
   <script defer>
     window.addEventListener('DOMContentLoaded', function(){
@@ -38,8 +35,6 @@
         return;
       }
 
-      // The library exports the initializer as the default export in builds,
-      // so support both named `initCMS` and `default` global shapes.
       const initializer = window.nimbiCMS.initCMS || window.nimbiCMS.default || window.nimbiCMS
       if (typeof initializer !== 'function') {
         console.warn('nimbiCMS found but initializer is not a function', initializer)
@@ -51,12 +46,11 @@
             el: '#app',
             contentPath: '.',
             indexDepth: 2,
-            searchIndex: false,
+            searchIndex: true,
             homePage: 'README.md',
             noIndexing: ['docs/index.html']
           });
         } catch (e) {
-          // Initialization error — show minimal feedback in console
           console.error('[index.html] initCMS failed', e);
         }
     });

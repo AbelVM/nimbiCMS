@@ -433,11 +433,30 @@ export let searchIndex = []
 
 let _indexPromise = null
 export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing = undefined) {
-  if (searchIndex && searchIndex.length && indexDepth === 1) return searchIndex
+  // Compute excludes early so we can decide whether a cached index is valid.
+  const earlyExcludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : []
+  try {
+    const nf = normalizePath(String(notFoundPage || ''))
+    if (nf && !earlyExcludes.includes(nf)) earlyExcludes.push(nf)
+  } catch (err) {}
+
+  if (searchIndex && searchIndex.length && indexDepth === 1) {
+    // If the cached index already contains any excluded paths, ignore it
+    const containsExcluded = searchIndex.some(e => {
+      try { return earlyExcludes.includes(normalizePath(String(e.path || ''))) } catch (_) { return false }
+    })
+    if (!containsExcluded) return searchIndex
+  }
   if (_indexPromise) return _indexPromise
 
   _indexPromise = (async () => {
-    const excludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : null
+    let excludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : []
+    try {
+      const nf = normalizePath(String(notFoundPage || ''))
+      if (nf && !excludes.includes(nf)) excludes.push(nf)
+    } catch (err) { /* ignore normalization errors */ }
+    // No hardcoded exclusions here — honor caller-provided `noIndexing`.
+
     const isExcluded = (p) => {
       if (!excludes || !excludes.length) return false
       for (const ex of excludes) {
@@ -474,8 +493,19 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         try {
           const md = await fetchMarkdown(p, contentBase)
           if (md && md.raw) {
+            // If fetchMarkdown returned the fallback not-found page (status 404),
+            // don't treat it as a valid page for discovery or indexing.
+            if (md.status === 404) continue
             let raw = md.raw
             const hrefs = []
+            // Avoid treating repository README files as site content entry points
+            // Many projects include example links (About, Blog, etc.) in README
+            // that aren't intended to be crawled by the site indexer.
+            const baseName = String(p || '').replace(/^.*\//, '')
+            if (/^readme(?:\.md)?$/i.test(baseName)) {
+              // Skip link discovery for README files
+              continue
+            }
             const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
             let m
             while ((m = mdLinkRe.exec(raw))) {
@@ -485,17 +515,30 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
             while ((m = htmlLinkRe.exec(raw))) {
               hrefs.push(m[1])
             }
+            const pageDirForLinks = (p && p.includes('/')) ? p.substring(0, p.lastIndexOf('/') + 1) : ''
             for (let href of hrefs) {
-              if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue
-              href = normalizePath(href)
-              if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
-              href = href.split(/[?#]/)[0]
-              if (isExcluded(href)) continue
-              if (!visited.has(href)) {
-                visited.add(href)
-                queue.push(href)
-                paths.push(href)
-              }
+              try {
+                // Skip external schemes (http:, //, mailto:, etc.)
+                if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue
+                // Skip absolute paths and parent-relative links which resolve
+                // outside the content directory (e.g. /modules.html or ../modules.html)
+                if (href.startsWith('/') || href.startsWith('..') || href.indexOf('/../') !== -1) continue
+                // Resolve simple relative links against the page directory so
+                // `modules.html` inside `docs/index.html` becomes `docs/modules.html`.
+                if (pageDirForLinks && !href.startsWith('./') && !href.startsWith('/') && !href.startsWith('../')) {
+                  href = pageDirForLinks + href
+                }
+                // Normalize and only follow markdown/html targets
+                href = normalizePath(href)
+                if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
+                href = href.split(/[?#]/)[0]
+                if (isExcluded(href)) continue
+                if (!visited.has(href)) {
+                  visited.add(href)
+                  queue.push(href)
+                  paths.push(href)
+                }
+              } catch (err) { console.warn('[slugManager] href processing failed', href, err) }
             }
           }
         } catch (e) {
@@ -520,6 +563,8 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       try {
         const md = await fetchMarkdown(path, contentBase)
         if (md && md.raw) {
+          // Skip indexing fetched fallback 404 content
+          if (md.status === 404) continue
           let title = ''
           let excerpt = ''
           if (md.isHtml) {
@@ -659,6 +704,9 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
+          // Skip external, absolute, or parent-relative links which point
+          // outside the content directory (e.g. /modules.html or ../modules.html)
+          if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('/') || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
             const sub = relDir + href
             if (!seenDirs.has(sub)) queue.push(sub)
@@ -723,6 +771,8 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
+          // Ignore external, absolute, or parent-relative links
+          if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('/') || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
             const sub = relDir + href
             if (!seenDirs.has(sub)) queue.push(sub)
