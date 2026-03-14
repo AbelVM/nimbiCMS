@@ -14,9 +14,9 @@ onmessage = async (ev) => {
   console.debug('[slugWorker] received message', msg)
   try {
     if (msg.type === 'buildSearchIndex') {
-      const { id, contentBase } = msg
+      const { id, contentBase, indexDepth, noIndexing } = msg
       try {
-        const res = await buildSearchIndex(contentBase)
+        const res = await buildSearchIndex(contentBase, indexDepth, noIndexing)
         postMessage({ id, result: res })
       } catch (e) {
         postMessage({ id, error: String(e) })

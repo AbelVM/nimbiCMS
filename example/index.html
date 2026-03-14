@@ -57,7 +57,7 @@
   <script type="module">
     import initCMS from '/dist/nimbi-cms.es.js';
     const contentPath = './content';
-    initCMS({ el: '#app', contentPath})
+    initCMS({ el: '#app', contentPath, indexDepth: 2})
       .catch(e => console.error('initCMS failed', e));
   </script>
 </body>

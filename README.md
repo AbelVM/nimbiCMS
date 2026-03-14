@@ -137,6 +137,35 @@ and open the example at `http://localhost:5173/example/index.html`.
 
 ## Development notes
 
+## Search indexing depth
+
+You can control how deep the client-side search index should go with the `indexDepth` option passed to `initCMS()` or via the URL query parameter `indexDepth` (values `1` or `2`).
+
+- `indexDepth: 1` (default) — index only H1 titles and excerpts.
+- `indexDepth: 2` — also index H2 headings; H2 results include a subtle parent label showing the page's H1.
+
+Example (URL param): `?indexDepth=2`
+
+Example (init option):
+
+```js
+nimbiCMS.initCMS({ el: '#app', indexDepth: 2 })
+```
+
+Behavior notes for `indexDepth=2`:
+
+- Search results for H2 headings will include a subtle parent label showing the containing page's H1. This helps users understand H2 results' context at-a-glance.
+
+Example of how an H2 result may be rendered in the search UI (simplified):
+
+```html
+<div class="search-result">
+  <div class="result-parent">My Page Title</div> <!-- shown only for H2 results when indexDepth=2 -->
+  <div class="result-title">Section A</div>
+  <div class="result-excerpt">A short excerpt from the section...</div>
+</div>
+```
+
 - Content lives under `example/content/`.
 - The SPA uses `?page=` query parameters internally.
 - Build output is written to `example/dist` when targeting the example case.
@@ -273,6 +302,13 @@ manager.terminate()
   If `searchIndex` is `false`, `searchIndexMode` is ignored and no search box or index is built.
   If `searchIndex` is `true`, only `'eager'` and `'lazy'` are valid modes.
   Placeholder text is pulled from the localization dictionary under the key `searchPlaceholder` (see `l10n` options).
+
+- `indexDepth` – `1 | 2` (default `1`). Controls how deep the runtime search index should go:
+  - `1`: index only page H1 titles and excerpts (default).
+  - `2`: also index H2 headings; H2 results include a subtle parent label showing the H1 for context. This can be set via the init option or the URL query string (`?indexDepth=2`).
+
+  - `noIndexing` – `string[]` (optional). Array of relative paths to exclude from the runtime search index and discovery crawl. Useful to avoid indexing heavy pages or large directories. Example: `noIndexing: ['large-manual.md','blog/drafts/']`.
+
 
   The core index builder runs entirely at runtime when `initCMS()` is
   called.  It gathers slug information from three sources in order:

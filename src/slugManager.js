@@ -57,16 +57,16 @@ function _sendToWorker(msg) {
  * @param {string} contentBase
  * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>}
  */
-export async function buildSearchIndexWorker(contentBase) {
+export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
   const w = initSlugWorker()
-  if (!w) return buildSearchIndex(contentBase)
+  if (!w) return buildSearchIndex(contentBase, indexDepth, noIndexing)
 
   try {
-    return await _sendToWorker({ type: 'buildSearchIndex', contentBase })
+    return await _sendToWorker({ type: 'buildSearchIndex', contentBase, indexDepth, noIndexing })
   } catch (err) {
     // If the worker fails, fall back to main thread index build.
     try {
-      return await buildSearchIndex(contentBase)
+      return await buildSearchIndex(contentBase, indexDepth, noIndexing)
     } catch (fallbackErr) {
       // If that also fails, log the fallback error and propagate the original worker error.
       console.warn('[slugManager] buildSearchIndex fallback failed', fallbackErr)
@@ -74,6 +74,7 @@ export async function buildSearchIndexWorker(contentBase) {
     }
   }
 }
+
 
 /**
  * Attempt to resolve a slug via the worker when available, otherwise fallback
@@ -414,11 +415,22 @@ export const crawlCache = new Map()
 export let searchIndex = []
 
 let _indexPromise = null
-export async function buildSearchIndex(contentBase) {
-  if (searchIndex && searchIndex.length) return searchIndex
+export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing = undefined) {
+  if (searchIndex && searchIndex.length && indexDepth === 1) return searchIndex
   if (_indexPromise) return _indexPromise
 
   _indexPromise = (async () => {
+    const excludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : null
+    const isExcluded = (p) => {
+      if (!excludes || !excludes.length) return false
+      for (const ex of excludes) {
+        if (!ex) continue
+        if (p === ex) return true
+        if (p.startsWith(ex + '/')) return true
+      }
+      return false
+    }
+
     let paths = []
     if (allMarkdownPaths && allMarkdownPaths.length) {
       paths = Array.from(allMarkdownPaths)
@@ -461,6 +473,7 @@ export async function buildSearchIndex(contentBase) {
               href = normalizePath(href)
               if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
               href = href.split(/[?#]/)[0]
+              if (isExcluded(href)) continue
               if (!visited.has(href)) {
                 visited.add(href)
                 queue.push(href)
@@ -479,6 +492,7 @@ export async function buildSearchIndex(contentBase) {
     const seen = new Set()
     paths = paths.filter(p => {
       if (!p || seen.has(p)) return false
+      if (isExcluded(p)) return false
       seen.add(p)
       return true
     })
@@ -499,6 +513,32 @@ export async function buildSearchIndex(contentBase) {
               if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
               const p = doc.querySelector('p')
               if (p && p.textContent) excerpt = p.textContent.trim()
+              // If indexing H2s, collect them as separate entries with parentTitle
+              if (indexDepth === 2) {
+                try {
+                  const topH1 = doc.querySelector('h1')
+                  const parentTitle = topH1 && topH1.textContent ? topH1.textContent.trim() : (title || '')
+                  const pageSlug = (() => {
+                    try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { /* ignore */ }
+                    return slugify(title || path)
+                  })()
+                  const h2s = Array.from(doc.querySelectorAll('h2'))
+                  for (const h2 of h2s) {
+                    try {
+                      const h2Text = (h2.textContent || '').trim()
+                      if (!h2Text) continue
+                      const anchor = h2.id ? h2.id : slugify(h2Text)
+                      const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
+                      let h2Excerpt = ''
+                      // Try to find a following paragraph sibling
+                      let sib = h2.nextElementSibling
+                      while (sib && sib.tagName && sib.tagName.toLowerCase() === 'script') sib = sib.nextElementSibling
+                      if (sib && sib.textContent) h2Excerpt = String(sib.textContent).trim()
+                      idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
+                    } catch (err) { console.warn('[slugManager] indexing H2 failed', err) }
+                  }
+                } catch (err) { console.warn('[slugManager] collect H2s failed', err) }
+              }
             } catch (err) { console.warn('[slugManager] parsing HTML for index failed', err) }
           } else {
             const raw = md.raw
@@ -510,6 +550,29 @@ export async function buildSearchIndex(contentBase) {
                 const p = parts[i].trim()
                 if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
               }
+            }
+            // If markdown and indexDepth === 2, extract H2 sections
+            if (indexDepth === 2) {
+              try {
+                const h1 = (raw.match(/^#\s+(.+)$/m) || [])[1]
+                const parentTitle = h1 ? h1.trim() : ''
+                const pageSlug = (function() { try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { } return slugify(title || path) })()
+                const h2re = /^##\s+(.+)$/gm
+                let m2
+                while ((m2 = h2re.exec(raw))) {
+                  try {
+                    const h2Text = (m2[1] || '').trim()
+                    if (!h2Text) continue
+                    const anchor = slugify(h2Text)
+                    const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
+                    // attempt to capture a short excerpt: next paragraph after the heading
+                    const after = raw.slice(h2re.lastIndex)
+                    const paraMatch = after.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
+                    const h2Excerpt = paraMatch && paraMatch[1] ? String(paraMatch[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
+                    idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
+                  } catch (err) { console.warn('[slugManager] indexing markdown H2 failed', err) }
+                }
+              } catch (err) { console.warn('[slugManager] collect markdown H2s failed', err) }
             }
           }
           let slug = ''

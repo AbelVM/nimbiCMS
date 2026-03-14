@@ -1,3 +1,8 @@
+/* Initialization logic extracted from nimbi-cms.js to keep the top-level
+ * entrypoint small.  This module exports the `initCMS` function which is
+ * responsible for validating options, constructing the DOM scaffolding, and
+ * delegating navigation and UI behaviour to helper modules.
+ */
 /**
  * Initialization logic extracted from nimbi-cms.js to keep the top-level
  * entrypoint small.  This module exports the `initCMS` function which is
@@ -85,6 +90,15 @@ export function parseInitOptionsFromQuery(queryString) {
     if (params.has('notFoundPage')) out.notFoundPage = params.get('notFoundPage')
     if (params.has('availableLanguages')) {
       out.availableLanguages = params.get('availableLanguages').split(',').map(s => s.trim()).filter(Boolean)
+    }
+    if (params.has('indexDepth')) {
+      const n = Number(params.get('indexDepth'))
+      if (Number.isInteger(n) && (n === 1 || n === 2)) out.indexDepth = n
+    }
+    if (params.has('noIndexing')) {
+      const v = params.get('noIndexing') || ''
+      const arr = v.split(',').map(s => s.trim()).filter(Boolean)
+      if (arr.length) out.noIndexing = arr
     }
 
     return out
@@ -212,6 +226,8 @@ export async function initCMS(options = {}) {
           crawlMaxQueue = 1000,
     searchIndex: searchEnabled = true,
     searchIndexMode = 'eager',
+    indexDepth = 1,
+    noIndexing = undefined,
     defaultStyle = 'light',
     bulmaCustomize = 'none',
     lang = undefined,
@@ -267,6 +283,10 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "searchIndexMode" must be "eager" or "lazy" when provided')
   }
 
+  if (indexDepth != null && (indexDepth !== 1 && indexDepth !== 2)) {
+    throw new TypeError('initCMS(options): "indexDepth" must be 1 or 2 when provided')
+  }
+
   if (defaultStyle !== 'light' && defaultStyle !== 'dark') {
     throw new TypeError('initCMS(options): "defaultStyle" must be "light" or "dark"')
   }
@@ -297,6 +317,9 @@ export async function initCMS(options = {}) {
 
   if (availableLanguages != null && (!Array.isArray(availableLanguages) || availableLanguages.some(l => typeof l !== 'string' || !l.trim()))) {
     throw new TypeError('initCMS(options): "availableLanguages" must be an array of non-empty strings when provided')
+  }
+  if (noIndexing != null && (!Array.isArray(noIndexing) || noIndexing.some(p => typeof p !== 'string' || !p.trim()))) {
+    throw new TypeError('initCMS(options): "noIndexing" must be an array of non-empty strings when provided')
   }
 
   if (homePage != null && (typeof homePage !== 'string' || !homePage.trim() || !/\.(md|html)$/.test(homePage))) {
@@ -434,7 +457,7 @@ export async function initCMS(options = {}) {
     mountEl.insertBefore(navbarWrap, container)
     const navMd = await fetchMarkdown('_navigation.md', contentBase)
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
-    const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode)
+    const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing)
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { console.warn('[nimbi-cms] onNavBuild hooks failed', e) }
     
     try {

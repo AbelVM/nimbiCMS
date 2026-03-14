@@ -48,9 +48,10 @@ export function createSiteNav(homePage) {
  * @param {boolean} effectiveSearchEnabled - whether search UI should be rendered
  * @param {('eager'|'lazy')} searchIndexMode - search index option
  *   forwarded from `initCMS`; only relevant if a search input is present.
+ * @param {1|2} indexDepth - include H2 headings in the search index when 2
  * @returns {Promise<NavBuildResult>} resolves with an object containing `navbar` and `linkEls`
  */
-export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager') {
+export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager', indexDepth = 1, noIndexing = undefined) {
   if (!navbarWrap || !(navbarWrap instanceof HTMLElement)) {
     throw new TypeError('navbarWrap must be an HTMLElement')
   }
@@ -85,24 +86,14 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       const p = u.searchParams.get('page')
       if (p) {
         brandItem.href = '?page=' + encodeURIComponent(decodeURIComponent(p))
-      } else if (u.hash && /\.md$/.test(u.hash.replace(/^#/, ''))) {
-        const h = u.hash.replace(/^#/, '')
-        brandItem.href = '?page=' + encodeURIComponent(h)
       } else {
-        const m = (u.pathname || '').match(/([^\/]+\.md)(?:$|[?#])/)
-        if (m) {
-          let md = normalizePath(m[1])
-          brandItem.href = '?page=' + encodeURIComponent(md)
-        } else {
-          brandItem.href = rawHref
-        }
+        brandItem.href = '?page=' + encodeURIComponent(homePage)
+        brandItem.textContent = t('home')
       }
     } catch (e) {
-      if (/^[#].*\.md$/.test(rawHref)) brandItem.href = '?page=' + encodeURIComponent(rawHref.replace(/^#/, ''))
-      else if (/\.md$/.test(rawHref)) brandItem.href = '?page=' + encodeURIComponent(normalizePath(rawHref))
-      else brandItem.href = rawHref
+      brandItem.href = '?page=' + encodeURIComponent(homePage)
+      brandItem.textContent = t('home')
     }
-    brandItem.textContent = firstLink.textContent || t('home')
   } else {
     brandItem.href = '?page=' + encodeURIComponent(homePage)
     brandItem.textContent = t('home')
@@ -168,6 +159,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     end.className = 'navbar-end'
     searchItem = document.createElement('div')
     searchItem.className = 'navbar-item'
+    // anchor results absolutely inside the search item so they can overflow
+    searchItem.style.position = 'relative'
 
     searchInput = document.createElement('input')
     searchInput.className = 'input'
@@ -183,6 +176,19 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     resultsContainer = document.createElement('div')
     resultsContainer.id = 'nimbi-search-results'
     resultsContainer.className = 'box'
+    // position and sizing so results can appear above other UI and scroll
+    resultsContainer.style.position = 'absolute'
+    resultsContainer.style.top = '100%'
+    resultsContainer.style.right = '0'
+    resultsContainer.style.left = 'auto'
+    resultsContainer.style.zIndex = '10000'
+    resultsContainer.style.minWidth = '240px'
+    resultsContainer.style.maxWidth = '420px'
+    resultsContainer.style.maxHeight = '50vh'
+    resultsContainer.style.overflowY = 'auto'
+    resultsContainer.style.display = 'none'
+    resultsContainer.style.padding = '8px'
+    resultsContainer.style.boxShadow = '0 6px 18px rgba(10,10,10,0.1)'
     searchItem.appendChild(resultsContainer)
     end.appendChild(searchItem)
 
@@ -194,6 +200,24 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         return
       }
       items.forEach(it => {
+        const wrap = document.createElement('div')
+        wrap.style.marginBottom = '6px'
+        wrap.style.padding = '6px'
+        wrap.style.borderBottom = '1px solid rgba(0,0,0,0.06)'
+        if (it.parentTitle) {
+          const label = document.createElement('div')
+          label.textContent = it.parentTitle
+          label.style.fontSize = '11px'
+          label.style.opacity = '0.7'
+          label.style.marginBottom = '4px'
+          label.className = 'nimbi-search-parent'
+          label.style.whiteSpace = 'nowrap'
+          label.style.overflow = 'hidden'
+          label.style.textOverflow = 'ellipsis'
+          label.style.display = 'block'
+          label.style.maxWidth = '100%'
+          wrap.appendChild(label)
+        }
         const a = document.createElement('a')
         a.className = 'block'
         a.href = '?page=' + encodeURIComponent(it.slug)
@@ -202,7 +226,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         a.style.overflow = 'hidden'
         a.style.textOverflow = 'ellipsis'
         a.addEventListener('click', () => { resultsContainer.style.display = 'none' })
-        resultsContainer.appendChild(a)
+        wrap.appendChild(a)
+        resultsContainer.appendChild(wrap)
       })
       resultsContainer.style.display = 'block'
       resultsContainer.style.right = '0'
@@ -227,10 +252,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           if (!searchIndexPromise) {
             searchIndexPromise = (async () => {
               try {
-                if (searchIndexMode === 'lazy' && fm.buildSearchIndexWorker) {
-                  return fm.buildSearchIndexWorker(contentBase);
-                }
-                return fm.buildSearchIndex(contentBase);
+                        if (searchIndexMode === 'lazy' && fm.buildSearchIndexWorker) {
+                          return fm.buildSearchIndexWorker(contentBase, indexDepth, noIndexing);
+                        }
+                        return fm.buildSearchIndex(contentBase, indexDepth, noIndexing);
               } catch (err) {
                 console.warn('[nimbi-cms] buildSearchIndex failed', err)
                 return [];
@@ -262,7 +287,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         searchIndexPromise = (async () => {
           try {
             const fm = await import('./slugManager.js')
-            const idx = await fm.buildSearchIndex(contentBase)
+            const idx = await fm.buildSearchIndex(contentBase, indexDepth, noIndexing)
             if (!indexedCountLog) {
               indexedCountLog = true
             }
@@ -377,6 +402,24 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         return
       }
       items.forEach(it => {
+        const wrap = document.createElement('div')
+        wrap.style.marginBottom = '6px'
+        wrap.style.padding = '6px'
+        wrap.style.borderBottom = '1px solid rgba(0,0,0,0.06)'
+        if (it.parentTitle) {
+          const label = document.createElement('div')
+          label.textContent = it.parentTitle
+          label.style.fontSize = '11px'
+          label.style.opacity = '0.7'
+          label.style.marginBottom = '4px'
+          label.className = 'nimbi-search-parent'
+          label.style.whiteSpace = 'nowrap'
+          label.style.overflow = 'hidden'
+          label.style.textOverflow = 'ellipsis'
+          label.style.display = 'block'
+          label.style.maxWidth = '100%'
+          wrap.appendChild(label)
+        }
         const a = document.createElement('a')
         a.className = 'block'
         a.href = '?page=' + encodeURIComponent(it.slug)
@@ -385,7 +428,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         a.style.overflow = 'hidden'
         a.style.textOverflow = 'ellipsis'
         a.addEventListener('click', () => { results.style.display = 'none' })
-        results.appendChild(a)
+        wrap.appendChild(a)
+        results.appendChild(wrap)
       })
       results.style.display = 'block'
       results.style.right = '0'
@@ -408,10 +452,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           if (!searchIndexPromise) {
             searchIndexPromise = (async () => {
               try {
-                if (searchIndexMode === 'lazy' && fm.buildSearchIndexWorker) {
-                  return fm.buildSearchIndexWorker(contentBase)
-                }
-                return fm.buildSearchIndex(contentBase)
+                  if (searchIndexMode === 'lazy' && fm.buildSearchIndexWorker) {
+                    return fm.buildSearchIndexWorker(contentBase, indexDepth, noIndexing)
+                  }
+                  return fm.buildSearchIndex(contentBase, indexDepth, noIndexing)
               } catch (err) {
                 console.warn('[nimbi-cms] buildSearchIndex failed', err)
                 return []
