@@ -413,5 +413,14 @@ describe('slugManager module', () => {
     expect(res.length).toBe(0)
   })
 
+  it('crawlAllMarkdown handles non-ok directory fetch response', async () => {
+    const base = 'http://example.com/content/'
+    // simulate directory fetch returning non-ok response (e.g., 404)
+    global.fetch = vi.fn(async (url) => ({ ok: false, status: 404, text: () => Promise.resolve('') }))
+    const res = await slugMgr.crawlAllMarkdown(base)
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(0)
+  })
+
 
 })

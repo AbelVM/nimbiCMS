@@ -170,3 +170,17 @@ if (typeof globalThis.fetch === 'function') {
     return res
   }
 }
+
+// Quiet noisy warnings from slugManager during tests. Tests assert behavior,
+// not console output — so filter out repetitive fetch warnings to keep test
+// logs focused. We only suppress messages that include the slugManager prefix.
+if (typeof console !== 'undefined' && console.warn) {
+  const _warn = console.warn.bind(console)
+  console.warn = (...args) => {
+    try {
+      const s = args.map(a => (typeof a === 'string' ? a : String(a))).join(' ')
+      if (s.includes('[slugManager]') || s.includes('fetchMarkdown failed')) return
+    } catch (e) {}
+    _warn(...args)
+  }
+}
