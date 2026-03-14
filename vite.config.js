@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite'
 import ViteRestart from 'vite-plugin-restart'
 import path from 'path'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 
 export default ({ command }) => {
   if (command === 'build') {
+    const shouldAnalyze = !!process.env.ANALYZE
     return defineConfig({
       worker: { format: 'es', inline: true },
       plugins: [
@@ -32,7 +34,24 @@ export default ({ command }) => {
         },
 
         rollupOptions: {
-          output: { exports: 'named', inlineDynamicImports: true }
+          output: { exports: 'named', inlineDynamicImports: true },
+          plugins: [
+            // optionally generate a static HTML bundle analysis when
+            // `ANALYZE=1` is set in the environment
+            ...(shouldAnalyze ? [
+              visualizer({
+                filename: 'dist/bundle-analysis.html',
+                // sunburst provides a compact overview useful for spotting large
+                // modules; treemap is another option. We also include gzip and
+                // brotli sizes to get accurate compressed metrics.
+                template: 'sunburst',
+                gzipSize: true,
+                brotliSize: true,
+                open: false,
+                title: 'nimbi-cms bundle analysis'
+              })
+            ] : [])
+          ]
         }
       }
     })
