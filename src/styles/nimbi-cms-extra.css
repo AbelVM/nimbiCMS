@@ -434,3 +434,12 @@
         overflow: auto;
     }
 }
+
+/* Fix: Bulma wires html overflow to CSS variables which can force
+   a persistent scrollbar (e.g. `overflow-y: scroll`). Ensure the
+   page-level overflow defaults to `auto` so an empty/thumbnail-less
+   scrollbar doesn't appear when no content is overflowing. */
+html, body {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}

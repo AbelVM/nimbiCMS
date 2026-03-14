@@ -7417,12 +7417,12 @@ async function dl(t = {}) {
               }
             } else {
               try {
-                O.style.height = "calc(100% - var(--nimbi-site-navbar-height))";
+                O.style.height = "calc(100vh - var(--nimbi-site-navbar-height))";
               } catch (Ie) {
                 console.warn("[nimbi-cms] set container height failed", Ie);
               }
               try {
-                O.style.setProperty("--nimbi-cms-height", "calc(100% - var(--nimbi-site-navbar-height))");
+                O.style.setProperty("--nimbi-cms-height", "calc(100vh - var(--nimbi-site-navbar-height))");
               } catch (Ie) {
                 console.warn("[nimbi-cms] set --nimbi-cms-height failed", Ie);
               }
