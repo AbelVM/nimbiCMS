@@ -397,5 +397,21 @@ describe('slugManager module', () => {
     expect(crawl).toBeNull()
   })
 
+  it('crawlAllMarkdown handles fetch rejection gracefully', async () => {
+    const base = 'http://example.com/content/'
+    global.fetch = vi.fn(async (url) => { throw new Error('network') })
+    const res = await slugMgr.crawlAllMarkdown(base)
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(0)
+  })
+
+  it('crawlAllMarkdown returns empty when directory HTML has no links', async () => {
+    const base = 'http://example.com/content/'
+    global.fetch = vi.fn(async (url) => ({ ok: true, text: () => Promise.resolve('<html><body>No links</body></html>') }))
+    const res = await slugMgr.crawlAllMarkdown(base)
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(0)
+  })
+
 
 })
