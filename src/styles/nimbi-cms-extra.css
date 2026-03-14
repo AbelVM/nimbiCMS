@@ -74,6 +74,7 @@
     width: auto;
     height: auto;
     object-fit: contain;
+    cursor: zoom-in;
 }
 
 .nimbi-content {
@@ -185,6 +186,130 @@
     bottom: 1.25rem;
     pointer-events: auto;
 }
+
+/* Image preview modal */
+.nimbi-image-preview {
+    border: none;
+    padding: 0;
+    background: rgba(10, 10, 10, 0.65);
+    color: var(--bulma-text-color, #fff);
+    border-radius: 10px;
+}
+
+.nimbi-image-preview::backdrop {
+    background: rgba(10, 10, 10, 0.65);
+}
+
+.nimbi-image-preview .nimbi-image-preview__content {
+    width: 80vw;
+    height: 80vh;
+    max-width: 80vw;
+    max-height: 80vh;
+    min-height: 60vh;
+    min-width: 60vw;
+    padding: 1rem;
+    background: var(--bulma-card-background, #222);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+}
+
+@media (max-width: 768px) {
+    .nimbi-image-preview .nimbi-image-preview__content {
+        width: 100vw;
+        max-width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+        padding: 0.5rem;
+    }
+}
+
+.nimbi-image-preview__image-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    touch-action: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.5) transparent;
+}
+
+.nimbi-image-preview__image-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.nimbi-image-preview__image-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.nimbi-image-preview__image-wrapper::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.45);
+    border-radius: 4px;
+}
+
+.nimbi-image-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    cursor: all-scroll;
+    user-select: none;
+    touch-action: none;
+}
+
+.nimbi-image-preview .nimbi-image-preview__controls {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.nimbi-image-preview .nimbi-image-preview__controls .nimbi-image-preview__group {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.nimbi-image-preview .nimbi-image-preview__controls .nimbi-image-preview__group + .nimbi-image-preview__group {
+    margin-left: 0.75rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nimbi-image-preview .nimbi-image-preview__controls .button {
+    min-width: 2.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.nimbi-image-preview .nimbi-image-preview__controls .nimbi-image-preview__zoom {
+    min-width: 3rem;
+    text-align: center;
+    color: var(--bulma-text-color, #fff);
+}
+
+.nimbi-image-preview .nimbi-image-preview__close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 1;
+}
+
+.nimbi-image-preview .nimbi-image-preview__close:hover {
+    background: var(--bulma-danger);
+    color: var(--bulma-background);
+    border-color: var(--bulma-danger);
+    }
 
 .nimbi-scroll-top.show {
     opacity: 1;

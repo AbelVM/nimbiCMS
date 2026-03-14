@@ -8,6 +8,12 @@
  * @property {string} scrollToTop
  * @property {string} readingTime - Template using `{minutes}` placeholder.
  * @property {string} searchPlaceholder
+ * @property {string} imagePreviewTitle
+ * @property {string} imagePreviewFit
+ * @property {string} imagePreviewOriginal
+ * @property {string} imagePreviewZoomOut
+ * @property {string} imagePreviewZoomIn
+ * @property {string} imagePreviewClose
  */
 
 /** @type {Record<string, L10nEntry>} */
@@ -18,7 +24,13 @@ export const DEFAULT_L10N = {
     home: 'Home',
     scrollToTop: 'Scroll to top',
     readingTime: '{minutes} min read',
-    searchPlaceholder: 'Search…'
+    searchPlaceholder: 'Search…',
+    imagePreviewTitle: 'Image preview',
+    imagePreviewFit: 'Fit to screen',
+    imagePreviewOriginal: 'Original size',
+    imagePreviewZoomOut: 'Zoom out',
+    imagePreviewZoomIn: 'Zoom in',
+    imagePreviewClose: 'Close'
   },
   es: {
     navigation: 'Navegación',
@@ -26,7 +38,13 @@ export const DEFAULT_L10N = {
     home: 'Inicio',
     scrollToTop: 'Ir arriba',
     readingTime: '{minutes} min de lectura',
-    searchPlaceholder: 'Buscar…'
+    searchPlaceholder: 'Buscar…',
+    imagePreviewTitle: 'Previsualización de imagen',
+    imagePreviewFit: 'Ajustar a la pantalla',
+    imagePreviewOriginal: 'Tamaño original',
+    imagePreviewZoomOut: 'Alejar',
+    imagePreviewZoomIn: 'Acercar',
+    imagePreviewClose: 'Cerrar'
   }
   ,
   de: {
@@ -35,7 +53,13 @@ export const DEFAULT_L10N = {
     home: 'Startseite',
     scrollToTop: 'Nach oben',
     readingTime: '{minutes} min Lesezeit',
-    searchPlaceholder: 'Suchen…'
+    searchPlaceholder: 'Suchen…',
+    imagePreviewTitle: 'Bildvorschau',
+    imagePreviewFit: 'An Bildschirm anpassen',
+    imagePreviewOriginal: 'Originalgröße',
+    imagePreviewZoomOut: 'Verkleinern',
+    imagePreviewZoomIn: 'Vergrößern',
+    imagePreviewClose: 'Schließen'
   },
   fr: {
     navigation: 'Navigation',
@@ -43,7 +67,13 @@ export const DEFAULT_L10N = {
     home: 'Accueil',
     scrollToTop: 'Aller en haut',
     readingTime: '{minutes} min de lecture',
-    searchPlaceholder: 'Rechercher…'
+    searchPlaceholder: 'Rechercher…',
+    imagePreviewTitle: 'Aperçu de l’image',
+    imagePreviewFit: 'Ajuster à l’écran',
+    imagePreviewOriginal: 'Taille originale',
+    imagePreviewZoomOut: 'Dézoomer',
+    imagePreviewZoomIn: 'Zoomer',
+    imagePreviewClose: 'Fermer'
   },
   pt: {
     navigation: 'Navegação',
@@ -51,7 +81,13 @@ export const DEFAULT_L10N = {
     home: 'Início',
     scrollToTop: 'Ir para o topo',
     readingTime: '{minutes} min de leitura',
-    searchPlaceholder: 'Procurar…'
+    searchPlaceholder: 'Procurar…',
+    imagePreviewTitle: 'Visualização da imagem',
+    imagePreviewFit: 'Ajustar à tela',
+    imagePreviewOriginal: 'Tamanho original',
+    imagePreviewZoomOut: 'Diminuir',
+    imagePreviewZoomIn: 'Aumentar',
+    imagePreviewClose: 'Fechar'
   }
 }
 

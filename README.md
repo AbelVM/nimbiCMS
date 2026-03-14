@@ -134,6 +134,7 @@ Recent behaviour fixes worth knowing:
   images as eager (adds `fetchpriority="high"` where appropriate). A CSS
   custom property `--nimbi-image-max-height-ratio` lets you tune what counts
   as "above the fold".
+- Image preview modal with zoom controls, wheel zoom, drag pan, double-click to zoom, and touch pinch support.
 - Syntax highlighting using `highlight.js` — only JS is bundled; other
   languages are auto-registered when detected.
 - Simple theming (light/dark) and Bulma customization options.

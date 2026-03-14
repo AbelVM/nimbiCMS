@@ -275,6 +275,9 @@ export const initialDocumentTitle: string
 export const indexSet: Set<string>
 
 
+// --- from src/imagePreview.js
+export function attachImagePreview(opts: any): any
+
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
 export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
