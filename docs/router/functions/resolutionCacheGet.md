@@ -16,7 +16,7 @@ Retrieve a cached resolution result and refresh its LRU position.
 
 `string`
 
-key parameter
+Cache key string.
 
 ## Returns
 

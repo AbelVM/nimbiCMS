@@ -12,7 +12,7 @@ let currentStyle = 'light'
  * Insert a stylesheet link into the document head if not already present.
  * @param {string} href - stylesheet URL to insert
  * @param {Record<string,string>} [attrs] - optional attributes to set on the link element
- * @returns {void} - return value
+ * @returns {void} - No return value.
  */
 function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return
@@ -28,7 +28,7 @@ function injectLink(href, attrs = {}) {
  *
  * @param {string} bulmaCustomize - 'none' | 'local' | theme name to load from unpkg
  * @param {string} pageDir - directory to probe for a local `bulma.css` when using 'local'
- * @returns {Promise<void>} - return value
+ * @returns {Promise<void>} - Promise that resolves when theme loading completes.
  */
 export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
   if (!bulmaCustomize || bulmaCustomize === 'none') return
@@ -66,7 +66,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
  * Toggle light/dark styling by setting `data-theme` and `is-dark`.
  *
  * @param {'light'|'dark'} style - 'light' or 'dark' to toggle theme
- * @returns {void} - return value
+ * @returns {void} - No return value.
  */
 export function setStyle(style) {
   currentStyle = style === 'dark' ? 'dark' : 'light'

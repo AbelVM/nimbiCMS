@@ -23,4 +23,4 @@ fn parameter
 
 `void`
 
-- return value
+- No return value.

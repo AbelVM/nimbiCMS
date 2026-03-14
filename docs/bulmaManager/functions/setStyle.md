@@ -22,4 +22,4 @@ Toggle light/dark styling by setting `data-theme` and `is-dark`.
 
 `void`
 
-- return value
+- No return value.

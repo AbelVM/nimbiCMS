@@ -23,4 +23,4 @@ href parameter
 
 `boolean`
 
-- return value
+- True when the href points outside the site content.

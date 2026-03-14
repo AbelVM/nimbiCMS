@@ -22,4 +22,4 @@ s parameter
 
 `string`
 
-- return value
+- The unescaped string.

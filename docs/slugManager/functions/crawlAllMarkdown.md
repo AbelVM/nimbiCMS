@@ -16,16 +16,16 @@ Crawl the content directory collecting all markdown and HTML pages.
 
 `string`
 
-contentBase parameter
+Base URL to crawl for markdown/html pages.
 
 ### maxQueue?
 
 `number` = `defaultCrawlMaxQueue`
 
-maxQueue parameter
+Optional maximum queue size for crawling.
 
 ## Returns
 
 `Promise`\<`string`[]\>
 
-- return value
+- Promise resolving to an array of discovered markdown/html paths.

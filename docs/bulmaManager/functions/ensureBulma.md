@@ -29,4 +29,4 @@ directory to probe for a local `bulma.css` when using 'local'
 
 `Promise`\<`void`\>
 
-- return value
+- Promise that resolves when theme loading completes.

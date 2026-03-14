@@ -16,13 +16,13 @@ Determine whether an href points outside of the provided contentBase.
 
 `string`
 
-href parameter
+The href to test for being external.
 
 ### contentBase?
 
 `string`
 
-contentBase parameter
+Optional base URL to use when resolving absolute paths.
 
 ## Returns
 

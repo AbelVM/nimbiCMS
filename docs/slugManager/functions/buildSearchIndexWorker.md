@@ -16,7 +16,7 @@ Build the search index using the slug worker when available.
 
 `string`
 
-contentBase parameter
+Base URL where markdown content is hosted
 
 ### indexDepth?
 

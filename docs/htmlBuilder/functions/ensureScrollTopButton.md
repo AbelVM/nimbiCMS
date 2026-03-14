@@ -16,11 +16,11 @@ Create or update a scroll-to-top button and toggle TOC/menu label visibility.
 
 `HTMLElement`
 
-article parameter
+The article element produced by `prepareArticle`.
 
 ### topH1
 
-topH1 parameter
+The top-level H1 element for the article, if present.
 
 `HTMLElement` | `null`
 
@@ -28,7 +28,7 @@ topH1 parameter
 
 `object` = `{}`
 
-opts parameter
+Options object controlling rendering behavior.
 
 ## Returns
 

@@ -23,17 +23,17 @@ parsed page metadata
 
 `HTMLElement`
 
-article parameter
+The article container element to parse.
 
 ### pagePath?
 
 `string`
 
-pagePath parameter
+Optional page path used to normalize relative links.
 
 ### anchor?
 
-anchor parameter
+Optional anchor id to scroll to after rendering.
 
 `string` | `null`
 

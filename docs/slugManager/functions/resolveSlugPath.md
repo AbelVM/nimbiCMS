@@ -23,4 +23,4 @@ slug parameter
 
 `string` \| `null`
 
-- return value
+- The resolved markdown path for the slug, or `null` if not found.

@@ -17,22 +17,22 @@ lookup, search-index, crawling, and other fallbacks in order.
 
 `string`
 
-decoded parameter
+Decoded slug value to resolve (string without encoding).
 
 ### contentBase
 
 `string`
 
-contentBase parameter
+Base URL used for discovery and fetching.
 
 ### maxQueue?
 
 `number`
 
-maxQueue parameter
+Optional maximum queue size for crawling.
 
 ## Returns
 
 `Promise`\<`string` \| `null`\>
 
-- return value
+- Promise resolving to the markdown path or `null` if not found.

@@ -34,4 +34,4 @@ optional page path used for relative href normalization
 
 `HTMLElement`
 
-- return value
+- The generated table-of-contents element.

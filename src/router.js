@@ -71,7 +71,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
 }
 /**
  * Empties the internal markdown index set. Only exposed for testing.
- * @returns {void} - return value
+ * @returns {void} - No return value.
  */
 export function _clearIndexCache() {
   indexSet.clear();
@@ -82,7 +82,7 @@ export function _clearIndexCache() {
 
 /**
  * Retrieve a cached resolution result and refresh its LRU position.
- * @param {string} key - key parameter
+ * @param {string} key - Cache key string.
  * @returns {{resolved:string,anchor:string|null}|undefined}
  */
 export function resolutionCacheGet(key) {
@@ -101,9 +101,9 @@ export function resolutionCacheGet(key) {
 /**
  * Store a resolution result in the runtime resolution cache. Evicts oldest
  * entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
- * @param {string} key - key parameter
- * @param {{resolved:string,anchor:string|null}} value
- * @returns {void} - return value
+ * @param {string} key - Cache key string.
+ * @param {{resolved:string,anchor:string|null}} value - Resolution record to store.
+ * @returns {void} - No return value.
  */
 /**
  * Store a resolution in the runtime cache and evict oldest entries if needed.
@@ -206,12 +206,12 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
  * ordered list of candidate markdown/html filenames to attempt fetching.
  *
  * @param {string} resolved - resolved parameter
- * @returns {string[]} - return value
+ * @returns {string[]} - Array of candidate filenames to attempt fetching.
  */
 /**
  * Given a resolved identifier, return ordered candidate filenames to fetch.
  * @param {string} resolved - resolved parameter
- * @returns {string[]} - return value
+ * @returns {string[]} - Array of candidate filenames to attempt fetching.
  */
 export function buildPageCandidates(resolved) {
   

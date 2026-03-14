@@ -158,6 +158,7 @@ export let initialDocumentTitle = ''
  * mistakes are surfaced early (e.g. passing a number for `contentPath`).
  *
  * @param {Object} options - options parameter
+ * @param {Object} options - Initialization options provided by the caller.
  * @param {boolean} [options.allowUrlPathOverrides=false] - advanced opt-in that
  *   allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via
  *   URL query parameters. This is disabled by default for security; enabling

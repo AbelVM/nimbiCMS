@@ -16,7 +16,7 @@ Generate a URL-friendly slug from a text string.
 
 `string`
 
-s parameter
+Text to generate a URL-friendly slug from.
 
 ## Returns
 

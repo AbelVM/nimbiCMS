@@ -17,7 +17,7 @@ maps and `allMarkdownPaths` relative to that base.
 
 `string`
 
-contentBase parameter
+Optional base URL where markdown content is hosted
 
 ## Returns
 

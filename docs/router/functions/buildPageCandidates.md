@@ -22,4 +22,4 @@ resolved parameter
 
 `string`[]
 
-- return value
+- Array of candidate filenames to attempt fetching.

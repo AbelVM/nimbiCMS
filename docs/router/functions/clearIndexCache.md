@@ -14,4 +14,4 @@ Empties the internal markdown index set. Only exposed for testing.
 
 `void`
 
-- return value
+- No return value.

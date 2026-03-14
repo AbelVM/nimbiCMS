@@ -56,7 +56,7 @@ export function createNavTree(t, tree) {
  * @param {Function} t - localization function
  * @param {Array<{level:number,text:string,id?:string}>} toc - TOC entries
  * @param {string} [pagePath] - optional page path used for relative href normalization
- * @returns {HTMLElement} - return value
+ * @returns {HTMLElement} - The generated table-of-contents element.
  */
 export function buildTocElement(t, toc, pagePath = '') {
   const aside = document.createElement('aside')
@@ -412,9 +412,9 @@ async function rewriteAnchors(article, contentBase, pagePath) {
  * Returns the detected top H1, its text, and the chosen slug key.
  *
  * @param {Object} parsed - parsed page metadata
- * @param {HTMLElement} article - article parameter
- * @param {string} [pagePath] - pagePath parameter
- * @param {string|null} [anchor] - anchor parameter
+ * @param {HTMLElement} article - The article container element to parse.
+ * @param {string} [pagePath] - Optional page path used to normalize relative links.
+ * @param {string|null} [anchor] - Optional anchor id to scroll to after rendering.
  * @returns {{topH1:HTMLElement|null,h1Text:string|null,slugKey:string}}
  */
 function computeSlug(parsed, article, pagePath, anchor) {
@@ -960,9 +960,9 @@ export function scrollToAnchorOrTop(anchor) {
  */
 /**
  * Create or update a scroll-to-top button and toggle TOC/menu label visibility.
- * @param {HTMLElement} article - article parameter
- * @param {HTMLElement|null} topH1 - topH1 parameter
- * @param {object} opts - opts parameter
+ * @param {HTMLElement} article - The article element produced by `prepareArticle`.
+ * @param {HTMLElement|null} topH1 - The top-level H1 element for the article, if present.
+ * @param {object} opts - Options object controlling rendering behavior.
  */
 export function ensureScrollTopButton(article, topH1, { mountOverlay = null, container = null, mountEl = null, navWrap = null, t = null } = {}) {
   try {
