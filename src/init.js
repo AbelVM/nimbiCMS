@@ -16,6 +16,122 @@ import { t, loadL10nFile, setLang } from './l10nManager.js'
 import { ensureBulma, setStyle } from './bulmaManager.js'
 
 /**
+ * Parse well-known `initCMS` options from the current page URL's query
+ * string. Values are converted to the expected types where possible.
+ *
+ * Supported query params:
+ * - `contentPath` (string)
+ * - `searchIndex` (boolean: true|false|1|0)
+ * - `searchIndexMode` ('eager'|'lazy')
+ * - `defaultStyle` ('light'|'dark')
+ * - `bulmaCustomize` (string)
+ * - `lang` (string)
+ * - `l10nFile` (string or 'null')
+ * - `cacheTtlMinutes` (number)
+ * - `cacheMaxEntries` (integer)
+ * - `homePage` (string)
+ * - `notFoundPage` (string)
+ * - `availableLanguages` (comma-separated list)
+ *
+ * The returned object contains only keys for params that were present and
+ * successfully parsed.
+ *
+ * @param {string} [queryString] optional query string (for tests); defaults to window.location.search
+ * @returns {Object}
+ */
+export function parseInitOptionsFromQuery(queryString) {
+  try {
+    const qs = typeof queryString === 'string' ? queryString : (typeof window !== 'undefined' && window.location ? window.location.search : '')
+    if (!qs) return {}
+    const params = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
+    const out = {}
+
+    const parseBool = (v) => {
+      if (v == null) return undefined
+      const s = String(v).toLowerCase()
+      if (s === '1' || s === 'true' || s === 'yes') return true
+      if (s === '0' || s === 'false' || s === 'no') return false
+      return undefined
+    }
+
+    if (params.has('contentPath')) out.contentPath = params.get('contentPath')
+    if (params.has('searchIndex')) {
+      const b = parseBool(params.get('searchIndex'))
+      if (typeof b === 'boolean') out.searchIndex = b
+    }
+    if (params.has('searchIndexMode')) {
+      const v = params.get('searchIndexMode')
+      if (v === 'eager' || v === 'lazy') out.searchIndexMode = v
+    }
+    if (params.has('defaultStyle')) {
+      const v = params.get('defaultStyle')
+      if (v === 'light' || v === 'dark') out.defaultStyle = v
+    }
+    if (params.has('bulmaCustomize')) out.bulmaCustomize = params.get('bulmaCustomize')
+    if (params.has('lang')) out.lang = params.get('lang')
+    if (params.has('l10nFile')) {
+      const v = params.get('l10nFile')
+      out.l10nFile = v === 'null' ? null : v
+    }
+    if (params.has('cacheTtlMinutes')) {
+      const n = Number(params.get('cacheTtlMinutes'))
+      if (Number.isFinite(n) && n >= 0) out.cacheTtlMinutes = n
+    }
+    if (params.has('cacheMaxEntries')) {
+      const n = Number(params.get('cacheMaxEntries'))
+      if (Number.isInteger(n) && n >= 0) out.cacheMaxEntries = n
+    }
+    if (params.has('homePage')) out.homePage = params.get('homePage')
+    if (params.has('notFoundPage')) out.notFoundPage = params.get('notFoundPage')
+    if (params.has('availableLanguages')) {
+      out.availableLanguages = params.get('availableLanguages').split(',').map(s => s.trim()).filter(Boolean)
+    }
+
+    return out
+  } catch (err) {
+    return {}
+  }
+}
+
+// --- Path sanitization helpers -------------------------------------------
+/**
+ * Rejects suspicious paths that could lead to path traversal or external URLs.
+ * Returns true if the path is safe to use as a content path segment.
+ * Safe rules:
+ *  - must be a string
+ *  - must not contain ".." segments
+ *  - must not be an absolute URL (protocol://) or start with //
+ *  - must not start with a leading slash (we normalize to relative)
+ */
+function isSafeContentPath(p) {
+  if (typeof p !== 'string') return false
+  if (!p.trim()) return false
+  if (p.includes('..')) return false
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(p)) return false // protocol://
+  if (p.startsWith('//')) return false
+  // disallow absolute filesystem-ish paths
+  if (p.startsWith('/') || /^[A-Za-z]:\\/.test(p)) return false
+  return true
+}
+
+/**
+ * Validates a page basename for `homePage` / `notFoundPage`.
+ * Rules:
+ *  - must be a simple basename (no slashes)
+ *  - allowed chars: A-Za-z0-9._- and must end with .md or .html
+ */
+function isSafePageBasename(name) {
+  if (typeof name !== 'string') return false
+  const s = name.trim()
+  if (!s) return false
+  if (s.includes('/') || s.includes('\\')) return false
+  if (s.includes('..')) return false
+  if (!/^[A-Za-z0-9._-]+\.(md|html)$/.test(s)) return false
+  return true
+}
+
+
+/**
  * Currently selected highlight theme name. Mutable export for runtime
  * customization; changes affect subsequent codeblock rendering.
  * @type {string}
@@ -34,6 +150,10 @@ export let initialDocumentTitle = ''
  * mistakes are surfaced early (e.g. passing a number for `contentPath`).
  *
  * @param {Object} options
+ * @param {boolean} [options.allowUrlPathOverrides=false] - advanced opt-in that
+ *   allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via
+ *   URL query parameters. This is disabled by default for security; enabling
+ *   it should only be done by trusted host pages.
  * @param {string|Element} options.el - mount point selector or element
  * @param {string} [options.contentPath='/content'] - URL path to content
  * @param {number} [options.crawlMaxQueue=1000] - maximum directory queue length for slug crawling (see docs)
@@ -56,6 +176,36 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): options must be an object')
   }
 
+  // Merge user-supplied options with any options provided via URL query
+  // parameters. Explicit `options` take precedence over query params.
+  //
+  // SECURITY: for safety, do not allow sensitive path-related options to be
+  // overridden via URL query parameters by default. Allowing `contentPath`,
+  // `homePage` or `notFoundPage` from the URL can enable path traversal or
+  // unintended exposure of server-served files if the backend is not
+  // explicitly hardened. These query params are still parsed (useful for
+  // tests), but are ignored at runtime unless the host page explicitly
+  // enables URL-based overrides via a deliberate opt-in mechanism.
+  const queryOpts = parseInitOptionsFromQuery()
+  if (queryOpts && (queryOpts.contentPath || queryOpts.homePage || queryOpts.notFoundPage)) {
+    // Only honor URL-provided path overrides when the embedding page has
+    // explicitly passed `allowUrlPathOverrides: true` to `initCMS()`.
+    if (options && options.allowUrlPathOverrides === true) {
+      try {
+        console.warn('[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage')
+      } catch (_) {}
+    } else {
+      try {
+        console.warn('[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage')
+      } catch (_) {}
+      // Remove any path-like overrides from queryOpts to avoid accidental exposure
+      delete queryOpts.contentPath
+      delete queryOpts.homePage
+      delete queryOpts.notFoundPage
+    }
+  }
+  const finalOptions = Object.assign({}, queryOpts, options)
+
   const {
     el,
     contentPath = '/content',
@@ -72,7 +222,26 @@ export async function initCMS(options = {}) {
     availableLanguages,
     homePage = '_home.md',
     notFoundPage = '_404.md'
-  } = options
+  } = finalOptions
+
+  // Validate sanitized overrides (if any) before accepting them. This enforces
+  // that runtime values cannot be used to traverse out of the static content
+  // tree or reference absolute/protocol URLs.
+  if (finalOptions.contentPath != null) {
+    if (!isSafeContentPath(finalOptions.contentPath)) {
+      throw new TypeError('initCMS(options): "contentPath" contains unsafe characters or patterns')
+    }
+  }
+  if (finalOptions.homePage != null) {
+    if (!isSafePageBasename(finalOptions.homePage)) {
+      throw new TypeError('initCMS(options): "homePage" must be a simple basename ending with .md or .html')
+    }
+  }
+  if (finalOptions.notFoundPage != null) {
+    if (!isSafePageBasename(finalOptions.notFoundPage)) {
+      throw new TypeError('initCMS(options): "notFoundPage" must be a simple basename ending with .md or .html')
+    }
+  }
 
   if (!el) {
     throw new Error('el is required')
@@ -303,6 +472,31 @@ export async function initCMS(options = {}) {
     console.warn('[nimbi-cms] build navigation failed', e)
   }
   await ui.renderByQuery()
+  
+  // Show a subtle version label in the bottom-left corner (non-blocking).
+  try {
+    import('./version.js').then(({ getVersion }) => {
+      if (typeof getVersion === 'function') {
+        getVersion().then(ver => {
+          try {
+            const v = ver || '0.0.0'
+            const label = document.createElement('div')
+            label.className = 'nimbi-version-label'
+            label.textContent = `Ninbi CMS v. ${v}`
+            label.style.position = 'absolute'
+            label.style.left = '8px'
+            label.style.bottom = '6px'
+            label.style.fontSize = '11px'
+            label.style.opacity = '0.6'
+            label.style.pointerEvents = 'none'
+            label.style.zIndex = '9999'
+            label.style.userSelect = 'none'
+            try { mountEl.appendChild(label) } catch (err) { /* ignore */ }
+          } catch (err) { /* ignore */ }
+        }).catch(() => {})
+      }
+    }).catch(() => {})
+  } catch (err) { /* ignore */ }
   
 
 

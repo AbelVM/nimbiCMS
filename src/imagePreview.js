@@ -21,6 +21,7 @@ let _label = (key, def) => def
 let _naturalWidth = 0
 let _naturalHeight = 0
 let _updateZoomLabel = () => {}
+let _zoomStep = 0.25
 
 function _createModal() {
   // If modal was created previously but removed from the DOM (e.g. in tests),
@@ -50,7 +51,9 @@ function _createModal() {
             <button class="button is-small" type="button" data-nimbi-preview-zoom-out>−</button>
             <div class="nimbi-image-preview__zoom" data-nimbi-preview-zoom-label>100%</div>
             <button class="button is-small" type="button" data-nimbi-preview-zoom-in>＋</button>
+            <button class="button is-small" type="button" data-nimbi-preview-reset>⟲</button>
           </div>
+          <div class="nimbi-image-preview__hud" data-nimbi-preview-zoom-hud>100%</div>
         </div>
       </div>
     </div>
@@ -67,10 +70,10 @@ function _createModal() {
   modal.addEventListener('wheel', (event) => {
     if (!isModalOpen()) return
     event.preventDefault()
-
-    const delta = event.deltaY < 0 ? 0.1 : -0.1
+    const delta = event.deltaY < 0 ? _zoomStep : -_zoomStep
     setZoom(_zoom + delta)
     updateZoomLabel()
+    showZoomHud()
   }, { passive: false })
 
   modal.addEventListener('keydown', (event) => {
@@ -115,19 +118,30 @@ function _createModal() {
   const originalBtn = modal.querySelector('[data-nimbi-preview-original]')
   const zoomIn = modal.querySelector('[data-nimbi-preview-zoom-in]')
   const zoomOut = modal.querySelector('[data-nimbi-preview-zoom-out]')
+  const resetBtn = modal.querySelector('[data-nimbi-preview-reset]')
   const closeBtn = modal.querySelector('[data-nimbi-preview-close]')
   const zoomLabel = modal.querySelector('[data-nimbi-preview-zoom-label]')
+  const zoomHud = modal.querySelector('[data-nimbi-preview-zoom-hud]')
 
   function updateZoomLabel() {
     if (zoomLabel) zoomLabel.textContent = `${Math.round(_zoom * 100)}%`
   }
 
+  const showZoomHud = () => {
+    if (!zoomHud) return
+    zoomHud.textContent = `${Math.round(_zoom * 100)}%`
+    zoomHud.classList.add('visible')
+    clearTimeout(zoomHud._timeout)
+    zoomHud._timeout = setTimeout(() => zoomHud.classList.remove('visible'), 800)
+  }
+
   _updateZoomLabel = updateZoomLabel
 
-  zoomIn.addEventListener('click', () => { setZoom(_zoom + 0.25); updateZoomLabel() })
-  zoomOut.addEventListener('click', () => { setZoom(_zoom - 0.25); updateZoomLabel() })
-  fitBtn.addEventListener('click', () => { fitToScreen(); updateZoomLabel() })
-  originalBtn.addEventListener('click', () => { setZoom(1); updateZoomLabel() })
+  zoomIn.addEventListener('click', () => { setZoom(_zoom + _zoomStep); updateZoomLabel(); showZoomHud() })
+  zoomOut.addEventListener('click', () => { setZoom(_zoom - _zoomStep); updateZoomLabel(); showZoomHud() })
+  fitBtn.addEventListener('click', () => { fitToScreen(); updateZoomLabel(); showZoomHud() })
+  originalBtn.addEventListener('click', () => { setZoom(1); updateZoomLabel(); showZoomHud() })
+  resetBtn.addEventListener('click', () => { fitToScreen(); updateZoomLabel(); showZoomHud() })
   closeBtn.addEventListener('click', closePreview)
 
   // Localize tooltip titles
@@ -479,13 +493,17 @@ function closePreview() {
  * @param {HTMLElement} root The DOM element containing images to enhance.
  * @param {{t?: (key: string) => string}} [options] Optional helpers, such as localization.
  */
-export function attachImagePreview(root, { t } = {}) {
+export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
   if (!root || !root.querySelectorAll) return
 
   _label = (key, def) => {
     const result = typeof t === 'function' ? t(key) : undefined
     return result || def
   }
+
+  // apply configured zoom step to module-level variable so modal handlers
+  // (created in `_createModal`) can access it.
+  _zoomStep = zoomStep
 
   // Delegate clicks so newly-inserted images are also covered.
   root.addEventListener('click', (event) => {

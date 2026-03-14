@@ -9,3 +9,4 @@ export { setStyle, setThemeVars } from './bulmaManager.js'
 export { t, loadL10nFile, setLang } from './l10nManager.js'
 
 export { initCMS as default } from './init.js'
+export { getVersion } from './version.js'

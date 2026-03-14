@@ -185,6 +185,9 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 
+// --- from src/version.js
+
+
 // --- from src/ui.js
 
 
@@ -267,7 +270,8 @@ export function setLang(lang: string): void
 
 
 // --- from src/init.js
-export const currentHighlightTheme: string
+export function parseInitOptionsFromQuery(queryString: string): object
+export const currentHighlightTheme: any
 export const initialDocumentTitle: string
 
 

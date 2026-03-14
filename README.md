@@ -1,5 +1,5 @@
 
-<img src="./logo.png" alt="logo" width="256" height="256" />
+<img src="./assets/logo.png" alt="logo" width="256" height="256" />
 
 # nimbiCMS
 
@@ -191,6 +191,13 @@ manager.terminate()
   `#app`). A DOM element is also accepted for compatibility.
 - `contentPath` – URL path to the content folder serving raw `.md` files
   (default `./content` or `/content`). The library normalizes trailing slashes.
+  
+  **Security note:** For safety, `contentPath`, `homePage` and `notFoundPage`
+  are not accepted from the page URL query string by default. Allowing these
+  values via URL can enable path traversal or exposure of files if the server
+  is not locked down. To intentionally enable URL-based overrides the host
+  page must pass `allowUrlPathOverrides: true` to `initCMS()` — this opt-in
+  must be set in script code, not via the URL itself.
 - `lang` – **string** (optional). UI language code (short form, e.g. `en`, `de`). Only affects UI strings (navigation labels, buttons, etc.); it does not change which folder the CMS loads content from.
 - `l10nFile` – **string** (optional). Path to a JSON localization file. Relative paths resolve against the current page directory.
 - `availableLanguages` – **string[]** (optional). When set, the CMS treats a leading path segment as a language code (e.g. `en/foo.md` or `fr/bar.md`) and maps slugs into a per-language bucket. This allows `setLang()` to resolve the correct language-specific page for a given slug.
@@ -255,6 +262,18 @@ manager.terminate()
 
 The `initCMS` export itself is returned when you call it; additional helpers
 are exposed (all are also available from the UMD bundle namespace).
+
+### Version helper
+
+The bundle exposes a small runtime helper so consumers can read the shipped
+package version programmatically and the library shows a subtle build label
+in the bottom-left corner of the mount element when initialized.
+
+- `getVersion()` — async function that resolves to the package `version` string (e.g. `0.1.0`). Use this to display the library version in your UI or diagnostics.
+
+When `initCMS()` runs it will append a non-interactive label with the text
+`Ninbi CMS v. ${version}` to the mount element. The label falls back to
+`Ninbi CMS v. 0.0.0` when a runtime package.json import isn't available.
 
 > **TypeScript users:** a `src/index.d.ts` declaration file is shipped with
 > the package that describes the public API. It includes not only the main
@@ -531,6 +550,69 @@ unions, nested generics, destructuring, etc.
 
 Dependencies were updated during development. If you need a conservative
 upgrade policy, let me know and I can prepare a selective plan.
+
+### Runtime path sanitization
+
+To reduce the risk of accidental exposure or path traversal on static hosts,
+the client now sanitizes and normalizes runtime path options. Important
+behaviour changes:
+
+- `contentPath`, `homePage`, and `notFoundPage` are not accepted from the
+  page URL query string by default. These values may be provided programmatically
+  via the `initCMS()` `options` object only.
+- When the host page explicitly opts in by passing `allowUrlPathOverrides: true`
+  to `initCMS()`, the library will consider URL query string overrides. Even
+  in that mode the values are validated and unsafe values are rejected.
+
+Sanitization rules applied client-side:
+
+- `contentPath`: must be a non-empty string, must not contain `..` segments,
+  must not be an absolute URL (no `protocol://`), must not start with `//`,
+  and must not be an absolute filesystem path (leading `/` or Windows drive
+  prefix). The value is normalized to a relative path with a trailing slash.
+- `homePage` / `notFoundPage`: must be a simple basename (no slashes), only
+  contain letters, numbers, dot, underscore or hyphen, and must end with
+  `.md` or `.html`. Example safe names: `index.html`, `_home.md`.
+
+If an unsafe value is detected the library will throw a `TypeError` when
+initializing. Unit tests were added to cover the common misuse cases
+(`tests/init.sanitization.test.js`) and the existing URL-override tests
+ensure the default behaviour (ignoring URL-provided paths) remains safe.
+
+If you need an advanced opt-in for integration tests or unusual hosting
+environments, use `allowUrlPathOverrides: true` with caution and only when
+you control the embedding page and the static host configuration.
+
+### Opt-in usage example (cautious)
+
+If you really need URL-driven overrides (for example in an integration test
+or a special controlled embed scenario), you must enable them explicitly in
+script code — they cannot be enabled from the URL itself. Only do this when
+you control both the embedding page and the static host's content layout.
+
+UMD example (bundle exposes `nimbiCMS`):
+
+```html
+<script>
+  // Only enable in trusted environments
+  nimbiCMS.initCMS({ el: '#app', allowUrlPathOverrides: true })
+</script>
+```
+
+ES module example:
+
+```js
+import initCMS from 'nimbi-cms'
+
+// Only enable in trusted environments where the host page is controlled
+initCMS({ el: '#app', allowUrlPathOverrides: true })
+```
+
+Note: enabling `allowUrlPathOverrides` still runs client-side validation; if
+an unsafe value is supplied the call to `initCMS()` will throw a `TypeError`.
+Prefer passing `contentPath`, `homePage`, and `notFoundPage` directly in the
+`options` object from secure script code rather than relying on URL query
+parameters.
 
 ## Available Bulmaswatch themes
 
