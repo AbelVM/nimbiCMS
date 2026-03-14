@@ -8,16 +8,15 @@ Lightweight client-side CMS used for local editing and testing.
 ## Table of Contents
 
 1. [Quick start](#quick-start)
-2. [Problem statement](#problem-statement)
-3. [Features](#features)
-5. [Options & API](#options--api)
-6. [Theming & Customization](#theming--customization)
-7. [Localization](#localization)
-8. [Content workflow](#content-workflow)
-9. [Testing](#testing)
-10. [Security & audit](#security--audit)
-11. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
-12. [Next steps](#next-steps)
+2. [Features](#features)
+3. [Options & API](#options-api)
+4. [Theming & Customization](#theming-customization)
+5. [Localization](#localization)
+6. [Content workflow](#content-workflow)
+7. [Testing](#testing)
+8. [Security & audit](#security-audit)
+9. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
+10. [Roadmap](#roadmap)
 
 ---
 
@@ -220,77 +219,64 @@ teardown for long-lived workers.
 
 ## Options & API
 
-`initCMS(options)` mounts the CMS into a page. Options are grouped below by functionality.
+`initCMS(options)` mounts the CMS into a page. The table below summarizes the supported `InitOptions` (see `src/index.d.ts` for the generated declarations).
 
 **Core**
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `el` | `string` \\ `Element` | required | CSS selector or DOM element used as the mount target. |
-| `contentPath` | `string` | `./content` | URL path to the content folder serving `.md`/`.html` files; trailing slashes are normalized. |
-| `allowUrlPathOverrides` | `boolean` | `false` | When `true` allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via URL query parameters (opt-in; use with caution for security). |
+| `el` | `string` \ `Element` | required | CSS selector or DOM element used as the mount target. |
+| `contentPath` | `string` | `/content` | URL path to the content folder serving `.md`/`.html` files; normalized to a relative path with trailing slash. |
+| `allowUrlPathOverrides` | `boolean` | `false` | Opt-in: when `true`, `contentPath`, `homePage`, and `notFoundPage` may be overridden from the page URL (validated). |
 
-**Indexing**
+**Indexing & Search**
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `searchIndex` | `boolean` | `true` | Enable the runtime search index and render a search box in the navbar. |
-| `searchIndexMode` | `'eager' \| 'lazy'` | `'eager'` | When to build the index (`'eager'` on init, `'lazy'` on first query). |
+| `searchIndex` | `boolean` | `true` | Enable the runtime search index and render a search box. |
+| `searchIndexMode` | `'eager'` \| `'lazy'` | `'eager'` | When to build the index (`'eager'` on init, `'lazy'` on first query). |
 | `indexDepth` | `1 \| 2 \| 3` | `1` | How deep headings are indexed (H1, H2, H3). |
 | `noIndexing` | `string[]` | — | Paths (relative) to exclude from discovery and indexing. |
-| `skipRootReadme` | `boolean` | `false` | When `true`, skip link discovery inside repository-root `README.md`. |
+| `skipRootReadme` | `boolean` | `false` | When `true`, skip link discovery inside a repository-root `README.md`. |
+
+**Routing & Pages**
+
+| Option | Type | Default | Description |
+|---|---:|:---:|---|
+| `homePage` | `string` | `'_home.md'` | Basename for the site home page (`.md` or `.html`). |
+| `notFoundPage` | `string` | `'_404.md'` | Basename for the not-found page (`.md` or `.html`). |
 
 **Styling & Theming**
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `defaultStyle` | `'light' \| 'dark'` | `'light'` | Initial UI theme. |
-| `bulmaCustomize` | `'none' \| 'local' \| string` | `'none'` | Bulma customization source: `'none'` bundled, `'local'` loads `<contentPath>/bulma.css`, or a Bulmaswatch theme name to load from unpkg. |
-| `highlightTheme` | `string` | `monokai` | Initial highlight.js theme. |
+| `defaultStyle` | `'light'` \| `'dark'` | `'light'` | Initial UI theme. |
+| `bulmaCustomize` | `string` | `'none'` | `'none'` (bundled), `'local'` (load `<contentPath>/bulma.css`) or a Bulmaswatch theme name to load remotely. |
 
 **Localization**
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `lang` | `string` | — | UI language code (short form, e.g. `en`, `de`). |
-| `l10nFile` | `string` | — | Path to a JSON localization file (relative paths resolve against the page). |
-| `availableLanguages` | `string[]` | — | When set, the CMS treats a leading path segment as a language code and maps slugs per-language. |
+| `lang` | `string` | — | UI language code (e.g. `en`, `de`). |
+| `l10nFile` | `string \| null` | `null` | Path to a JSON localization file (relative paths resolve against the page). |
+| `availableLanguages` | `string[]` | — | When set, treats a leading path segment as a language code and maps slugs per-language. |
 
 **Caching & Performance**
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `cacheTtlMinutes` | `number` | `5` | TTL for slug-resolution cache entries (minutes). Set to `0` to disable expiration. |
+| `cacheTtlMinutes` | `number` | `5` | TTL for slug-resolution cache entries (minutes). Set `0` to disable expiration. |
 | `cacheMaxEntries` | `number` | — | Maximum entries in the router resolution cache. |
-| `crawlMaxQueue` | `number` | `1000` | Upper bound on directories queued during breadth-first crawl. Set to `0` to disable the guard. |
+| `crawlMaxQueue` | `number` | `1000` | Upper bound on directories queued during breadth-first crawl (0 disables the guard). |
 
 **Advanced & Extensions**
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `markdownExtensions` | `Array<object>` | — | `marked`-style extension/plugin objects registered at init via `addMarkdownExtension()`. Useful for custom tokenizers, renderers, and link transforms. |
+| `markdownExtensions` | `Array<object>` | — | `marked`-style extension/plugin objects registered at init via `addMarkdownExtension()`. |
+| `markdownPaths` | `string[]` | — | Optional host-provided list of markdown paths used by slug resolution/search. |
 
-The `markdownExtensions` example (registering a simple inline tokenizer):
-
-```js
-// add a custom inline tokenizer that uppercases text
-const upperExt = {
-  name: 'upper',
-  level: 'inline',
-  start(src) { return src.search(/[A-Z]{2,}/); },
-  tokenizer(src) {
-    const match = /^[A-Z]{2,}/.exec(src);
-    if (match) return { type: 'upper', raw: match[0], text: match[0].toLowerCase() };
-  },
-  renderer(token) { return `<span class="upper">${token.text}</span>`; }
-};
-
-initCMS({ el: '#app', markdownExtensions: [upperExt] });
-```
-
-The `initCMS` export itself is returned when you call it; additional helpers
-are exposed (all are also available from the UMD bundle namespace).
-
+The `initCMS` function also exposes many helpers and lower-level utilities; consult `src/index.d.ts` for the full, generated public API and types.
 ### Version helper
 
 The bundle exposes a small runtime helper so consumers can read the shipped
@@ -651,7 +637,6 @@ superhero, united, yeti.
 See previews at
 <https://jenil.github.io/bulmaswatch/> and load via `bulmaCustomize`.
 
-## Next steps
+## Roadmap
 
-- Bundle extra highlight.js languages to reduce runtime CDN requests.
-- Run a smoke test on the example build and report missing assets/console errors.
+- See the project issue tracker for planned improvements and priorities.
