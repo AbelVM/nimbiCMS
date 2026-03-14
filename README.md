@@ -51,6 +51,58 @@ the kind of lightweight site where you want live preview without any server.
 </body></html>
 ```
 
+### Bundle format usage
+
+Examples showing how to consume each shipped bundle format produced by the build.
+
+- UMD (browser global)
+
+```html
+<!-- include the UMD bundle and CSS -->
+<link rel="stylesheet" href="/dist/nimbi-cms.css">
+<script src="/dist/nimbi-cms.js"></script>
+<div id="app"></div>
+<script>
+  // UMD exposes a global `nimbiCMS` object
+  nimbiCMS.initCMS({ el: '#app' })
+</script>
+```
+
+- ESM (modern bundlers / <script type="module">)
+
+```html
+<script type="module">
+  // import from the ES build artifact
+  import initCMS, { getVersion } from '/dist/nimbi-cms.es.js'
+
+  // If you prefer named imports from the package, bundlers can resolve
+  // the `module` field in package.json to this file.
+  initCMS({ el: '#app' })
+  // optional: read runtime version
+  getVersion().then(v => console.log('nimbi-cms version', v))
+</script>
+```
+
+- CJS (Node / CommonJS consumers)
+
+```js
+// require the CommonJS build
+const { initCMS, getVersion } = require('./dist/nimbi-cms.cjs.js')
+
+// initCMS is available to mount the library in a DOM-like environment
+// (useful in SSR test harnesses or Node environments that provide DOM)
+initCMS({ el: '#app' })
+// optional: read runtime version
+getVersion().then(v => console.log('nimbi-cms version', v))
+```
+
+Notes:
+
+- The UMD build is a single, self-contained `dist/nimbi-cms.js` file that exposes the public API on the `nimbiCMS` global.
+- The ES build is `dist/nimbi-cms.es.js` and is ideal for modern bundlers and `<script type="module">` usage.
+- The CJS build is `dist/nimbi-cms.cjs.js` for CommonJS consumers.
+- CSS is always shipped as `dist/nimbi-cms.css` and should be loaded alongside the script for styling.
+
 Now create a `content/_navigation.md` file like this:
 
 ```markdown

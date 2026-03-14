@@ -19,9 +19,14 @@ export default ({ command }) => {
         lib: {
           entry: path.resolve(__dirname, 'src/lib/index.js'),
           name: 'nimbiCMS',
-          formats: ['es', 'cjs'],
-          // emit a plain nimbi-cms.js for ES module (no .es suffix)
-          fileName: (format) => format === 'es' ? 'nimbi-cms.js' : `nimbi-cms.${format}.js`
+          // Always emit ES, CJS and UMD builds. UMD will be the plain
+          // `nimbi-cms.js` artifact (no .umd suffix); ES gets an explicit
+          // suffix so consumers can reference it via `module` field.
+          formats: ['es', 'cjs', 'umd'],
+          fileName: (format) => {
+            if (format === 'umd') return 'nimbi-cms.js'
+            return `nimbi-cms.${format}.js`
+          }
         },
 
         rollupOptions: {

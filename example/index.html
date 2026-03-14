@@ -55,7 +55,7 @@
   <div id="app"></div>
   <div id="footer">Footer</div>
   <script type="module">
-    import initCMS from '/dist/nimbi-cms.js';
+    import initCMS from '/dist/nimbi-cms.es.js';
     const contentPath = './content';
     initCMS({ el: '#app', contentPath})
       .catch(e => console.error('initCMS failed', e));
