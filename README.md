@@ -8,15 +8,16 @@ Lightweight client-side CMS used for local editing and testing.
 ## Table of Contents
 
 1. [Quick start](#quick-start)
-2. [Features](#features)
-3. [Options & API](#options-and-api)
-4. [Theming & Customization](#theming-and-customization)
-5. [Localization](#localization)
-6. [Content workflow](#content-workflow)
-7. [Testing](#testing)
-8. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
-9. [Using with GitHub Pages](#using-with-github-pages-and-the-github-file-editor)
-10. [Roadmap](#roadmap)
+2. [Examples](#examples)
+3. [Features](#features)
+4. [Options](#options-and-api)
+5. [Theming](#theming-and-customization)
+6. [Localization](#localization)
+7. [Content workflow](#content-workflow)
+8. [Testing](#testing)
+9. [Bulmaswatch themes](#available-bulmaswatch-themes)
+10. [GitHub Pages](#using-with-github-pages-and-the-github-file-editor)
+11. [Roadmap](#roadmap)
 
 ---
 
@@ -100,6 +101,32 @@ Notes:
 - The ES build is `dist/nimbi-cms.es.js` and is ideal for modern bundlers and `<script type="module">` usage.
 - The CJS build is `dist/nimbi-cms.cjs.js` for CommonJS consumers.
 - CSS is always shipped as `dist/nimbi-cms.css` and should be loaded alongside the script for styling.
+
+## Examples
+
+Quick runnable examples are provided in the `example/` folder. The simplest way to try the project locally:
+
+```bash
+npm install
+npm run build -- --outDir example/dist
+npx http-server example -p 5174
+# then open http://127.0.0.1:5174/example/index.html
+```
+
+You can also run the dev server and open the example page with live reload:
+
+```bash
+npm run dev
+# open http://localhost:5173/example/index.html
+```
+
+Programmatic example (UMD):
+
+```html
+<div id="app"></div>
+<script src="/dist/nimbi-cms.js"></script>
+<script>nimbiCMS.initCMS({ el: '#app', contentPath: './content' })</script>
+```
 
 Now create a `content/_navigation.md` file like this:
 

@@ -309,11 +309,17 @@ try { setContentBase() } catch (err) { console.warn('[slugManager] initial setCo
  * @returns {string} - The generated slug string.
  */
 export function slugify(s) {
+  const MAX_SLUG_LENGTH = 80 // reasonable default to avoid extremely long URLs
   let slug = String(s || '')
     .toLowerCase()
     .replace(/[^a-z0-9\- ]/g, '')
     .replace(/ /g, '-')
+  // Strip trailing file extensions like '.md' or '.html' if present
   slug = slug.replace(/(?:-?)(?:md|html)$/, '')
+  // Truncate to a safe maximum length and trim trailing hyphens
+  if (slug.length > MAX_SLUG_LENGTH) {
+    slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, '')
+  }
   return slug
 }
 
