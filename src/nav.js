@@ -151,7 +151,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         }
       } catch (err) { console.warn('[nimbi-cms] navbar burger toggle failed', err) }
     })
-  } catch (err) { /* ignore if addEventListener not supported */ }
+  } catch (err) { console.warn('[nimbi-cms] burger event binding failed', err) }
 
   const menu = document.createElement('div')
   menu.className = 'navbar-menu'
@@ -231,7 +231,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                   return fm.buildSearchIndexWorker(contentBase);
                 }
                 return fm.buildSearchIndex(contentBase);
-              } catch (_) {
+              } catch (err) {
+                console.warn('[nimbi-cms] buildSearchIndex failed', err)
                 return [];
               } finally {
                 if (domInput) {
@@ -244,7 +245,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           const idx = await searchIndexPromise;
           const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)));
           showResults(filtered.slice(0, 10));
-        } catch (_) { showResults([]); }
+        } catch (err) { console.warn('[nimbi-cms] search input handler failed', err); showResults([]); }
       }, 50);
 
       if (searchInput) searchInput.addEventListener('input', handleInput);
@@ -266,11 +267,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               indexedCountLog = true
             }
             return idx
-          } catch (_) {
+          } catch (err) {
+            console.warn('[nimbi-cms] buildSearchIndex failed', err)
             return []
           }
         })()
-      } catch (_) {
+      } catch (err) {
+        console.warn('[nimbi-cms] eager search index init failed', err)
         searchIndexPromise = Promise.resolve([])
       }
       searchIndexPromise.finally(() => {
@@ -337,7 +340,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       } else {
         item.href = href
       }
-    } catch (e) { item.href = href }
+    } catch (e) { console.warn('[nimbi-cms] nav item href parse failed', e); item.href = href }
     try {
       const displayName = (a.textContent && String(a.textContent).trim()) ? String(a.textContent).trim() : null
       if (displayName) {
@@ -409,7 +412,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                   return fm.buildSearchIndexWorker(contentBase)
                 }
                 return fm.buildSearchIndex(contentBase)
-              } catch (_) {
+              } catch (err) {
+                console.warn('[nimbi-cms] buildSearchIndex failed', err)
                 return []
               } finally {
                 if (searchInput) {
@@ -422,7 +426,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           const idx = await searchIndexPromise
           const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
           showResults(filtered.slice(0, 10))
-        } catch (_) { showResults([]) }
+        } catch (err) { console.warn('[nimbi-cms] search input handler failed', err); showResults([]) }
       }, 50)
 
       searchInput.addEventListener('input', handleInput)
@@ -467,7 +471,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             burgerEl.setAttribute('aria-expanded', 'false')
             if (target) target.classList.remove('is-active')
           }
-        } catch (err) { /* best-effort close; ignore errors */ }
+        } catch (err) { console.warn('[nimbi-cms] mobile menu close failed', err) }
     })
   } catch (e) { console.warn('[nimbi-cms] attach content click handler failed', e) }
 
@@ -488,6 +492,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
         }
       } catch (e) {
+        console.warn('[nimbi-cms] container click URL parse failed', e)
       }
     })
   } catch (e) { console.warn('[nimbi-cms] build navbar failed', e) }

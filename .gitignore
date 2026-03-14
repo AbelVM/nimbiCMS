@@ -2,9 +2,7 @@
 node_modules/
 
 # Build outputs
-dist/
-example/dist/
-example/content/
+example/
 
 # Logs
 npm-debug.log*

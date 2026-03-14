@@ -67,8 +67,9 @@ export async function buildSearchIndexWorker(contentBase) {
     // If the worker fails, fall back to main thread index build.
     try {
       return await buildSearchIndex(contentBase)
-    } catch (_) {
-      // If that also fails, propagate the original worker error.
+    } catch (fallbackErr) {
+      // If that also fails, log the fallback error and propagate the original worker error.
+      console.warn('[slugManager] buildSearchIndex fallback failed', fallbackErr)
       throw err
     }
   }

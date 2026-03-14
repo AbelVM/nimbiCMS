@@ -77,8 +77,8 @@ function preloadImage(url) {
     link.as = 'image'
     link.href = url
     document.head.appendChild(link)
-  } catch (_) {
-    // ignore
+  } catch (err) {
+    console.warn('[helpers] preloadImage failed', err)
   }
 }
 
@@ -127,8 +127,8 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
       const ratio = css && css.getPropertyValue('--nimbi-image-max-height-ratio')
       const parsed = ratio ? parseFloat(ratio) : NaN
       if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 1) maxHeightRatio = parsed
-    } catch (_) {
-      // ignore
+    } catch (err) {
+      console.warn('[helpers] read CSS ratio failed', err)
     }
 
     const maxImageHeight = Math.max(200, Math.floor(viewportHeight * maxHeightRatio))
@@ -185,8 +185,8 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
             maxImageHeight
           })
         }
-      } catch (_) {
-        // ignore per-image errors
+      } catch (err) {
+        console.warn('[helpers] setEagerForAboveFoldImages per-image failed', err)
       }
     })
 
@@ -212,8 +212,8 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
             fallback: true
           })
         }
-      } catch (_) {
-        // ignore
+      } catch (err) {
+        console.warn('[helpers] setEagerForAboveFoldImages fallback failed', err)
       }
     }
   } catch (err) {

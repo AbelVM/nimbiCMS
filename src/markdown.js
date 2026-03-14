@@ -104,9 +104,9 @@ export async function parseMarkdownToHtml(md) {
                 const rawCls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
                 const cleanedCls = String(rawCls || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
                 if (cleanedCls) {
-                  try { codeEl.setAttribute && codeEl.setAttribute('class', cleanedCls) } catch (_) { codeEl.className = cleanedCls }
+                  try { codeEl.setAttribute && codeEl.setAttribute('class', cleanedCls) } catch (err) { console.warn('[markdown] set code class failed', err); codeEl.className = cleanedCls }
                 } else {
-                  try { codeEl.removeAttribute && codeEl.removeAttribute('class') } catch (_) { codeEl.className = '' }
+                  try { codeEl.removeAttribute && codeEl.removeAttribute('class') } catch (err) { console.warn('[markdown] remove code class failed', err); codeEl.className = '' }
                 }
                 const cls = cleanedCls
                 const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
@@ -173,9 +173,9 @@ export async function parseMarkdownToHtml(md) {
           const rawCls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
           const cleanedCls = String(rawCls || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
           if (cleanedCls) {
-            try { codeEl.setAttribute && codeEl.setAttribute('class', cleanedCls) } catch (_) { codeEl.className = cleanedCls }
+            try { codeEl.setAttribute && codeEl.setAttribute('class', cleanedCls) } catch (err) { console.warn('[markdown] set code class failed', err); codeEl.className = cleanedCls }
           } else {
-            try { codeEl.removeAttribute && codeEl.removeAttribute('class') } catch (_) { codeEl.className = '' }
+            try { codeEl.removeAttribute && codeEl.removeAttribute('class') } catch (err) { console.warn('[markdown] remove code class failed', err); codeEl.className = '' }
           }
           const cls = cleanedCls
           const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)

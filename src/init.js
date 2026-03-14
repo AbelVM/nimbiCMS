@@ -193,11 +193,11 @@ export async function initCMS(options = {}) {
     if (options && options.allowUrlPathOverrides === true) {
       try {
         console.warn('[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage')
-      } catch (_) {}
+      } catch (e) { console.warn('[nimbi-cms] allowUrlPathOverrides logging failed', e) }
     } else {
       try {
         console.warn('[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage')
-      } catch (_) {}
+      } catch (e) { console.warn('[nimbi-cms] logging ignore of URL overrides failed', e) }
       // Remove any path-like overrides from queryOpts to avoid accidental exposure
       delete queryOpts.contentPath
       delete queryOpts.homePage
@@ -335,8 +335,8 @@ export async function initCMS(options = {}) {
   try {
     const label = (typeof t === 'function') ? t('navigation') : null
     if (label) navCol.setAttribute('aria-label', label)
-  } catch (_) {
-    // ignore
+  } catch (e) {
+    console.warn('[nimbi-cms] set nav aria-label failed', e)
   }
   cols.appendChild(navCol)
 
@@ -442,13 +442,13 @@ export async function initCMS(options = {}) {
         const navHeight = (navbarWrap && navbarWrap.getBoundingClientRect && Math.round(navbarWrap.getBoundingClientRect().height)) || (navbarWrap && navbarWrap.offsetHeight) || 0
         if (navHeight > 0) {
           try { mountEl.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { console.warn('[nimbi-cms] set CSS var failed', err) }
-          try { container.style.paddingTop = '' } catch (err) { /* ignore */ }
+          try { container.style.paddingTop = '' } catch (err) { console.warn('[nimbi-cms] set container paddingTop failed', err) }
           try {
             // set explicit pixel height to avoid layout differences across browsers
             const mountH = (mountEl && mountEl.getBoundingClientRect && Math.round(mountEl.getBoundingClientRect().height)) || (mountEl && mountEl.clientHeight) || 0
             if (mountH > 0) {
               const explicit = Math.max(0, mountH - navHeight)
-              try { container.style.boxSizing = 'border-box' } catch (_) {}
+              try { container.style.boxSizing = 'border-box' } catch (e) { console.warn('[nimbi-cms] set container boxSizing failed', e) }
               try { container.style.height = `${explicit}px` } catch (err) { console.warn('[nimbi-cms] set container height failed', err) }
               try { container.style.setProperty('--nimbi-cms-height', `${explicit}px`) } catch (err) { console.warn('[nimbi-cms] set --nimbi-cms-height failed', err) }
             } else {
@@ -456,16 +456,16 @@ export async function initCMS(options = {}) {
               try { container.style.setProperty('--nimbi-cms-height', 'calc(100% - var(--nimbi-site-navbar-height))') } catch (err) { console.warn('[nimbi-cms] set --nimbi-cms-height failed', err) }
             }
           } catch (err) { console.warn('[nimbi-cms] compute container height failed', err) }
-          try { navbarWrap.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { /* best-effort */ }
+          try { navbarWrap.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { console.warn('[nimbi-cms] set navbar CSS var failed', err) }
         }
       }
       computeAndSet()
       try {
         if (typeof ResizeObserver !== 'undefined') {
           const ro = new ResizeObserver(() => computeAndSet())
-          try { ro.observe(navbarWrap) } catch (err) { /* ignore observe errors */ }
+          try { ro.observe(navbarWrap) } catch (err) { console.warn('[nimbi-cms] ResizeObserver.observe failed', err) }
         }
-      } catch (err) { /* ignore ResizeObserver failures */ }
+      } catch (err) { console.warn('[nimbi-cms] ResizeObserver setup failed', err) }
     } catch (err) { console.warn('[nimbi-cms] compute navbar height failed', err) }
     
   } catch (e) {
@@ -491,12 +491,12 @@ export async function initCMS(options = {}) {
             label.style.pointerEvents = 'none'
             label.style.zIndex = '9999'
             label.style.userSelect = 'none'
-            try { mountEl.appendChild(label) } catch (err) { /* ignore */ }
-          } catch (err) { /* ignore */ }
-        }).catch(() => {})
+            try { mountEl.appendChild(label) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
+          } catch (err) { console.warn('[nimbi-cms] building version label failed', err) }
+        }).catch((e) => { console.warn('[nimbi-cms] getVersion() failed', e) })
       }
-    }).catch(() => {})
-  } catch (err) { /* ignore */ }
+    }).catch((e) => { console.warn('[nimbi-cms] import version module failed', e) })
+  } catch (err) { console.warn('[nimbi-cms] version label setup failed', err) }
   
 
 
