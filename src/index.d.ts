@@ -192,8 +192,13 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 // --- from src/slugManager.js
+export function setSkipRootReadme(v: any): any
+export const skipRootReadme: boolean
 export const homePage: string
 export function setHomePage(p: string): any
+export function isExternalLink(href: string): boolean
+export function isExternalLinkWithBase(href: string, contentBase: string): boolean
+export function unescapeMarkdown(s: string): string
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): any
 
 
@@ -337,13 +342,13 @@ export const DEFAULT_L10N: Record<string, L10nEntry>
 
 
 // --- from src/utils/helpers.js
-export function isExternalLink(href: string): boolean
 export function normalizePath(p: string): string
 export function trimTrailingSlash(u: string): string
 export function ensureTrailingSlash(u: string): string
 export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): any
 export function encodeURL(u: string): string
 export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
+
 
 
 

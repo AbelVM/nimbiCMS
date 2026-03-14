@@ -22,6 +22,17 @@ export const slugToMd = new Map()
 export let availableLanguages = []
 
 /**
+ * When true, skip crawling links inside repository-root README files
+ * (e.g. `README.md`). If false, README files will be treated like any
+ * other markdown page and their links may be discovered during index
+ * building. Default: false (treat README like other pages by default).
+ * @type {boolean}
+ */
+export let skipRootReadme = false
+
+export function setSkipRootReadme(v) { skipRootReadme = !!v }
+
+/**
  * Set available language codes for multilingual sites.
  * @param {string[]} list
  * @returns {void}
@@ -299,6 +310,78 @@ export function slugify(s) {
 }
 
 /**
+ * Return true for links that point outside the site content (absolute
+ * schemes, protocol-relative `//`, etc.). Centralizing this check avoids
+ * inconsistencies across crawlers and indexers.
+ * @param {string} href
+ * @returns {boolean}
+ */
+export function isExternalLink(href) {
+  return isExternalLinkWithBase(href, undefined)
+}
+
+/**
+ * Determine whether an href points outside of the provided contentBase.
+ * If `contentBase` is omitted, this falls back to a conservative check
+ * (protocol or protocol-relative URLs are considered external).
+ *
+ * @param {string} href
+ * @param {string} [contentBase] - optional absolute or relative content base
+ * @returns {boolean}
+ */
+export function isExternalLinkWithBase(href, contentBase) {
+  if (!href) return false
+  // protocol-relative
+  if (href.startsWith('//')) return true
+  // absolute / scheme-based URLs
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+    // If contentBase is provided and both are absolute URLs, check origin
+    if (contentBase && typeof contentBase === 'string') {
+      try {
+        const h = new URL(href)
+        const base = new URL(contentBase)
+        // external if different origin
+        if (h.origin !== base.origin) return true
+        // same origin: external if path does not start with contentBase path
+        return !h.pathname.startsWith(base.pathname)
+      } catch (err) {
+        return true
+      }
+    }
+    return true
+  }
+  // absolute path starting with '/': consider internal if it resolves
+  // under the configured contentBase (when provided and absolute).
+  if (href.startsWith('/') && contentBase && typeof contentBase === 'string') {
+    try {
+      const abs = new URL(href, contentBase)
+      const base = new URL(contentBase)
+      if (abs.origin !== base.origin) return true
+      return !abs.pathname.startsWith(base.pathname)
+    } catch (err) {
+      // If we can't parse, be conservative and treat as external.
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Unescape Markdown-escaped characters so search titles/excerpts show
+ * natural text (e.g. "\\_clearHooks" -> "_clearHooks"). Only a small
+ * set of escapable characters per CommonMark is handled here.
+ * @param {string} s
+ * @returns {string}
+ */
+export function unescapeMarkdown(s) {
+  if (s == null) return s
+  // Per CommonMark/Markdown Guide, these characters may be escaped
+  // with a single backslash: \\ ` * _ { } [ ] ( ) # + - . !
+  // Only remove the backslash when it precedes one of these characters.
+  return String(s).replace(/\\([\\`*_{}\[\]()#+\-.!])/g, (_m, ch) => ch)
+}
+
+/**
  * Given a slug, return the most appropriate markdown path taking the
  * current UI language and available language list into account. If no
  * mapping exists the return value is `null`.
@@ -503,8 +586,15 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
             // that aren't intended to be crawled by the site indexer.
             const baseName = String(p || '').replace(/^.*\//, '')
             if (/^readme(?:\.md)?$/i.test(baseName)) {
-              // Skip link discovery for README files
-              continue
+              // Skip link discovery for README files at the repository root
+              // (e.g. README.md) by default. Allow README files inside
+              // content subdirs such as `docs/index/README.md` to be crawled.
+              // This behavior is configurable via `skipRootReadme`.
+              if (skipRootReadme) {
+                if (!p || !p.includes('/')) {
+                  continue
+                }
+              }
             }
             const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
             let m
@@ -516,13 +606,13 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
               hrefs.push(m[1])
             }
             const pageDirForLinks = (p && p.includes('/')) ? p.substring(0, p.lastIndexOf('/') + 1) : ''
-            for (let href of hrefs) {
+                for (let href of hrefs) {
               try {
-                // Skip external schemes (http:, //, mailto:, etc.)
-                if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue
-                // Skip absolute paths and parent-relative links which resolve
-                // outside the content directory (e.g. /modules.html or ../modules.html)
-                if (href.startsWith('/') || href.startsWith('..') || href.indexOf('/../') !== -1) continue
+                // Skip external links (http:, protocol-relative `//`, mailto:, etc.)
+                if (isExternalLinkWithBase(href, contentBase)) continue
+                // Skip parent-relative links which resolve outside the content
+                // directory (e.g. ../modules.html)
+                if (href.startsWith('..') || href.indexOf('/../') !== -1) continue
                 // Resolve simple relative links against the page directory so
                 // `modules.html` inside `docs/index.html` becomes `docs/modules.html`.
                 if (pageDirForLinks && !href.startsWith('./') && !href.startsWith('/') && !href.startsWith('../')) {
@@ -625,6 +715,9 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
             const raw = md.raw
             const h1m = raw.match(/^#\s+(.+)$/m)
             title = h1m ? h1m[1].trim() : ''
+            // Unescape any Markdown-escaped characters so search UI shows
+            // natural text (e.g. "\\_clearHooks" -> "_clearHooks").
+            try { title = unescapeMarkdown(title) } catch (_) {}
             const parts = raw.split(/\r?\n\s*\r?\n/)
             if (parts.length > 1) {
               for (let i = 1; i < parts.length; i++) {
@@ -645,6 +738,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                 while ((m2 = h2re.exec(raw))) {
                   try {
                     const h2Text = (m2[1] || '').trim()
+                      const unescH2 = unescapeMarkdown(h2Text)
                     if (!h2Text) continue
                     const anchor = slugify(h2Text)
                     const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
@@ -652,7 +746,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                     const after = raw.slice(h2re.lastIndex)
                     const paraMatch = after.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
                     const h2Excerpt = paraMatch && paraMatch[1] ? String(paraMatch[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
-                    idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
+                      idx.push({ slug: h2Slug, title: unescH2, excerpt: h2Excerpt, path, parentTitle })
                   } catch (err) { console.warn('[slugManager] indexing markdown H2 failed', err) }
                 }
               } catch (err) { console.warn('[slugManager] collect markdown H2s failed', err) }
@@ -664,13 +758,14 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                   while ((m3 = h3re.exec(raw))) {
                     try {
                       const h3Text = (m3[1] || '').trim()
+                        const unescH3 = unescapeMarkdown(h3Text)
                       if (!h3Text) continue
                       const anchor3 = slugify(h3Text)
                       const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
                       const after3 = raw.slice(h3re.lastIndex)
                       const paraMatch3 = after3.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
                       const h3Excerpt = paraMatch3 && paraMatch3[1] ? String(paraMatch3[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
-                      idx.push({ slug: h3Slug, title: h3Text, excerpt: h3Excerpt, path, parentTitle })
+                        idx.push({ slug: h3Slug, title: unescH3, excerpt: h3Excerpt, path, parentTitle })
                     } catch (err) { console.warn('[slugManager] indexing markdown H3 failed', err) }
                   }
                 } catch (err) { console.warn('[slugManager] collect markdown H3s failed', err) }
@@ -752,13 +847,13 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
       const text = await res.text()
       const doc = _crawlParser.parseFromString(text, 'text/html')
       const links = doc.querySelectorAll(_crawlLinkSelector)
-      for (const a of links) {
+          for (const a of links) {
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
-          // Skip external, absolute, or parent-relative links which point
-          // outside the content directory (e.g. /modules.html or ../modules.html)
-          if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('/') || href.startsWith('..') || href.indexOf('/../') !== -1) continue
+          // Skip external links; allow absolute paths that live under
+          // `contentBase` when possible.
+          if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
             const sub = relDir + href
             if (!seenDirs.has(sub)) queue.push(sub)
@@ -823,8 +918,8 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
-          // Ignore external, absolute, or parent-relative links
-          if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('/') || href.startsWith('..') || href.indexOf('/../') !== -1) continue
+          // Ignore external links; allow absolute paths under `contentBase`.
+          if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
             const sub = relDir + href
             if (!seenDirs.has(sub)) queue.push(sub)

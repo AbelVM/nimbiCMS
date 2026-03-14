@@ -153,6 +153,15 @@ Example (init option):
 nimbiCMS.initCMS({ el: '#app', indexDepth: 3 })
 ```
 
+## Crawling & search options
+
+- `skipRootReadme` (default: `false`): by default the indexer treats a repository-root `README.md` like any other content page and will discover links within it. Set this option to `true` (via `initCMS({ skipRootReadme: true })` or `setSkipRootReadme(true)`) to opt-out and prevent link discovery inside the repository root README.
+
+- External links are never crawled: absolute URLs (e.g. `http:`/`https:`), protocol-relative links (`//`), `mailto:` and other URI schemes are ignored by the crawler to prevent accidental traversal off-site.
+
+- Markdown escapes are unescaped for search results: titles and heading text extracted from Markdown have common backslash escapes removed so results display `\_clearHooks` as `_clearHooks` for a cleaner UX.
+
+
 Behavior notes for `indexDepth=2` and `indexDepth=3`:
 
 - Search results for H2 (when `indexDepth>=2`) and H3 (when `indexDepth=3`) headings include a subtle parent label showing the containing page's H1. This helps users understand deeper-heading results' context at-a-glance.
@@ -310,6 +319,8 @@ manager.terminate()
   - `3`: also index H3 headings; H3 results include a subtle parent label showing the H1 for context. This can be set via the init option or the URL query string (`?indexDepth=3`).
 
   - `noIndexing` – `string[]` (optional). Array of relative paths to exclude from the runtime search index and discovery crawl. Useful to avoid indexing heavy pages or large directories. Example: `noIndexing: ['large-manual.md','blog/drafts/']`.
+
+- `skipRootReadme` – **boolean** (default `false`). When `true`, the indexer will skip link discovery inside a repository-root `README.md`. Set to `false` (the default) to treat the root `README.md` like any other content page so its links may be discovered during indexing.
 
 
   The core index builder runs entirely at runtime when `initCMS()` is

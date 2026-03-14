@@ -10,7 +10,7 @@
  * delegating navigation and UI behaviour to helper modules.
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage } from './slugManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, setSkipRootReadme } from './slugManager.js'
 import * as router from './router.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
@@ -182,6 +182,7 @@ export let initialDocumentTitle = ''
  * @param {Array<object>} [options.markdownExtensions] - list of marked extensions to register on init
  * @param {string} [options.homePage] - Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`.
  * @param {string} [options.notFoundPage] - Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, defaults to `'_404.md'`.
+ * @param {boolean} [options.skipRootReadme=false] - when true, the indexer will skip link discovery inside a repository-root `README.md`; set to `false` to treat the root README like other content pages.
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
 export async function initCMS(options = {}) {
@@ -239,6 +240,8 @@ export async function initCMS(options = {}) {
     homePage = '_home.md',
     notFoundPage = '_404.md'
   } = finalOptions
+
+  const { skipRootReadme = false } = finalOptions
 
   // Validate sanitized overrides (if any) before accepting them. This enforces
   // that runtime values cannot be used to traverse out of the static content
@@ -322,6 +325,10 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "noIndexing" must be an array of non-empty strings when provided')
   }
 
+  if (skipRootReadme != null && typeof skipRootReadme !== 'boolean') {
+    throw new TypeError('initCMS(options): "skipRootReadme" must be a boolean when provided')
+  }
+
   if (homePage != null && (typeof homePage !== 'string' || !homePage.trim() || !/\.(md|html)$/.test(homePage))) {
     throw new TypeError('initCMS(options): "homePage" must be a non-empty string ending with .md or .html')
   }
@@ -331,6 +338,10 @@ export async function initCMS(options = {}) {
   }
 
   const effectiveSearchEnabled = !!searchEnabled
+
+  // Apply crawler/readme behavior option early so subsequent index builds
+  // honor the caller's preference.
+  try { setSkipRootReadme(!!skipRootReadme) } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme failed', e) }
 
   try {
     mountEl.classList.add('nimbi-mount')
