@@ -15,7 +15,8 @@ Lightweight client-side CMS used for local editing and testing.
 6. [Content workflow](#content-workflow)
 7. [Testing](#testing)
 8. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
-9. [Roadmap](#roadmap)
+9. [Using with GitHub Pages](#using-with-github-pages-and-the-github-file-editor)
+10. [Roadmap](#roadmap)
 
 ---
 
@@ -630,6 +631,34 @@ superhero, united, yeti.
 
 See previews at
 <https://jenil.github.io/bulmaswatch/> and load via `bulmaCustomize`.
+
+## Using with GitHub Pages and the GitHub file editor
+
+Nimbi CMS works well with GitHub Pages and the built-in GitHub web file editor. Minimal steps:
+
+- Enable GitHub Pages for the repository (Settings → Pages) and choose the branch/folder you want to publish (e.g., `gh-pages` or `main` / `/docs`).
+- Ensure your published site serves the built `dist` assets (upload `dist/` to the chosen branch or use a build step / GitHub Action to publish).
+- Place your content under a folder (default: `content/`) or set `contentPath` when calling `initCMS()` to point somewhere else.
+
+Editing content via the GitHub web editor:
+
+1. Open the repository on [GitHub](https://github.com) and navigate to the `content/` folder (or your chosen `contentPath`).
+2. Click any `.md` file, then click the pencil icon to edit the file in the browser.
+3. Make changes and commit them directly to the branch. The published site will receive the updates on the next Pages build (or immediately if you host the `dist` on the same branch).
+4. Refresh the site to see the updated content. Nimbi CMS loads content at runtime, so browser refresh shows the latest files.
+
+Tips:
+- Add or update `content/_navigation.md` to control the navigation bar; the nav is re-built when pages are crawled.
+- If you publish `dist/` separately (for example to `gh-pages`), consider a GitHub Action to build and push `dist/` automatically from `main`.
+- To preview locally before pushing, run:
+
+```bash
+npm run build -- --outDir example/dist
+npx http-server example -p 5174
+# visit http://127.0.0.1:5174/
+```
+
+Security note: Avoid exposing sensitive paths via URL query options; do not allow untrusted runtime overrides for `contentPath`, `homePage`, or `notFoundPage` unless you validate them server- or build-side.
 
 ## Roadmap
 
