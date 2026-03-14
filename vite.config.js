@@ -17,7 +17,9 @@ export default ({ command }) => {
         // as data URIs; we rely on an actual URL so imports resolve correctly.
         assetsInlineLimit: 0,
         lib: {
-          entry: path.resolve(__dirname, 'src/lib/index.js'),
+          // Use the full library entry so helper exports (registerLanguage,
+          // setStyle, etc.) are included in all bundle formats.
+          entry: path.resolve(__dirname, 'src/nimbi-cms.js'),
           name: 'nimbiCMS',
           // Always emit ES, CJS and UMD builds. UMD will be the plain
           // `nimbi-cms.js` artifact (no .umd suffix); ES gets an explicit

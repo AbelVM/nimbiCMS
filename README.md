@@ -68,7 +68,7 @@ Examples showing how to consume each shipped bundle format produced by the build
 </script>
 ```
 
-- ESM (modern bundlers / <script type="module">)
+- ESM (modern bundlers / `<script type="module">`)
 
 ```html
 <script type="module">
