@@ -18,6 +18,10 @@
     padding: 0;
     margin: 0;
     background: var(--bulma-body-background-color, #fff);
+    /* Ensure card background variable exists for environments where
+       the Bulma-derived theme doesn't expose it. Scope to the CMS so
+       we don't override global themes. */
+    --bulma-card-background-color: var(--bulma-card-background, var(--bulma-scheme-main, var(--bulma-background, #fff)));
     position: relative;
     overflow-x: hidden !important;
 }
@@ -88,7 +92,9 @@
 }
 
 .nimbi-toc-inner {
-    background: var(--bulma-card-background, #fff);
+    /* Prefer Bulma's canonical card background variable; fall back for
+       backwards compatibility. */
+    background: var(--bulma-card-background-color, var(--bulma-card-background, #fff));
     padding: 1rem;
     border-radius: 6px
 }
@@ -208,7 +214,7 @@
     min-height: 60vh;
     min-width: 60vw;
     padding: 1rem;
-    background: var(--bulma-card-background, #222);
+    background: var(--bulma-card-background-color, var(--bulma-card-background, #222));
     border-radius: 10px;
     display: flex;
     flex-direction: column;

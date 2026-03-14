@@ -1,0 +1,23 @@
+[**nimbi-cms**](../../README.md)
+
+***
+
+[nimbi-cms](../../README.md) / [codeblocksManager](../README.md) / loadSupportedLanguages
+
+# Function: loadSupportedLanguages()
+
+> **loadSupportedLanguages**(`url?`): `Promise`\<`void`\>
+
+Load the list of supported highlight.js languages from the canonical
+GitHub markdown file and populate `SUPPORTED_HLJS_MAP`.  This is called
+once at startup and caches the promise.
+
+## Parameters
+
+### url?
+
+`string` = `DEFAULT_HLJS_SUPPORTED_URL`
+
+## Returns
+
+`Promise`\<`void`\>

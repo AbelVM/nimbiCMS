@@ -5,9 +5,11 @@
     "moduleResolution": "Node",
     "esModuleInterop": true,
     "strict": true,
+    "allowJs": true,
+    "checkJs": false,
     "declaration": true,
     "outDir": "dist",
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src/**/*"]
 }

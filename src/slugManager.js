@@ -30,6 +30,12 @@ export let availableLanguages = []
  */
 export let skipRootReadme = false
 
+/**
+ * Configure whether README files at the repository root should be
+ * excluded from link discovery during crawling/index building.
+ * @param {boolean} v - truthy to skip root README files, falsy to include
+ * @returns {void}
+ */
 export function setSkipRootReadme(v) { skipRootReadme = !!v }
 
 /**
@@ -40,6 +46,10 @@ export function setSkipRootReadme(v) { skipRootReadme = !!v }
 export function setLanguages(list) {
   availableLanguages = Array.isArray(list) ? list.slice() : []
 }
+/**
+ * Return the current list of configured available language codes.
+ * @returns {string[]}
+ */
 export function getLanguages() { return availableLanguages }
 
 import * as l10n from './l10nManager.js'
@@ -101,6 +111,12 @@ export async function crawlForSlugWorker(slug, base, maxQueue) {
   return crawlForSlug(slug, base, maxQueue)
 }
 
+/**
+ * Store a slug -> markdown path mapping, respecting configured languages.
+ * @param {string} slug
+ * @param {string} rel
+ * @returns {void}
+ */
 export function _storeSlugMapping(slug, rel) {
   if (!slug) return
   if (availableLanguages && availableLanguages.length) {
@@ -300,6 +316,11 @@ export function setContentBase(contentBase) {
 
 try { setContentBase() } catch (err) { console.warn('[slugManager] initial setContentBase failed', err) }
 
+/**
+ * Generate a URL-friendly slug from a text string.
+ * @param {string} s
+ * @returns {string}
+ */
 export function slugify(s) {
   let slug = String(s || '')
     .toLowerCase()
@@ -316,6 +337,12 @@ export function slugify(s) {
  * @param {string} href
  * @returns {boolean}
  */
+/**
+ * Return true for links that point outside the site content (absolute
+ * schemes, protocol-relative `//`, etc.). Centralized helper.
+ * @param {string} href
+ * @returns {boolean}
+ */
 export function isExternalLink(href) {
   return isExternalLinkWithBase(href, undefined)
 }
@@ -327,6 +354,12 @@ export function isExternalLink(href) {
  *
  * @param {string} href
  * @param {string} [contentBase] - optional absolute or relative content base
+ * @returns {boolean}
+ */
+/**
+ * Determine whether an href points outside of the provided contentBase.
+ * @param {string} href
+ * @param {string} [contentBase]
  * @returns {boolean}
  */
 export function isExternalLinkWithBase(href, contentBase) {
@@ -373,6 +406,11 @@ export function isExternalLinkWithBase(href, contentBase) {
  * @param {string} s
  * @returns {string}
  */
+/**
+ * Unescape a small set of Markdown-escaped characters.
+ * @param {string} s
+ * @returns {string}
+ */
 export function unescapeMarkdown(s) {
   if (s == null) return s
   // Per CommonMark/Markdown Guide, these characters may be escaped
@@ -386,6 +424,12 @@ export function unescapeMarkdown(s) {
  * current UI language and available language list into account. If no
  * mapping exists the return value is `null`.
  *
+ * @param {string} slug
+ * @returns {string|null}
+ */
+/**
+ * Given a slug, return the most appropriate markdown path taking the
+ * current UI language into account.
  * @param {string} slug
  * @returns {string|null}
  */
@@ -408,6 +452,10 @@ export function resolveSlugPath(slug) {
 }
 
 export const fetchCache = new Map()
+/**
+ * Clear internal fetch cache used by `fetchMarkdown`.
+ * @returns {void}
+ */
 export function clearFetchCache() { fetchCache.clear() }
 
 /**
@@ -511,6 +559,28 @@ export function setFetchMarkdown(fn) {
 
 export const crawlCache = new Map()
 
+/**
+ * Remove code blocks, inline code, and HTML comments from markdown
+ * to avoid extracting links that appear only inside code or comments.
+ * @param {string} raw
+ * @returns {string}
+ */
+function _stripCodeAndComments(raw) {
+  if (!raw || typeof raw !== 'string') return ''
+  // Remove fenced code blocks ```lang ... ```
+  let s = raw.replace(/```[\s\S]*?```/g, '')
+  // Remove <pre>...</pre> and <code>...</code> blocks
+  s = s.replace(/<pre[\s\S]*?<\/pre>/gi, '')
+  s = s.replace(/<code[\s\S]*?<\/code>/gi, '')
+  // Remove HTML comments
+  s = s.replace(/<!--([\s\S]*?)-->/g, '')
+  // Remove indented code block lines (4+ spaces)
+  s = s.replace(/^ {4,}.*$/gm, '')
+  // Remove inline code spans `...`
+  s = s.replace(/`[^`]*`/g, '')
+  return s
+}
+
 /** @type {Array<{slug:string,title:string,excerpt:string,path:string}>} */
 export let searchIndex = []
 
@@ -596,13 +666,16 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                 }
               }
             }
+            // Strip code blocks and comments so we don't index links inside
+            // code samples or HTML comments.
+            const clean = _stripCodeAndComments(raw)
             const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
             let m
-            while ((m = mdLinkRe.exec(raw))) {
+            while ((m = mdLinkRe.exec(clean))) {
               hrefs.push(m[1])
             }
             const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
-            while ((m = htmlLinkRe.exec(raw))) {
+            while ((m = htmlLinkRe.exec(clean))) {
               hrefs.push(m[1])
             }
             const pageDirForLinks = (p && p.includes('/')) ? p.substring(0, p.lastIndexOf('/') + 1) : ''
@@ -806,6 +879,11 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
 export const CRAWL_MAX_QUEUE = 1000
 export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
 
+/**
+ * Set the default maximum crawl queue size used by crawlers.
+ * @param {number} n
+ * @returns {void}
+ */
 export function setDefaultCrawlMaxQueue(n) {
   if (typeof n === 'number' && n >= 0) defaultCrawlMaxQueue = n
 }

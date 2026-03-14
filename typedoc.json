@@ -1,8 +1,8 @@
 {
   "entryPoints": [
-    "src"
+    "src/**/*.js"
   ],
-  "entryPointStrategy": "expand",
+  "entryPointStrategy": "resolve",
   "out": "docs",
   "cleanOutputDir": true,
   "exclude": [

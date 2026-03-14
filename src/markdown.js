@@ -218,18 +218,11 @@ function extractToc(md) {
 }
 
 /**
- * Scan markdown text for fenced code blocks and return a set of language
- * identifiers.  Uses heuristics to discard false positives and can consult
- * a map of supported languages to be stricter.
- */
-/**
- * Scan markdown text for fenced code blocks and return a set of language
- * identifiers.  Uses heuristics to discard false positives and can consult
- * a map of supported languages to be stricter.
- *
- * @param {string} md
- * @param {Map<string,string>} [supportedMap]
- * @returns {Set<string>}
+ * Detect fenced code block languages in a markdown string.
+ * Kept immediately above the exported symbol for TypeDoc.
+ * @param {string} md - markdown source
+ * @param {Map<string,string>} [supportedMap] - optional supported languages map
+ * @returns {Set<string>} set of detected language identifiers
  */
 export function detectFenceLanguages(md, supportedMap) {
   const set = new Set()

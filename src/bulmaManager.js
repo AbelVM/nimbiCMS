@@ -83,6 +83,11 @@ export function setStyle(style) {
  * @param {Record<string,string>} vars
  * @returns {void}
  */
+/**
+ * Apply CSS custom properties to the document root (keys without `--`).
+ * @param {Record<string,string>} vars
+ * @returns {void}
+ */
 export function setThemeVars(vars) {
   const root = document.documentElement
   for (const [k, v] of Object.entries(vars || {})) {

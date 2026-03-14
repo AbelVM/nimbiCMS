@@ -26,7 +26,7 @@ export function createNavTree(t, tree) {
   label.textContent = t('navigation')
   nav.appendChild(label)
   const ul = document.createElement('ul')
-  ul.className = 'menu-list'
+  ul.className = 'menu-list';
   tree.forEach((item) => {
     const li = document.createElement('li')
     const a = document.createElement('a')
@@ -51,8 +51,6 @@ export function createNavTree(t, tree) {
   return nav
 }
 
-
-
 /**
  * Build a table-of-contents DOM element from parsed TOC entries.
  * @param {Function} t - localization function
@@ -68,28 +66,29 @@ export function buildTocElement(t, toc, pagePath = '') {
   label.textContent = t('onThisPage')
   aside.appendChild(label)
   const ul = document.createElement('ul')
-  ul.className = 'menu-list'
-  toc.forEach(item => {
-    if (item.level === 1) return
-    const li = document.createElement('li')
-    const a = document.createElement('a')
-    const slug = item.id || slugify(item.text)
+  ul.className = 'menu-list';
+
+  (toc || []).forEach(item => {
+    try {
+      if (!item || item.level === 1) return
+      const li = document.createElement('li')
+      const a = document.createElement('a')
+      const slug = item.id || slugify(item.text || '')
+      a.textContent = item.text || ''
       try {
-      const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
-      const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
-      if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
-      else a.href = `?page=${encodeURIComponent(slug)}#${encodeURIComponent(slug)}`
-    } catch (err) {
-      console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
-      const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
-      const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
-      if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
-      else a.href = `?page=${encodeURIComponent(slug)}#${encodeURIComponent(slug)}`
-    }
-    a.textContent = item.text
-    li.appendChild(a)
-    ul.appendChild(li)
+        const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
+        const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
+        if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
+        else a.href = `#${encodeURIComponent(slug)}`
+      } catch (err) {
+        console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
+        a.href = `#${encodeURIComponent(slug)}`
+      }
+      li.appendChild(a)
+      ul.appendChild(li)
+    } catch (err) { /* ignore per-item failures */ }
   })
+
   aside.appendChild(ul)
   return aside
 }
@@ -273,8 +272,18 @@ async function rewriteAnchors(article, contentBase, pagePath) {
           // so that `modules.html` on `docs/index.html` becomes `docs/modules.html`.
           let toResolve = href
           if (!href.startsWith('/') && pagePath) {
-            const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
-            toResolve = dir + href
+            // If the href is an anchor-only link (e.g. "#foo"), resolve it
+            // against the current pagePath so it targets the current page
+            // (`pagePath#foo`) instead of resolving to the content root
+            // which would produce an empty relative path (and fall back to
+            // `_home`). For non-anchor relative links, resolve against the
+            // page directory as before.
+            if (href.startsWith('#')) {
+              toResolve = pagePath + href
+            } else {
+              const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+              toResolve = dir + href
+            }
           }
           const full = new URL(toResolve, contentBase)
           const p = full.pathname || ''
@@ -730,6 +739,13 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     try { observeCodeBlocks(article) } catch (err) { console.warn('[htmlBuilder] observeCodeBlocks failed', err) }
 
     lazyLoadImages(article, pagePath, contentBase)
+
+    // Compute slug early so anchor rewriting can use the page's slug mapping
+    // (helps anchor-only links like `#quick-start` resolve to the current
+    // page instead of falling back to the site home when `pagePath` is
+    // not populated). This must run before `rewriteAnchorsWorker`.
+    const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
+
     try {
       await rewriteAnchorsWorker(article, contentBase, pagePath)
     } catch (err) {
@@ -737,12 +753,31 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       await rewriteAnchors(article, contentBase, pagePath)
     }
 
-    const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
-
     const toc = buildTocElement(t, parsed.toc, pagePath)
     return { article, parsed, toc, topH1, h1Text, slugKey }
   }
 
+/**
+ * Render a simple not-found message into the provided content wrapper.
+ * @param {HTMLElement|null} contentWrap - Container to render the message into
+ * @param {Function|null} t - localization function (optional)
+ * @param {Error|null} e - optional error providing details
+ * @returns {void}
+ */
+/**
+ * Render a simple not-found message into the provided content wrapper.
+ * @param {HTMLElement|null} contentWrap - Container to render the message into
+ * @param {Function|null} t - localization function (optional)
+ * @param {Error|null} e - optional error providing details
+ * @returns {void}
+ */
+/**
+ * Render a simple "not found" message into the provided container.
+ * Placed immediately above export for TypeDoc.
+ * @param {HTMLElement|null} contentWrap
+ * @param {Function|null} t
+ * @param {Error|null} e
+ */
 export function renderNotFound(contentWrap, t, e) {
     if (contentWrap) contentWrap.innerHTML = ''
     const notFound = document.createElement('article')
@@ -887,6 +922,11 @@ export function attachTocClickHandler(toc) {
  * @param {string|null} anchor - element id (without '#') or `null` to scroll
  *                               to the top.
  */
+/**
+ * Scroll to a specific anchor ID inside the CMS container or to top.
+ * @param {string|null} anchor - element id (without '#') or null to scroll to top
+ * @returns {void}
+ */
 export function scrollToAnchorOrTop(anchor) {
     const containerEl = document.querySelector('.nimbi-cms') || null
     if (anchor) {
@@ -921,6 +961,19 @@ export function scrollToAnchorOrTop(anchor) {
  * visibility.  Observes the supplied `topH1` element if present; on pages
  * without a top heading we fall back to a simple scroll-position listener.
  *
+ * @param {HTMLElement} article
+ * @param {HTMLElement|null} topH1
+ * @param {object} opts
+ */
+/**
+ * Create or update a scroll-to-top button and toggle TOC visibility.
+ * @param {HTMLElement} article
+ * @param {HTMLElement|null} topH1
+ * @param {object} opts
+ * @returns {void}
+ */
+/**
+ * Create or update a scroll-to-top button and toggle TOC/menu label visibility.
  * @param {HTMLElement} article
  * @param {HTMLElement|null} topH1
  * @param {object} opts

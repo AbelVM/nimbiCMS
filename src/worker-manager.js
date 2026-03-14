@@ -5,17 +5,17 @@
  */
 
 /**
+ * @typedef {Object} WorkerManager
+ * @property {() => (Worker|null)} get - Return the Worker instance or null.
+ * @property {(msg: any, timeout?: number) => Promise<unknown>} send - Send a message to the worker and await a response.
+ * @property {() => void} terminate - Terminate the worker and clear internal state.
+ */
+/**
  * Create a worker manager that lazily instantiates a Worker and provides
  * request/response semantics with timeout and automatic cleanup on errors.
- *
  * @param {function(): (Worker|null)} createWorker - Function that returns a new Worker instance when called.
  * @param {string} [name='worker'] - Friendly name used in console warnings.
- * @returns {{get: function(): (Worker|null), send: function(object, number=): Promise<unknown>, terminate: function(): void}}
- *   - `get()` returns the Worker instance or null.
- *   - `send(msg, timeoutMs?)` sends a message and returns a Promise that resolves with the worker reply or rejects on timeout/error.
- *   - `terminate()` forcefully terminates the worker and clears internal state.
- *
- * @typedef {{get: function(): (Worker|null), send: function(object, number=): Promise<unknown>, terminate: function(): void}} WorkerManager
+ * @returns {WorkerManager}
  */
 export function makeWorkerManager(createWorker, name = 'worker') {
   let _w = null
@@ -126,6 +126,12 @@ export function makeWorkerManager(createWorker, name = 'worker') {
  *
  * @param {string} code - JavaScript source code for the worker as a string.
  * @returns {(Worker|null)} A Worker instance configured with `type: 'module'`, or `null` if creation failed.
+ */
+/**
+ * Build a Blob URL from raw worker source and return a Worker (module).
+ * Returns null if the environment cannot create a Blob-based Worker.
+ * @param {string} code - JavaScript source for the worker
+ * @returns {(Worker|null)}
  */
 export function createWorkerFromRaw(code) {
   try {

@@ -15,6 +15,11 @@ export const indexSet = new Set();
  * @param {string} contentBase - The base path for content (not used directly, but for API symmetry)
  * @returns {void}
  */
+/**
+ * Refresh the internal index set from available markdown paths and slug maps.
+ * @param {string} contentBase
+ * @returns {void}
+ */
 export function refreshIndexPaths(contentBase) {
   _ensureMapsTracked();
   indexSet.clear();

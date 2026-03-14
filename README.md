@@ -9,14 +9,13 @@ Lightweight client-side CMS used for local editing and testing.
 
 1. [Quick start](#quick-start)
 2. [Features](#features)
-3. [Options & API](#options-api)
-4. [Theming & Customization](#theming-customization)
+3. [Options & API](#options-and-api)
+4. [Theming & Customization](#theming-and-customization)
 5. [Localization](#localization)
 6. [Content workflow](#content-workflow)
 7. [Testing](#testing)
-8. [Security & audit](#security-audit)
-9. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
-10. [Roadmap](#roadmap)
+8. [Available Bulmaswatch themes](#available-bulmaswatch-themes)
+9. [Roadmap](#roadmap)
 
 ---
 
@@ -217,7 +216,7 @@ Blob-backed workers for inline bundling. Prefer `manager.send(...)` for
 short-lived RPC-style interactions and call `manager.terminate()` during
 teardown for long-lived workers.
 
-## Options & API
+## Options and API
 
 `initCMS(options)` mounts the CMS into a page. The table below summarizes the supported `InitOptions` (see `src/index.d.ts` for the generated declarations).
 
@@ -444,7 +443,7 @@ extension when building slug mappings so that clicking or searching for the
 slug works regardless of whether the original link had the file name or not.
 
 
-## Theming & Customization
+## Theming and Customization
 
 Bulma is bundled by default. To alter styles at runtime, use
 `bulmaCustomize` with `'local'` or a Bulmaswatch theme name:
@@ -559,11 +558,6 @@ unions, nested generics, destructuring, etc.
 - Anchor/hash behaviour: open
   `http://127.0.0.1:5174/?page=dummy-html-test-page#some-anchor`.
 - Verify no mass `.md` fetches by inspecting the network tab on an HTML page.
-
-## Security & audit
-
-Dependencies were updated during development. If you need a conservative
-upgrade policy, let me know and I can prepare a selective plan.
 
 ### Runtime path sanitization
 

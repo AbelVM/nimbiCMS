@@ -482,14 +482,7 @@ function closePreview() {
 
 /**
  * Attach image preview behavior to all images within the given root element.
- *
- * @param {HTMLElement} root
- */
-/**
- * Attach image preview behavior to all images within the given root element.
- *
  * When an image is clicked, a modal opens and provides zoom/pan controls.
- *
  * @param {HTMLElement} root The DOM element containing images to enhance.
  * @param {{t?: (key: string) => string}} [options] Optional helpers, such as localization.
  */

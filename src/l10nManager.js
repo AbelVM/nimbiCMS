@@ -27,6 +27,12 @@ export let currentLang = detectedLang
  * @param {Object} [replacements]
  * @returns {string}
  */
+/**
+ * Translate a key using the current language, interpolating replacements.
+ * @param {string} key
+ * @param {Object} [replacements]
+ * @returns {string}
+ */
 export function t(key, replacements = {}) {
   const dict = L10N[currentLang] || L10N.en
   let s = dict && dict[key] ? dict[key] : (L10N.en[key] || '')
@@ -65,6 +71,11 @@ export async function loadL10nFile(path, pageDir) {
  * Switch the current UI language.  Falls back to English if the requested
  * language is not available.
  *
+ * @param {string} lang
+ * @returns {void}
+ */
+/**
+ * Switch the current UI language; falls back to English if unknown.
  * @param {string} lang
  * @returns {void}
  */

@@ -194,14 +194,14 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 // --- from src/slugManager.js
 export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
+export function getLanguages(): string[]
+export function _storeSlugMapping(slug: string, rel: string): void
 export const homePage: string
 export function setHomePage(p: string): any
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
 export function unescapeMarkdown(s: string): string
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): any
-
-
 
 
 
@@ -292,7 +292,7 @@ export function attachImagePreview(opts: any): any
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
 export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
-
+export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): any
 
 
 
@@ -353,6 +353,6 @@ export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
 
 
 // --- from src/utils/frontmatter.js
-
+export function parseFrontmatter(md: string): {content:string, data: Record<string,string>}
 
 // --- from src/lib/index.js

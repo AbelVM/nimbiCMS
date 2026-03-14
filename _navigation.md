@@ -1,2 +1,2 @@
 [Home](README.md)
-[API](docs/index/README.md)
+[API](docs/README.md)

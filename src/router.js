@@ -34,6 +34,10 @@ export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000 // five minutes
  * mutating the namespace object directly (which is read‑only in ESM).
  * @param {number} ms
  */
+/**
+ * Modify the resolution cache time-to-live (milliseconds).
+ * @param {number} ms
+ */
 export function setResolutionCacheTtl(ms) {
   RESOLUTION_CACHE_TTL = ms
 }
@@ -105,6 +109,11 @@ export function resolutionCacheGet(key) {
  * @param {string} key
  * @param {{resolved:string,anchor:string|null}} value
  * @returns {void}
+ */
+/**
+ * Store a resolution in the runtime cache and evict oldest entries if needed.
+ * @param {string} key
+ * @param {{resolved:string,anchor:string|null}} value
  */
 export function resolutionCacheSet(key, value) {
   _purgeExpiredEntries()
@@ -206,6 +215,11 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
  * Given a resolved identifier (possibly slug, path, or HTML), produce an
  * ordered list of candidate markdown/html filenames to attempt fetching.
  *
+ * @param {string} resolved
+ * @returns {string[]}
+ */
+/**
+ * Given a resolved identifier, return ordered candidate filenames to fetch.
  * @param {string} resolved
  * @returns {string[]}
  */

@@ -6,6 +6,11 @@
  * @param {string} href
  * @returns {boolean}
  */
+/**
+ * Determine whether an href is external (absolute URL or mailto/tel).
+ * @param {string} href
+ * @returns {boolean}
+ */
 export function isExternalLink(href) {
   if (!href || typeof href !== 'string') return false
   return /^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')
@@ -15,6 +20,11 @@ export function isExternalLink(href) {
  * Normalize a path by stripping leading dots and slashes.  Useful for
  * converting user-supplied paths into canonical relative identifiers.
  *
+ * @param {string} p
+ * @returns {string}
+ */
+/**
+ * Normalize a path by stripping leading dots and slashes.
  * @param {string} p
  * @returns {string}
  */
@@ -29,6 +39,11 @@ export function normalizePath(p) {
  * @param {string} u
  * @returns {string}
  */
+/**
+ * Remove trailing slashes from a path or URL.
+ * @param {string} u
+ * @returns {string}
+ */
 export function trimTrailingSlash(u) {
   return String(u || '').replace(/\/+$/, '')
 }
@@ -37,6 +52,11 @@ export function trimTrailingSlash(u) {
  * Ensure the given URL/path ends with a single slash.  This wraps
  * `trimTrailingSlash` and appends '/'.
  *
+ * @param {string} u
+ * @returns {string}
+ */
+/**
+ * Ensure the path ends with a single trailing slash.
  * @param {string} u
  * @returns {string}
  */
@@ -95,6 +115,12 @@ function preloadImage(url) {
  * @param {HTMLElement} container - Root element containing the images.
  * @param {number} [marginPx=0] - Extra pixels past the visible bottom that should still be considered above-the-fold.
  * @param {boolean} [debug=false] - If true, logs debug info for each image.
+ */
+/**
+ * Mark above-the-fold images as eager and set high fetch priority.
+ * @param {HTMLElement} container
+ * @param {number} [marginPx=0]
+ * @param {boolean} [debug=false]
  */
 export function setEagerForAboveFoldImages(container, marginPx = 0, debug = false) {
   try {
@@ -230,6 +256,11 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
  * @param {...string} parts
  * @returns {string}
  */
+/**
+ * Join URL-like path segments producing a normalized path string.
+ * @param {...string} parts
+ * @returns {string}
+ */
 export function joinPaths(...parts) {
   if (!parts || parts.length === 0) return ''
   const segs = parts.map(p => String(p || ''))
@@ -252,6 +283,11 @@ export function joinPaths(...parts) {
  * @param {string} u
  * @returns {string}
  */
+/**
+ * Encode a URL or component with a safe fallback on failure.
+ * @param {string} u
+ * @returns {string}
+ */
 export function encodeURL(u) {
   try {
     const s = String(u || '')
@@ -269,6 +305,11 @@ export function encodeURL(u) {
  * a Promise, the returned Promise will resolve to `undefined` on rejection.
  * Useful for replacing frequent `try { ... } catch (_) {}` patterns.
  *
+ * @param {() => any|Promise<any>} fn
+ * @returns {any|Promise<any>|undefined}
+ */
+/**
+ * Execute a function and swallow errors, returning undefined on failure.
  * @param {() => any|Promise<any>} fn
  * @returns {any|Promise<any>|undefined}
  */

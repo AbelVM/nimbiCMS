@@ -16,8 +16,8 @@ describe('docs indexing', () => {
     // discover them without relying on directory HTML listings.
     const baseDir = join(process.cwd(), 'docs')
     const files = [
-      'index/README.md',
-      'index/functions/clearHooks.md'
+      'hookManager/README.md',
+      'hookManager/functions/clearHooks.md'
     ]
     const manifest = {}
     for (const f of files) {
@@ -36,6 +36,6 @@ describe('docs indexing', () => {
     setContentBase('/docs/')
     const idx = await buildSearchIndex('/docs/', 3)
     const paths = idx.map(e => e.path)
-    expect(paths).toContain('index/functions/clearHooks.md')
+    expect(paths).toContain('hookManager/functions/clearHooks.md')
   })
 })

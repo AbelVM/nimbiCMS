@@ -278,6 +278,26 @@ describe('slugManager module', () => {
     expect(paths).toEqual(['a.md','b.md','nav.md'])
   })
 
+  it('buildSearchIndex ignores links inside fenced code blocks and HTML comments', async () => {
+    const base = 'http://example.com/content/'
+    slugMgr.searchIndex.splice(0)
+    slugMgr.clearFetchCache()
+    slugMgr.allMarkdownPaths.splice(0, slugMgr.allMarkdownPaths.length, 'page.md')
+    global.fetch = vi.fn(async (url) => {
+      if (url.endsWith('page.md')) return { ok: true, text: () => Promise.resolve(`# Title\n\nSome intro\n\n\`\`\`js\n[BadLink](linked.md)\n\`\`\`\n\n<!-- <a href="commented.md">commented</a> -->\n\n[GoodLink](other.md)` ) }
+      if (url.endsWith('other.md')) return { ok: true, text: () => Promise.resolve('# Other\n\nBody') }
+      if (url.endsWith('linked.md')) return { ok: true, text: () => Promise.resolve('# Linked\n\nBody') }
+      if (url.endsWith('commented.md')) return { ok: true, text: () => Promise.resolve('# Commented\n\nBody') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    const paths = idx.map(e => e.path)
+    expect(paths).toContain('page.md')
+    expect(paths).toContain('other.md')
+    expect(paths).not.toContain('linked.md')
+    expect(paths).not.toContain('commented.md')
+  })
+
   // additional unit tests --------------------------------------------------
   it('_storeSlugMapping respects availableLanguages and normalizes entries', () => {
     slugMgr.slugToMd.clear()

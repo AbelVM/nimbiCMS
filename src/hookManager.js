@@ -23,6 +23,12 @@ const hooks = {
  * @param {(ctx:object)=>void|Promise<void>} fn - callback invoked for the hook
  * @returns {void}
  */
+/**
+ * Register a hook callback by name.
+ * @param {string} name - hook name (e.g. 'onPageLoad')
+ * @param {(ctx:object)=>void|Promise<void>} fn - callback function
+ * @returns {void}
+ */
 export function addHook(name, fn) {
   if (!Object.prototype.hasOwnProperty.call(hooks, name)) {
     throw new Error('Unknown hook "' + name + '"');

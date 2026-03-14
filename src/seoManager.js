@@ -1,4 +1,5 @@
 import { normalizePath } from './utils/helpers.js'
+import readingTime from 'reading-time/lib/reading-time'
 
 /**
  * Page data shape passed around the renderer.
@@ -8,8 +9,7 @@ import { normalizePath } from './utils/helpers.js'
  */
 
 /**
- * Set or update a single meta tag or property in the document head.
- *
+ * Set or update a single meta tag in the document head.
  * @param {string} name
  * @param {string} content
  */
@@ -61,10 +61,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
 }
 
 /**
- * Populate standard meta tags (title, description, og:image, etc.) using
- * the provided page metadata.  Overrides allow caller to supply alternate
- * values.
- *
+ * Populate standard meta tags (title, description, open-graph, twitter, etc.)
  * @param {PageData} data
  * @param {string} [titleOverride]
  * @param {string} [imageOverride]
@@ -108,8 +105,7 @@ export function getSiteNameFromMeta() {
 }
 
 /**
- * Inject JSON-LD structured data based on page metadata and defaults.
- *
+ * Inject JSON-LD structured data for the provided page metadata.
  * @param {PageData} data
  * @param {string} pagePath
  * @param {string} [titleOverride]
@@ -165,20 +161,11 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
   } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
 }
 
-import readingTime from 'reading-time/lib/reading-time'
-
 /**
- * High-level helper invoked by the main renderer to update all SEO-related
- * metadata (meta tags, structured data, document title, etc.) based on the
- * freshly parsed page.
- *
+ * Apply page-level SEO metadata: meta tags, structured data, and document title.
  * @param {Function} t - localization function
- * @typedef {Object} ParsedPage
- * @property {Object} [meta]
-
- * @param {function(string, Object=): string} t - localization function
  * @param {string} initialDocumentTitle
- * @param {ParsedPage} parsed
+ * @param {Object} parsed
  * @param {HTMLElement} toc
  * @param {HTMLElement} article
  * @param {string} pagePath
@@ -190,67 +177,64 @@ import readingTime from 'reading-time/lib/reading-time'
  * @returns {void}
  */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
-    try {
-      const labelEl = toc.querySelector('.menu-label')
-      if (labelEl) {
-        labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
-      }
-    } catch (e) { console.warn('[seoManager] update toc label failed', e) }
+  try {
+    const labelEl = toc.querySelector('.menu-label')
+    if (labelEl) {
+      labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
+    }
+  } catch (e) { console.warn('[seoManager] update toc label failed', e) }
 
+  try {
+    const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
+    const firstImgEl = article.querySelector('img')
+    const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
+    let descOverride = ''
     try {
-      const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
-      const firstImgEl = article.querySelector('img')
-      const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
-      let descOverride = ''
+      let found = ''
       try {
-        let found = ''
-        try {
-          // Prefer the text between the first H1 and the first H2
-          const h1El = topH1 || (article && article.querySelector ? article.querySelector('h1') : null)
-          if (h1El) {
-            let sib = h1El.nextElementSibling
-            const parts = []
-            while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
-              const txt = (sib.textContent || '').trim()
-              if (txt) parts.push(txt)
-              sib = sib.nextElementSibling
-            }
-            if (parts.length) {
-              found = parts.join(' ').replace(/\s+/g, ' ').trim()
-            }
-            // if no text between h1 and h2, fallback to the h1 text
-            if (!found && h1Text) found = String(h1Text).trim()
+        const h1El = topH1 || (article && article.querySelector ? article.querySelector('h1') : null)
+        if (h1El) {
+          let sib = h1El.nextElementSibling
+          const parts = []
+          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
+            const txt = (sib.textContent || '').trim()
+            if (txt) parts.push(txt)
+            sib = sib.nextElementSibling
           }
-        } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
-        // limit length to a reasonable snippet
-        if (found && String(found).length > 160) found = String(found).slice(0, 157).trim() + '...'
-        descOverride = found
+          if (parts.length) {
+            found = parts.join(' ').replace(/\s+/g, ' ').trim()
+          }
+          if (!found && h1Text) found = String(h1Text).trim()
+        }
       } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
+      if (found && String(found).length > 160) found = String(found).slice(0, 157).trim() + '...'
+      descOverride = found
+    } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
 
-      try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { console.warn('[seoManager] setMetaTags failed', e) }
-      try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
-      const siteName = getSiteNameFromMeta()
-      if (h1Text) {
-        if (siteName) document.title = `${siteName} - ${h1Text}`
-        else document.title = `${initialDocumentTitle || 'Site'} - ${h1Text}`
-      } else if (metaTitle) {
-        document.title = metaTitle
-      } else {
-        document.title = initialDocumentTitle || document.title
-      }
-    } catch (e) { console.warn('[seoManager] applyPageMeta failed', e) }
+    try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { console.warn('[seoManager] setMetaTags failed', e) }
+    try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
+    const siteName = getSiteNameFromMeta()
+    if (h1Text) {
+      if (siteName) document.title = `${siteName} - ${h1Text}`
+      else document.title = `${initialDocumentTitle || 'Site'} - ${h1Text}`
+    } else if (metaTitle) {
+      document.title = metaTitle
+    } else {
+      document.title = initialDocumentTitle || document.title
+    }
+  } catch (e) { console.warn('[seoManager] applyPageMeta failed', e) }
 
-    try {
-      const prev = article.querySelector('.nimbi-reading-time')
-      if (prev) prev.remove()
-      if (h1Text) {
-        const rt = readingTime(data.raw || '')
-        const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
-        const p = document.createElement('p')
-        p.className = 'nimbi-reading-time'
-        p.textContent = minutes ? t('readingTime', { minutes }) : ''
-        const topH1Elem = article.querySelector('h1')
-        if (topH1Elem) topH1Elem.insertAdjacentElement('afterend', p)
-      }
-    } catch (ee) { console.warn('[seoManager] reading time update failed', ee) }
-  }
+  try {
+    const prev = article.querySelector('.nimbi-reading-time')
+    if (prev) prev.remove()
+    if (h1Text) {
+      const rt = readingTime(data.raw || '')
+      const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
+      const p = document.createElement('p')
+      p.className = 'nimbi-reading-time'
+      p.textContent = minutes ? t('readingTime', { minutes }) : ''
+      const topH1Elem = article.querySelector('h1')
+      if (topH1Elem) topH1Elem.insertAdjacentElement('afterend', p)
+    }
+  } catch (ee) { console.warn('[seoManager] reading time update failed', ee) }
+}

@@ -322,6 +322,11 @@ let __hlObserver = null
  * @param {ParentNode} [root=document]
  * @returns {void}
  */
+/**
+ * Observe and lazy-highlight `<pre><code>` blocks, registering languages as needed.
+ * @param {ParentNode} [root=document]
+ * @returns {void}
+ */
 export function observeCodeBlocks(root = document) {
   
   if (!loadSupportedLanguagesPromise) {
@@ -402,6 +407,12 @@ export function observeCodeBlocks(root = document) {
  * `'monokai'` nothing happens (it's the default bundle).  When `useCdn` is
  * true the stylesheet is fetched from jsdelivr.
  *
+ * @param {string} theme
+ * @param {{useCdn?:boolean}} [opts]
+ * @returns {void}
+ */
+/**
+ * Switch highlight.js CSS theme, optionally loading from CDN.
  * @param {string} theme
  * @param {{useCdn?:boolean}} [opts]
  * @returns {void}
