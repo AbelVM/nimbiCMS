@@ -5,12 +5,19 @@
  */
 
 /**
- * Mapping from a slug (generated from title/H1) to a markdown path or a
- * localized mapping object when `availableLanguages` is used. Values may be
- * a string (direct path) or an object with `{ default?: string, langs?: { [lang:string]: string } }`.
+ * Localized slug mapping entry. When multilingual sites are configured the
+ * value stored for a slug may be an object with a `default` path and a
+ * `langs` map with per-language paths.
+ * @typedef {{default?:string, langs?: Object.<string,string>}} SlugEntry
+ */
+
+/**
+ * Mapping from a slug (generated from title/H1) to either a markdown path
+ * (string) or a localized mapping object (`SlugEntry`) when
+ * `availableLanguages` is used.
  * Populated during nav construction, anchor rewriting, or on demand via
  * crawling.
- * @type {Map<string, string|{default?:string,langs?:Object.<string,string>}>}
+ * @type {Map<string, string|SlugEntry>}
  */
 export const slugToMd = new Map()
 
@@ -913,8 +920,17 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
     if (!url.endsWith('/')) url += '/'
     url += relDir
     try {
-      const res = await globalThis.fetch(url)
-      if (!res.ok) continue
+      let res
+      try {
+        res = await globalThis.fetch(url)
+      } catch (errFetch) {
+        console.warn('[slugManager] crawlAllMarkdown: fetch failed', { url, error: errFetch })
+        continue
+      }
+      if (!res || !res.ok) {
+        if (res && !res.ok) console.warn('[slugManager] crawlAllMarkdown: directory fetch non-ok', { url, status: res.status })
+        continue
+      }
       const text = await res.text()
       const doc = _crawlParser.parseFromString(text, 'text/html')
       const links = doc.querySelectorAll(_crawlLinkSelector)
@@ -980,8 +996,17 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
     if (!url.endsWith('/')) url += '/'
     url += relDir
     try {
-      const res = await globalThis.fetch(url)
-      if (!res.ok) continue
+      let res
+      try {
+        res = await globalThis.fetch(url)
+      } catch (errFetch) {
+        console.warn('[slugManager] crawlAllMarkdown: fetch failed', { url, error: errFetch })
+        continue
+      }
+      if (!res || !res.ok) {
+        if (res && !res.ok) console.warn('[slugManager] crawlAllMarkdown: directory fetch non-ok', { url, status: res.status })
+        continue
+      }
       const text = await res.text()
       const doc = _crawlParser.parseFromString(text, 'text/html')
       const links = doc.querySelectorAll(_crawlLinkSelector)

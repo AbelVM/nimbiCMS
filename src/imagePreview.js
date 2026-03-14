@@ -161,6 +161,11 @@ function _createModal() {
   let scrollStartX = 0
   let scrollStartY = 0
 
+  /**
+   * Active pointer coordinates used for drag/pinch handling.
+   * Key: pointer identifier (number). Value: {x:number,y:number}.
+   * @type {Map<number,{x:number,y:number}>}
+   */
   const pointers = new Map()
   let initialPinchDistance = 0
   let initialPinchZoom = 1

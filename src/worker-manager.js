@@ -10,6 +10,18 @@
  * @property {(msg: any, timeout?: number) => Promise<unknown>} send - Send a message to the worker and await a response.
  * @property {() => void} terminate - Terminate the worker and clear internal state.
  */
+
+/**
+ * Shape of a request sent to the worker manager. `type` is the worker action
+ * name and `id` is injected by the manager when sending.
+ * @typedef {{type:string,id?:string} & Record<string, any>} WorkerRequest
+ */
+
+/**
+ * Shape of a worker response message. `id` matches the request id and
+ * either `result` or `error` is present.
+ * @typedef {{id?:string,result?:any,error?:string}} WorkerResponse
+ */
 /**
  * Create a worker manager that lazily instantiates a Worker and provides
  * request/response semantics with timeout and automatic cleanup on errors.
@@ -70,6 +82,12 @@ export function makeWorkerManager(createWorker, name = 'worker') {
    * @param {number} [timeout=1000] - Timeout in milliseconds.
    * @returns {Promise<unknown>} - Promise resolving to the worker response.
    */
+  /**
+   * Send a message to the managed worker and await a typed response.
+   * @param {WorkerRequest} msg - Message payload for the worker.
+   * @param {number} [timeout=1000] - Timeout in milliseconds.
+   * @returns {Promise<any>} - Promise resolving to the worker response `result`.
+   */
   function send(msg, timeout = 1000) {
     return new Promise((resolve, reject) => {
       const w = get()
@@ -85,6 +103,7 @@ export function makeWorkerManager(createWorker, name = 'worker') {
       }
 
       const handler = (ev) => {
+        /** @type {WorkerResponse} */
         const data = ev.data || {}
         if (data.id !== id) return
         cleanup()

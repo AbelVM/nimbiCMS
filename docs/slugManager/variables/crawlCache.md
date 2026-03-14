@@ -6,4 +6,7 @@
 
 # Variable: crawlCache
 
-> `const` **crawlCache**: `Map`\<`any`, `any`\>
+> `const` **crawlCache**: `Map`\<`string`, `string` \| `Promise`\<`string` \| `null`\> \| `null`\>
+
+Cache used by crawlForSlug to memoize crawl results.
+Values may be `string|null` or a `Promise<string|null>` when in-flight.

@@ -18,6 +18,14 @@ describe('slugManager module', () => {
     global.fetch = vi.fn()
   })
 
+  it('crawlAllMarkdown handles undefined fetch responses gracefully', async () => {
+    // simulate a faulty fetch implementation that returns undefined
+    global.fetch = vi.fn(async (url) => undefined)
+    const res = await slugMgr.crawlAllMarkdown('http://example.com/content/')
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(0)
+  })
+
   it('slugify cleans text and strips md/html suffix', () => {
     expect(slugMgr.slugify('Hello World')).toBe('hello-world')
     expect(slugMgr.slugify('File.md')).toBe('file')

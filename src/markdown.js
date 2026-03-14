@@ -7,11 +7,26 @@ const _rendererManager = makeWorkerManager(() => new RendererWorker(), 'markdown
 const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
 
 /**
- * @typedef {{level:number,text:string,id?:string}} TocEntry
+ * Table-of-contents entry extracted from a parsed document.
+ * @typedef {{
+ *   level: number,
+ *   text: string,
+ *   id?: string,
+ *   slug?: string,
+ *   parentTitle?: string
+ * }} TocEntry
  */
 
 /**
- * @typedef {{html:string,meta:Object,toc:Array<TocEntry>}} ParseResult
+ * Generic metadata object returned alongside parsed content. Common keys
+ * include `title`, `description`, `author`, etc. Consumers can inspect
+ * additional keys as needed.
+ * @typedef {Object.<string, string|number|boolean|any>} Meta
+ */
+
+/**
+ * Parse result returned by `parseMarkdownToHtml` and similar helpers.
+ * @typedef {{html:string,meta:Meta,toc:Array<TocEntry>}} ParseResult
  */
 
 /**

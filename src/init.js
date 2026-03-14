@@ -407,7 +407,7 @@ export async function initCMS(options = {}) {
   // - non-empty values always end with a trailing '/'.
   if (cp !== '' && !cp.endsWith('/')) cp = cp + '/'
   const contentBase = new URL(pageDir + cp, location.origin).toString()
-  try { setHomePage && setHomePage(homePage) } catch (e) { /* ignore */ }
+  try { setHomePage && setHomePage(homePage) } catch (e) { console.warn('[nimbi-cms] setHomePage failed', e) }
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (availableLanguages && Array.isArray(availableLanguages)) {
     // Set the list of languages used for slug resolution and navigation mapping.

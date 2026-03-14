@@ -86,7 +86,7 @@ export function buildTocElement(t, toc, pagePath = '') {
       }
       li.appendChild(a)
       ul.appendChild(li)
-    } catch (err) { /* ignore per-item failures */ }
+    } catch (err) { console.warn('[htmlBuilder] buildTocElement item failed', err, item) }
   })
 
   aside.appendChild(ul)
@@ -159,8 +159,8 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
             if (!val) return
             if (/^(https?:)?\/\//i.test(val) || val.startsWith('/')) return
             if (val.startsWith('#')) return
-            try { node.setAttribute(attr, new URL(val, baseForPage).toString()) } catch (err) { /* ignore */ }
-          } catch (err) { /* ignore */ }
+            try { node.setAttribute(attr, new URL(val, baseForPage).toString()) } catch (err) { console.warn('[htmlBuilder] rewrite asset attribute failed', attr, val, err) }
+          } catch (err) { console.warn('[htmlBuilder] rewriteAttr failed', err) }
         }
         if (node.hasAttribute && node.hasAttribute('src')) rewriteAttr('src')
         if (node.hasAttribute && node.hasAttribute('href')) {
@@ -180,7 +180,7 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
           }).join(', ')
           node.setAttribute('srcset', mapped)
         }
-      } catch (err) { /* ignore per-node failures */ }
+      } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets node processing failed', err) }
     }
   } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed', err) }
 }
@@ -298,12 +298,12 @@ async function rewriteAnchors(article, contentBase, pagePath) {
                 if (mdToSlug && mdToSlug.has && mdToSlug.has(rel)) {
                   slugKey = mdToSlug.get(rel)
                 } else {
-                  try {
-                    const baseName = String(rel || '').replace(/^.*\//, '')
-                    if (baseName && mdToSlug.has && mdToSlug.has(baseName)) slugKey = mdToSlug.get(baseName)
-                  } catch (e) { /* ignore */ }
-                }
-              } catch (err) { /* ignore */ }
+                    try {
+                      const baseName = String(rel || '').replace(/^.*\//, '')
+                      if (baseName && mdToSlug.has && mdToSlug.has(baseName)) slugKey = mdToSlug.get(baseName)
+                    } catch (e) { console.warn('[htmlBuilder] mdToSlug baseName check failed', e) }
+                  }
+                } catch (err) { console.warn('[htmlBuilder] mdToSlug access check failed', err) }
               if (!slugKey) {
                 try {
                   const baseName = String(rel || '').replace(/^.*\//, '')
@@ -397,9 +397,9 @@ async function rewriteAnchors(article, contentBase, pagePath) {
     for (const info of htmlAnchorInfo) {
       const { node: a, rel } = info
       let slug = null
-      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { /* ignore */ }
+      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { console.warn('[htmlBuilder] mdToSlug access failed for htmlAnchorInfo', err) }
       if (!slug) {
-        try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { /* ignore */ }
+        try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { console.warn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
       }
       if (slug) a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
       else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
@@ -705,7 +705,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
         const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
         if (parser) {
           const doc = parser.parseFromString(data.raw || '', 'text/html')
-          try { rewriteRelativeAssets(doc.body, pagePath, contentBase) } catch (err) { /* ignore */ }
+          try { rewriteRelativeAssets(doc.body, pagePath, contentBase) } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle (inner)', err) }
           parsed = parseHtml(doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : data.raw || '')
         } else {
           parsed = parseHtml(data.raw || '')

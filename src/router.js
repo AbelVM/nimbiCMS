@@ -400,8 +400,8 @@ export async function fetchPageData(raw, contentBase) {
                         try {
                           const resolved = new URL(val, absUrl).toString()
                           el.setAttribute(attr, resolved)
-                        } catch (err) { /* ignore */ }
-                      } catch (err) { /* ignore */ }
+                        } catch (err) { console.warn('[router] rewrite attribute failed', attr, err) }
+                      } catch (err) { console.warn('[router] rewrite helper failed', err) }
                     }
                     const els = doc.querySelectorAll('[src],[href],[srcset],[xlink\:href],[poster]')
                     const rewritten = []

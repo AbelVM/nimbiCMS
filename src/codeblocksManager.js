@@ -43,6 +43,11 @@ export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
 
+/**
+ * Cache for language import attempts. Keys are canonical language ids;
+ * values hold promise/module/ok/ts metadata to support negative caching.
+ * @type {Map<string,{promise?:Promise<any>,module?:any,ok?:boolean,ts?:number}>}
+ */
 const languageImportCache = new Map()
 const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
 
@@ -159,6 +164,7 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
   return loadSupportedLanguagesPromise
 }
 
+/** @type {Set<string>} */
 const registeredLangs = new Set()
 
 /**
@@ -314,6 +320,7 @@ export async function registerLanguage(name, modulePath) {
 }
 
  
+/** @type {IntersectionObserver|null} */
 let __hlObserver = null
 /**
  * Lazy-highlight `<pre><code>` blocks using IntersectionObserver.  The

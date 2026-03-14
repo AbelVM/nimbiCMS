@@ -6,4 +6,6 @@
 
 # Variable: fetchCache
 
-> `const` **fetchCache**: `Map`\<`any`, `any`\>
+> `const` **fetchCache**: `Map`\<`string`, `Promise`\<[`FetchResult`](../type-aliases/FetchResult.md)\>\>
+
+Cache of pending/fulfilled fetchMarkdown promises keyed by resolved URL.
