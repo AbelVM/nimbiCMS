@@ -976,7 +976,9 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
 
     if (!btn) {
       btn = document.createElement('button')
-      btn.className = 'nimbi-scroll-top'
+      // follow Bulma button styling while keeping our hook class
+      // use a subtle 'light' modifier by default so the button is non-dominant
+      btn.className = 'nimbi-scroll-top button is-primary is-rounded is-small'
       btn.setAttribute('aria-label', tFn('scrollToTop'))
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>'
       try {
