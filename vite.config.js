@@ -18,6 +18,9 @@ export default ({ command }) => {
         // prevent small files (like the renderer worker) from being inlined
         // as data URIs; we rely on an actual URL so imports resolve correctly.
         assetsInlineLimit: 0,
+        // Emit a single CSS file across multi-format library builds so we
+        // don't produce duplicate identical CSS files for each format.
+        cssCodeSplit: false,
         lib: {
           // Use the full library entry so helper exports (registerLanguage,
           // setStyle, etc.) are included in all bundle formats.
@@ -65,6 +68,8 @@ export default ({ command }) => {
     build: {
       // also disable inlining during dev build so ?url returns a real path
       assetsInlineLimit: 0,
+      // Keep CSS output consistent in dev build as well
+      cssCodeSplit: false,
       minify: 'terser',
       terserOptions: {
         compress: {

@@ -105,7 +105,26 @@ export async function parseMarkdownToHtml(md) {
           const parser = SHARED_DOM_PARSER || new DOMParser()
           const doc = parser.parseFromString(res.html, 'text/html')
           const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-          heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+          heads.forEach(h => {
+            if (!h.id) h.id = slugify(h.textContent || '')
+            try {
+              const level = Number(h.tagName.substring(1))
+              if (level >= 1 && level <= 6) {
+                // Responsive size mapping (mobile -> tablet -> desktop)
+                const resp = {
+                  1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
+                  2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
+                  3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
+                  4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
+                  5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
+                  6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
+                }
+                const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
+                const classes = `${resp[level]} ${weight}`.split(/\s+/).filter(Boolean)
+                classes.forEach(c => { try { h.classList.add(c) } catch (e) {} })
+              }
+            } catch (e) {}
+          })
 
           try {
             const imgs = doc.querySelectorAll('img')
@@ -173,8 +192,26 @@ export async function parseMarkdownToHtml(md) {
   try {
     const parser = SHARED_DOM_PARSER || new DOMParser()
     const doc = parser.parseFromString(html, 'text/html')
-    const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-    heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
+      const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+      heads.forEach(h => {
+        if (!h.id) h.id = slugify(h.textContent || '')
+        try {
+          const level = Number(h.tagName.substring(1))
+          if (level >= 1 && level <= 6) {
+            const resp = {
+              1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
+              2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
+              3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
+              4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
+              5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
+              6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
+            }
+            const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
+            const classes = `${resp[level]} ${weight}`.split(/\s+/).filter(Boolean)
+            classes.forEach(c => { try { h.classList.add(c) } catch (e) {} })
+          }
+        } catch (e) {}
+      })
 
     try {
       const imgs = doc.querySelectorAll('img')

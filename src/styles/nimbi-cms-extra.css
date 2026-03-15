@@ -314,6 +314,18 @@
     }
 }
 
+/* Ensure the wrapping .modal-content uses the full viewport width on small screens
+   so the preview content aligns with the modal background edge. */
+@media (max-width: 768px) {
+    .nimbi-image-preview .modal-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }
+}
+
 .nimbi-image-preview__image-wrapper {
     width: 100%;
     height: 100%;
