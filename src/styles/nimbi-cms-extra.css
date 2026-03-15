@@ -138,15 +138,15 @@
 }
 .nimbi-toc-inner {
     margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 6px
+}
+
+.nimbi-toc-inner .menu-list {
     /* Keep the TOC within the visible area by capping its height to a
        percentage of the CMS viewport. */
     max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6);
     overflow: auto;
-}
-
-.nimbi-toc-inner {
-    padding: 1rem;
-    border-radius: 6px
 }
 
 .nimbi-nav-wrap .menu-label {
