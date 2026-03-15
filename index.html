@@ -35,7 +35,7 @@
         return;
       }
 
-      const initializer = window.nimbiCMS.initCMS || window.nimbiCMS.default || window.nimbiCMS
+      const initializer = window.nimbiCMS.initCMS
       if (typeof initializer !== 'function') {
         console.warn('nimbiCMS found but initializer is not a function', initializer)
         return

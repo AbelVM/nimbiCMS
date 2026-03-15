@@ -7944,6 +7944,7 @@ export {
   Ao as default,
   ys as ensureBulma,
   mo as getVersion,
+  Ao as initCMS,
   zr as loadL10nFile,
   $r as loadSupportedLanguages,
   ws as observeCodeBlocks,
