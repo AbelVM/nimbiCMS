@@ -520,8 +520,10 @@ export async function initCMS(options = {}) {
                   // or `package.json.repository.url` if `homepage` is not present.
                   const finishWithAnchor = (href) => {
                     const a = document.createElement('a')
-                    // Use Bulma tag classes so the label follows the current theme
-                    a.className = 'nimbi-version-label tag is-light is-small'
+                    // Apply Bulma `tag` classes; we'll toggle `is-light` / `is-dark`
+                    // to respect the current theme. `nimbi-version-label` allows
+                    // consumers to override via CSS if desired.
+                    a.className = 'nimbi-version-label tag is-small'
                     a.textContent = `Ninbi CMS v. ${v}`
                     a.href = href || '#'
                     a.target = '_blank'
@@ -535,10 +537,36 @@ export async function initCMS(options = {}) {
                     a.style.zIndex = '9999'
                     a.style.userSelect = 'none'
                     a.style.transition = 'opacity 150ms ease'
-                    // subtle hover effect (increase opacity) using inline handlers so
-                    // we don't rely on external CSS being present during init.
+                    // subtle hover effect (increase opacity) using inline handlers
                     a.addEventListener('mouseenter', () => { try { a.style.opacity = '0.95'; a.classList.add('has-text-weight-semibold') } catch (e) {} })
                     a.addEventListener('mouseleave', () => { try { a.style.opacity = '0.6'; a.classList.remove('has-text-weight-semibold') } catch (e) {} })
+
+                    // Apply initial theme class based on `data-theme` or body class.
+                    const applyThemeClass = () => {
+                      try {
+                        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('is-dark')
+                        a.classList.toggle('is-dark', isDark)
+                        a.classList.toggle('is-light', !isDark)
+                      } catch (e) {}
+                    }
+                    applyThemeClass()
+
+                    // Watch for theme changes (data-theme attribute) and update
+                    // the tag class so it follows light/dark toggles at runtime.
+                    try {
+                      const mo = new MutationObserver((mutations) => {
+                        for (const m of mutations) {
+                          if (m.type === 'attributes' && (m.attributeName === 'data-theme' || m.attributeName === 'class')) {
+                            applyThemeClass()
+                          }
+                        }
+                      })
+                      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+                      mo.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+                    } catch (e) {
+                      // ignore
+                    }
+
                     try { mountEl.appendChild(a) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
                   }
 

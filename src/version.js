@@ -17,9 +17,23 @@ export async function getVersion() {
       // Note: some environments support import assertions; others don't.
       mod = await import('../package.json', { assert: { type: 'json' } })
     } catch (e) {
-      // Fallback to plain dynamic import for environments that don't support assertions.
+      // Fallback: try to fetch package.json via HTTP relative to the current
+      // document location. This avoids a plain dynamic import without
+      // assertions which can cause bundlers to report inconsistent import
+      // attributes across modules.
       try {
-        mod = await import('../package.json')
+        if (typeof fetch === 'function' && typeof location !== 'undefined') {
+          const url = new URL('../package.json', location.href).toString()
+          const res = await fetch(url)
+          if (res && res.ok) {
+            const json = await res.json()
+            mod = { default: json }
+          } else {
+            mod = null
+          }
+        } else {
+          mod = null
+        }
       } catch (err) {
         mod = null
       }
