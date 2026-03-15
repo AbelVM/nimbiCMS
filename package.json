@@ -1,6 +1,11 @@
 {
   "name": "nimbi-cms",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbelVM/nimbiCMS.git"
+  },
+  "homepage": "https://abelvm.github.io/nimbiCMS/",
   "private": true,
   "type": "module",
   "scripts": {

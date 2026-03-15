@@ -514,19 +514,56 @@ export async function initCMS(options = {}) {
       if (typeof getVersion === 'function') {
         getVersion().then(ver => {
           try {
-            const v = ver || '0.0.0'
-            const label = document.createElement('div')
-            label.className = 'nimbi-version-label'
-            label.textContent = `Ninbi CMS v. ${v}`
-            label.style.position = 'absolute'
-            label.style.left = '8px'
-            label.style.bottom = '6px'
-            label.style.fontSize = '11px'
-            label.style.opacity = '0.6'
-            label.style.pointerEvents = 'none'
-            label.style.zIndex = '9999'
-            label.style.userSelect = 'none'
-            try { mountEl.appendChild(label) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
+                const v = ver || '0.0.0'
+                try {
+                  // Build a linked version label that uses `package.json.homepage`
+                  // or `package.json.repository.url` if `homepage` is not present.
+                  const finishWithAnchor = (href) => {
+                    const a = document.createElement('a')
+                    // Use Bulma tag classes so the label follows the current theme
+                    a.className = 'nimbi-version-label tag is-light is-small'
+                    a.textContent = `Ninbi CMS v. ${v}`
+                    a.href = href || '#'
+                    a.target = '_blank'
+                    a.rel = 'noopener noreferrer nofollow'
+                    a.setAttribute('aria-label', `Ninbi CMS version ${v}`)
+                    a.style.position = 'absolute'
+                    a.style.left = '8px'
+                    a.style.bottom = '6px'
+                    a.style.fontSize = '11px'
+                    a.style.opacity = '0.6'
+                    a.style.zIndex = '9999'
+                    a.style.userSelect = 'none'
+                    a.style.transition = 'opacity 150ms ease'
+                    // subtle hover effect (increase opacity) using inline handlers so
+                    // we don't rely on external CSS being present during init.
+                    a.addEventListener('mouseenter', () => { try { a.style.opacity = '0.95'; a.classList.add('has-text-weight-semibold') } catch (e) {} })
+                    a.addEventListener('mouseleave', () => { try { a.style.opacity = '0.6'; a.classList.remove('has-text-weight-semibold') } catch (e) {} })
+                    try { mountEl.appendChild(a) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
+                  }
+
+                  // Read the URL to link from package.json (homepage or repository.url).
+                  ;(async () => {
+                    try {
+                      const maybePkg = await import('../package.json', { assert: { type: 'json' } }).catch(() => null)
+                      const pkg = maybePkg && (maybePkg.default || maybePkg)
+                      let homepage = null
+                      if (pkg) {
+                        if (pkg.homepage && typeof pkg.homepage === 'string') homepage = pkg.homepage
+                        else if (pkg.repository) {
+                          if (typeof pkg.repository === 'string') homepage = pkg.repository
+                          else if (pkg.repository.url && typeof pkg.repository.url === 'string') homepage = pkg.repository.url
+                        }
+                      }
+                      try { if (homepage) new URL(homepage) } catch (e) { homepage = null }
+                      finishWithAnchor(homepage || '#')
+                    } catch (e) {
+                      finishWithAnchor('#')
+                    }
+                  })()
+                } catch (err) {
+                  console.warn('[nimbi-cms] building version label failed', err)
+                }
           } catch (err) { console.warn('[nimbi-cms] building version label failed', err) }
         }).catch((e) => { console.warn('[nimbi-cms] getVersion() failed', e) })
       }
