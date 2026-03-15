@@ -475,25 +475,25 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = document.querySelector('link[data-hl-theme]')
   const existingTheme = existing && existing.getAttribute ? existing.getAttribute('data-hl-theme') : null
 
-  // Interpret the special value 'default' as a request to revert to the
-  // bundled theme (whatever that bundle provides). Do not hardcode the
-  // bundle's theme name here; restoring the bundled default is achieved
-  // by removing any injected theme link.
+  // Interpret the special value 'default' or the bundled theme name
+  // 'monokai' as a request to revert to the bundled stylesheet. Treat
+  // the check case-insensitively and remove any injected theme link to
+  // restore the bundle-provided styles.
   const requested = (theme === undefined || theme === null) ? 'default' : String(theme)
-  if (requested === 'default') {
-    // revert to bundled default by removing any injected theme link
+  const requestedLower = (requested && String(requested).toLowerCase()) || ''
+  if (requestedLower === 'default' || requestedLower === 'monokai') {
     try { if (existing && existing.parentNode) existing.parentNode.removeChild(existing) } catch (e) { /* ignore */ }
     return
   }
 
-  if (existingTheme === requested) return
+  if (existingTheme && existingTheme.toLowerCase() === requestedLower) return
 
   if (!useCdn) {
     console.warn('Requested highlight theme not bundled; set useCdn=true to load theme from CDN')
     return
   }
 
-  const currentHighlightTheme = requested
+  const currentHighlightTheme = requestedLower
   const href = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/styles/${currentHighlightTheme}.css`
   const newLink = document.createElement('link')
   newLink.rel = 'stylesheet'

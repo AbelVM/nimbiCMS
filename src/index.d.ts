@@ -329,7 +329,7 @@ export function setHighlightTheme(opts: {useCdn?:boolean}): void
 
 // --- from src/bulmaManager.js
 export function ensureBulma(bulmaCustomize: string, pageDir: string): Promise<void>
-export function setStyle(style: 'light'|'dark'): void
+export function setStyle(style: 'light'|'dark'|'system'): void
 export function setThemeVars(vars: Record<string,string>): void
 export function registerThemedElement(el: any): () => void
 

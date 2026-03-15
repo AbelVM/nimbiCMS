@@ -70,11 +70,11 @@ describe('codeblocksManager', () => {
     const link = document.createElement('link')
     link.setAttribute('data-hl-theme', 'old')
     document.head.appendChild(link)
-    cb.setHighlightTheme('monokai')
+    cb.setHighlightTheme('default')
     expect(document.querySelector('link[data-hl-theme]')).toBeNull()
 
-    // monokai should not re-add anything
-    cb.setHighlightTheme('monokai')
+    // default should not re-add anything (revert to bundled default)
+    cb.setHighlightTheme('default')
     expect(document.querySelectorAll('link[data-hl-theme]').length).toBe(0)
 
     // request non-monokai with useCdn=false should log warning and not add

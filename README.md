@@ -293,7 +293,7 @@ teardown for long-lived workers.
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `defaultStyle` | `'light'` \| `'dark'` | `'light'` | Initial UI theme. |
+| `defaultStyle` | `'light'` \| `'dark'` \| `'system'` | `'light'` | Initial UI theme. |
 | `bulmaCustomize` | `string` | `'none'` | `'none'` (bundled), `'local'` (load `<contentPath>/bulma.css`) or a Bulmaswatch theme name to load remotely. |
 | `navbarLogo` | `string` | `'favicon'` | Small site logo placed at the leftmost position of the navbar. Supported values: `none`, `favicon` (uses PNG favicon when available), a path or URL to an image, `copy-first` (use first image from `homePage`), and `move-first` (use first image from `homePage` and remove it from the rendered page). |
 

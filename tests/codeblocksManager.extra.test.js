@@ -21,9 +21,9 @@ describe('codeblocksManager extra', () => {
     vi.restoreAllMocks()
   })
 
-  it('setHighlightTheme: monokai is no-op, other theme with useCdn=false warns, useCdn=true appends link', () => {
-    // monokai -> no link
-    setHighlightTheme('monokai')
+  it('setHighlightTheme: default is no-op, other theme with useCdn=false warns, useCdn=true appends link', () => {
+    // default -> no link (revert to bundled default)
+    setHighlightTheme('default')
     expect(document.querySelector('link[data-hl-theme]')).toBeNull()
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})

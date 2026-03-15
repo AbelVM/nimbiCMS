@@ -1,7 +1,7 @@
 import 'bulma/css/bulma.min.css'
 import './styles/nimbi-cms-extra.css'
 
-/** @type {'light'|'dark'} */
+/** @type {'light'|'dark'|'system'} */
 let currentStyle = 'light'
 
 /**
@@ -63,16 +63,37 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
 }
 
 /**
- * Toggle light/dark styling by setting `data-theme` and `is-dark`.
+ * Toggle theme styling by setting `data-theme` on each `.nimbi-mount`
+ * container. There are three recognized theme values:
+ * - `light`: explicitly apply light theme (sets `data-theme="light"`).
+ * - `dark`: explicitly apply dark theme (sets `data-theme="dark"`).
+ * - `system`: follow the system/OS preference; implementation removes any
+ *   explicit `data-theme` attribute so user agent or CSS using
+ *   `prefers-color-scheme` can take effect.
  *
- * @param {'light'|'dark'} style - 'light' or 'dark' to toggle theme
- * @returns {void} - No return value.
+ * When no `.nimbi-mount` elements are present the same attribute is
+ * applied to `document.documentElement` to support global/UMD usage.
+ *
+ * @param {'light'|'dark'|'system'} style - chosen theme mode.
+ * @returns {void}
  */
 export function setStyle(style) {
-  currentStyle = style === 'dark' ? 'dark' : 'light'
-  document.documentElement.setAttribute('data-theme', currentStyle)
-  if (currentStyle === 'dark') document.body.classList.add('is-dark')
-  else document.body.classList.remove('is-dark')
+  currentStyle = style === 'dark' ? 'dark' : style === 'system' ? 'system' : 'light'
+  try {
+    const mounts = Array.from(document.querySelectorAll('.nimbi-mount'))
+    if (mounts.length > 0) {
+      for (const m of mounts) {
+        if (currentStyle === 'dark') m.setAttribute('data-theme', 'dark')
+        else if (currentStyle === 'light') m.setAttribute('data-theme', 'light')
+        else m.removeAttribute('data-theme')
+      }
+    } else {
+      const root = document.documentElement
+      if (currentStyle === 'dark') root.setAttribute('data-theme', 'dark')
+      else if (currentStyle === 'light') root.setAttribute('data-theme', 'light')
+      else root.removeAttribute('data-theme')
+    }
+  } catch (e) { /* ignore */ }
 }
 
 /**
@@ -96,29 +117,23 @@ export function setThemeVars(vars) {
 }
 
 /**
- * Register an element so it follows the current Bulma light/dark theme.
- * The element will receive either `is-dark` (for dark) or `is-light` (for light).
+ * Register an element so it follows the current Bulma light/dark/system theme.
  * Returns an unregister function to stop observing theme changes.
  * @param {HTMLElement} el
  * @returns {() => void}
  */
 export function registerThemedElement(el) {
   if (!el || !(el instanceof HTMLElement)) return () => {}
-  const apply = () => {
-    if (currentStyle === 'dark') {
-      el.classList.add('is-dark')
-      el.classList.remove('is-light')
-    } else {
-      el.classList.add('is-light')
-      el.classList.remove('is-dark')
+  // Find the nearest mount; prefer `.nimbi-mount` so Bulma's styles
+  // propagate naturally from the container.
+  const mount = (el.closest && el.closest('.nimbi-mount')) || null
+  try {
+    if (mount) {
+      if (currentStyle === 'dark') mount.setAttribute('data-theme', 'dark')
+      else if (currentStyle === 'light') mount.setAttribute('data-theme', 'light')
+      else mount.removeAttribute('data-theme')
     }
-  }
-  apply()
-  const mo = new MutationObserver(() => {
-    const theme = document.documentElement.getAttribute('data-theme')
-    currentStyle = theme === 'dark' ? 'dark' : 'light'
-    apply()
-  })
-  try { mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }) } catch (_) { /* ignore */ }
-  return () => { try { mo.disconnect() } catch (_) {} }
+  } catch (_) { /* ignore */ }
+  // No ongoing observation required; attribute on the mount propagates.
+  return () => {}
 }

@@ -30,14 +30,14 @@ function _createModal() {
   _modal = null
 
   const modal = document.createElement('dialog')
-  modal.className = 'nimbi-image-preview'
+  modal.className = 'nimbi-image-preview modal'
   modal.setAttribute('role', 'dialog')
   modal.setAttribute('aria-modal', 'true')
   modal.setAttribute('aria-label', _label('imagePreviewTitle', 'Image preview'))
   modal.innerHTML = `
     <div class="modal-background"></div>
     <div class="modal-content">
-      <div class="nimbi-image-preview__content" role="document">
+      <div class="nimbi-image-preview__content box" role="document">
         <button class="button is-small nimbi-image-preview__close" type="button" data-nimbi-preview-close>✕</button>
         <div class="nimbi-image-preview__image-wrapper">
           <img data-nimbi-preview-image alt="" />

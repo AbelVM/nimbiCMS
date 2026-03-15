@@ -9,15 +9,23 @@ describe('bulmaManager theming helpers', () => {
     // clear any previously injected links or styles
     document.querySelectorAll('link[data-bulmaswatch-theme], style[data-bulma-override]').forEach(el => el.remove())
     global.fetch = vi.fn()
+    // ensure a mount exists for mount-scoped theming
+    const existing = document.querySelector('.nimbi-mount')
+    if (existing) existing.remove()
+    const m = document.createElement('div')
+    m.className = 'nimbi-mount'
+    document.body.appendChild(m)
   })
 
   it('setStyle toggles dark/light correctly', () => {
     setStyle('dark')
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
-    expect(document.body.classList.contains('is-dark')).toBe(true)
+    const mount = document.querySelector('.nimbi-mount')
+    expect(mount.getAttribute('data-theme')).toBe('dark')
+    // light is default; body class should not be used for theming
+    expect(document.body.classList.contains('is-dark')).toBe(false)
 
     setStyle('light')
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+      expect(mount.getAttribute('data-theme')).toBe('light')
     expect(document.body.classList.contains('is-dark')).toBe(false)
   })
 

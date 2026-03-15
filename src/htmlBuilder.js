@@ -43,7 +43,7 @@ function resolvePathWithBase(path, base) {
  */
 export function createNavTree(t, tree) {
   const nav = document.createElement('aside')
-  nav.className = 'menu nimbi-nav'
+  nav.className = 'menu box nimbi-nav'
   const label = document.createElement('p')
   label.className = 'menu-label'
   label.textContent = t('navigation')
@@ -83,7 +83,8 @@ export function createNavTree(t, tree) {
  */
 export function buildTocElement(t, toc, pagePath = '') {
   const aside = document.createElement('aside')
-  aside.className = 'menu nimbi-toc-inner'
+  // Hide the TOC on mobile by default; Bulma handles the responsive helper.
+  aside.className = 'menu box nimbi-toc-inner is-hidden-mobile'
   const label = document.createElement('p')
   label.className = 'menu-label'
   label.textContent = t('onThisPage')
@@ -819,6 +820,39 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     try { observeCodeBlocks(article) } catch (err) { console.warn('[htmlBuilder] observeCodeBlocks failed', err) }
 
     lazyLoadImages(article, pagePath, contentBase)
+
+    // Wrap standalone images in Bulma's `image` helper for consistent spacing
+    try {
+      const imgs = article.querySelectorAll && article.querySelectorAll('img') || []
+      imgs.forEach(img => {
+        try {
+          const parent = img.parentElement
+          if (!parent || parent.tagName.toLowerCase() !== 'p') return
+          if (parent.childNodes.length !== 1) return
+          const figure = document.createElement('figure')
+          figure.className = 'image'
+          parent.replaceWith(figure)
+          figure.appendChild(img)
+        } catch (e) { /* ignore per-image failures */ }
+      })
+    } catch (err) { console.warn('[htmlBuilder] wrap images in Bulma image helper failed', err) }
+
+    // Ensure tables use Bulma's table class for consistent styling
+    try {
+      const tables = article.querySelectorAll && article.querySelectorAll('table') || []
+      tables.forEach(tb => {
+        try {
+          if (tb.classList) {
+            if (!tb.classList.contains('table')) tb.classList.add('table')
+          } else {
+            const cur = tb.getAttribute && tb.getAttribute('class') ? tb.getAttribute('class') : ''
+            const classes = String(cur || '').split(/\s+/).filter(Boolean)
+            if (classes.indexOf('table') === -1) classes.push('table')
+            try { tb.setAttribute && tb.setAttribute('class', classes.join(' ')) } catch (e) { tb.className = classes.join(' ') }
+          }
+        } catch (e) { /* ignore per-table failures */ }
+      })
+    } catch (err) { console.warn('[htmlBuilder] add Bulma table class failed', err) }
 
     // Compute slug early so anchor rewriting can use the page's slug mapping
     // (helps anchor-only links like `#quick-start` resolve to the current

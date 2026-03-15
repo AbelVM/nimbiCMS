@@ -318,9 +318,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchControl.appendChild(searchInput)
     searchItem.appendChild(searchControl)
 
-    resultsContainer = document.createElement('div')
+    resultsContainer = document.createElement('nav')
     resultsContainer.id = 'nimbi-search-results'
-    resultsContainer.className = 'box'
+    resultsContainer.className = 'panel nimbi-search-results'
     searchItem.appendChild(resultsContainer)
     end.appendChild(searchItem)
 
@@ -333,21 +333,20 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         return
       }
       items.forEach(it => {
-        const wrap = document.createElement('div')
-        wrap.className = 'nimbi-search-result'
         if (it.parentTitle) {
-          const label = document.createElement('div')
-          label.textContent = it.parentTitle
-          label.className = 'nimbi-search-title nimbi-search-parent'
-          wrap.appendChild(label)
+          const heading = document.createElement('p')
+          heading.textContent = it.parentTitle
+          heading.className = 'panel-heading nimbi-search-title nimbi-search-parent'
+          resultsContainer.appendChild(heading)
         }
         const a = document.createElement('a')
-        a.className = 'block'
+        // Use Bulma panel-block for result items, while keeping legacy class
+        // for any custom styling.
+        a.className = 'panel-block nimbi-search-result'
         a.href = '?page=' + encodeURIComponent(it.slug)
         a.textContent = it.title
         a.addEventListener('click', () => { resultsContainer.style.display = 'none' })
-        wrap.appendChild(a)
-        resultsContainer.appendChild(wrap)
+        resultsContainer.appendChild(a)
       })
       try { resultsContainer.style.display = 'block' } catch (e) {}
       resultsContainer.classList.add('is-open')

@@ -20,11 +20,14 @@
 
   <div class="controls">
     <div class="row">
-      <label for="darkSwitch" style="margin-right:0.5rem">Dark mode:</label>
-      <label class="switch">
-        <input type="checkbox" id="darkSwitch">
-        <span class="check"></span>
-      </label>
+      <label for="themeSel" style="margin-right:0.5rem">Theme:</label>
+      <div class="select">
+        <select id="themeSel">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="system">System</option>
+        </select>
+      </div>
     </div>
 
     <div class="row">
@@ -59,7 +62,6 @@
       <label for="hljs" style="margin-right:0.5rem">Highlight theme:</label>
       <div class="select">
         <select id="hljs">
-          <option value="default">Bundled (default)</option>
         <option value="a11y-dark">a11y-dark</option>
         <option value="a11y-light">a11y-light</option>
         <option value="agate">agate</option>
@@ -113,7 +115,7 @@ function hello(){
 
   <script>
     // Defaults
-    const darkSwitch = document.getElementById('darkSwitch');
+    const themeSel = document.getElementById('themeSel');
     const bulmaSel = document.getElementById('bulma');
     const hlSel = document.getElementById('hljs');
     const preview = document.getElementById('preview');
@@ -146,11 +148,16 @@ function hello(){
       }catch(e){console.warn(e)}
     }
 
-    // dark switch handler applies immediately
-    darkSwitch.addEventListener('change', ()=>{
-      const style = darkSwitch.checked ? 'dark' : 'light';
+    // theme select handler applies immediately (supports system)
+    function _isDarkForStyle(style){
+      if(style==='dark') return true
+      if(style==='light') return false
+      try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches } catch(e) { return false }
+    }
+    themeSel.addEventListener('change', ()=>{
+      const style = themeSel.value
       try{window.nimbiCMS && typeof window.nimbiCMS.setStyle === 'function' && window.nimbiCMS.setStyle(style)}catch(e){console.warn(e)}
-      if(style==='dark')preview.classList.add('dark');else preview.classList.remove('dark');
+      if(_isDarkForStyle(style)) preview.classList.add('dark'); else preview.classList.remove('dark');
     });
 
     // apply on change for selects
@@ -161,7 +168,9 @@ function hello(){
     (function init(){
       try {
         const theme = document.documentElement.getAttribute('data-theme')
-        if (theme === 'dark') darkSwitch.checked = true
+        if (theme === 'dark') themeSel.value = 'dark'
+        else if (theme === 'light') themeSel.value = 'light'
+        else themeSel.value = 'system'
       } catch (e) { /* ignore */ }
       try {
         const bul = (document.querySelector('link[data-bulmaswatch-theme]') || {}).getAttribute && (document.querySelector('link[data-bulmaswatch-theme]') || {}).getAttribute('data-bulmaswatch-theme')
@@ -192,14 +201,19 @@ function hello(){
             }
           } catch (e) {}
         }
+        if (!cur) cur = 'monokai'
         if (cur) {
-          // Use the actual theme name when available (show 'monokai' when
-          // the bundled default is active) so the select reflects the
-          // current stylesheet name rather than the generic 'default'.
+          // Use the actual theme name when available. Default to the
+          // bundled theme name 'monokai' so the UI does not show a
+          // generic "default" option and the select reflects runtime
+          // behavior.
           hlSel.value = cur
         }
       } catch (e) {}
+      // apply visual settings and current theme
       applySettings();
+      // trigger theme handler to apply preview class and runtime style
+      themeSel.dispatchEvent(new Event('change'))
     })();
   </script>
 </body>

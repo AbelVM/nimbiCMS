@@ -349,8 +349,13 @@ export async function initCMS(options = {}) {
     // layout and overflow are handled via CSS classes and variables
   } catch (e) { console.warn('[nimbi-cms] mount element setup failed', e) }
 
+  // Wrap the CMS content in Bulma layout elements to let Bulma manage
+  // spacing and alignment (section + container + columns).
+  const sectionEl = document.createElement('section')
+  sectionEl.className = 'section'
+
   const container = document.createElement('div')
-  container.className = 'nimbi-cms'
+  container.className = 'container nimbi-cms'
   try {
     // Use CSS for container layout defaults; explicit heights are set via
     // the `--nimbi-cms-height` variable elsewhere when needed.
@@ -361,7 +366,8 @@ export async function initCMS(options = {}) {
   cols.className = 'columns'
 
   const navCol = document.createElement('div')
-  navCol.className = 'column is-full-mobile is-3-tablet nimbi-nav-wrap'
+  // Hide the sidebar on mobile devices and show it on tablet+ using Bulma helpers.
+  navCol.className = 'column is-hidden-mobile is-3-tablet nimbi-nav-wrap'
   navCol.setAttribute('role', 'navigation')
   try {
     const label = (typeof t === 'function') ? t('navigation') : null
@@ -371,17 +377,21 @@ export async function initCMS(options = {}) {
   }
   cols.appendChild(navCol)
 
-  const contentCol = document.createElement('div')
+  const contentCol = document.createElement('main')
   contentCol.className = 'column nimbi-content'
   contentCol.setAttribute('role', 'main')
   cols.appendChild(contentCol)
 
   container.appendChild(cols)
 
+  // Bulma container is now wrapped in a section so it can be styled
+  // with Bulma spacing helpers.
+  sectionEl.appendChild(container)
+
   const navWrap = navCol
   const contentWrap = contentCol
 
-  mountEl.appendChild(container)
+  mountEl.appendChild(sectionEl)
 
   let mountOverlay = null
   try {
@@ -472,7 +482,8 @@ export async function initCMS(options = {}) {
   try {
     const navbarWrap = document.createElement('header')
     navbarWrap.className = 'nimbi-site-navbar'
-    mountEl.insertBefore(navbarWrap, container)
+    // Place navbar before the Bulma section container to allow sticky behavior.
+    mountEl.insertBefore(navbarWrap, sectionEl)
     const navMd = await fetchMarkdown('_navigation.md', contentBase)
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
     const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing, navbarLogo)
