@@ -138,15 +138,15 @@
 }
 .nimbi-toc-inner {
     margin-bottom: 1rem;
-    padding: 1rem;
-    border-radius: 6px
-}
-
-.nimbi-toc-inner .menu-list {
     /* Keep the TOC within the visible area by capping its height to a
        percentage of the CMS viewport. */
     max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6);
-    overflow: auto;
+    overflow: hidden;
+}
+
+.nimbi-toc-inner {
+    padding: 1rem;
+    border-radius: 6px
 }
 
 .nimbi-nav-wrap .menu-label {
@@ -207,6 +207,11 @@
 .nimbi-toc-inner ul ul ul {
     margin-left: 1.25rem;
     font-size: 0.92em;
+}
+
+.nimbi-toc-inner .menu-list{
+    overflow-y: auto;
+    
 }
 
 /* Stronger specificity to override Bulma's .menu-list rules for nested TOC links */
