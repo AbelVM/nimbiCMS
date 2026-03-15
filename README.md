@@ -182,6 +182,22 @@ nimbiCMS.initCMS({ el: '#app', indexDepth: 3 })
 
 - External links are never crawled: absolute URLs (e.g. `http:`/`https:`), protocol-relative links (`//`), `mailto:` and other URI schemes are ignored by the crawler to prevent accidental traversal off-site.
 
+## Navbar logo option
+
+You can display a small site logo at the leftmost position of the navbar by passing the `navbarLogo` option to `initCMS()`.
+
+- `none` — no logo (default behavior if omitted)
+- `favicon` — use the page's favicon (only PNG favicons are used; other formats fall back to none)
+- `<path>` — a string path or URL to an image (absolute or relative)
+- `copy-first` — extract the first `<img>` from the configured `homePage` and use it as the navbar logo
+- `move-first` — same as `copy-first` but also marks the image as moved by setting the `data-nimbi-logo-moved` attribute on the document element (consumers can remove the original image during render)
+
+Example:
+
+```js
+nimbiCMS.initCMS({ el: '#app', navbarLogo: 'favicon' })
+```
+
 - Markdown escapes are unescaped for search results: titles and heading text extracted from Markdown have common backslash escapes removed so results display `\_clearHooks` as `_clearHooks` for a cleaner UX.
 
 
@@ -244,11 +260,11 @@ Blob-backed workers for inline bundling. Prefer `manager.send(...)` for
 short-lived RPC-style interactions and call `manager.terminate()` during
 teardown for long-lived workers.
 
-## Options and API
+## Options
 
 `initCMS(options)` mounts the CMS into a page. The table below summarizes the supported `InitOptions` (see `src/index.d.ts` for the generated declarations).
 
-**Core**
+### Core
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
@@ -256,7 +272,7 @@ teardown for long-lived workers.
 | `contentPath` | `string` | `/content` | URL path to the content folder serving `.md`/`.html` files; normalized to a relative path with trailing slash. |
 | `allowUrlPathOverrides` | `boolean` | `false` | Opt-in: when `true`, `contentPath`, `homePage`, and `notFoundPage` may be overridden from the page URL (validated). |
 
-**Indexing & Search**
+### Indexing and Search
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
@@ -266,21 +282,22 @@ teardown for long-lived workers.
 | `noIndexing` | `string[]` | — | Paths (relative) to exclude from discovery and indexing. |
 | `skipRootReadme` | `boolean` | `false` | When `true`, skip link discovery inside a repository-root `README.md`. |
 
-**Routing & Pages**
+### Routing and Pages
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
 | `homePage` | `string` | `'_home.md'` | Basename for the site home page (`.md` or `.html`). |
 | `notFoundPage` | `string` | `'_404.md'` | Basename for the not-found page (`.md` or `.html`). |
 
-**Styling & Theming**
+### Styling and Theming
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
 | `defaultStyle` | `'light'` \| `'dark'` | `'light'` | Initial UI theme. |
 | `bulmaCustomize` | `string` | `'none'` | `'none'` (bundled), `'local'` (load `<contentPath>/bulma.css`) or a Bulmaswatch theme name to load remotely. |
+| `navbarLogo` | `string` | `'favicon'` | Small site logo placed at the leftmost position of the navbar. Supported values: `none`, `favicon` (uses PNG favicon when available), a path or URL to an image, `copy-first` (use first image from `homePage`), and `move-first` (use first image from `homePage` and remove it from the rendered page). |
 
-**Localization**
+### Localization
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
@@ -288,7 +305,7 @@ teardown for long-lived workers.
 | `l10nFile` | `string \| null` | `null` | Path to a JSON localization file (relative paths resolve against the page). |
 | `availableLanguages` | `string[]` | — | When set, treats a leading path segment as a language code and maps slugs per-language. |
 
-**Caching & Performance**
+### Caching and Performance
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
@@ -296,14 +313,17 @@ teardown for long-lived workers.
 | `cacheMaxEntries` | `number` | — | Maximum entries in the router resolution cache. |
 | `crawlMaxQueue` | `number` | `1000` | Upper bound on directories queued during breadth-first crawl (0 disables the guard). |
 
-**Advanced & Extensions**
+### Advanced and Extensions
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
 | `markdownExtensions` | `Array<object>` | — | `marked`-style extension/plugin objects registered at init via `addMarkdownExtension()`. |
 | `markdownPaths` | `string[]` | — | Optional host-provided list of markdown paths used by slug resolution/search. |
 
+## API 
+
 The `initCMS` function also exposes many helpers and lower-level utilities; consult `src/index.d.ts` for the full, generated public API and types.
+
 ### Version helper
 
 The bundle exposes a small runtime helper so consumers can read the shipped

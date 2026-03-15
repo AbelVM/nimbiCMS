@@ -59,7 +59,7 @@ export function createSiteNav(homePage) {
  * @param {1|2|3} indexDepth - include H2 headings in the search index when 2; include H3 when 3
  * @returns {Promise<NavBuildResult>} resolves with an object containing `navbar` and `linkEls`
  */
-export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager', indexDepth = 1, noIndexing = undefined) {
+export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager', indexDepth = 1, noIndexing = undefined, logoOption = 'favicon') {
   if (!navbarWrap || !(navbarWrap instanceof HTMLElement)) {
     throw new TypeError('navbarWrap must be an HTMLElement')
   }
@@ -182,6 +182,64 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     brandItem.href = '?page=' + encodeURIComponent(homePage)
     brandItem.textContent = t('home')
   }
+  // Attempt to resolve/insert a small logo according to `logoOption`.
+  async function resolveLogoSrc(opt) {
+    try {
+      if (!opt || opt === 'none') return null
+      if (opt === 'favicon') {
+        try {
+          const link = document.querySelector('link[rel~="icon"],link[rel="shortcut icon"]')
+          if (!link) return null
+          const href = link.getAttribute('href') || ''
+          if (!href) return null
+          // Prefer PNG favicon; if not PNG, skip (fallback none)
+          if (/\.png(?:\?|$)/i.test(href)) return new URL(href, location.href).toString()
+          return null
+        } catch (e) { return null }
+      }
+      if (opt === 'copy-first' || opt === 'move-first') {
+        try {
+          const res = await fetchMarkdown(homePage, contentBase)
+          if (!res || !res.raw) return null
+          const p = new DOMParser()
+          const d = p.parseFromString(res.raw, 'text/html')
+          const img = d.querySelector('img')
+          if (!img) return null
+          const src = img.getAttribute('src') || ''
+          if (!src) return null
+          const abs = new URL(src, location.href).toString()
+          if (opt === 'move-first') {
+            try { document.documentElement.setAttribute('data-nimbi-logo-moved', abs) } catch (e) {}
+          }
+          return abs
+        } catch (e) { return null }
+      }
+      // Otherwise treat opt as a direct path
+      try {
+        return new URL(opt, location.href).toString()
+      } catch (e) { return null }
+    } catch (e) { return null }
+  }
+
+  let logoSrc = null
+  try { logoSrc = await resolveLogoSrc(logoOption) } catch (e) { logoSrc = null }
+
+  if (logoSrc) {
+    try {
+      const img = document.createElement('img')
+      img.className = 'nimbi-navbar-logo'
+      // Prefer a localized site label; fall back to a siteLogo key if present
+      const label = t && typeof t === 'function' ? (t('home') || t('siteLogo') || '') : ''
+      img.alt = label
+      // Provide a title attribute for hover/tooltips; mirror `alt` for accessibility
+      img.title = label
+      img.src = logoSrc
+      // Clear textual content and append image inside the brand link
+      try { brandItem.innerHTML = '' } catch (e) { brandItem.textContent = '' }
+      brandItem.appendChild(img)
+    } catch (e) { /* ignore image insertion failures */ }
+  }
+
   brand.appendChild(brandItem)
 
   brandItem.addEventListener('click', function (ev) {
@@ -347,6 +405,22 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           }
         })
     }
+    
+        // Close search results when clicking/tapping outside the input or results box
+        try {
+          const searchOutsideHandler = (ev) => {
+            try {
+              const tgt = ev && ev.target
+              if (!resultsContainer) return
+              if (!resultsContainer.classList.contains('is-open') && (resultsContainer.style && resultsContainer.style.display !== 'block')) return
+              if (tgt && (resultsContainer.contains(tgt) || (searchInput && (tgt === searchInput || (searchInput.contains && searchInput.contains(tgt)))))) return
+              try { resultsContainer.style.display = 'none' } catch (e) {}
+              try { resultsContainer.classList.remove('is-open') } catch (e) {}
+            } catch (e) { /* ignore */ }
+          }
+          document.addEventListener('click', searchOutsideHandler, true)
+          document.addEventListener('touchstart', searchOutsideHandler, true)
+        } catch (e) { /* ignore */ }
   }
 
   

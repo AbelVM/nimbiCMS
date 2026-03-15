@@ -236,6 +236,8 @@ export async function initCMS(options = {}) {
     notFoundPage = '_404.md'
   } = finalOptions
 
+  const { navbarLogo = 'favicon' } = finalOptions
+
   const { skipRootReadme = false } = finalOptions
 
   // Validate sanitized overrides (if any) before accepting them. This enforces
@@ -473,7 +475,7 @@ export async function initCMS(options = {}) {
     mountEl.insertBefore(navbarWrap, container)
     const navMd = await fetchMarkdown('_navigation.md', contentBase)
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
-    const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing)
+    const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing, navbarLogo)
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { console.warn('[nimbi-cms] onNavBuild hooks failed', e) }
     
     try {

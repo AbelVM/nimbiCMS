@@ -127,6 +127,30 @@ export async function parseMarkdownToHtml(md) {
           })
 
           try {
+            // If a logo was moved into the navbar (move-first), remove the
+            // matching image from the rendered document to avoid duplication.
+            try {
+              const moved = (typeof document !== 'undefined' && document.documentElement && document.documentElement.getAttribute) ? document.documentElement.getAttribute('data-nimbi-logo-moved') : null
+              if (moved) {
+                const imgs = Array.from(doc.querySelectorAll('img'))
+                for (const img of imgs) {
+                  try {
+                    const src = img.getAttribute('src') || ''
+                    const abs = new URL(src, location.href).toString()
+                    if (abs === moved) {
+                      const parent = img.parentElement
+                      img.remove()
+                      // If the parent is a <p> that is now empty, remove it too.
+                      if (parent && parent.tagName && parent.tagName.toLowerCase() === 'p' && parent.childNodes.length === 0) {
+                        parent.remove()
+                      }
+                      break
+                    }
+                  } catch (e) { /* ignore per-image errors */ }
+                }
+              }
+            } catch (e) { /* ignore moved-logo removal errors */ }
+
             const imgs = doc.querySelectorAll('img')
             imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
           } catch (e) { console.warn('[markdown] query images failed', e) }
@@ -214,8 +238,31 @@ export async function parseMarkdownToHtml(md) {
       })
 
     try {
-      const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
+        // If a logo was moved into the navbar (move-first), remove the
+        // matching image from the rendered document to avoid duplication.
+        try {
+          const moved = (typeof document !== 'undefined' && document.documentElement && document.documentElement.getAttribute) ? document.documentElement.getAttribute('data-nimbi-logo-moved') : null
+          if (moved) {
+            const imgs = Array.from(doc.querySelectorAll('img'))
+            for (const img of imgs) {
+              try {
+                const src = img.getAttribute('src') || ''
+                const abs = new URL(src, location.href).toString()
+                if (abs === moved) {
+                  const parent = img.parentElement
+                  img.remove()
+                  if (parent && parent.tagName && parent.tagName.toLowerCase() === 'p' && parent.childNodes.length === 0) {
+                    parent.remove()
+                  }
+                  break
+                }
+              } catch (e) { /* ignore per-image errors */ }
+            }
+          }
+        } catch (e) { /* ignore moved-logo removal errors */ }
+
+        const imgs = doc.querySelectorAll('img')
+        imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (e) { console.warn('[markdown] set image loading attribute failed', e) } })
     } catch (e) { console.warn('[markdown] query images failed', e) }
 
     try {

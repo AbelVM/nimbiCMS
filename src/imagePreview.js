@@ -46,14 +46,13 @@ function _createModal() {
           <div class="nimbi-image-preview__group">
             <button class="button is-small" type="button" data-nimbi-preview-fit>⤢</button>
             <button class="button is-small" type="button" data-nimbi-preview-original>1:1</button>
+            <button class="button is-small" type="button" data-nimbi-preview-reset>⟲</button>
           </div>
           <div class="nimbi-image-preview__group">
             <button class="button is-small" type="button" data-nimbi-preview-zoom-out>−</button>
             <div class="nimbi-image-preview__zoom" data-nimbi-preview-zoom-label>100%</div>
             <button class="button is-small" type="button" data-nimbi-preview-zoom-in>＋</button>
-            <button class="button is-small" type="button" data-nimbi-preview-reset>⟲</button>
           </div>
-          <div class="nimbi-image-preview__hud" data-nimbi-preview-zoom-hud>100%</div>
         </div>
       </div>
     </div>
@@ -487,6 +486,11 @@ function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
   // Always mark it as active so internal drag/pan code can reliably detect open state
   modal.classList.add('is-active')
 
+  // Lock body scroll while preview is open
+  try {
+    document.documentElement.classList.add('nimbi-image-preview-open')
+  } catch (e) {}
+
   modal.focus()
 }
 
@@ -499,6 +503,11 @@ function closePreview() {
     _modal.close()
   }
   _modal.classList.remove('is-active')
+
+  // Restore body scroll when preview closes
+  try {
+    document.documentElement.classList.remove('nimbi-image-preview-open')
+  } catch (e) {}
 }
 
 /**
