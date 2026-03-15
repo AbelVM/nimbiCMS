@@ -77,6 +77,67 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   let searchInput = null
   let indexedCountLog = false
 
+  const ensureSearchIndex = () => {
+    if (searchIndexPromise) return searchIndexPromise
+    searchIndexPromise = (async () => {
+      try {
+        const fm = await import('./slugManager.js')
+        const workerFn = safeGet(fm, 'buildSearchIndexWorker')
+        const buildFn = safeGet(fm, 'buildSearchIndex')
+        if (searchIndexMode === 'lazy' && typeof workerFn === 'function') {
+          try {
+            const r = await workerFn(contentBase, indexDepth, noIndexing)
+            if (r && r.length) return r
+          } catch (e) { console.warn && console.warn('[nimbi-cms] worker builder threw', e) }
+        }
+        if (typeof buildFn === 'function') return await buildFn(contentBase, indexDepth, noIndexing)
+        return []
+      } catch (err) {
+        console.warn('[nimbi-cms] buildSearchIndex failed', err)
+        return []
+      } finally {
+        if (searchInput) {
+          try { searchInput.removeAttribute('disabled') } catch (e) {}
+          try { searchInput.classList.remove('is-loading') } catch (e) {}
+        }
+      }
+    })()
+
+    // Rerun active query when index becomes available
+    searchIndexPromise.then((idx) => {
+      try {
+        const qnow = String(searchInput && searchInput.value || '').trim().toLowerCase()
+        if (!qnow) return
+        if (!Array.isArray(idx) || !idx.length) return
+        const filteredNow = idx.filter(e => (e.title && e.title.toLowerCase().includes(qnow)) || (e.excerpt && e.excerpt.toLowerCase().includes(qnow)))
+        if (!filteredNow || !filteredNow.length) return
+        const resultsEl = document.getElementById('nimbi-search-results')
+        if (!resultsEl) return
+        resultsEl.innerHTML = ''
+        filteredNow.slice(0,10).forEach(it => {
+          const wrap = document.createElement('div')
+          wrap.className = 'nimbi-search-result'
+          if (it.parentTitle) {
+            const label = document.createElement('div')
+            label.textContent = it.parentTitle
+            label.className = 'nimbi-search-title nimbi-search-parent'
+            wrap.appendChild(label)
+          }
+          const a = document.createElement('a')
+          a.className = 'block'
+          a.href = '?page=' + encodeURIComponent(it.slug)
+          a.textContent = it.title
+          a.addEventListener('click', () => { try { resultsEl.style.display = 'none' } catch (_) {} })
+          wrap.appendChild(a)
+          resultsEl.appendChild(wrap)
+        })
+        try { resultsEl.style.display = 'block' } catch (e) {}
+      } catch (e) { /* ignore */ }
+    }).catch(()=>{})
+
+    return searchIndexPromise
+  }
+
   const navbar = document.createElement('nav')
   navbar.className = 'navbar'
   navbar.setAttribute('role', 'navigation')
@@ -228,153 +289,43 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const q = String(domInput && domInput.value || '').trim().toLowerCase()
         if (!q) { showResults([]); return }
         try {
-          const fm = await import('./slugManager.js')
-          if (!searchIndexPromise) {
-            searchIndexPromise = (async () => {
-              try {
-                const workerFn = safeGet(fm, 'buildSearchIndexWorker')
-                const buildFn = safeGet(fm, 'buildSearchIndex')
-                if (searchIndexMode === 'lazy' && typeof workerFn === 'function') {
-                    try {
-                    const r = await workerFn(contentBase, indexDepth, noIndexing)
-                    if (r && r.length) return r
-                    // fallback to main-thread builder when worker returns nothing
-                  } catch (e) {
-                    console.warn && console.warn('[nimbi-cms] worker builder threw', e)
-                    // fallthrough to main-thread builder
-                  }
-                }
-                if (typeof buildFn === 'function') return buildFn(contentBase, indexDepth, noIndexing)
-                return []
-              } catch (err) {
-                console.warn('[nimbi-cms] buildSearchIndex failed', err)
-                return []
-              } finally {
-                if (searchInput) {
-                  try { searchInput.removeAttribute('disabled') } catch (e) {}
-                  try { searchInput.classList.remove('is-loading') } catch (e) {}
-                }
-              }
-            })()
-            // Ensure that once the index resolves we show results for the
-            // current query if applicable — this guards against timing
-            // races where the worker returns after the input event.
-                try {
-                searchIndexPromise.then((idx) => {
-                try {
-                  const qnow = String(searchInput && searchInput.value || '').trim().toLowerCase()
-                  if (!qnow) return
-                  if (!Array.isArray(idx) || !idx.length) return
-                  const filteredNow = idx.filter(e => (e.title && e.title.toLowerCase().includes(qnow)) || (e.excerpt && e.excerpt.toLowerCase().includes(qnow)))
-                                            if (!filteredNow || !filteredNow.length) return
-                  const resultsEl = document.getElementById('nimbi-search-results')
-                  if (!resultsEl) return
-                  resultsEl.innerHTML = ''
-                  filteredNow.slice(0,10).forEach(it => {
-                    const wrap = document.createElement('div')
-                    wrap.className = 'nimbi-search-result'
-                    if (it.parentTitle) {
-                      const label = document.createElement('div')
-                      label.textContent = it.parentTitle
-                      label.className = 'nimbi-search-title nimbi-search-parent'
-                      wrap.appendChild(label)
-                    }
-                    const a = document.createElement('a')
-                    a.className = 'block'
-                    a.href = '?page=' + encodeURIComponent(it.slug)
-                    a.textContent = it.title
-                    a.addEventListener('click', () => { try { resultsEl.style.display = 'none' } catch (_) {} })
-                    wrap.appendChild(a)
-                    resultsEl.appendChild(wrap)
-                  })
-                  try { resultsEl.style.display = 'block' } catch (e) {}
-                } catch (e) { /* ignore */ }
-              }).catch(()=>{})
-            } catch (e) { /* ignore */ }
-          }
+          await ensureSearchIndex()
+
           const idx = await searchIndexPromise
           const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
           showResults(filtered.slice(0, 10))
         } catch (err) { console.warn('[nimbi-cms] search input handler failed', err); showResults([]) }
       }, 50)
+
+      try {
+        searchInput.addEventListener('input', handleInput)
+      } catch (e) { /* ignore attach failures in constrained env */ }
+
+      try {
+        document.addEventListener('input', (ev) => {
+          try {
+            if (ev && ev.target && ev.target.id === 'nimbi-search') {
+              handleInput(ev)
+            }
+          } catch (e) { /* ignore */ }
+        }, true)
+      } catch (e) { /* ignore attach failures in constrained env */ }
     }
 
     if (searchIndexMode === 'eager') {
       try {
-        searchIndexPromise = (async () => {
-            try {
-            const fm = await import('./slugManager.js')
-            const workerFn = safeGet(fm, 'buildSearchIndexWorker')
-            const buildFn = safeGet(fm, 'buildSearchIndex')
-            let idx = []
-            if (searchIndexMode === 'lazy' && typeof workerFn === 'function') {
-              try {
-                const r = await workerFn(contentBase, indexDepth, noIndexing)
-                if (r && r.length) idx = r
-              } catch (e) { console.warn('[nimbi-cms] worker builder (eager branch) threw', e) }
-            }
-            if (!idx.length && typeof buildFn === 'function') {
-              try { idx = await buildFn(contentBase, indexDepth, noIndexing) } catch (e) { console.warn('[nimbi-cms] eager buildSearchIndex call failed', e) }
-            }
-            
-            if (!indexedCountLog) indexedCountLog = true
-            return idx
-          } catch (err) {
-            console.warn('[nimbi-cms] buildSearchIndex failed', err)
-            return []
-          }
-        })()
+        searchIndexPromise = ensureSearchIndex()
       } catch (err) {
         console.warn('[nimbi-cms] eager search index init failed', err)
         searchIndexPromise = Promise.resolve([])
       }
       searchIndexPromise.finally(() => {
-        const domInput = document.querySelector('input#nimbi-search');
+        const domInput = document.querySelector('input#nimbi-search')
         if (domInput) {
-          domInput.removeAttribute('disabled');
-          domInput.classList.remove('is-loading');
+          try { domInput.removeAttribute('disabled') } catch (e) {}
+          try { domInput.classList.remove('is-loading') } catch (e) {}
         }
       })
-      // If an eager index finished and the input already contains text
-      // (tests sometimes set the value before the index completes), run
-      // a quick post-index check to show results for the current query.
-      try {
-        searchIndexPromise.then((idx) => {
-          try {
-            const domInput = document.querySelector('input#nimbi-search')
-            if (domInput) {
-              const q = String(domInput.value || '').trim().toLowerCase()
-              if (q && Array.isArray(idx) && idx.length) {
-                const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
-                try {
-                  const results = document.getElementById('nimbi-search-results')
-                  if (results) {
-                    results.innerHTML = ''
-                    filtered.slice(0,10).forEach(it => {
-                      const wrap = document.createElement('div')
-                      wrap.className = 'nimbi-search-result'
-                      if (it.parentTitle) {
-                        const label = document.createElement('div')
-                        label.textContent = it.parentTitle
-                        label.className = 'nimbi-search-title nimbi-search-parent'
-                        wrap.appendChild(label)
-                      }
-                      const a = document.createElement('a')
-                      a.className = 'block'
-                      a.href = '?page=' + encodeURIComponent(it.slug)
-                      a.textContent = it.title
-                      a.addEventListener('click', () => { try { results.style.display = 'none' } catch (_) {} })
-                      wrap.appendChild(a)
-                      results.appendChild(wrap)
-                    })
-                    try { results.style.display = 'block' } catch (_) {}
-                  }
-                } catch (e) {}
-              }
-            }
-          } catch (e) { /* ignore post-index errors */ }
-        }).catch(() => {})
-      } catch (e) { /* ignore */ }
     }
   }
 
@@ -458,161 +409,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   }
 
   
-
-    try {
-      searchInput = document.getElementById('nimbi-search')
-      const results = document.getElementById('nimbi-search-results')
-      const showResults = (items) => {
-      results.innerHTML = ''
-      if (!items.length) {
-        results.classList.remove('is-open')
-        try { results.style.display = 'none' } catch (e) {}
-        return
-      }
-      items.forEach(it => {
-        const wrap = document.createElement('div')
-        wrap.className = 'nimbi-search-result'
-        if (it.parentTitle) {
-          const label = document.createElement('div')
-          label.textContent = it.parentTitle
-          label.className = 'nimbi-search-title nimbi-search-parent'
-          wrap.appendChild(label)
-        }
-        const a = document.createElement('a')
-        a.className = 'block'
-        a.href = '?page=' + encodeURIComponent(it.slug)
-        a.textContent = it.title
-        a.addEventListener('click', () => { results.style.display = 'none' })
-        wrap.appendChild(a)
-        results.appendChild(wrap)
-      })
-      try { results.style.display = 'block' } catch (e) {}
-      results.classList.add('is-open')
-    }
-    const debounce = (fn, delay) => {
-      let timer = null
-      return (...args) => {
-        if (timer) clearTimeout(timer)
-        timer = setTimeout(() => fn(...args), delay)
-      }
-    }
-
-    if (searchInput) {
-      const handleInput = debounce(async () => {
-        const q = String(searchInput.value || '').trim().toLowerCase()
-        if (!q) { showResults([]); return }
-        try {
-          const fm = await import('./slugManager.js')
-          if (!searchIndexPromise) {
-            searchIndexPromise = (async () => {
-              try {
-                  
-                  if (searchIndexMode === 'lazy' && fm.buildSearchIndexWorker) {
-                    return fm.buildSearchIndexWorker(contentBase, indexDepth, noIndexing)
-                  }
-                  return fm.buildSearchIndex(contentBase, indexDepth, noIndexing)
-              } catch (err) {
-                console.warn('[nimbi-cms] buildSearchIndex failed', err)
-                return []
-              } finally {
-                if (searchInput) {
-                  try { searchInput.removeAttribute('disabled') } catch (e) {}
-                  try { searchInput.classList.remove('is-loading') } catch (e) {}
-                }
-              }
-            })()
-          }
-            const idx = await searchIndexPromise
-              const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
-          showResults(filtered.slice(0, 10))
-        } catch (err) { console.warn('[nimbi-cms] search input handler failed', err); showResults([]) }
-      }, 50)
-
-      searchInput.addEventListener('input', handleInput)
-      
-      // Also listen at document capture phase to ensure synthetic input
-      // events (from tests or other frameworks) are caught reliably.
-      try {
-        document.addEventListener('input', (ev) => {
-          try {
-            if (ev && ev.target && ev.target.id === 'nimbi-search') {
-              handleInput(ev)
-            }
-          } catch (e) { /* ignore */ }
-        }, true)
-      } catch (e) { /* ignore attach failures in constrained env */ }
-      document.addEventListener('click', (ev) => {
-        if (searchInput && !searchInput.contains(ev.target) && results && !results.contains(ev.target)) {
-          results.style.display = 'none'
-        }
-      })
-    }
-  } catch (_) {
-    console.warn('[nimbi-cms] navbar/search setup inner failed', _)
-  }
+  
 
   menu.appendChild(start)
   if (end) menu.appendChild(end)
   navbar.appendChild(brand)
   navbar.appendChild(menu)
   navbarWrap.appendChild(navbar)
-
-  // Lightweight fallback for environments where the primary input listener
-  // may not be attached yet. This re-runs the filtering/render logic on
-  // `input` events for `#nimbi-search` without emitting debug logs.
-  try {
-    setTimeout(() => {
-      try {
-        const inp = document.getElementById('nimbi-search')
-        const resultsEl = document.getElementById('nimbi-search-results')
-        if (!inp || inp.__nimbi_input_fallback) return
-        inp.__nimbi_input_fallback = true
-        inp.addEventListener('input', async (ev) => {
-          try {
-            const q = String((ev && ev.target && ev.target.value) || '').trim().toLowerCase()
-            if (!q) {
-              if (resultsEl) {
-                resultsEl.innerHTML = ''
-                try { resultsEl.style.display = 'none' } catch (e) {}
-              }
-              return
-            }
-            if (!searchIndexPromise) return
-            const idx = await searchIndexPromise
-            if (!Array.isArray(idx) || !idx.length) {
-              if (resultsEl) {
-                resultsEl.innerHTML = ''
-                try { resultsEl.style.display = 'none' } catch (e) {}
-              }
-              return
-            }
-            const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
-            if (!resultsEl) return
-            resultsEl.innerHTML = ''
-            filtered.slice(0,10).forEach(it => {
-              const wrap = document.createElement('div')
-              wrap.className = 'nimbi-search-result'
-              if (it.parentTitle) {
-                const label = document.createElement('div')
-                label.textContent = it.parentTitle
-                label.className = 'nimbi-search-title nimbi-search-parent'
-                wrap.appendChild(label)
-              }
-              const a = document.createElement('a')
-              a.className = 'block'
-              a.href = '?page=' + encodeURIComponent(it.slug)
-              a.textContent = it.title
-              a.addEventListener('click', () => { try { resultsEl.style.display = 'none' } catch (e) {} })
-              wrap.appendChild(a)
-              resultsEl.appendChild(wrap)
-            })
-            try { resultsEl.style.display = filtered.length ? 'block' : 'none' } catch (e) {}
-          } catch (e) { /* ignore fallback errors */ }
-        })
-      } catch (e) { /* ignore attach errors */ }
-    }, 50)
-  } catch (e) {}
-
   
 
   try {
