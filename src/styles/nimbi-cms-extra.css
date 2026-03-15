@@ -585,8 +585,13 @@
 .nimbi-article table td,
 .nimbi-cms table th,
 .nimbi-cms table td {
+    /* Allow wrapping at natural break points (spaces/hyphens) but avoid
+       breaking words mid-word. Long unbreakable words will overflow and
+       cause horizontal scroll if necessary. */
     white-space: normal;
-    word-break: break-word;
+    word-break: normal;
+    overflow-wrap: normal;
+    hyphens: none;
 }
 
 /* Prefer wider first column for option tables and sensible column splits */
