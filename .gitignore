@@ -36,3 +36,5 @@ coverage/
 notes.md
 notes.txt
 docs-typedoc.json
+tmp/
+temp/

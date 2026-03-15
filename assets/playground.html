@@ -1,26 +1,21 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>NimbiCMS Playground</title>
-  <style>
-    body{padding:1rem;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .controls{display:flex;flex-direction:column;gap:0.75rem;align-items:flex-start;margin-bottom:1.25rem}
-    .controls label{font-size:0.9rem}
-    .preview{border:1px solid #ddd;padding:1rem;border-radius:6px;background:#fff}
-    .preview.dark{background:#222;color:#eee;border-color:#444}
-    .row{display:flex;gap:0.5rem;align-items:center}
-    select,switch,input[type=checkbox]{padding:0.25rem}
-  </style>
+
 </head>
+
 <body>
   <h1>NimbiCMS Visual Playground</h1>
-  <p>Change visual settings and see them applied live via the nimbiCMS API.</p>
+  <p>Change visual settings and see them applied live via the nimbiCMS API.
+    Keep in mind that Some themes do not play well with certain color schemas.</p>
 
   <div class="controls">
     <div class="row">
-      <label for="themeSel" style="margin-right:0.5rem">Theme:</label>
+      <label for="themeSel" style="margin-right:0.5rem">Color schema:</label>
       <div class="select">
         <select id="themeSel">
           <option value="light">Light</option>
@@ -35,25 +30,25 @@
       <div class="select">
         <select id="bulma">
           <option value="none">None (default)</option>
-        <option>cerulean</option>
-        <option>cosmo</option>
-        <option>cyborg</option>
-        <option>darkly</option>
-        <option>flatly</option>
-        <option>journal</option>
-        <option>litera</option>
-        <option>lumen</option>
-        <option>lux</option>
-        <option>materia</option>
-        <option>minty</option>
-        <option>pulse</option>
-        <option>sandstone</option>
-        <option>simplex</option>
-        <option>solar</option>
-        <option>spacelab</option>
-        <option>superhero</option>
-        <option>united</option>
-        <option>yeti</option>
+          <option>cerulean</option>
+          <option>cosmo</option>
+          <option>cyborg</option>
+          <option>darkly</option>
+          <option>flatly</option>
+          <option>journal</option>
+          <option>litera</option>
+          <option>lumen</option>
+          <option>lux</option>
+          <option>materia</option>
+          <option>minty</option>
+          <option>pulse</option>
+          <option>sandstone</option>
+          <option>simplex</option>
+          <option>solar</option>
+          <option>spacelab</option>
+          <option>superhero</option>
+          <option>united</option>
+          <option>yeti</option>
         </select>
       </div>
     </div>
@@ -62,50 +57,47 @@
       <label for="hljs" style="margin-right:0.5rem">Highlight theme:</label>
       <div class="select">
         <select id="hljs">
-        <option value="a11y-dark">a11y-dark</option>
-        <option value="a11y-light">a11y-light</option>
-        <option value="agate">agate</option>
-        <option value="androidstudio">androidstudio</option>
-        <option value="arta">arta</option>
-        <option value="atom-one-dark">atom-one-dark</option>
-        <option value="atom-one-light">atom-one-light</option>
-        <option value="base16-dark">base16-dark</option>
-        <option value="base16-light">base16-light</option>
-        <option value="brown-paper">brown-paper</option>
-        <option value="codepen-embed">codepen-embed</option>
-        <option value="darcula">darcula</option>
-        <option value="docco">docco</option>
-        <option value="dracula">dracula</option>
-        <option value="eclipse">eclipse</option>
-        <option value="github">github</option>
-        <option value="googlecode">googlecode</option>
-        <option value="gruvbox-dark">gruvbox-dark</option>
-        <option value="gruvbox-light">gruvbox-light</option>
-        <option value="hybrid">hybrid</option>
-        <option value="idea">idea</option>
-        <option value="ir-black">ir-black</option>
-        <option value="kimbie.dark">kimbie.dark</option>
-        <option value="lightfair">lightfair</option>
-        <option value="mono-blue">mono-blue</option>
-        <option value="monokai">monokai</option>
-        <option value="nord">nord</option>
-        <option value="obsidian">obsidian</option>
-        <option value="paraiso-dark">paraiso-dark</option>
-        <option value="paraiso-light">paraiso-light</option>
-        <option value="solarized-dark">solarized-dark</option>
-        <option value="solarized-light">solarized-light</option>
-        <option value="vs">vs</option>
-        <option value="vs2015">vs2015</option>
+          <option value="a11y-dark">a11y-dark</option>
+          <option value="a11y-light">a11y-light</option>
+          <option value="agate">agate</option>
+          <option value="androidstudio">androidstudio</option>
+          <option value="arta">arta</option>
+          <option value="atom-one-dark">atom-one-dark</option>
+          <option value="atom-one-light">atom-one-light</option>
+          <option value="brown-paper">brown-paper</option>
+          <option value="codepen-embed">codepen-embed</option>
+          <option value="darcula">darcula</option>
+          <option value="docco">docco</option>
+          <option value="dracula">dracula</option>
+          <option value="eclipse">eclipse</option>
+          <option value="github">github</option>
+          <option value="googlecode">googlecode</option>
+          <option value="gruvbox-dark">gruvbox-dark</option>
+          <option value="gruvbox-light">gruvbox-light</option>
+          <option value="hybrid">hybrid</option>
+          <option value="idea">idea</option>
+          <option value="ir-black">ir-black</option>
+          <option value="kimbie.dark">kimbie.dark</option>
+          <option value="lightfair">lightfair</option>
+          <option value="mono-blue">mono-blue</option>
+          <option value="monokai">monokai</option>
+          <option value="nord">nord</option>
+          <option value="obsidian">obsidian</option>
+          <option value="paraiso-dark">paraiso-dark</option>
+          <option value="paraiso-light">paraiso-light</option>
+          <option value="solarized-dark">solarized-dark</option>
+          <option value="solarized-light">solarized-light</option>
+          <option value="vs">vs</option>
+          <option value="vs2015">vs2015</option>
         </select>
       </div>
     </div>
 
-    <!-- buttons removed: live apply on change -->
   </div>
 
   <section id="preview" class="preview">
-    <h2>Preview area</h2>
-    <p>This area demonstrates the site style and highlight theme. Use the controls above to change settings.</p>
+    <h2>Code preview</h2>
+    <p>This area demonstrates the highlight theme. Use the controls above to change settings.</p>
     <pre><code class="language-js">// Example code block
 function hello(){
   console.log('Hello Nimbi');
@@ -114,42 +106,34 @@ function hello(){
   </section>
 
   <script>
-    // The playground runs embedded inside nimbiCMS, so we expect the API to
-    // already be present on the global `nimbiCMS` object.
     const api = window.nimbiCMS || window.nimbiCms || null
 
-    // Defaults
     const themeSel = document.getElementById('themeSel');
     const bulmaSel = document.getElementById('bulma');
     const hlSel = document.getElementById('hljs');
     const preview = document.getElementById('preview');
 
-    function applySettings(){
+    function applySettings() {
       const bulma = bulmaSel.value;
       const hl = hlSel.value;
 
-      // Apply Bulma theme via nimbiCMS API
       try {
         if (api && typeof api.ensureBulma === 'function') {
           if (bulma === 'none') {
-            // undo any previously injected Bulmaswatch theme (nimbicms does not expose an API for this)
-            try { const el = document.querySelector('link[data-bulmaswatch-theme]'); if (el && el.parentNode) el.parentNode.removeChild(el) } catch (e) {}
-            try { const s = document.querySelector('style[data-bulma-override]'); if (s && s.parentNode) s.parentNode.removeChild(s) } catch (e) {}
+            try { const el = document.querySelector('link[data-bulmaswatch-theme]'); if (el && el.parentNode) el.parentNode.removeChild(el) } catch (e) { }
+            try { const s = document.querySelector('style[data-bulma-override]'); if (s && s.parentNode) s.parentNode.removeChild(s) } catch (e) { }
           } else {
             api.ensureBulma(bulma)
           }
         }
       } catch (e) { console.warn(e) }
 
-      // Apply highlight theme via nimbiCMS API
       try {
         if (api && typeof api.setHighlightTheme === 'function') {
-          // The API expects an options object (e.g. { useCdn: true }).
           api.setHighlightTheme(hl, { useCdn: true })
         }
       } catch (e) { console.warn(e) }
 
-      // Re-run highlighting on the example code block
       try {
         if (api && typeof api.observeCodeBlocks === 'function') {
           api.observeCodeBlocks(preview)
@@ -160,26 +144,22 @@ function hello(){
       } catch (e) { console.warn(e) }
     }
 
-    // theme select handler applies immediately (supports system)
-    function _isDarkForStyle(style){
-      if(style==='dark') return true
-      if(style==='light') return false
-      try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches } catch(e) { return false }
+    function _isDarkForStyle(style) {
+      if (style === 'dark') return true
+      if (style === 'light') return false
+      try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches } catch (e) { return false }
     }
-    themeSel.addEventListener('change', ()=>{
+    themeSel.addEventListener('change', () => {
       const style = themeSel.value
       try { if (api && typeof api.setStyle === 'function') api.setStyle(style) } catch (e) { console.warn(e) }
       if (_isDarkForStyle(style)) preview.classList.add('dark'); else preview.classList.remove('dark');
     });
 
-    // apply on change for selects
     bulmaSel.addEventListener('change', applySettings);
     hlSel.addEventListener('change', applySettings);
 
-    // set initial state from current document/theme and injected links
-    (function init(){
+    (function init() {
       try {
-        // Prefer the NimbiCMS mount theme if available; fallback to document theme.
         const mount = document.querySelector('.nimbi-mount')
         const theme = (mount && mount.getAttribute && mount.getAttribute('data-theme')) || document.documentElement.getAttribute('data-theme')
         if (theme === 'dark') themeSel.value = 'dark'
@@ -189,15 +169,13 @@ function hello(){
       try {
         const bul = (document.querySelector('link[data-bulmaswatch-theme]') || {}).getAttribute && (document.querySelector('link[data-bulmaswatch-theme]') || {}).getAttribute('data-bulmaswatch-theme')
         if (bul) bulmaSel.value = bul
-      } catch (e) {}
+      } catch (e) { }
       try {
-        // Prefer explicit data-hl-theme attribute when present
         let cur = ''
         try {
           const hlEl = document.querySelector('link[data-hl-theme]')
           if (hlEl && hlEl.getAttribute) cur = hlEl.getAttribute('data-hl-theme') || ''
         } catch (e) { cur = '' }
-        // Fallback: try to infer theme from stylesheet href (jsdelivr/highlight.js)
         if (!cur) {
           try {
             const links = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -205,30 +183,67 @@ function hello(){
               try {
                 const href = lnk.href || ''
                 if (!href) continue
-                // match patterns like .../styles/<theme>.css
                 const m = href.match(/\/styles\/([^\/\?#]+)\.css(?:$|[\?#])/) || href.match(/\/styles\/([^\/\?#]+)\.min\.css(?:$|[\?#])/)
                 if (m && m[1]) { cur = m[1]; break }
-                // older pattern: highlight.js/themes/<theme>.css
                 const m2 = href.match(/highlight\.js(?:@[^/]*)?\/.+?\/(?:styles|themes)\/([^\/\?#]+)\.css(?:$|[\?#])/) || null
                 if (m2 && m2[1]) { cur = m2[1]; break }
-              } catch (e) { /* ignore per-link failures */ }
+              } catch (e) { /* ignore */ }
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         if (!cur) cur = 'monokai'
         if (cur) {
-          // Use the actual theme name when available. Default to the
-          // bundled theme name 'monokai' so the UI does not show a
-          // generic "default" option and the select reflects runtime
-          // behavior.
           hlSel.value = cur
         }
-      } catch (e) {}
-      // apply visual settings and current theme
+      } catch (e) { }
       applySettings();
-      // trigger theme handler to apply preview class and runtime style
       themeSel.dispatchEvent(new Event('change'))
     })();
   </script>
+  <style>
+    body {
+      padding: 1rem;
+      font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: flex-start;
+      margin-bottom: 1.25rem
+    }
+
+    .controls label {
+      font-size: 0.9rem
+    }
+
+    .preview {
+      border: 1px solid #ddd;
+      padding: 1rem;
+      border-radius: 6px;
+      background: #fff
+    }
+
+    .preview.dark {
+      background: #222;
+      color: #eee;
+      border-color: #444
+    }
+
+    .row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      min-height: 2rem !important
+    }
+
+    select,
+    switch,
+    input[type=checkbox] {
+      padding: 0.25rem
+    }
+  </style>
 </body>
+
 </html>

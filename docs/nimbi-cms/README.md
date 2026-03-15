@@ -30,14 +30,6 @@ Re-exports [BAD_LANGUAGES](../codeblocksManager/variables/BAD_LANGUAGES.md)
 
 Renames and re-exports [initCMS](../init/functions/initCMS.md)
 
-***
-
-### ensureBulma
-
-Re-exports [ensureBulma](../bulmaManager/functions/ensureBulma.md)
-
-***
-
 ### getVersion
 
 Re-exports [getVersion](../version/functions/getVersion.md)

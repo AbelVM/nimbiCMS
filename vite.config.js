@@ -2,12 +2,37 @@ import { defineConfig } from 'vite'
 import ViteRestart from 'vite-plugin-restart'
 import path from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, resolve } from 'path'
 
 
 export default ({ command }) => {
   if (command === 'build') {
     const shouldAnalyze = !!process.env.ANALYZE
+
+    // Load package.json at build-time; Vite may not support JSON module imports
+    // in all environments, so read & parse manually.
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = dirname(__filename)
+    let highlightJsVersion = '11.11.1'
+    try {
+      const pkgPath = resolve(__dirname, 'package.json')
+      const pkgText = fs.readFileSync(pkgPath, 'utf8')
+      const pkg = JSON.parse(pkgText)
+      const dep = pkg && pkg.dependencies && pkg.dependencies['highlight.js']
+      if (dep) {
+        const m = String(dep).match(/(\d+\.\d+\.\d+)/)
+        if (m && m[1]) highlightJsVersion = m[1]
+      }
+    } catch (_e) {
+      // fallback to default version if package.json is inaccessible
+    }
+
     return defineConfig({
+      define: {
+        __HIGHLIGHT_JS_VERSION__: JSON.stringify(highlightJsVersion)
+      },
       worker: { format: 'es', inline: true },
       plugins: [
         ViteRestart({

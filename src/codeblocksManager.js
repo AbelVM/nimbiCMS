@@ -1,19 +1,11 @@
 import hljs from 'highlight.js/lib/core'
-import pkg from '../package.json' assert { type: 'json' }
 
 export { hljs }
 
-// Determine the actual highlight.js version from package.json so CDN URLs
-// stay in sync with the installed dependency.
-const HLJS_VERSION = (() => {
-  try {
-    const v = (pkg && pkg.dependencies && pkg.dependencies['highlight.js']) || ''
-    // strip leading ^~ etc. (e.g. ^11.11.1 -> 11.11.1)
-    return String(v).replace(/^[^\d]*/, '')
-  } catch (e) {
-    return ''
-  }
-})()
+// Injected by the build system (Vite). Falls back to a known compatible version.
+const HIGHLIGHT_JS_VERSION = typeof __HIGHLIGHT_JS_VERSION__ !== 'undefined'
+  ? String(__HIGHLIGHT_JS_VERSION__)
+  : '11.11.1'
 
 /**
  * @typedef {{name?:string,aliases?:string[]}} HLJSLangEntry
@@ -287,13 +279,11 @@ export async function registerLanguage(name, modulePath) {
                 }
               } catch (_localErr) {
                 try {
-                  const version = HLJS_VERSION || '11.11.1'
-          const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${version}/es/languages/${candidate}.js`
+                  const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
                   return await new Function('u', 'return import(u)')(esmUrl)
                 } catch (_esmErr) {
                   try {
-                    const version = HLJS_VERSION || '11.11.1'
-                    const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${version}/lib/languages/${candidate}.js`
+                    const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
                     return await new Function('u', 'return import(u)')(moduleUrl)
                   } catch (_cdnErr) {
                     return null
@@ -509,8 +499,7 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
   }
 
   const currentHighlightTheme = requestedLower
-  const version = HLJS_VERSION || '11.11.1'
-  const href = `https://cdn.jsdelivr.net/npm/highlight.js@${version}/styles/${currentHighlightTheme}.css`
+  const href = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/styles/${currentHighlightTheme}.css`
   const newLink = document.createElement('link')
   newLink.rel = 'stylesheet'
   newLink.href = href

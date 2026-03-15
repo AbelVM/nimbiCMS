@@ -12,6 +12,5 @@
 
 ## Functions
 
-- [ensureBulma](functions/ensureBulma.md)
 - [setStyle](functions/setStyle.md)
 - [setThemeVars](functions/setThemeVars.md)

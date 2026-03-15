@@ -64,7 +64,7 @@ export function parseInitOptionsFromQuery(queryString) {
     }
     if (params.has('defaultStyle')) {
       const v = params.get('defaultStyle')
-      if (v === 'light' || v === 'dark') out.defaultStyle = v
+      if (v === 'light' || v === 'dark' || v === 'system') out.defaultStyle = v
     }
     if (params.has('bulmaCustomize')) out.bulmaCustomize = params.get('bulmaCustomize')
     if (params.has('lang')) out.lang = params.get('lang')
@@ -287,8 +287,8 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "indexDepth" must be 1, 2, or 3 when provided')
   }
 
-  if (defaultStyle !== 'light' && defaultStyle !== 'dark') {
-    throw new TypeError('initCMS(options): "defaultStyle" must be "light" or "dark"')
+  if (defaultStyle !== 'light' && defaultStyle !== 'dark' && defaultStyle !== 'system') {
+    throw new TypeError('initCMS(options): "defaultStyle" must be "light", "dark" or "system"')
   }
 
   if (bulmaCustomize != null && typeof bulmaCustomize !== 'string') {
