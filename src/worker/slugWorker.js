@@ -11,7 +11,6 @@ import { buildSearchIndex, crawlForSlug } from '../slugManager.js'
  */
 onmessage = async (ev) => {
   const msg = ev.data || {}
-  console.debug('[slugWorker] received message', msg)
   try {
     if (msg.type === 'buildSearchIndex') {
       const { id, contentBase, indexDepth, noIndexing } = msg

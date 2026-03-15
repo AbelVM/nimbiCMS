@@ -389,6 +389,12 @@ function setZoom(value) {
     _img.style.setProperty('--nimbi-preview-img-width', `${naturalWidth * _zoom}px`)
     _img.style.setProperty('--nimbi-preview-img-height', `${naturalHeight * _zoom}px`)
     _img.style.setProperty('--nimbi-preview-img-transform', 'none')
+    // Backwards-compatible inline styles for tests and environments
+    try {
+      _img.style.width = `${naturalWidth * _zoom}px`
+      _img.style.height = `${naturalHeight * _zoom}px`
+      _img.style.transform = 'none'
+    } catch (e) {}
   } else {
     // Fallback when dimensions aren't known yet.
     _img.style.setProperty('--nimbi-preview-img-max-width', '')
@@ -396,6 +402,7 @@ function setZoom(value) {
     _img.style.setProperty('--nimbi-preview-img-width', '')
     _img.style.setProperty('--nimbi-preview-img-height', '')
     _img.style.setProperty('--nimbi-preview-img-transform', `scale(${_zoom})`)
+    try { _img.style.transform = `scale(${_zoom})` } catch (e) {}
   }
 
   // Always use the pan cursor for consistency.

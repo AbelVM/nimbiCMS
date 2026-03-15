@@ -198,19 +198,7 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
           firstVisibleImage = { img, src, rect, beforeLoading }
         }
 
-        if (debug) {
-          console.log('[helpers] setEagerForAboveFoldImages:', {
-            src,
-            rect,
-            marginPx,
-            visibleTop,
-            visibleBottom,
-            beforeLoading,
-            isAboveFold,
-            effectiveHeight,
-            maxImageHeight
-          })
-        }
+        // debug logging removed
       } catch (err) {
         console.warn('[helpers] setEagerForAboveFoldImages per-image failed', err)
       }
@@ -227,17 +215,7 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
           img.loading = 'eager'
           img.fetchPriority = 'high'
         }
-        if (debug) {
-          console.log('[helpers] setEagerForAboveFoldImages (fallback first visible):', {
-            src,
-            rect,
-            marginPx,
-            visibleTop,
-            visibleBottom,
-            beforeLoading,
-            fallback: true
-          })
-        }
+        // debug logging removed
       } catch (err) {
         console.warn('[helpers] setEagerForAboveFoldImages fallback failed', err)
       }

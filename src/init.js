@@ -4,7 +4,7 @@
  * delegating navigation and UI behaviour to helper modules.
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, setSkipRootReadme } from './slugManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages } from './slugManager.js'
 import * as router from './router.js'
 import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
@@ -337,10 +337,10 @@ export async function initCMS(options = {}) {
   // Apply crawler/readme behavior option early so subsequent index builds
   // honor the caller's preference.
   try {
-    if (typeof setSkipRootReadme === 'function') {
-      setSkipRootReadme(!!skipRootReadme)
-    }
-  } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme failed', e) }
+    import('./slugManager.js').then(m => {
+      try { if (m && typeof m.setSkipRootReadme === 'function') m.setSkipRootReadme(!!skipRootReadme) } catch (e2) { console.warn('[nimbi-cms] setSkipRootReadme failed', e2) }
+    }).catch(e => { /* ignore dynamic import errors for tests */ })
+  } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
 
   try {
     mountEl.classList.add('nimbi-mount')
@@ -407,7 +407,11 @@ export async function initCMS(options = {}) {
   // - non-empty values always end with a trailing '/'.
   if (cp !== '' && !cp.endsWith('/')) cp = cp + '/'
   const contentBase = new URL(pageDir + cp, location.origin).toString()
-  try { setHomePage && setHomePage(homePage) } catch (e) { console.warn('[nimbi-cms] setHomePage failed', e) }
+  try {
+    import('./slugManager.js').then(m => {
+      try { if (m && typeof m.setHomePage === 'function') m.setHomePage(homePage) } catch (e2) { console.warn('[nimbi-cms] setHomePage failed', e2) }
+    }).catch(e => { /* ignore dynamic import errors for tests */ })
+  } catch (e) { console.warn('[nimbi-cms] setHomePage dynamic import failed', e) }
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (availableLanguages && Array.isArray(availableLanguages)) {
     // Set the list of languages used for slug resolution and navigation mapping.

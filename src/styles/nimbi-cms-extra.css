@@ -396,10 +396,10 @@
     right: 0;              /* grow to the left from the input */
     left: auto;
     margin-right: 0.5rem;  /* keep some space from right border */
-    width: 250px;          /* fixed width ensures ellipsis works */
+    width: 340px;          /* a bit wider to show longer titles */
     /* Bulma .box already provides background, border, and padding */
     display: none;
-    max-height: 200px;
+    max-height: 320px;     /* allow more vertical results before scrolling */
     overflow: auto;
     z-index: 100;
 }
@@ -411,7 +411,7 @@
     display: block;
 }
 
-#nimbi-search { width: 200px; }
+#nimbi-search { width: 240px; }
 #nimbi-search-results a { text-decoration: none; color: inherit; }
 #nimbi-search-results a:hover { background: #f5f5f5; }
 
@@ -427,7 +427,7 @@
 /* Individual search result wrapper inside the results box */
 #nimbi-search-results .nimbi-search-result {
     margin-bottom: 6px;
-    padding: 6px;
+    padding: 8px 8px 10px 8px;
     border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
@@ -437,9 +437,10 @@
 }
 
 #nimbi-search-results .nimbi-search-title {
-    font-size: 11px;
-    opacity: 0.7;
-    margin-bottom: 4px;
+    font-size: 12px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+    color: var(--bulma-help-color, #6b6b6b);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

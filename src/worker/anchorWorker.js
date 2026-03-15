@@ -12,7 +12,6 @@ import { _rewriteAnchors } from '../htmlBuilder.js'
 
 onmessage = async (ev) => {
   const msg = ev.data || {}
-  console.debug('[anchorWorker] received message', msg)
   try {
     if (msg.type === 'rewriteAnchors') {
       const { id, html, contentBase, pagePath } = msg

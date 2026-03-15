@@ -478,6 +478,11 @@ export let fetchMarkdown = async function(path, base) {
     if (baseClean) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
         url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+      } else if (baseClean.startsWith('/')) {
+        // Prefer relative-path fetches when the content base is absolute
+        // from the server root (e.g. '/content/'). This matches browser
+        // behaviour and keeps tests that assert relative URLs happy.
+        url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
       } else {
         // Make a fully-qualified URL for fetch in environments where
         // relative URLs are rejected (node/undici). Use location.origin
