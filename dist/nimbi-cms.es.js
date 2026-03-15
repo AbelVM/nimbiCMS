@@ -5629,7 +5629,7 @@ function Ua(t, e) {
 }
 function Ha(t, e, n = "") {
   const s = document.createElement("aside");
-  s.className = "menu box nimbi-toc-inner";
+  s.className = "menu box nimbi-toc-inner is-hidden-mobile";
   const r = document.createElement("p");
   r.className = "menu-label", r.textContent = t("onThisPage"), s.appendChild(r);
   const i = document.createElement("ul");
@@ -7852,7 +7852,7 @@ async function Ro(t = {}) {
   const G = document.createElement("div");
   G.className = "columns";
   const U = document.createElement("div");
-  U.className = "column is-full-mobile is-3-tablet nimbi-nav-wrap", U.setAttribute("role", "navigation");
+  U.className = "column is-hidden-mobile is-3-tablet nimbi-nav-wrap", U.setAttribute("role", "navigation");
   try {
     const y = typeof mt == "function" ? mt("navigation") : null;
     y && U.setAttribute("aria-label", y);

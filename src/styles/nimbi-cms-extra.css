@@ -18,12 +18,11 @@
     display: block;
     padding: 0;
     margin: 0;
-    background: var(--bulma-body-background-color);
     /* Ensure card background variable exists for environments where
        the Bulma-derived theme doesn't expose it. Scope to the CMS so
        we don't override global themes. */
-    --bulma-card-background-color: var(--bulma-card-background, var(--bulma-scheme-main, var(--bulma-background)));
-    position: relative;
+/*     --bulma-card-background-color: var(--bulma-card-background, var(--bulma-scheme-main, var(--bulma-background)));
+ */    position: relative;
     overflow-x: hidden !important;
     overflow: auto; /* allow vertical scrolling by default */
     width: 100%;
@@ -107,9 +106,6 @@
 }
 
 .nimbi-toc-inner {
-    /* Prefer Bulma's canonical card background variable; fall back for
-       backwards compatibility. */
-    background: var(--bulma-card-background-color, var(--bulma-card-background));
     padding: 1rem;
     border-radius: 6px
 }
@@ -127,13 +123,11 @@
 
 .nimbi-article .nimbi-reading-time {
     font-size: 0.75rem;
-    color: var(--bulma-menu-label-color);
     margin-top: 0.25rem;
     margin-bottom: 0.75rem;
 }
 
 .nimbi-article.content {
-    background: var(--bulma-body-background-color);
 }
 
 .nimbi-toc-inner ul {
@@ -147,7 +141,6 @@
 }
 
 .nimbi-toc-inner a {
-    color: var(--bulma-link-color);
     text-decoration: none
 }
 
@@ -167,7 +160,6 @@
 }
 .nimbi-toc-inner ul ul a {
     font-weight: 400; /* less bold for H3 entries */
-    color: var(--bulma-text-weak);
 }
 .nimbi-toc-inner ul ul li {
     margin: 0.25rem 0;
@@ -189,35 +181,18 @@
 .nimbi-toc-inner .menu-list li li a {
     font-size: 0.95em;
     font-weight: 400;
-    color: var(--bulma-text-weak);
     /* increase gap between the left vertical rule and the link text for H3 */
     padding-left: 0.5rem;
 }
 
 .nimbi-toc-inner .menu-list li ul li ul li a {
     font-size: 0.92em;
-    color: var(--bulma-text-weak);
     padding-left: 0.75rem;
 }
 
 @media (max-width: 800px) {
-    .nimbi-nav-wrap {
-        display: none
-    }
-
     .nimbi-cms {
         padding: 0
-    }
-
-    /* Ensure the nav column is hidden on small screens (matches markup).
-       Use high-specificity selector and !important to override Bulma helpers. */
-    .column.is-full-mobile.is-3-tablet.nimbi-nav-wrap {
-        display: none !important;
-    }
-
-    /* On small screens hide the table-of-contents to reduce clutter */
-    .nimbi-toc {
-        display: none !important;
     }
 }
 
@@ -265,14 +240,10 @@
 .nimbi-image-preview {
     border: none;
     padding: 0;
-    /* Bulma's modal and theme variables control background and text colors. */
-    background: var(--bulma-modal-background);
-    color: var(--bulma-text-color);
     border-radius: 10px;
 }
 
 .nimbi-image-preview::backdrop {
-    background: var(--bulma-modal-background);
 }
 
 .nimbi-image-preview .nimbi-image-preview__content {
@@ -283,7 +254,6 @@
     min-height: 60vh;
     min-width: 60vw;
     padding: 1rem;
-    background: var(--bulma-card-background-color, var(--bulma-card-background));
     border-radius: 10px;
     display: flex;
     flex-direction: column;
@@ -341,7 +311,7 @@
     overflow: auto;
     touch-action: none;
     scrollbar-width: thin;
-    scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
+    scrollbar-color: auto;
 }
 
 .nimbi-image-preview__image-wrapper::-webkit-scrollbar {
@@ -350,7 +320,6 @@
 }
 
 .nimbi-image-preview__image-wrapper::-webkit-scrollbar-track {
-    background: transparent;
 }
 
 .nimbi-image-preview__image-wrapper::-webkit-scrollbar-thumb {
@@ -412,7 +381,6 @@
 .nimbi-image-preview .nimbi-image-preview__controls .nimbi-image-preview__zoom {
     min-width: 3rem;
     text-align: center;
-    color: var(--bulma-text-color);
 }
 
 .nimbi-image-preview .nimbi-image-preview__close {
@@ -423,10 +391,7 @@
 }
 
 .nimbi-image-preview .nimbi-image-preview__close:hover {
-    background: var(--bulma-danger);
-    color: var(--bulma-background);
-    border-color: var(--bulma-danger);
-    }
+}
 
 .nimbi-scroll-top.show {
     opacity: 1;
@@ -434,7 +399,7 @@
 }
 
 .nimbi-scroll-top:focus {
-    outline: 2px solid var(--bulma-focus-outline-color);
+    outline: 2px solid;
     outline-offset: 2px
 }
 
@@ -457,9 +422,9 @@
 
 /* Provide reasonable defaults for light/dark modifiers; Bulma's
    is-dark / is-light classes can override colors as needed. */
-/* .nimbi-version-label.is-dark { background: var(--bulma-background); color: var(--bulma-text-color) }
-.nimbi-version-label.is-light { background: var(--bulma-background); color: var(--bulma-text-color) }
- */
+
+/* NOTE: Color and background are managed by Bulma's theme variables.
+   This file avoids setting them explicitly so Bulma can take the wheel. */
 /* Image preview cursor state classes */
 .nimbi-image-preview img.is-panning { cursor: all-scroll }
 .nimbi-image-preview img.is-grabbing { cursor: grabbing }
@@ -474,7 +439,7 @@
     height: 8px;
 }
 .nimbi-cms::-webkit-scrollbar-track, .nimbi-nav-wrap::-webkit-scrollbar-track {
-    background: transparent;
+    /* default track background; Bulma theming applies automatically */
 }
 
 /* search box result dropdown */
@@ -503,24 +468,22 @@
 }
 
 #nimbi-search { width: 240px; }
-#nimbi-search-results a { text-decoration: none; color: inherit; }
-#nimbi-search-results a:hover { background: var(--bulma-background-hover); }
+#nimbi-search-results a { text-decoration: none; }
+#nimbi-search-results a:hover { }
 
 /* Make the search results use a thin Bulma-like scrollbar */
 #nimbi-search-results {
     scrollbar-width: thin;
-    scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
+    scrollbar-color: auto;
 }
 #nimbi-search-results::-webkit-scrollbar { width: 8px; height: 8px }
-#nimbi-search-results::-webkit-scrollbar-track { background: transparent }
+#nimbi-search-results::-webkit-scrollbar-track { }
 #nimbi-search-results::-webkit-scrollbar-thumb {
-    background-color: var(--bulma-scrollbar-thumb-color);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 #nimbi-search-results::-webkit-scrollbar-thumb:hover {
-    background-color: var(--bulma-scrollbar-thumb-hover-color);
 }
 
 /* Parent label for H2 search results: keep on one line and truncate with ellipsis when long */
@@ -555,13 +518,11 @@
 }
 
 .nimbi-cms::-webkit-scrollbar-thumb, .nimbi-nav-wrap::-webkit-scrollbar-thumb {
-    background-color: var(--bulma-scrollbar-thumb-color);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 .nimbi-cms::-webkit-scrollbar-thumb:hover, .nimbi-nav-wrap::-webkit-scrollbar-thumb:hover {
-    background-color: var(--bulma-scrollbar-thumb-hover-color);
 }
 
 /* Make HTML tables horizontally scrollable when they're wider than the article */
@@ -578,7 +539,7 @@
     table-layout: fixed; /* allow predictable column sizing */
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
+    scrollbar-color: auto;
 }
 
 /* Ensure table cells wrap long content instead of forcing overflow */
@@ -654,16 +615,14 @@
     height: 8px;
 }
 .nimbi-article table::-webkit-scrollbar-track {
-    background: transparent;
+    /* default track background; Bulma theming applies automatically */
 }
 .nimbi-article table::-webkit-scrollbar-thumb {
-    background-color: var(--bulma-scrollbar-thumb-color);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 .nimbi-article table::-webkit-scrollbar-thumb:hover {
-    background-color: var(--bulma-scrollbar-thumb-hover-color);
 }
 
 /* Desktop: limit long menu-lists to 80% of the visible CMS area */
