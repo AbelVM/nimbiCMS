@@ -36,7 +36,7 @@ describe('renderer worker register-success', () => {
 
   it('register posts registered when language module loads and hljs core is available', async () => {
     // mock the CDN core import used by ensureHljs
-    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/core.js', () => ({ default: { registerLanguage: () => {}, getLanguage: () => false } }), { virtual: true })
+    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => ({ default: { registerLanguage: () => {}, getLanguage: () => false } }), { virtual: true })
     const tmpPath = globalThis._rendererRegModule
     const mod = await import(pathToFileURL(tmpPath).href)
     // send register with local file URL

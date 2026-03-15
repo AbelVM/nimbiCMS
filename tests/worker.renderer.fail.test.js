@@ -37,7 +37,7 @@ describe('renderer worker register failure when hljs core missing', () => {
 
   it('posts register-error when hljs core import fails even if language module exists', async () => {
     // mock CDN core import to throw/fail
-    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/core.js', () => { throw new Error('no core') }, { virtual: true })
+    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => { throw new Error('no core') }, { virtual: true })
     const mod = await import(pathToFileURL(globalThis._rendererFail).href)
     const langUrl = pathToFileURL(globalThis._langOk).href
     await globalThis.onmessage({ data: { type: 'register', name: 'xlang', url: langUrl } })

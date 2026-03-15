@@ -114,6 +114,10 @@ function hello(){
   </section>
 
   <script>
+    // The playground runs embedded inside nimbiCMS, so we expect the API to
+    // already be present on the global `nimbiCMS` object.
+    const api = window.nimbiCMS || window.nimbiCms || null
+
     // Defaults
     const themeSel = document.getElementById('themeSel');
     const bulmaSel = document.getElementById('bulma');
@@ -124,28 +128,36 @@ function hello(){
       const bulma = bulmaSel.value;
       const hl = hlSel.value;
 
-      // load bulma theme via bulmaswatch (uses ensureBulma)
-      try{
-        if (window.nimbiCMS && typeof window.nimbiCMS.ensureBulma === 'function') {
+      // Apply Bulma theme via nimbiCMS API
+      try {
+        if (api && typeof api.ensureBulma === 'function') {
           if (bulma === 'none') {
-            // remove any injected bulmaswatch stylesheet to revert to base Bulma
+            // undo any previously injected Bulmaswatch theme (nimbicms does not expose an API for this)
             try { const el = document.querySelector('link[data-bulmaswatch-theme]'); if (el && el.parentNode) el.parentNode.removeChild(el) } catch (e) {}
             try { const s = document.querySelector('style[data-bulma-override]'); if (s && s.parentNode) s.parentNode.removeChild(s) } catch (e) {}
           } else {
-            window.nimbiCMS.ensureBulma(bulma)
+            api.ensureBulma(bulma)
           }
         }
-      }catch(e){console.warn(e)}
-      // set highlight theme (loads from CDN)
-      try{window.nimbiCMS && typeof window.nimbiCMS.setHighlightTheme === 'function' && window.nimbiCMS.setHighlightTheme(hl, true)}catch(e){console.warn(e)}
+      } catch (e) { console.warn(e) }
 
-      // re-run highlight on the code block
-      try{
-        if (window.nimbiCMS && typeof window.nimbiCMS.observeCodeBlocks === 'function') window.nimbiCMS.observeCodeBlocks(preview)
-        else {
-          try{if(window.hljs&&typeof window.hljs.highlightElement==='function'){const els=preview.querySelectorAll('pre code');els.forEach(el=>window.hljs.highlightElement(el))}}catch(e){console.warn(e)}
+      // Apply highlight theme via nimbiCMS API
+      try {
+        if (api && typeof api.setHighlightTheme === 'function') {
+          // The API expects an options object (e.g. { useCdn: true }).
+          api.setHighlightTheme(hl, { useCdn: true })
         }
-      }catch(e){console.warn(e)}
+      } catch (e) { console.warn(e) }
+
+      // Re-run highlighting on the example code block
+      try {
+        if (api && typeof api.observeCodeBlocks === 'function') {
+          api.observeCodeBlocks(preview)
+        } else if (window.hljs && typeof window.hljs.highlightElement === 'function') {
+          const els = preview.querySelectorAll('pre code')
+          els.forEach(el => window.hljs.highlightElement(el))
+        }
+      } catch (e) { console.warn(e) }
     }
 
     // theme select handler applies immediately (supports system)
@@ -156,8 +168,8 @@ function hello(){
     }
     themeSel.addEventListener('change', ()=>{
       const style = themeSel.value
-      try{window.nimbiCMS && typeof window.nimbiCMS.setStyle === 'function' && window.nimbiCMS.setStyle(style)}catch(e){console.warn(e)}
-      if(_isDarkForStyle(style)) preview.classList.add('dark'); else preview.classList.remove('dark');
+      try { if (api && typeof api.setStyle === 'function') api.setStyle(style) } catch (e) { console.warn(e) }
+      if (_isDarkForStyle(style)) preview.classList.add('dark'); else preview.classList.remove('dark');
     });
 
     // apply on change for selects
@@ -167,7 +179,9 @@ function hello(){
     // set initial state from current document/theme and injected links
     (function init(){
       try {
-        const theme = document.documentElement.getAttribute('data-theme')
+        // Prefer the NimbiCMS mount theme if available; fallback to document theme.
+        const mount = document.querySelector('.nimbi-mount')
+        const theme = (mount && mount.getAttribute && mount.getAttribute('data-theme')) || document.documentElement.getAttribute('data-theme')
         if (theme === 'dark') themeSel.value = 'dark'
         else if (theme === 'light') themeSel.value = 'light'
         else themeSel.value = 'system'

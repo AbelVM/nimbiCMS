@@ -16,7 +16,7 @@ import { parseFrontmatter } from '../../src/utils/frontmatter.js'
  */
 
 let hljs = null
-const HLJS_CDN_BASE = 'https://cdn.jsdelivr.net/npm/highlight.js@11.8.0'
+const HLJS_CDN_BASE = 'https://cdn.jsdelivr.net/npm/highlight.js'
 
 async function ensureHljs() {
   if (hljs) return hljs

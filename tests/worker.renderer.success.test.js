@@ -37,7 +37,7 @@ describe('renderer worker register-success (idempotent)', () => {
 
   it('posts registered when language module loads; repeated register still posts registered', async () => {
     // mock the CDN core import used by ensureHljs
-    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/core.js', () => ({ default: { registerLanguage: () => {}, getLanguage: () => false } }), { virtual: true })
+    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => ({ default: { registerLanguage: () => {}, getLanguage: () => false } }), { virtual: true })
     const tmpPath = globalThis._rendererRegModule2
     const mod = await import(pathToFileURL(tmpPath).href)
     const langUrl = pathToFileURL(globalThis._langTestModule2).href

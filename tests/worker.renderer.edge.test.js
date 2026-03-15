@@ -37,7 +37,7 @@ describe('renderer worker edges', () => {
 
   it('register posts register-error when ensureHljs fails', async () => {
     // simulate ensureHljs failing by mocking CDN core import to throw
-    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/core.js', () => { throw new Error('no core') }, { virtual: true })
+    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => { throw new Error('no core') }, { virtual: true })
     const mod = await import(pathToFileURL(globalThis._rendererEdgeModule).href)
     await globalThis.onmessage({ data: { type: 'register', name: 'x', url: 'https://example.com/lang.js' } })
     const last = posted[posted.length - 1]

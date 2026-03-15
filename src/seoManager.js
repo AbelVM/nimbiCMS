@@ -178,9 +178,11 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
  */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
   try {
-    const labelEl = toc.querySelector('.menu-label')
-    if (labelEl) {
-      labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
+    if (toc && toc.querySelector) {
+      const labelEl = toc.querySelector('.menu-label')
+      if (labelEl) {
+        labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
+      }
     }
   } catch (e) { console.warn('[seoManager] update toc label failed', e) }
 

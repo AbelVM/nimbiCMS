@@ -494,7 +494,7 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
   }
 
   const currentHighlightTheme = requestedLower
-  const href = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/styles/${currentHighlightTheme}.css`
+  const href = `https://cdn.jsdelivr.net/npm/highlight.js/styles/${currentHighlightTheme}.css`
   const newLink = document.createElement('link')
   newLink.rel = 'stylesheet'
   newLink.href = href

@@ -239,7 +239,7 @@ describe('htmlBuilder utilities', () => {
     expect(links[2].href).toContain('#b')
   })
 
-  it('buildTocElement ignores level 1 and respects pagePath mapping', () => {
+  it('buildTocElement returns null when only one useful entry exists', () => {
     const t = k => k === 'onThisPage' ? 'OnPage' : k
     // prepare slug maps
     mdToSlug.set('path/foo.md', 'foo-slug')
@@ -248,10 +248,7 @@ describe('htmlBuilder utilities', () => {
       { level: 2, text: 'Second', id: 'sec' }
     ]
     const aside = buildTocElement(t, toc, 'path/foo.md')
-    expect(aside.querySelector('p.menu-label').textContent).toBe('OnPage')
-    const a = aside.querySelector('a')
-    expect(a.href).toContain('?page=foo-slug')
-    expect(a.href).toContain('#sec')
+    expect(aside).toBeNull()
   })
 
   it('prepareArticle processes markdown, images, links, slug and anchor', async () => {

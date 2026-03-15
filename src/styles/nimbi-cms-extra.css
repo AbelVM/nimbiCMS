@@ -211,7 +211,7 @@
 
 .nimbi-toc-inner .menu-list{
     overflow-y: auto;
-    
+    max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6 - 4rem) !important;
 }
 
 /* Stronger specificity to override Bulma's .menu-list rules for nested TOC links */

@@ -59,8 +59,10 @@ export function createUI(opts) {
     applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
 
     navWrap.innerHTML = ''
-    navWrap.appendChild(toc)
-    attachTocClickHandler(toc)
+    if (toc) {
+      navWrap.appendChild(toc)
+      attachTocClickHandler(toc)
+    }
 
     try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { console.warn('[nimbi-cms] transformHtml hooks failed', e) }
 

@@ -147,6 +147,10 @@ export function buildTocElement(t, toc, pagePath = '') {
   } catch (err) { console.warn('[htmlBuilder] buildTocElement failed', err) }
 
   aside.appendChild(ul)
+  // If there are zero or only a single TOC entry, there's not enough content
+  // to warrant showing a TOC panel.
+  const itemCount = ul.querySelectorAll('li').length
+  if (itemCount <= 1) return null
   return aside
 }
 
