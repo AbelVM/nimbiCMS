@@ -12,7 +12,7 @@ import { buildNav } from './nav.js'
 import { createUI } from './ui.js'
 import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
-import { ensureBulma, setStyle } from './bulmaManager.js'
+import { ensureBulma, setStyle, registerThemedElement } from './bulmaManager.js'
 
 /**
  * Parse well-known `initCMS` options from the current page URL's query
@@ -336,23 +336,23 @@ export async function initCMS(options = {}) {
 
   // Apply crawler/readme behavior option early so subsequent index builds
   // honor the caller's preference.
-  try { setSkipRootReadme(!!skipRootReadme) } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme failed', e) }
+  try {
+    if (typeof setSkipRootReadme === 'function') {
+      setSkipRootReadme(!!skipRootReadme)
+    }
+  } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme failed', e) }
 
   try {
     mountEl.classList.add('nimbi-mount')
-    mountEl.style.position = mountEl.style.position || 'relative'
-    mountEl.style.overflow = mountEl.style.overflow || 'hidden'
+    // layout and overflow are handled via CSS classes and variables
   } catch (e) { console.warn('[nimbi-cms] mount element setup failed', e) }
 
   const container = document.createElement('div')
   container.className = 'nimbi-cms'
   try {
-    container.style.position = container.style.position || 'relative'
-    container.style.overflow = container.style.overflow || 'auto'
-    try { if (!container.style.webkitOverflowScrolling) container.style.webkitOverflowScrolling = 'touch' } catch (e) { console.warn('[nimbi-cms] set container webkitOverflowScrolling failed', e) }
-    container.style.width = container.style.width || '100%'
-    container.style.height = container.style.height || '100%'
-    container.style.boxSizing = container.style.boxSizing || 'border-box'
+    // Use CSS for container layout defaults; explicit heights are set via
+    // the `--nimbi-cms-height` variable elsewhere when needed.
+    // `-webkit-overflow-scrolling: touch` is covered by CSS defaults
   } catch (e) { console.warn('[nimbi-cms] container style setup failed', e) }
 
   const cols = document.createElement('div')
@@ -483,11 +483,8 @@ export async function initCMS(options = {}) {
             const mountH = (mountEl && mountEl.getBoundingClientRect && Math.round(mountEl.getBoundingClientRect().height)) || (mountEl && mountEl.clientHeight) || 0
             if (mountH > 0) {
               const explicit = Math.max(0, mountH - navHeight)
-              try { container.style.boxSizing = 'border-box' } catch (e) { console.warn('[nimbi-cms] set container boxSizing failed', e) }
-              try { container.style.height = `${explicit}px` } catch (err) { console.warn('[nimbi-cms] set container height failed', err) }
               try { container.style.setProperty('--nimbi-cms-height', `${explicit}px`) } catch (err) { console.warn('[nimbi-cms] set --nimbi-cms-height failed', err) }
             } else {
-              try { container.style.height = `calc(100vh - var(--nimbi-site-navbar-height))` } catch (err) { console.warn('[nimbi-cms] set container height failed', err) }
               try { container.style.setProperty('--nimbi-cms-height', 'calc(100vh - var(--nimbi-site-navbar-height))') } catch (err) { console.warn('[nimbi-cms] set --nimbi-cms-height failed', err) }
             }
           } catch (err) { console.warn('[nimbi-cms] compute container height failed', err) }
@@ -518,55 +515,17 @@ export async function initCMS(options = {}) {
                 try {
                   // Build a linked version label that uses `package.json.homepage`
                   // or `package.json.repository.url` if `homepage` is not present.
-                  const finishWithAnchor = (href) => {
+                    const finishWithAnchor = (href) => {
                     const a = document.createElement('a')
-                    // Apply Bulma `tag` classes; we'll toggle `is-light` / `is-dark`
-                    // to respect the current theme. `nimbi-version-label` allows
-                    // consumers to override via CSS if desired.
+                    // Apply Bulma `tag` classes; consumers can override via CSS.
                     a.className = 'nimbi-version-label tag is-small'
                     a.textContent = `Ninbi CMS v. ${v}`
                     a.href = href || '#'
                     a.target = '_blank'
                     a.rel = 'noopener noreferrer nofollow'
                     a.setAttribute('aria-label', `Ninbi CMS version ${v}`)
-                    a.style.position = 'absolute'
-                    a.style.left = '8px'
-                    a.style.bottom = '6px'
-                    a.style.fontSize = '11px'
-                    a.style.opacity = '0.6'
-                    a.style.zIndex = '9999'
-                    a.style.userSelect = 'none'
-                    a.style.transition = 'opacity 150ms ease'
-                    // subtle hover effect (increase opacity) using inline handlers
-                    a.addEventListener('mouseenter', () => { try { a.style.opacity = '0.95'; a.classList.add('has-text-weight-semibold') } catch (e) {} })
-                    a.addEventListener('mouseleave', () => { try { a.style.opacity = '0.6'; a.classList.remove('has-text-weight-semibold') } catch (e) {} })
-
-                    // Apply initial theme class based on `data-theme` or body class.
-                    const applyThemeClass = () => {
-                      try {
-                        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('is-dark')
-                        a.classList.toggle('is-dark', isDark)
-                        a.classList.toggle('is-light', !isDark)
-                      } catch (e) {}
-                    }
-                    applyThemeClass()
-
-                    // Watch for theme changes (data-theme attribute) and update
-                    // the tag class so it follows light/dark toggles at runtime.
-                    try {
-                      const mo = new MutationObserver((mutations) => {
-                        for (const m of mutations) {
-                          if (m.type === 'attributes' && (m.attributeName === 'data-theme' || m.attributeName === 'class')) {
-                            applyThemeClass()
-                          }
-                        }
-                      })
-                      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-                      mo.observe(document.body, { attributes: true, attributeFilter: ['class'] })
-                    } catch (e) {
-                      // ignore
-                    }
-
+                    // Visual and positioning styles are in CSS; register theme
+                    try { registerThemedElement(a) } catch (e) { /* ignore */ }
                     try { mountEl.appendChild(a) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
                   }
 

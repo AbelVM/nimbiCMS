@@ -2,6 +2,29 @@ import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
+import { registerThemedElement } from './bulmaManager.js'
+
+// Resolve a path against a base while guarding against invalid-base errors
+function resolvePathWithBase(path, base) {
+  try {
+    // Prefer constructing with provided base; if that fails, fall back to location.href
+    const u = new URL(path, base)
+    return u.pathname
+  } catch (err) {
+    try {
+      const u2 = new URL(path, typeof location !== 'undefined' ? location.href : 'http://localhost/')
+      return u2.pathname
+    } catch (err2) {
+      // Last-resort: join as plain path and return normalized string
+      try {
+        const joined = String((base || '')).replace(/\/$/, '') + '/' + String(path || '').replace(/^\//, '')
+        return joined.replace(/\/\\+/g, '/')
+      } catch (err3) {
+        return String(path || '')
+      }
+    }
+  }
+}
 
 /**
  * @typedef {{path:string,name:string,children?:NavItem[]}} NavItem
@@ -462,6 +485,8 @@ export async function preScanHtmlSlugs(linkEls, base) {
         const raw = normalizePath(href)
         const parts = raw.split(/::|#/, 2)
         let path = parts[0]
+        // strip query string (e.g. ?page=...) to avoid passing queries into path resolution
+        try { const qi = path.indexOf('?'); if (qi !== -1) path = path.slice(0, qi) } catch (e) { /* ignore */ }
         if (!path) continue
         if (!path.includes('.')) {
           path = path + '.html'
@@ -532,7 +557,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
   const pending = new Set()
   let contentBasePath = ''
   try {
-    const contentBaseUrl = new URL(contentBase)
+    const contentBaseUrl = new URL(contentBase, typeof location !== 'undefined' ? location.href : 'http://localhost/')
     contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
   } catch (err) { contentBasePath = ''; console.warn('[htmlBuilder] preMapMdSlugs parse base failed', err) }
 
@@ -546,12 +571,12 @@ export async function preMapMdSlugs(linkEls, contentBase) {
           try {
             let resolved
             try {
-              resolved = new URL(mdPathRaw, contentBase).pathname
+              resolved = resolvePathWithBase(mdPathRaw, contentBase)
             } catch (err) {
               resolved = mdPathRaw
               console.warn('[htmlBuilder] resolve mdPath URL failed', err)
             }
-          const rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved.replace(/^\//, '')
+          const rel = (resolved && contentBasePath && resolved.startsWith(contentBasePath)) ? resolved.slice(contentBasePath.length) : String(resolved || '').replace(/^\//, '')
           anchorInfo.push({ rel })
           if (!mdToSlug.has(rel)) pending.add(rel)
         } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
@@ -990,11 +1015,10 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
         try { document.body.appendChild(btn) } catch (err2) { console.warn('[htmlBuilder] append scroll top button failed', err2) }
       }
       try {
-        btn.style.position = 'absolute'
-        btn.style.right = '1rem'
-        btn.style.bottom = '1.25rem'
-        btn.style.zIndex = '60'
-      } catch (err) { console.warn('[htmlBuilder] set scroll-top button styles failed', err) }
+        // Positioning and visual styles are controlled via CSS (.nimbi-scroll-top)
+        // Ensure the button follows the current theme
+        try { registerThemedElement(btn) } catch (e) { /* ignore */ }
+      } catch (err) { console.warn('[htmlBuilder] set scroll-top button theme registration failed', err) }
       btn.addEventListener('click', () => {
         try {
           if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })

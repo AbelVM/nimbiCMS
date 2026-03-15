@@ -152,8 +152,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     end.className = 'navbar-end'
     searchItem = document.createElement('div')
     searchItem.className = 'navbar-item'
-    // anchor results absolutely inside the search item so they can overflow
-    searchItem.style.position = 'relative'
 
     searchInput = document.createElement('input')
     searchInput.className = 'input'
@@ -169,19 +167,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     resultsContainer = document.createElement('div')
     resultsContainer.id = 'nimbi-search-results'
     resultsContainer.className = 'box'
-    // position and sizing so results can appear above other UI and scroll
-    resultsContainer.style.position = 'absolute'
-    resultsContainer.style.top = '100%'
-    resultsContainer.style.right = '0'
-    resultsContainer.style.left = 'auto'
-    resultsContainer.style.zIndex = '10000'
-    resultsContainer.style.minWidth = '240px'
-    resultsContainer.style.maxWidth = '420px'
-    resultsContainer.style.maxHeight = '50vh'
-    resultsContainer.style.overflowY = 'auto'
-    resultsContainer.style.display = 'none'
-    resultsContainer.style.padding = '8px'
-    resultsContainer.style.boxShadow = '0 6px 18px rgba(10,10,10,0.1)'
     searchItem.appendChild(resultsContainer)
     end.appendChild(searchItem)
 
@@ -189,42 +174,27 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     const showResults = (items) => {
       resultsContainer.innerHTML = ''
       if (!items.length) {
-        resultsContainer.style.display = 'none'
+        resultsContainer.classList.remove('is-open')
         return
       }
       items.forEach(it => {
         const wrap = document.createElement('div')
-        wrap.style.marginBottom = '6px'
-        wrap.style.padding = '6px'
-        wrap.style.borderBottom = '1px solid rgba(0,0,0,0.06)'
+        wrap.className = 'nimbi-search-result'
         if (it.parentTitle) {
           const label = document.createElement('div')
           label.textContent = it.parentTitle
-          label.style.fontSize = '11px'
-          label.style.opacity = '0.7'
-          label.style.marginBottom = '4px'
-          label.className = 'nimbi-search-parent'
-          label.style.whiteSpace = 'nowrap'
-          label.style.overflow = 'hidden'
-          label.style.textOverflow = 'ellipsis'
-          label.style.display = 'block'
-          label.style.maxWidth = '100%'
+          label.className = 'nimbi-search-title nimbi-search-parent'
           wrap.appendChild(label)
         }
         const a = document.createElement('a')
         a.className = 'block'
         a.href = '?page=' + encodeURIComponent(it.slug)
         a.textContent = it.title
-        a.style.whiteSpace = 'nowrap'
-        a.style.overflow = 'hidden'
-        a.style.textOverflow = 'ellipsis'
         a.addEventListener('click', () => { resultsContainer.style.display = 'none' })
         wrap.appendChild(a)
         resultsContainer.appendChild(wrap)
       })
-      resultsContainer.style.display = 'block'
-      resultsContainer.style.right = '0'
-      resultsContainer.style.left = 'auto'
+      resultsContainer.classList.add('is-open')
     }
 
     const debounce = (fn, delay) => {
@@ -269,8 +239,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       if (searchInput) searchInput.addEventListener('input', handleInput);
       document.addEventListener('click', (ev) => {
         const domInput = document.querySelector('input#nimbi-search');
-        if (domInput && !domInput.contains(ev.target) && resultsContainer && !resultsContainer.contains(ev.target)) {
-          resultsContainer.style.display = 'none';
+            if (domInput && !domInput.contains(ev.target) && resultsContainer && !resultsContainer.contains(ev.target)) {
+              resultsContainer.classList.remove('is-open');
         }
       });
     }
@@ -391,42 +361,27 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     const showResults = (items) => {
       results.innerHTML = ''
       if (!items.length) {
-        results.style.display = 'none'
+        results.classList.remove('is-open')
         return
       }
       items.forEach(it => {
         const wrap = document.createElement('div')
-        wrap.style.marginBottom = '6px'
-        wrap.style.padding = '6px'
-        wrap.style.borderBottom = '1px solid rgba(0,0,0,0.06)'
+        wrap.className = 'nimbi-search-result'
         if (it.parentTitle) {
           const label = document.createElement('div')
           label.textContent = it.parentTitle
-          label.style.fontSize = '11px'
-          label.style.opacity = '0.7'
-          label.style.marginBottom = '4px'
-          label.className = 'nimbi-search-parent'
-          label.style.whiteSpace = 'nowrap'
-          label.style.overflow = 'hidden'
-          label.style.textOverflow = 'ellipsis'
-          label.style.display = 'block'
-          label.style.maxWidth = '100%'
+          label.className = 'nimbi-search-title nimbi-search-parent'
           wrap.appendChild(label)
         }
         const a = document.createElement('a')
         a.className = 'block'
         a.href = '?page=' + encodeURIComponent(it.slug)
         a.textContent = it.title
-        a.style.whiteSpace = 'nowrap'
-        a.style.overflow = 'hidden'
-        a.style.textOverflow = 'ellipsis'
         a.addEventListener('click', () => { results.style.display = 'none' })
         wrap.appendChild(a)
         results.appendChild(wrap)
       })
-      results.style.display = 'block'
-      results.style.right = '0'
-      results.style.left = 'auto'
+      results.classList.add('is-open')
     }
     const debounce = (fn, delay) => {
       let timer = null

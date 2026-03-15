@@ -25,6 +25,10 @@
     --bulma-card-background-color: var(--bulma-card-background, var(--bulma-scheme-main, var(--bulma-background, #fff)));
     position: relative;
     overflow-x: hidden !important;
+    overflow: auto; /* allow vertical scrolling by default */
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
 }
 
 .nimbi-cms .columns {
@@ -272,6 +276,19 @@
     touch-action: none;
 }
 
+/* Allow JS to control image size/transform via CSS variables.
+   Fallbacks keep behavior consistent when variables are not set. */
+.nimbi-image-preview img {
+    width: var(--nimbi-preview-img-width, auto);
+    height: var(--nimbi-preview-img-height, auto);
+    max-width: var(--nimbi-preview-img-max-width, 100%);
+    max-height: var(--nimbi-preview-img-max-height, 100%);
+    transform: var(--nimbi-preview-img-transform, none);
+}
+
+/* Smooth transform transitions when zooming */
+.nimbi-image-preview img { transition: transform 120ms ease; }
+
 .nimbi-image-preview .nimbi-image-preview__controls {
     display: flex;
     gap: 0.25rem;
@@ -334,6 +351,28 @@
     height: 18px
 }
 
+/* Version label: positioned bottom-left and theme-aware */
+.nimbi-version-label {
+    position: absolute;
+    left: 8px;
+    bottom: 6px;
+    font-size: 11px;
+    opacity: 0.6;
+    z-index: 9999;
+    user-select: none;
+    transition: opacity 150ms ease;
+}
+.nimbi-version-label:hover { opacity: 0.95 }
+
+/* Provide reasonable defaults for light/dark modifiers; Bulma's
+   is-dark / is-light classes can override colors as needed. */
+.nimbi-version-label.is-dark { background: rgba(255,255,255,0.06); color: var(--bulma-text-color, #fff) }
+.nimbi-version-label.is-light { background: rgba(10,10,10,0.03); color: var(--bulma-text-color, #222) }
+
+/* Image preview cursor state classes */
+.nimbi-image-preview img.is-panning { cursor: all-scroll }
+.nimbi-image-preview img.is-grabbing { cursor: grabbing }
+
 .nimbi-cms, .nimbi-nav-wrap, .menu-list {
     scrollbar-width: thin; 
     scrollbar-color: var(--bulma-scrollbar-thumb-color, rgba(0,0,0,0.28)) transparent;
@@ -364,6 +403,7 @@
     overflow: auto;
     z-index: 100;
 }
+#nimbi-search-results.is-open { display: block }
 #nimbi-search-results a {
     white-space: nowrap;
     overflow: hidden;
@@ -377,6 +417,29 @@
 
 /* Parent label for H2 search results: keep on one line and truncate with ellipsis when long */
 #nimbi-search-results .nimbi-search-parent {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 100%;
+}
+
+/* Individual search result wrapper inside the results box */
+#nimbi-search-results .nimbi-search-result {
+    margin-bottom: 6px;
+    padding: 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+#nimbi-search-results .nimbi-search-result:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+#nimbi-search-results .nimbi-search-title {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-bottom: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

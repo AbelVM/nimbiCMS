@@ -479,11 +479,16 @@ export let fetchMarkdown = async function(path, base) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
         url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
       } else {
-        const leading = baseClean.startsWith('/') ? '' : '/'
-        url = leading + baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+        // Make a fully-qualified URL for fetch in environments where
+        // relative URLs are rejected (node/undici). Use location.origin
+        // when available, otherwise fall back to http://localhost.
+        const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+        const basePath = baseClean.startsWith('/') ? baseClean : ('/' + baseClean)
+        url = origin + basePath.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
       }
     } else {
-      url = '/' + path.replace(/^\//, '')
+      const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+      url = origin + '/' + path.replace(/^\//, '')
     }
   } catch (err) {
     url = '/' + path.replace(/^\//, '')

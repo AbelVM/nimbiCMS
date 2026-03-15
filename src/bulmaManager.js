@@ -94,3 +94,31 @@ export function setThemeVars(vars) {
     try { root.style.setProperty(`--${k}`, v) } catch (_) { console.warn('[bulmaManager] setThemeVars failed for', k, _ ) }
   }
 }
+
+/**
+ * Register an element so it follows the current Bulma light/dark theme.
+ * The element will receive either `is-dark` (for dark) or `is-light` (for light).
+ * Returns an unregister function to stop observing theme changes.
+ * @param {HTMLElement} el
+ * @returns {() => void}
+ */
+export function registerThemedElement(el) {
+  if (!el || !(el instanceof HTMLElement)) return () => {}
+  const apply = () => {
+    if (currentStyle === 'dark') {
+      el.classList.add('is-dark')
+      el.classList.remove('is-light')
+    } else {
+      el.classList.add('is-light')
+      el.classList.remove('is-dark')
+    }
+  }
+  apply()
+  const mo = new MutationObserver(() => {
+    const theme = document.documentElement.getAttribute('data-theme')
+    currentStyle = theme === 'dark' ? 'dark' : 'light'
+    apply()
+  })
+  try { mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }) } catch (_) { /* ignore */ }
+  return () => { try { mo.disconnect() } catch (_) {} }
+}

@@ -182,7 +182,9 @@ function _createModal() {
     initialPinchDistance = 0
     // Keep cursor consistent during and after drag.
     if (_img) {
-      _img.style.cursor = 'all-scroll'
+      _img.classList.add('is-panning')
+      _img.classList.remove('is-grabbing')
+      try { _img.style.cursor = 'all-scroll' } catch (e) {}
     }
   }
 
@@ -273,7 +275,9 @@ function _createModal() {
     dragStartY = clientY
     scrollStartX = wrapper.scrollLeft
     scrollStartY = wrapper.scrollTop
-    _img.style.cursor = 'all-scroll'
+    _img.classList.add('is-panning')
+    _img.classList.remove('is-grabbing')
+    try { _img.style.cursor = 'all-scroll' } catch (e) {}
 
     // Track pointer move/up on the whole window so dragging still works if pointer leaves image.
     window.addEventListener('pointermove', windowPointerMove)
@@ -335,6 +339,9 @@ function _createModal() {
   if (wrapper) {
     wrapper.addEventListener('pointerdown', (event) => {
       startDrag(event.clientX, event.clientY, event.pointerId)
+      if (event && event.target && event.target.tagName === 'IMG') {
+        try { event.target.classList.add('is-grabbing'); event.target.style.cursor = 'grabbing' } catch (e) {}
+      }
     })
     wrapper.addEventListener('pointermove', (event) => {
       moveDrag(event.clientX, event.clientY, event.pointerId)
@@ -344,6 +351,9 @@ function _createModal() {
 
     wrapper.addEventListener('mousedown', (event) => {
       startDrag(event.clientX, event.clientY, 1)
+      if (event && event.target && event.target.tagName === 'IMG') {
+        try { event.target.classList.add('is-grabbing'); event.target.style.cursor = 'grabbing' } catch (e) {}
+      }
     })
     wrapper.addEventListener('mousemove', (event) => {
       moveDrag(event.clientX, event.clientY, 1)
@@ -373,24 +383,26 @@ function setZoom(value) {
 
   if (naturalWidth && naturalHeight) {
     // Allow scaling below/above wrapper size without max constraints.
-    _img.style.maxWidth = 'none'
-    _img.style.maxHeight = 'none'
+    _img.style.setProperty('--nimbi-preview-img-max-width', 'none')
+    _img.style.setProperty('--nimbi-preview-img-max-height', 'none')
 
-    _img.style.width = `${naturalWidth * _zoom}px`
-    _img.style.height = `${naturalHeight * _zoom}px`
-    _img.style.transform = ''
+    _img.style.setProperty('--nimbi-preview-img-width', `${naturalWidth * _zoom}px`)
+    _img.style.setProperty('--nimbi-preview-img-height', `${naturalHeight * _zoom}px`)
+    _img.style.setProperty('--nimbi-preview-img-transform', 'none')
   } else {
     // Fallback when dimensions aren't known yet.
-    _img.style.maxWidth = ''
-    _img.style.maxHeight = ''
-    _img.style.width = ''
-    _img.style.height = ''
-    _img.style.transform = `scale(${_zoom})`
+    _img.style.setProperty('--nimbi-preview-img-max-width', '')
+    _img.style.setProperty('--nimbi-preview-img-max-height', '')
+    _img.style.setProperty('--nimbi-preview-img-width', '')
+    _img.style.setProperty('--nimbi-preview-img-height', '')
+    _img.style.setProperty('--nimbi-preview-img-transform', `scale(${_zoom})`)
   }
 
   // Always use the pan cursor for consistency.
   if (_img) {
-    _img.style.cursor = 'all-scroll'
+    _img.classList.add('is-panning')
+    _img.classList.remove('is-grabbing')
+    try { _img.style.cursor = 'all-scroll' } catch (e) {}
   }
 }
 
