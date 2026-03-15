@@ -136,7 +136,7 @@
 .nimbi-site-navbar + .nimbi-cms .nimbi-content {
     padding-top: calc(var(--nimbi-site-navbar-height) + 2rem);
 }
-.nimbi-toc {
+.nimbi-toc-inner {
     margin-bottom: 1rem;
     /* Keep the TOC within the visible area by capping its height to a
        percentage of the CMS viewport. */
