@@ -184,7 +184,6 @@ function _createModal() {
     if (_img) {
       _img.classList.add('is-panning')
       _img.classList.remove('is-grabbing')
-      try { _img.style.cursor = 'all-scroll' } catch (e) {}
     }
   }
 
@@ -277,7 +276,6 @@ function _createModal() {
     scrollStartY = wrapper.scrollTop
     _img.classList.add('is-panning')
     _img.classList.remove('is-grabbing')
-    try { _img.style.cursor = 'all-scroll' } catch (e) {}
 
     // Track pointer move/up on the whole window so dragging still works if pointer leaves image.
     window.addEventListener('pointermove', windowPointerMove)
@@ -340,7 +338,7 @@ function _createModal() {
     wrapper.addEventListener('pointerdown', (event) => {
       startDrag(event.clientX, event.clientY, event.pointerId)
       if (event && event.target && event.target.tagName === 'IMG') {
-        try { event.target.classList.add('is-grabbing'); event.target.style.cursor = 'grabbing' } catch (e) {}
+        try { event.target.classList.add('is-grabbing') } catch (e) {}
       }
     })
     wrapper.addEventListener('pointermove', (event) => {
@@ -352,7 +350,7 @@ function _createModal() {
     wrapper.addEventListener('mousedown', (event) => {
       startDrag(event.clientX, event.clientY, 1)
       if (event && event.target && event.target.tagName === 'IMG') {
-        try { event.target.classList.add('is-grabbing'); event.target.style.cursor = 'grabbing' } catch (e) {}
+        try { event.target.classList.add('is-grabbing') } catch (e) {}
       }
     })
     wrapper.addEventListener('mousemove', (event) => {
@@ -409,7 +407,6 @@ function setZoom(value) {
   if (_img) {
     _img.classList.add('is-panning')
     _img.classList.remove('is-grabbing')
-    try { _img.style.cursor = 'all-scroll' } catch (e) {}
   }
 }
 
@@ -585,7 +582,7 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     scrollStartX = wrapper.scrollLeft
     scrollStartY = wrapper.scrollTop
     target.setPointerCapture(event.pointerId)
-    target.style.cursor = 'grabbing'
+    try { target.classList.add('is-grabbing') } catch (e) {}
   })
 
   root.addEventListener('pointermove', (event) => {
@@ -622,6 +619,14 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     isDragging = false
     pointers.clear()
     initialPinchDistance = 0
+    // normalize preview image cursor/class state
+    try {
+      const preview = document.querySelector('[data-nimbi-preview-image]')
+      if (preview) {
+        preview.classList.add('is-panning')
+        preview.classList.remove('is-grabbing')
+      }
+    } catch (e) {}
   }
 
   root.addEventListener('pointerup', endDrag)

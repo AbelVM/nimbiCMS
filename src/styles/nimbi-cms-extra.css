@@ -291,6 +291,19 @@
     overflow: auto;
 }
 
+/* Override Bulma's default .modal-content fixed width (640px) when inside
+   the image-preview dialog so the preview can be responsive. Keep the
+   intent of our `.nimbi-image-preview__content` sizing but ensure the
+   wrapping .modal-content doesn't constrain it. */
+.nimbi-image-preview .modal-content {
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+}
+
 @media (max-width: 768px) {
     .nimbi-image-preview .nimbi-image-preview__content {
         width: 100vw;

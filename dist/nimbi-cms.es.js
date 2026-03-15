@@ -375,7 +375,7 @@ function as() {
         // look for 3 words in a row
       }
     ), W;
-  }, y = R("//", "$"), U = R("/\\*", "\\*/"), Z = R("#", "$"), ge = {
+  }, y = R("//", "$"), H = R("/\\*", "\\*/"), G = R("#", "$"), ge = {
     scope: "number",
     begin: V,
     relevance: 0
@@ -420,7 +420,7 @@ function as() {
     BINARY_NUMBER_MODE: ee,
     BINARY_NUMBER_RE: j,
     COMMENT: R,
-    C_BLOCK_COMMENT_MODE: U,
+    C_BLOCK_COMMENT_MODE: H,
     C_LINE_COMMENT_MODE: y,
     C_NUMBER_MODE: ke,
     C_NUMBER_RE: se,
@@ -439,7 +439,7 @@ function as() {
         }
       );
     },
-    HASH_COMMENT_MODE: Z,
+    HASH_COMMENT_MODE: G,
     IDENT_RE: N,
     MATCH_NOTHING_RE: B,
     METHOD_GUARD: qe,
@@ -704,19 +704,19 @@ function as() {
       return $.noHighlightRe.test(E);
     }
     function ye(E) {
-      let H = E.className + " ";
-      H += E.parentNode ? E.parentNode.className : "";
-      const te = $.languageDetectRe.exec(H);
+      let D = E.className + " ";
+      D += E.parentNode ? E.parentNode.className : "";
+      const te = $.languageDetectRe.exec(D);
       if (te) {
         const le = je(te[1]);
         return le || (Fn(pe.replace("{}", te[1])), Fn("Falling back to no-highlight mode for this block.", E)), le ? te[1] : "no-highlight";
       }
-      return H.split(/\s+/).find((le) => F(le) || je(le));
+      return D.split(/\s+/).find((le) => F(le) || je(le));
     }
-    function fe(E, H, te) {
+    function fe(E, D, te) {
       let le = "", we = "";
-      typeof H == "object" ? (le = E, te = H.ignoreIllegals, we = H.language) : (tt("10.7.0", "highlight(lang, code, ...args) has been deprecated."), tt("10.7.0", `Please use highlight(code, options) instead.
-https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te === void 0 && (te = !0);
+      typeof D == "object" ? (le = E, te = D.ignoreIllegals, we = D.language) : (tt("10.7.0", "highlight(lang, code, ...args) has been deprecated."), tt("10.7.0", `Please use highlight(code, options) instead.
+https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = D), te === void 0 && (te = !0);
       const _e = {
         code: le,
         language: we
@@ -725,22 +725,22 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
       const Fe = _e.result ? _e.result : ot(_e.language, _e.code, te);
       return Fe.code = _e.code, Pt("after:highlight", Fe), Fe;
     }
-    function ot(E, H, te, le) {
+    function ot(E, D, te, le) {
       const we = /* @__PURE__ */ Object.create(null);
       function _e(_, z) {
         return _.keywords[z];
       }
       function Fe() {
-        if (!G.keywords) {
+        if (!Z.keywords) {
           xe.addText(ce);
           return;
         }
         let _ = 0;
-        G.keywordPatternRe.lastIndex = 0;
-        let z = G.keywordPatternRe.exec(ce), X = "";
+        Z.keywordPatternRe.lastIndex = 0;
+        let z = Z.keywordPatternRe.exec(ce), X = "";
         for (; z; ) {
           X += ce.substring(_, z.index);
-          const ae = Be.case_insensitive ? z[0].toLowerCase() : z[0], ve = _e(G, ae);
+          const ae = Be.case_insensitive ? z[0].toLowerCase() : z[0], ve = _e(Z, ae);
           if (ve) {
             const [Oe, is] = ve;
             if (xe.addText(X), X = "", we[ae] = (we[ae] || 0) + 1, we[ae] <= Ui && (zt += is), Oe.startsWith("_"))
@@ -751,26 +751,26 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
             }
           } else
             X += z[0];
-          _ = G.keywordPatternRe.lastIndex, z = G.keywordPatternRe.exec(ce);
+          _ = Z.keywordPatternRe.lastIndex, z = Z.keywordPatternRe.exec(ce);
         }
         X += ce.substring(_), xe.addText(X);
       }
       function It() {
         if (ce === "") return;
         let _ = null;
-        if (typeof G.subLanguage == "string") {
-          if (!S[G.subLanguage]) {
+        if (typeof Z.subLanguage == "string") {
+          if (!S[Z.subLanguage]) {
             xe.addText(ce);
             return;
           }
-          _ = ot(G.subLanguage, ce, !0, rr[G.subLanguage]), rr[G.subLanguage] = /** @type {CompiledMode} */
+          _ = ot(Z.subLanguage, ce, !0, rr[Z.subLanguage]), rr[Z.subLanguage] = /** @type {CompiledMode} */
           _._top;
         } else
-          _ = sn(ce, G.subLanguage.length ? G.subLanguage : null);
-        G.relevance > 0 && (zt += _.relevance), xe.__addSublanguage(_._emitter, _.language);
+          _ = sn(ce, Z.subLanguage.length ? Z.subLanguage : null);
+        Z.relevance > 0 && (zt += _.relevance), xe.__addSublanguage(_._emitter, _.language);
       }
       function Re() {
-        G.subLanguage != null ? It() : Fe(), ce = "";
+        Z.subLanguage != null ? It() : Fe(), ce = "";
       }
       function Ie(_, z) {
         _ !== "" && (xe.startScope(z), xe.addText(_), xe.endScope());
@@ -788,7 +788,7 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
         }
       }
       function er(_, z) {
-        return _.scope && typeof _.scope == "string" && xe.openNode(Be.classNameAliases[_.scope] || _.scope), _.beginScope && (_.beginScope._wrap ? (Ie(ce, Be.classNameAliases[_.beginScope._wrap] || _.beginScope._wrap), ce = "") : _.beginScope._multi && (Jn(_.beginScope, z), ce = "")), G = Object.create(_, { parent: { value: G } }), G;
+        return _.scope && typeof _.scope == "string" && xe.openNode(Be.classNameAliases[_.scope] || _.scope), _.beginScope && (_.beginScope._wrap ? (Ie(ce, Be.classNameAliases[_.beginScope._wrap] || _.beginScope._wrap), ce = "") : _.beginScope._multi && (Jn(_.beginScope, z), ce = "")), Z = Object.create(_, { parent: { value: Z } }), Z;
       }
       function tr(_, z, X) {
         let ae = C(_.endRe, X);
@@ -807,7 +807,7 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
           return tr(_.parent, z, X);
       }
       function Ji(_) {
-        return G.matcher.regexIndex === 0 ? (ce += _[0], 1) : (cn = !0, 0);
+        return Z.matcher.regexIndex === 0 ? (ce += _[0], 1) : (cn = !0, 0);
       }
       function es(_) {
         const z = _[0], X = _.rule, ae = new e(X), ve = [X.__beforeBegin, X["on:begin"]];
@@ -817,19 +817,19 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
         return X.skip ? ce += z : (X.excludeBegin && (ce += z), Re(), !X.returnBegin && !X.excludeBegin && (ce = z)), er(X, _), X.returnBegin ? 0 : z.length;
       }
       function ts(_) {
-        const z = _[0], X = H.substring(_.index), ae = tr(G, _, X);
+        const z = _[0], X = D.substring(_.index), ae = tr(Z, _, X);
         if (!ae)
           return Qn;
-        const ve = G;
-        G.endScope && G.endScope._wrap ? (Re(), Ie(z, G.endScope._wrap)) : G.endScope && G.endScope._multi ? (Re(), Jn(G.endScope, _)) : ve.skip ? ce += z : (ve.returnEnd || ve.excludeEnd || (ce += z), Re(), ve.excludeEnd && (ce = z));
+        const ve = Z;
+        Z.endScope && Z.endScope._wrap ? (Re(), Ie(z, Z.endScope._wrap)) : Z.endScope && Z.endScope._multi ? (Re(), Jn(Z.endScope, _)) : ve.skip ? ce += z : (ve.returnEnd || ve.excludeEnd || (ce += z), Re(), ve.excludeEnd && (ce = z));
         do
-          G.scope && xe.closeNode(), !G.skip && !G.subLanguage && (zt += G.relevance), G = G.parent;
-        while (G !== ae.parent);
+          Z.scope && xe.closeNode(), !Z.skip && !Z.subLanguage && (zt += Z.relevance), Z = Z.parent;
+        while (Z !== ae.parent);
         return ae.starts && er(ae.starts, _), ve.returnEnd ? 0 : z.length;
       }
       function ns() {
         const _ = [];
-        for (let z = G; z !== Be; z = z.parent)
+        for (let z = Z; z !== Be; z = z.parent)
           z.scope && _.unshift(z.scope);
         _.forEach((z) => xe.openNode(z));
       }
@@ -839,7 +839,7 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
         if (ce += _, X == null)
           return Re(), 0;
         if (Bt.type === "begin" && z.type === "end" && Bt.index === z.index && X === "") {
-          if (ce += H.slice(z.index, z.index + 1), !de) {
+          if (ce += D.slice(z.index, z.index + 1), !de) {
             const ae = new Error(`0 width match regex (${E})`);
             throw ae.languageName = E, ae.badRule = Bt.rule, ae;
           }
@@ -848,8 +848,8 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
         if (Bt = z, z.type === "begin")
           return es(z);
         if (z.type === "illegal" && !te) {
-          const ae = new Error('Illegal lexeme "' + X + '" for mode "' + (G.scope || "<unnamed>") + '"');
-          throw ae.mode = G, ae;
+          const ae = new Error('Illegal lexeme "' + X + '" for mode "' + (Z.scope || "<unnamed>") + '"');
+          throw ae.mode = Z, ae;
         } else if (z.type === "end") {
           const ae = ts(z);
           if (ae !== Qn)
@@ -866,22 +866,22 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
       if (!Be)
         throw Ke(pe.replace("{}", E)), new Error('Unknown language: "' + E + '"');
       const rs = Ni(Be);
-      let on = "", G = le || rs;
+      let on = "", Z = le || rs;
       const rr = {}, xe = new $.__emitter($);
       ns();
       let ce = "", zt = 0, Ye = 0, ln = 0, cn = !1;
       try {
         if (Be.__emitTokens)
-          Be.__emitTokens(H, xe);
+          Be.__emitTokens(D, xe);
         else {
-          for (G.matcher.considerAll(); ; ) {
-            ln++, cn ? cn = !1 : G.matcher.considerAll(), G.matcher.lastIndex = Ye;
-            const _ = G.matcher.exec(H);
+          for (Z.matcher.considerAll(); ; ) {
+            ln++, cn ? cn = !1 : Z.matcher.considerAll(), Z.matcher.lastIndex = Ye;
+            const _ = Z.matcher.exec(D);
             if (!_) break;
-            const z = H.substring(Ye, _.index), X = nr(z, _);
+            const z = D.substring(Ye, _.index), X = nr(z, _);
             Ye = _.index + X;
           }
-          nr(H.substring(Ye));
+          nr(D.substring(Ye));
         }
         return xe.finalize(), on = xe.toHTML(), {
           language: E,
@@ -889,19 +889,19 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
           relevance: zt,
           illegal: !1,
           _emitter: xe,
-          _top: G
+          _top: Z
         };
       } catch (_) {
         if (_.message && _.message.includes("Illegal"))
           return {
             language: E,
-            value: nn(H),
+            value: nn(D),
             illegal: !0,
             relevance: 0,
             _illegalBy: {
               message: _.message,
               index: Ye,
-              context: H.slice(Ye - 100, Ye + 100),
+              context: D.slice(Ye - 100, Ye + 100),
               mode: _.mode,
               resultSoFar: on
             },
@@ -910,29 +910,29 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
         if (de)
           return {
             language: E,
-            value: nn(H),
+            value: nn(D),
             illegal: !1,
             relevance: 0,
             errorRaised: _,
             _emitter: xe,
-            _top: G
+            _top: Z
           };
         throw _;
       }
     }
     function rn(E) {
-      const H = {
+      const D = {
         value: nn(E),
         illegal: !1,
         relevance: 0,
         _top: P,
         _emitter: new $.__emitter($)
       };
-      return H._emitter.addText(E), H;
+      return D._emitter.addText(E), D;
     }
-    function sn(E, H) {
-      H = H || $.languages || Object.keys(S);
-      const te = rn(E), le = H.filter(je).filter(Vn).map(
+    function sn(E, D) {
+      D = D || $.languages || Object.keys(S);
+      const te = rn(E), le = D.filter(je).filter(Vn).map(
         (Re) => ot(Re, E, !1)
       );
       le.unshift(te);
@@ -948,12 +948,12 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
       }), [_e, Fe] = we, It = _e;
       return It.secondBest = Fe, It;
     }
-    function qi(E, H, te) {
-      const le = H && T[H] || te;
+    function qi(E, D, te) {
+      const le = D && T[D] || te;
       E.classList.add("hljs"), E.classList.add(`language-${le}`);
     }
     function an(E) {
-      let H = null;
+      let D = null;
       const te = ye(E);
       if (F(te)) return;
       if (Pt(
@@ -968,8 +968,8 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
           "One of your code blocks includes unescaped HTML.",
           E.innerHTML
         );
-      H = E;
-      const le = H.textContent, we = te ? fe(le, { language: te, ignoreIllegals: !0 }) : sn(le);
+      D = E;
+      const le = D.textContent, we = te ? fe(le, { language: te, ignoreIllegals: !0 }) : sn(le);
       E.innerHTML = we.value, E.dataset.highlighted = "yes", qi(E, te, we.language), E.result = {
         language: we.language,
         // TODO: remove with version 11.0
@@ -1000,10 +1000,10 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
       }
       document.querySelectorAll($.cssSelector).forEach(an);
     }
-    function Zi(E, H) {
+    function Zi(E, D) {
       let te = null;
       try {
-        te = H(g);
+        te = D(g);
       } catch (le) {
         if (Ke("Language definition for '{}' could not be registered.".replace("{}", E)), de)
           Ke(le);
@@ -1011,12 +1011,12 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
           throw le;
         te = P;
       }
-      te.name || (te.name = E), S[E] = te, te.rawDefinition = H.bind(null, g), te.aliases && Yn(te.aliases, { languageName: E });
+      te.name || (te.name = E), S[E] = te, te.rawDefinition = D.bind(null, g), te.aliases && Yn(te.aliases, { languageName: E });
     }
     function Gi(E) {
       delete S[E];
-      for (const H of Object.keys(T))
-        T[H] === E && delete T[H];
+      for (const D of Object.keys(T))
+        T[D] === E && delete T[D];
     }
     function Qi() {
       return Object.keys(S);
@@ -1024,23 +1024,23 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
     function je(E) {
       return E = (E || "").toLowerCase(), S[E] || S[T[E]];
     }
-    function Yn(E, { languageName: H }) {
+    function Yn(E, { languageName: D }) {
       typeof E == "string" && (E = [E]), E.forEach((te) => {
-        T[te.toLowerCase()] = H;
+        T[te.toLowerCase()] = D;
       });
     }
     function Vn(E) {
-      const H = je(E);
-      return H && !H.disableAutodetect;
+      const D = je(E);
+      return D && !D.disableAutodetect;
     }
     function Xi(E) {
-      E["before:highlightBlock"] && !E["before:highlightElement"] && (E["before:highlightElement"] = (H) => {
+      E["before:highlightBlock"] && !E["before:highlightElement"] && (E["before:highlightElement"] = (D) => {
         E["before:highlightBlock"](
-          Object.assign({ block: H.el }, H)
+          Object.assign({ block: D.el }, D)
         );
-      }), E["after:highlightBlock"] && !E["after:highlightElement"] && (E["after:highlightElement"] = (H) => {
+      }), E["after:highlightBlock"] && !E["after:highlightElement"] && (E["after:highlightElement"] = (D) => {
         E["after:highlightBlock"](
-          Object.assign({ block: H.el }, H)
+          Object.assign({ block: D.el }, D)
         );
       });
     }
@@ -1048,13 +1048,13 @@ https://github.com/highlightjs/highlight.js/issues/2277`), we = E, le = H), te =
       Xi(E), W.push(E);
     }
     function Yi(E) {
-      const H = W.indexOf(E);
-      H !== -1 && W.splice(H, 1);
+      const D = W.indexOf(E);
+      D !== -1 && W.splice(D, 1);
     }
-    function Pt(E, H) {
+    function Pt(E, D) {
       const te = E;
       W.forEach(function(le) {
-        le[te] && le[te](H);
+        le[te] && le[te](D);
       });
     }
     function Vi(E) {
@@ -2763,11 +2763,11 @@ async function Os(t, e) {
                         }
                         if (O.hasAttribute("srcset")) {
                           const v = (O.getAttribute("srcset") || "").split(",").map((R) => R.trim()).filter(Boolean).map((R) => {
-                            const [y, U] = R.split(/\s+/, 2);
+                            const [y, H] = R.split(/\s+/, 2);
                             if (!y || /^(https?:)?\/\//i.test(y) || y.startsWith("/")) return R;
                             try {
-                              const Z = new URL(y, I).toString();
-                              return U ? `${Z} ${U}` : Z;
+                              const G = new URL(y, I).toString();
+                              return H ? `${G} ${H}` : G;
                             } catch {
                               return R;
                             }
@@ -6422,16 +6422,16 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
       v.innerHTML = "", b.slice(0, 10).forEach((R) => {
         const y = document.createElement("div");
         if (y.className = "nimbi-search-result", R.parentTitle) {
-          const Z = document.createElement("div");
-          Z.textContent = R.parentTitle, Z.className = "nimbi-search-title nimbi-search-parent", y.appendChild(Z);
+          const G = document.createElement("div");
+          G.textContent = R.parentTitle, G.className = "nimbi-search-title nimbi-search-parent", y.appendChild(G);
         }
-        const U = document.createElement("a");
-        U.className = "block", U.href = "?page=" + encodeURIComponent(R.slug), U.textContent = R.title, U.addEventListener("click", () => {
+        const H = document.createElement("a");
+        H.className = "block", H.href = "?page=" + encodeURIComponent(R.slug), H.textContent = R.title, H.addEventListener("click", () => {
           try {
             v.style.display = "none";
           } catch {
           }
-        }), y.appendChild(U), v.appendChild(y);
+        }), y.appendChild(H), v.appendChild(y);
       });
       try {
         v.style.display = "block";
@@ -6509,8 +6509,8 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
       b.forEach((v) => {
         const R = document.createElement("div");
         if (R.className = "nimbi-search-result", v.parentTitle) {
-          const U = document.createElement("div");
-          U.textContent = v.parentTitle, U.className = "nimbi-search-title nimbi-search-parent", R.appendChild(U);
+          const H = document.createElement("div");
+          H.textContent = v.parentTitle, H.className = "nimbi-search-title nimbi-search-parent", R.appendChild(H);
         }
         const y = document.createElement("a");
         y.className = "block", y.href = "?page=" + encodeURIComponent(v.slug), y.textContent = v.title, y.addEventListener("click", () => {
@@ -6537,8 +6537,8 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
         }
         try {
           await k();
-          const U = (await d).filter((Z) => Z.title && Z.title.toLowerCase().includes(R) || Z.excerpt && Z.excerpt.toLowerCase().includes(R));
-          A(U.slice(0, 10));
+          const H = (await d).filter((G) => G.title && G.title.toLowerCase().includes(R) || G.excerpt && G.excerpt.toLowerCase().includes(R));
+          A(H.slice(0, 10));
         } catch (y) {
           console.warn("[nimbi-cms] search input handler failed", y), A([]);
         }
@@ -6585,15 +6585,15 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
     v.className = "navbar-item";
     try {
       if (/^[^#]*\.md(?:$|[#?])/.test(b) || b.endsWith(".md")) {
-        const y = he(b).split(/::|#/, 2), U = y[0], Z = y[1];
-        v.href = "?page=" + encodeURIComponent(U) + (Z ? "#" + encodeURIComponent(Z) : "");
+        const y = he(b).split(/::|#/, 2), H = y[0], G = y[1];
+        v.href = "?page=" + encodeURIComponent(H) + (G ? "#" + encodeURIComponent(G) : "");
       } else if (/\.html(?:$|[#?])/.test(b) || b.endsWith(".html")) {
         const y = he(b).split(/::|#/, 2);
-        let U = y[0];
-        U && !U.toLowerCase().endsWith(".html") && (U = U + ".html");
-        const Z = y[1];
+        let H = y[0];
+        H && !H.toLowerCase().endsWith(".html") && (H = H + ".html");
+        const G = y[1];
         try {
-          const ge = await Se(U, s);
+          const ge = await Se(H, s);
           if (ge && ge.raw)
             try {
               const ee = new DOMParser().parseFromString(ge.raw, "text/html"), oe = ee.querySelector("title"), me = ee.querySelector("h1"), Ue = oe && oe.textContent && oe.textContent.trim() ? oe.textContent.trim() : me && me.textContent ? me.textContent.trim() : null;
@@ -6601,17 +6601,17 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
                 const qe = ie(Ue);
                 if (qe) {
                   try {
-                    Y.set(qe, U), q.set(U, qe);
+                    Y.set(qe, H), q.set(H, qe);
                   } catch (Un) {
                     console.warn("[nimbi-cms] slugToMd/mdToSlug set failed", Un);
                   }
-                  v.href = "?page=" + encodeURIComponent(qe) + (Z ? "#" + encodeURIComponent(Z) : "");
+                  v.href = "?page=" + encodeURIComponent(qe) + (G ? "#" + encodeURIComponent(G) : "");
                 } else
-                  v.href = "?page=" + encodeURIComponent(U) + (Z ? "#" + encodeURIComponent(Z) : "");
+                  v.href = "?page=" + encodeURIComponent(H) + (G ? "#" + encodeURIComponent(G) : "");
               } else
-                v.href = "?page=" + encodeURIComponent(U) + (Z ? "#" + encodeURIComponent(Z) : "");
+                v.href = "?page=" + encodeURIComponent(H) + (G ? "#" + encodeURIComponent(G) : "");
             } catch {
-              v.href = "?page=" + encodeURIComponent(U) + (Z ? "#" + encodeURIComponent(Z) : "");
+              v.href = "?page=" + encodeURIComponent(H) + (G ? "#" + encodeURIComponent(G) : "");
             }
           else
             v.href = b;
@@ -6629,9 +6629,9 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
         try {
           const y = ie(R);
           if (y) {
-            const U = v.getAttribute && v.getAttribute("href") ? v.getAttribute("href") : "";
+            const H = v.getAttribute && v.getAttribute("href") ? v.getAttribute("href") : "";
             try {
-              const ge = new URL(U, location.href).searchParams.get("page");
+              const ge = new URL(H, location.href).searchParams.get("page");
               if (ge) {
                 const ke = decodeURIComponent(ge);
                 try {
@@ -6640,8 +6640,8 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
                   console.warn("[nimbi-cms] slugToMd/mdToSlug set failed", ee);
                 }
               }
-            } catch (Z) {
-              console.warn("[nimbi-cms] nav slug mapping failed", Z);
+            } catch (G) {
+              console.warn("[nimbi-cms] nav slug mapping failed", G);
             }
           }
         } catch (y) {
@@ -6678,8 +6678,8 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
           A.preventDefault(), history.pushState({ page: R }, "", "?page=" + encodeURIComponent(R) + (y ? "#" + encodeURIComponent(y) : ""));
           try {
             a();
-          } catch (U) {
-            console.warn("[nimbi-cms] renderByQuery failed", U);
+          } catch (H) {
+            console.warn("[nimbi-cms] renderByQuery failed", H);
           }
         }
       } catch (v) {
@@ -6707,8 +6707,8 @@ async function Za(t, e, n, s, r, i, a, c, o = "eager", l = 1, u = void 0) {
             A.preventDefault(), history.pushState({ page: R }, "", "?page=" + encodeURIComponent(R) + (y ? "#" + encodeURIComponent(y) : ""));
             try {
               a();
-            } catch (U) {
-              console.warn("[nimbi-cms] renderByQuery failed", U);
+            } catch (H) {
+              console.warn("[nimbi-cms] renderByQuery failed", H);
             }
           }
         } catch (v) {
@@ -6954,7 +6954,7 @@ function to(t, e, n, s, r, i, a, c, o, l, u) {
     console.warn("[seoManager] reading time update failed", h);
   }
 }
-let Ee = null, D = null, be = 1, Ze = (t, e) => e, yt = 0, kt = 0, jt = () => {
+let Ee = null, U = null, be = 1, Ze = (t, e) => e, yt = 0, kt = 0, jt = () => {
 }, ft = 0.25;
 function no() {
   if (Ee && document.contains(Ee)) return Ee;
@@ -7014,7 +7014,7 @@ function no() {
           break;
       }
     }
-  }), document.body.appendChild(t), Ee = t, D = t.querySelector("[data-nimbi-preview-image]");
+  }), document.body.appendChild(t), Ee = t, U = t.querySelector("[data-nimbi-preview-image]");
   const e = t.querySelector("[data-nimbi-preview-fit]"), n = t.querySelector("[data-nimbi-preview-original]"), s = t.querySelector("[data-nimbi-preview-zoom-in]"), r = t.querySelector("[data-nimbi-preview-zoom-out]"), i = t.querySelector("[data-nimbi-preview-reset]"), a = t.querySelector("[data-nimbi-preview-close]"), c = t.querySelector("[data-nimbi-preview-zoom-label]"), o = t.querySelector("[data-nimbi-preview-zoom-hud]");
   function l() {
     c && (c.textContent = `${Math.round(be * 100)}%`);
@@ -7040,18 +7040,12 @@ function no() {
     const R = b.x - v.x, y = b.y - v.y;
     return Math.hypot(R, y);
   }, I = () => {
-    if (h = !1, w.clear(), x = 0, D) {
-      D.classList.add("is-panning"), D.classList.remove("is-grabbing");
-      try {
-        D.style.cursor = "all-scroll";
-      } catch {
-      }
-    }
+    h = !1, w.clear(), x = 0, U && (U.classList.add("is-panning"), U.classList.remove("is-grabbing"));
   };
   let M = 0, B = 0, N = 0;
   const K = (b) => {
-    const v = Date.now(), R = v - M, y = b.clientX - B, U = b.clientY - N;
-    M = v, B = b.clientX, N = b.clientY, R < 300 && Math.hypot(y, U) < 30 && (He(be > 1 ? 1 : 2), l(), b.preventDefault());
+    const v = Date.now(), R = v - M, y = b.clientX - B, H = b.clientY - N;
+    M = v, B = b.clientX, N = b.clientY, R < 300 && Math.hypot(y, H) < 30 && (He(be > 1 ? 1 : 2), l(), b.preventDefault());
   }, V = (b) => {
     He(be > 1 ? 1 : 2), l(), b.preventDefault();
   }, se = () => Ee ? typeof Ee.open == "boolean" ? Ee.open : Ee.classList.contains("is-active") : !1, j = (b, v, R = 1) => {
@@ -7064,49 +7058,42 @@ function no() {
       return;
     }
     if (!h) return;
-    const y = D.closest(".nimbi-image-preview__image-wrapper");
+    const y = U.closest(".nimbi-image-preview__image-wrapper");
     if (!y) return;
-    const U = b - f, Z = v - p;
-    y.scrollLeft = d - U, y.scrollTop = m - Z;
+    const H = b - f, G = v - p;
+    y.scrollLeft = d - H, y.scrollTop = m - G;
   }, Q = (b, v, R = 1) => {
     if (!se()) return;
     if (w.set(R, { x: b, y: v }), w.size === 2) {
-      const Z = Array.from(w.values());
-      x = C(Z[0], Z[1]), k = be;
+      const G = Array.from(w.values());
+      x = C(G[0], G[1]), k = be;
       return;
     }
-    const y = D.closest(".nimbi-image-preview__image-wrapper");
-    if (!(!y || !(y.scrollWidth > y.clientWidth || y.scrollHeight > y.clientHeight))) {
-      h = !0, f = b, p = v, d = y.scrollLeft, m = y.scrollTop, D.classList.add("is-panning"), D.classList.remove("is-grabbing");
-      try {
-        D.style.cursor = "all-scroll";
-      } catch {
-      }
-      window.addEventListener("pointermove", O), window.addEventListener("pointerup", A), window.addEventListener("pointercancel", A);
-    }
+    const y = U.closest(".nimbi-image-preview__image-wrapper");
+    !y || !(y.scrollWidth > y.clientWidth || y.scrollHeight > y.clientHeight) || (h = !0, f = b, p = v, d = y.scrollLeft, m = y.scrollTop, U.classList.add("is-panning"), U.classList.remove("is-grabbing"), window.addEventListener("pointermove", O), window.addEventListener("pointerup", A), window.addEventListener("pointercancel", A));
   }, O = (b) => {
     h && (b.preventDefault(), j(b.clientX, b.clientY, b.pointerId));
   }, A = () => {
     I(), window.removeEventListener("pointermove", O), window.removeEventListener("pointerup", A), window.removeEventListener("pointercancel", A);
   };
-  D.addEventListener("pointerdown", (b) => {
+  U.addEventListener("pointerdown", (b) => {
     b.preventDefault(), Q(b.clientX, b.clientY, b.pointerId);
-  }), D.addEventListener("pointermove", (b) => {
+  }), U.addEventListener("pointermove", (b) => {
     (h || w.size === 2) && b.preventDefault(), j(b.clientX, b.clientY, b.pointerId);
-  }), D.addEventListener("pointerup", (b) => {
+  }), U.addEventListener("pointerup", (b) => {
     b.preventDefault(), b.pointerType === "touch" && K(b), I();
-  }), D.addEventListener("dblclick", V), D.addEventListener("pointercancel", I), D.addEventListener("mousedown", (b) => {
+  }), U.addEventListener("dblclick", V), U.addEventListener("pointercancel", I), U.addEventListener("mousedown", (b) => {
     b.preventDefault(), Q(b.clientX, b.clientY, 1);
-  }), D.addEventListener("mousemove", (b) => {
+  }), U.addEventListener("mousemove", (b) => {
     h && b.preventDefault(), j(b.clientX, b.clientY, 1);
-  }), D.addEventListener("mouseup", (b) => {
+  }), U.addEventListener("mouseup", (b) => {
     b.preventDefault(), I();
   });
   const L = t.querySelector(".nimbi-image-preview__image-wrapper");
   return L && (L.addEventListener("pointerdown", (b) => {
     if (Q(b.clientX, b.clientY, b.pointerId), b && b.target && b.target.tagName === "IMG")
       try {
-        b.target.classList.add("is-grabbing"), b.target.style.cursor = "grabbing";
+        b.target.classList.add("is-grabbing");
       } catch {
       }
   }), L.addEventListener("pointermove", (b) => {
@@ -7114,7 +7101,7 @@ function no() {
   }), L.addEventListener("pointerup", I), L.addEventListener("pointercancel", I), L.addEventListener("mousedown", (b) => {
     if (Q(b.clientX, b.clientY, 1), b && b.target && b.target.tagName === "IMG")
       try {
-        b.target.classList.add("is-grabbing"), b.target.style.cursor = "grabbing";
+        b.target.classList.add("is-grabbing");
       } catch {
       }
   }), L.addEventListener("mousemove", (b) => {
@@ -7122,47 +7109,41 @@ function no() {
   }), L.addEventListener("mouseup", I)), t;
 }
 function He(t) {
-  if (!D) return;
+  if (!U) return;
   const e = Number(t);
   be = Number.isFinite(e) ? Math.max(0.1, Math.min(4, e)) : 1;
-  const s = D.getBoundingClientRect(), r = yt || D.naturalWidth || D.width || s.width || 0, i = kt || D.naturalHeight || D.height || s.height || 0;
+  const s = U.getBoundingClientRect(), r = yt || U.naturalWidth || U.width || s.width || 0, i = kt || U.naturalHeight || U.height || s.height || 0;
   if (r && i) {
-    D.style.setProperty("--nimbi-preview-img-max-width", "none"), D.style.setProperty("--nimbi-preview-img-max-height", "none"), D.style.setProperty("--nimbi-preview-img-width", `${r * be}px`), D.style.setProperty("--nimbi-preview-img-height", `${i * be}px`), D.style.setProperty("--nimbi-preview-img-transform", "none");
+    U.style.setProperty("--nimbi-preview-img-max-width", "none"), U.style.setProperty("--nimbi-preview-img-max-height", "none"), U.style.setProperty("--nimbi-preview-img-width", `${r * be}px`), U.style.setProperty("--nimbi-preview-img-height", `${i * be}px`), U.style.setProperty("--nimbi-preview-img-transform", "none");
     try {
-      D.style.width = `${r * be}px`, D.style.height = `${i * be}px`, D.style.transform = "none";
+      U.style.width = `${r * be}px`, U.style.height = `${i * be}px`, U.style.transform = "none";
     } catch {
     }
   } else {
-    D.style.setProperty("--nimbi-preview-img-max-width", ""), D.style.setProperty("--nimbi-preview-img-max-height", ""), D.style.setProperty("--nimbi-preview-img-width", ""), D.style.setProperty("--nimbi-preview-img-height", ""), D.style.setProperty("--nimbi-preview-img-transform", `scale(${be})`);
+    U.style.setProperty("--nimbi-preview-img-max-width", ""), U.style.setProperty("--nimbi-preview-img-max-height", ""), U.style.setProperty("--nimbi-preview-img-width", ""), U.style.setProperty("--nimbi-preview-img-height", ""), U.style.setProperty("--nimbi-preview-img-transform", `scale(${be})`);
     try {
-      D.style.transform = `scale(${be})`;
+      U.style.transform = `scale(${be})`;
     } catch {
     }
   }
-  if (D) {
-    D.classList.add("is-panning"), D.classList.remove("is-grabbing");
-    try {
-      D.style.cursor = "all-scroll";
-    } catch {
-    }
-  }
+  U && (U.classList.add("is-panning"), U.classList.remove("is-grabbing"));
 }
 function xt() {
-  if (!D) return;
-  const t = D.closest(".nimbi-image-preview__image-wrapper");
+  if (!U) return;
+  const t = U.closest(".nimbi-image-preview__image-wrapper");
   if (!t) return;
   const e = t.getBoundingClientRect();
   if (e.width === 0 || e.height === 0) return;
-  const n = yt || D.naturalWidth || e.width, s = kt || D.naturalHeight || e.height;
+  const n = yt || U.naturalWidth || e.width, s = kt || U.naturalHeight || e.height;
   if (!n || !s) return;
   const r = e.width / n, i = e.height / s, a = Math.min(r, i, 1);
   He(Number.isFinite(a) ? a : 1);
 }
 function ro(t, e = "", n = 0, s = 0) {
   const r = no();
-  be = 1, yt = n || 0, kt = s || 0, D.src = t, D.alt = e, D.style.transform = "scale(1)";
+  be = 1, yt = n || 0, kt = s || 0, U.src = t, U.alt = e, U.style.transform = "scale(1)";
   const i = () => {
-    yt = D.naturalWidth || D.width || 0, kt = D.naturalHeight || D.height || 0;
+    yt = U.naturalWidth || U.width || 0, kt = U.naturalHeight || U.height || 0;
   };
   if (i(), xt(), jt(), requestAnimationFrame(() => {
     xt(), jt();
@@ -7170,9 +7151,9 @@ function ro(t, e = "", n = 0, s = 0) {
     const a = () => {
       i(), requestAnimationFrame(() => {
         xt(), jt();
-      }), D.removeEventListener("load", a);
+      }), U.removeEventListener("load", a);
     };
-    D.addEventListener("load", a);
+    U.addEventListener("load", a);
   }
   typeof r.showModal == "function" && (r.open || r.showModal()), r.classList.add("is-active"), r.focus();
 }
@@ -7218,7 +7199,13 @@ function io(t, { t: e, zoomStep: n = 0.25 } = {}) {
       return;
     }
     const m = d.closest(".nimbi-image-preview__image-wrapper");
-    m && (be <= 1 || (p.preventDefault(), s = !0, r = p.clientX, i = p.clientY, a = m.scrollLeft, c = m.scrollTop, d.setPointerCapture(p.pointerId), d.style.cursor = "grabbing"));
+    if (m && !(be <= 1)) {
+      p.preventDefault(), s = !0, r = p.clientX, i = p.clientY, a = m.scrollLeft, c = m.scrollTop, d.setPointerCapture(p.pointerId);
+      try {
+        d.classList.add("is-grabbing");
+      } catch {
+      }
+    }
   }), t.addEventListener("pointermove", (p) => {
     if (o.has(p.pointerId) && o.set(p.pointerId, { x: p.clientX, y: p.clientY }), o.size === 2) {
       p.preventDefault();
@@ -7238,6 +7225,11 @@ function io(t, { t: e, zoomStep: n = 0.25 } = {}) {
   });
   const f = () => {
     s = !1, o.clear(), l = 0;
+    try {
+      const p = document.querySelector("[data-nimbi-preview-image]");
+      p && (p.classList.add("is-panning"), p.classList.remove("is-grabbing"));
+    } catch {
+    }
   };
   t.addEventListener("pointerup", f), t.addEventListener("pointercancel", f);
 }
@@ -7489,8 +7481,8 @@ async function bo(t = {}) {
     Promise.resolve().then(() => qt).then((y) => {
       try {
         y && typeof y.setSkipRootReadme == "function" && y.setSkipRootReadme(!!I);
-      } catch (U) {
-        console.warn("[nimbi-cms] setSkipRootReadme failed", U);
+      } catch (H) {
+        console.warn("[nimbi-cms] setSkipRootReadme failed", H);
       }
     }).catch((y) => {
     });
@@ -7538,8 +7530,8 @@ async function bo(t = {}) {
     Promise.resolve().then(() => qt).then((y) => {
       try {
         y && typeof y.setHomePage == "function" && y.setHomePage(k);
-      } catch (U) {
-        console.warn("[nimbi-cms] setHomePage failed", U);
+      } catch (H) {
+        console.warn("[nimbi-cms] setHomePage failed", H);
       }
     }).catch((y) => {
     });
@@ -7560,8 +7552,8 @@ async function bo(t = {}) {
     typeof i == "number" && Promise.resolve().then(() => qt).then(({ setDefaultCrawlMaxQueue: y }) => {
       try {
         y(i);
-      } catch (U) {
-        console.warn("[nimbi-cms] setDefaultCrawlMaxQueue failed", U);
+      } catch (H) {
+        console.warn("[nimbi-cms] setDefaultCrawlMaxQueue failed", H);
       }
     });
   } catch (y) {
@@ -7596,7 +7588,7 @@ async function bo(t = {}) {
   try {
     const y = document.createElement("header");
     y.className = "nimbi-site-navbar", M.insertBefore(y, N);
-    const U = await Se("_navigation.md", v), Z = await Vt(U.raw || ""), { navbar: ge, linkEls: ke } = await Za(y, N, Z.html || "", v, k, dt, R.renderByQuery, B, c, o, l);
+    const H = await Se("_navigation.md", v), G = await Vt(H.raw || ""), { navbar: ge, linkEls: ke } = await Za(y, N, G.html || "", v, k, dt, R.renderByQuery, B, c, o, l);
     try {
       await ir("onNavBuild", { navWrap: j, navbar: ge, linkEls: ke, contentBase: v });
     } catch (ee) {
@@ -7663,13 +7655,13 @@ async function bo(t = {}) {
   await R.renderByQuery();
   try {
     Promise.resolve().then(() => co).then(({ getVersion: y }) => {
-      typeof y == "function" && y().then((U) => {
+      typeof y == "function" && y().then((H) => {
         try {
-          const Z = U || "0.0.0";
+          const G = H || "0.0.0";
           try {
             const ge = (ke) => {
               const ee = document.createElement("a");
-              ee.className = "nimbi-version-label tag is-small", ee.textContent = `Ninbi CMS v. ${Z}`, ee.href = ke || "#", ee.target = "_blank", ee.rel = "noopener noreferrer nofollow", ee.setAttribute("aria-label", `Ninbi CMS version ${Z}`);
+              ee.className = "nimbi-version-label tag is-small", ee.textContent = `Ninbi CMS v. ${G}`, ee.href = ke || "#", ee.target = "_blank", ee.rel = "noopener noreferrer nofollow", ee.setAttribute("aria-label", `Ninbi CMS version ${G}`);
               try {
                 _r(ee);
               } catch {
@@ -7698,11 +7690,11 @@ async function bo(t = {}) {
           } catch (ge) {
             console.warn("[nimbi-cms] building version label failed", ge);
           }
-        } catch (Z) {
-          console.warn("[nimbi-cms] building version label failed", Z);
+        } catch (G) {
+          console.warn("[nimbi-cms] building version label failed", G);
         }
-      }).catch((U) => {
-        console.warn("[nimbi-cms] getVersion() failed", U);
+      }).catch((H) => {
+        console.warn("[nimbi-cms] getVersion() failed", H);
       });
     }).catch((y) => {
       console.warn("[nimbi-cms] import version module failed", y);

@@ -66,8 +66,8 @@ describe('imagePreview deeper interactions', () => {
     imgInModal.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 10, clientY: 10 }))
     await new Promise(r => setTimeout(r, 10))
 
-    // jsdom may not update scroll values reliably; assert the modal image cursor indicates drag handling
-    expect(imgInModal.style.cursor === 'all-scroll' || imgInModal.style.cursor === 'grabbing').toBe(true)
+    // jsdom may not update scroll values reliably; assert the modal image cursor/class indicates drag handling
+    expect(imgInModal.classList.contains('is-panning') || imgInModal.classList.contains('is-grabbing')).toBe(true)
   })
 
   it('keyboard arrow keys pan when zoomed', async () => {

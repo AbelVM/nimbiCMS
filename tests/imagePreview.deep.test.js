@@ -50,18 +50,18 @@ describe('imagePreview deep interactions', () => {
     previewImg.style.width = '1600px'
     previewImg.style.height = '1200px'
 
-    // ensure zoom is >1 by setting style (fallback for jsdom limitations)
-    previewImg.style.cursor = 'all-scroll'
+    // ensure zoom is >1 by setting class (fallback for jsdom limitations)
+    previewImg.classList.add('is-panning')
 
     const startEvent = new MouseEvent('mousedown', { bubbles: true, clientX: 50, clientY: 50 })
     previewImg.dispatchEvent(startEvent)
-    // when dragging starts, cursor should become grabbing
-    expect(previewImg.style.cursor === 'grabbing' || previewImg.style.cursor === 'all-scroll').toBe(true)
+    // when dragging starts, class should indicate grabbing or panning
+    expect(previewImg.classList.contains('is-grabbing') || previewImg.classList.contains('is-panning')).toBe(true)
     const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientX: 150, clientY: 150 })
     previewImg.dispatchEvent(moveEvent)
     const upEvent = new MouseEvent('mouseup', { bubbles: true })
     previewImg.dispatchEvent(upEvent)
-    // after mouseup, cursor should no longer be grabbing
-    expect(previewImg.style.cursor !== 'grabbing').toBe(true)
+    // after mouseup, preview should not have grabbing class
+    expect(!previewImg.classList.contains('is-grabbing')).toBe(true)
   })
 })

@@ -137,7 +137,7 @@ describe('imagePreview', () => {
     }))
 
     // Ensure the cursor is still in a valid state (pan mode)
-    expect(previewImg.style.cursor).toBe('all-scroll')
+    expect(previewImg.classList.contains('is-panning')).toBe(true)
 
     modal.remove()
     root.remove()
