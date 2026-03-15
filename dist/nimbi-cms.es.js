@@ -5491,22 +5491,44 @@ function Ba(t, e, n = "") {
   const r = document.createElement("p");
   r.className = "menu-label", r.textContent = t("onThisPage"), s.appendChild(r);
   const i = document.createElement("ul");
-  return i.className = "menu-list", (e || []).forEach((a) => {
-    try {
-      if (!a || a.level === 1) return;
-      const c = document.createElement("li"), o = document.createElement("a"), l = a.id || ie(a.text || "");
-      o.textContent = a.text || "";
+  i.className = "menu-list";
+  try {
+    const a = {};
+    (e || []).forEach((c) => {
       try {
-        const u = String(n || "").replace(/^[\.\/]+/, ""), h = u && q && q.has && q.has(u) ? q.get(u) : u;
-        h ? o.href = `?page=${encodeURIComponent(h)}#${encodeURIComponent(l)}` : o.href = `#${encodeURIComponent(l)}`;
-      } catch (u) {
-        console.warn("[htmlBuilder] buildTocElement href normalization failed", u), o.href = `#${encodeURIComponent(l)}`;
+        if (!c || c.level === 1) return;
+        const o = Number(c.level) >= 2 ? Number(c.level) : 2, l = document.createElement("li"), u = document.createElement("a"), h = c.id || ie(c.text || "");
+        u.textContent = c.text || "";
+        try {
+          const m = String(n || "").replace(/^[\\.\\/]+/, ""), w = m && q && q.has && q.has(m) ? q.get(m) : m;
+          w ? u.href = `?page=${encodeURIComponent(w)}#${encodeURIComponent(h)}` : u.href = `#${encodeURIComponent(h)}`;
+        } catch (m) {
+          console.warn("[htmlBuilder] buildTocElement href normalization failed", m), u.href = `#${encodeURIComponent(h)}`;
+        }
+        if (l.appendChild(u), o === 2) {
+          i.appendChild(l), a[2] = l, Object.keys(a).forEach((m) => {
+            Number(m) > 2 && delete a[m];
+          });
+          return;
+        }
+        let f = o - 1;
+        for (; f > 2 && !a[f]; ) f--;
+        f < 2 && (f = 2);
+        let p = a[f];
+        if (!p) {
+          i.appendChild(l), a[o] = l;
+          return;
+        }
+        let d = p.querySelector("ul");
+        d || (d = document.createElement("ul"), p.appendChild(d)), d.appendChild(l), a[o] = l;
+      } catch (o) {
+        console.warn("[htmlBuilder] buildTocElement item failed", o, c);
       }
-      c.appendChild(o), i.appendChild(c);
-    } catch (c) {
-      console.warn("[htmlBuilder] buildTocElement item failed", c, a);
-    }
-  }), s.appendChild(i), s;
+    });
+  } catch (a) {
+    console.warn("[htmlBuilder] buildTocElement failed", a);
+  }
+  return s.appendChild(i), s;
 }
 function ai(t) {
   t.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((n) => {

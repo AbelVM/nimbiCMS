@@ -91,26 +91,59 @@ export function buildTocElement(t, toc, pagePath = '') {
   const ul = document.createElement('ul')
   ul.className = 'menu-list';
 
-  (toc || []).forEach(item => {
-    try {
-      if (!item || item.level === 1) return
-      const li = document.createElement('li')
-      const a = document.createElement('a')
-      const slug = item.id || slugify(item.text || '')
-      a.textContent = item.text || ''
+  // Build nested lists by heading level (H2 -> top-level, H3+ -> nested)
+  try {
+    const lastLiAtLevel = {}
+    ;(toc || []).forEach(item => {
       try {
-        const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
-        const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
-        if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
-        else a.href = `#${encodeURIComponent(slug)}`
-      } catch (err) {
-        console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
-        a.href = `#${encodeURIComponent(slug)}`
-      }
-      li.appendChild(a)
-      ul.appendChild(li)
-    } catch (err) { console.warn('[htmlBuilder] buildTocElement item failed', err, item) }
-  })
+        if (!item || item.level === 1) return
+        const level = Number(item.level) >= 2 ? Number(item.level) : 2
+
+        const li = document.createElement('li')
+        const a = document.createElement('a')
+        const slug = item.id || slugify(item.text || '')
+        a.textContent = item.text || ''
+        try {
+          const normPage = String(pagePath || '').replace(/^[\\.\\/]+/, '')
+          const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
+          if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
+          else a.href = `#${encodeURIComponent(slug)}`
+        } catch (err) {
+          console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
+          a.href = `#${encodeURIComponent(slug)}`
+        }
+        li.appendChild(a)
+
+        if (level === 2) {
+          ul.appendChild(li)
+          lastLiAtLevel[2] = li
+          // clear deeper trackers
+          Object.keys(lastLiAtLevel).forEach(k => { if (Number(k) > 2) delete lastLiAtLevel[k] })
+          return
+        }
+
+        // For deeper levels, find nearest parent li (level-1, level-2, ...)
+        let parentLevel = level - 1
+        while (parentLevel > 2 && !lastLiAtLevel[parentLevel]) parentLevel--
+        if (parentLevel < 2) parentLevel = 2
+        let parentLi = lastLiAtLevel[parentLevel]
+        if (!parentLi) {
+          // fallback to appending to root ul
+          ul.appendChild(li)
+          lastLiAtLevel[level] = li
+          return
+        }
+
+        let subUl = parentLi.querySelector('ul')
+        if (!subUl) {
+          subUl = document.createElement('ul')
+          parentLi.appendChild(subUl)
+        }
+        subUl.appendChild(li)
+        lastLiAtLevel[level] = li
+      } catch (err) { console.warn('[htmlBuilder] buildTocElement item failed', err, item) }
+    })
+  } catch (err) { console.warn('[htmlBuilder] buildTocElement failed', err) }
 
   aside.appendChild(ul)
   return aside
