@@ -331,7 +331,6 @@
     padding-left: 0.5rem;
     padding-right: 0.5rem;
     text-align: center;
-    font-weight: 600;
 }
 
 .nimbi-image-preview .nimbi-image-preview__controls .nimbi-image-preview__zoom {
@@ -373,7 +372,6 @@
     position: absolute;
     left: 8px;
     bottom: 6px;
-    font-size: 11px;
     opacity: 0.6;
     z-index: 9999;
     user-select: none;
@@ -454,10 +452,8 @@
 }
 
 #nimbi-search-results .nimbi-search-title {
-    font-size: 12px;
     opacity: 0.85;
     margin-bottom: 6px;
-    color: var(--bulma-help-color, #6b6b6b);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
