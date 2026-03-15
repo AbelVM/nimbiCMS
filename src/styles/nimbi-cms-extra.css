@@ -28,6 +28,12 @@
     width: 100%;
     box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
+
+    /* Limit height to the parent section so the CMS can’t grow beyond the mount.
+       This allows the section to enforce overall height constraints. */
+    max-height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
 }
 
 .nimbi-cms .columns {
@@ -49,9 +55,9 @@
     width: 100%;
     position: sticky;
     top: var(--nimbi-site-navbar-height);
-    /* Use viewport-based height to avoid scrollbars when parent heights
-       are not explicitly set. */
-    max-height: calc(100vh - var(--nimbi-site-navbar-height));
+    /* Use the computed CMS height so the sidebar never exceeds the
+       available vertical space inside the mount. */
+    max-height: calc(var(--nimbi-cms-height, 100vh) - var(--nimbi-site-navbar-height));
     overflow: auto;
     margin-right: 1rem;
 }
@@ -67,15 +73,44 @@
     top: var(--nimbi-site-navbar-height);
 }
 
-.nimbi-site-navbar + .nimbi-cms {
-    /* expose the computed cms height so other components can reference it */
-    /* Use viewport height to avoid persistent scrollbars caused by
-       percentage heights when html/body are not 100%. */
-    --nimbi-cms-height: calc(100vh - var(--nimbi-site-navbar-height));
+.nimbi-mount {
+    position: relative;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Limit the section wrapper height to the mount height minus the navbar.
+   This ensures the overall mount does not exceed its container when
+   embedded inside a fixed-height host. */
+.nimbi-mount > section {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: calc(100% - var(--nimbi-site-navbar-height));
+    overflow: hidden;
+}
+
+.nimbi-mount > section > .nimbi-cms {
+    height: 100%;
+}
+
+.nimbi-mount > .nimbi-site-navbar + .nimbi-cms {
+    /* Expose the computed cms height so other components can reference it. */
+    /* Prefer mount-relative height so the portal can be embedded in a
+       fixed-height container. */
+    --nimbi-cms-height: calc(100% - var(--nimbi-site-navbar-height));
     /* fraction (number) used to limit menu-list height: default 0.8 = 80% */
     --nimbi-menu-max-ratio: 0.6;
     /* fraction (number) used to limit image height: default 0.6 = 60% */
     --nimbi-image-max-height-ratio: 0.6;
+    height: var(--nimbi-cms-height);
+    overflow: auto;
+}
+
+/* Fallback for when `.nimbi-cms` is not a sibling of `.nimbi-site-navbar` */
+.nimbi-site-navbar + .nimbi-cms {
+    --nimbi-cms-height: calc(100vh - var(--nimbi-site-navbar-height));
     height: var(--nimbi-cms-height);
     overflow: auto;
 }
@@ -102,7 +137,11 @@
     padding-top: calc(var(--nimbi-site-navbar-height) + 2rem);
 }
 .nimbi-toc {
-    margin-bottom: 1rem
+    margin-bottom: 1rem;
+    /* Keep the TOC within the visible area by capping its height to a
+       percentage of the CMS viewport. */
+    max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6);
+    overflow: auto;
 }
 
 .nimbi-toc-inner {
@@ -442,80 +481,26 @@
     /* default track background; Bulma theming applies automatically */
 }
 
-/* search box result dropdown */
-/* container will be positioned relative so absolute child can overlay */
-.navbar-end .navbar-item { position: relative; }
-
-#nimbi-search-results {
-    position: absolute;
-    top: 100%;
-    right: 0;              /* grow to the left from the input */
-    left: auto;
-    margin-right: 0.5rem;  /* keep some space from right border */
-    width: 340px;          /* a bit wider to show longer titles */
-    /* Bulma .box already provides background, border, and padding */
-    display: none;
-    max-height: 320px;     /* allow more vertical results before scrolling */
-    overflow: auto;
-    z-index: 100;
+/* Search results dropdown uses Bulma dropdown helpers */
+#nimbi-search-dropdown {
+    position: relative;
 }
-#nimbi-search-results.is-open { display: block }
-#nimbi-search-results a {
+
+#nimbi-search-dropdown .dropdown-content {
+    max-height: 320px;
+    overflow-y: auto;
+    width: 340px;
+}
+
+#nimbi-search-dropdown .dropdown-item {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: block;
 }
 
 #nimbi-search { width: 240px; }
-#nimbi-search-results a { text-decoration: none; }
-#nimbi-search-results a:hover { }
 
-/* Make the search results use a thin Bulma-like scrollbar */
-#nimbi-search-results {
-    scrollbar-width: thin;
-    scrollbar-color: auto;
-}
-#nimbi-search-results::-webkit-scrollbar { width: 8px; height: 8px }
-#nimbi-search-results::-webkit-scrollbar-track { }
-#nimbi-search-results::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-}
-#nimbi-search-results::-webkit-scrollbar-thumb:hover {
-}
-
-/* Parent label for H2 search results: keep on one line and truncate with ellipsis when long */
-#nimbi-search-results .nimbi-search-parent {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
-    max-width: 100%;
-}
-
-/* Individual search result wrapper inside the results box */
-#nimbi-search-results .nimbi-search-result {
-    margin-bottom: 6px;
-    padding: 8px 8px 10px 8px;
-    border-bottom: 1px solid var(--bulma-border-weak);
-}
-
-#nimbi-search-results .nimbi-search-result:last-child {
-    margin-bottom: 0;
-    border-bottom: none;
-}
-
-#nimbi-search-results .nimbi-search-title {
-    opacity: 0.85;
-    margin-bottom: 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
-    max-width: 100%;
-}
+/* Bulma handles dropdown show/hide via the .is-active class. */
 
 .nimbi-cms::-webkit-scrollbar-thumb, .nimbi-nav-wrap::-webkit-scrollbar-thumb {
     border-radius: 999px;

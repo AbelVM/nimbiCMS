@@ -75,7 +75,11 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   
   let searchIndexPromise = null
   let searchInput = null
-    let searchControl = null
+  let searchControl = null
+  let dropdown = null
+  let dropdownContent = null
+  let resultsContainer = null
+  let searchOutsideHandler = null
   let indexedCountLog = false
 
   // Close the mobile hamburger/menu if active
@@ -97,8 +101,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchIndexPromise = (async () => {
       try {
         const fm = await import('./slugManager.js')
-        const workerFn = safeGet(fm, 'buildSearchIndexWorker')
-        const buildFn = safeGet(fm, 'buildSearchIndex')
+        const buildFn = safeGet(fm, 'buildSearchIndex') || (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndex : undefined)
+        const workerFn = safeGet(fm, 'buildSearchIndexWorker') || (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndexWorker : undefined)
         if (searchIndexMode === 'lazy' && typeof workerFn === 'function') {
           try {
             const r = await workerFn(contentBase, indexDepth, noIndexing)
@@ -292,10 +296,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   menu.id = targetId
   const start = document.createElement('div')
   start.className = 'navbar-start'
-  let end, searchItem, resultsContainer
+  let end = null
+  let searchItem = null
   if (!effectiveSearchEnabled) {
     end = null
     searchInput = null
+    dropdown = null
+    dropdownContent = null
     resultsContainer = null
   } else {
     end = document.createElement('div')
@@ -318,18 +325,39 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchControl.appendChild(searchInput)
     searchItem.appendChild(searchControl)
 
-    resultsContainer = document.createElement('nav')
-    resultsContainer.id = 'nimbi-search-results'
-    resultsContainer.className = 'panel nimbi-search-results'
-    searchItem.appendChild(resultsContainer)
-    end.appendChild(searchItem)
+    // Wrap the search input and results in a Bulma dropdown so Bulma manages
+    // the styling and visibility.
+    dropdown = document.createElement('div')
+    dropdown.className = 'dropdown is-right'
+    dropdown.id = 'nimbi-search-dropdown'
 
-    
+    const trigger = document.createElement('div')
+    trigger.className = 'dropdown-trigger'
+    trigger.appendChild(searchItem)
+
+    const dropdownMenu = document.createElement('div')
+    dropdownMenu.className = 'dropdown-menu'
+    dropdownMenu.setAttribute('role', 'menu')
+
+    dropdownContent = document.createElement('div')
+    dropdownContent.id = 'nimbi-search-results'
+    dropdownContent.className = 'dropdown-content nimbi-search-results'
+
+    // Keep a reference to satisfy existing tests that expect this element.
+    resultsContainer = dropdownContent
+
+    dropdownMenu.appendChild(dropdownContent)
+    dropdown.appendChild(trigger)
+    dropdown.appendChild(dropdownMenu)
+    end.appendChild(dropdown)
+
     const showResults = (items) => {
-      resultsContainer.innerHTML = ''
+      if (!dropdownContent) return
+      dropdownContent.innerHTML = ''
       if (!items.length) {
-        resultsContainer.classList.remove('is-open')
-        try { resultsContainer.style.display = 'none' } catch (e) {}
+        if (dropdown) dropdown.classList.remove('is-active')
+        try { dropdownContent.style.display = 'none' } catch (e) {}
+        try { dropdownContent.classList.remove('is-open') } catch (e) {}
         return
       }
       items.forEach(it => {
@@ -337,19 +365,22 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           const heading = document.createElement('p')
           heading.textContent = it.parentTitle
           heading.className = 'panel-heading nimbi-search-title nimbi-search-parent'
-          resultsContainer.appendChild(heading)
+          dropdownContent.appendChild(heading)
         }
         const a = document.createElement('a')
-        // Use Bulma panel-block for result items, while keeping legacy class
-        // for any custom styling.
-        a.className = 'panel-block nimbi-search-result'
+        a.className = 'dropdown-item nimbi-search-result'
         a.href = '?page=' + encodeURIComponent(it.slug)
         a.textContent = it.title
-        a.addEventListener('click', () => { resultsContainer.style.display = 'none' })
-        resultsContainer.appendChild(a)
+        a.addEventListener('click', () => {
+          if (dropdown) dropdown.classList.remove('is-active')
+          try { dropdownContent.style.display = 'none' } catch (e) {}
+          try { dropdownContent.classList.remove('is-open') } catch (e) {}
+        })
+        dropdownContent.appendChild(a)
       })
-      try { resultsContainer.style.display = 'block' } catch (e) {}
-      resultsContainer.classList.add('is-open')
+      if (dropdown) dropdown.classList.add('is-active')
+      try { dropdownContent.style.display = 'block' } catch (e) {}
+      try { dropdownContent.classList.add('is-open') } catch (e) {}
     }
 
     const debounce = (fn, delay) => {
@@ -413,6 +444,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               if (!resultsContainer) return
               if (!resultsContainer.classList.contains('is-open') && (resultsContainer.style && resultsContainer.style.display !== 'block')) return
               if (tgt && (resultsContainer.contains(tgt) || (searchInput && (tgt === searchInput || (searchInput.contains && searchInput.contains(tgt)))))) return
+              if (dropdown) dropdown.classList.remove('is-active')
               try { resultsContainer.style.display = 'none' } catch (e) {}
               try { resultsContainer.classList.remove('is-open') } catch (e) {}
             } catch (e) { /* ignore */ }
