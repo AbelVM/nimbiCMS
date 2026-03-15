@@ -75,7 +75,22 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   
   let searchIndexPromise = null
   let searchInput = null
+    let searchControl = null
   let indexedCountLog = false
+
+  // Close the mobile hamburger/menu if active
+  function closeMobileMenu() {
+    try {
+      const burgerEl = document.querySelector('.navbar-burger')
+      const targetId = burgerEl && burgerEl.dataset ? burgerEl.dataset.target : null
+      const target = targetId ? document.getElementById(targetId) : null
+      if (burgerEl && burgerEl.classList.contains('is-active')) {
+        burgerEl.classList.remove('is-active')
+        burgerEl.setAttribute('aria-expanded', 'false')
+        if (target) target.classList.remove('is-active')
+      }
+    } catch (err) { console.warn && console.warn('[nimbi-cms] closeMobileMenu failed', err) }
+  }
 
   const ensureSearchIndex = () => {
     if (searchIndexPromise) return searchIndexPromise
@@ -98,7 +113,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       } finally {
         if (searchInput) {
           try { searchInput.removeAttribute('disabled') } catch (e) {}
-          try { searchInput.classList.remove('is-loading') } catch (e) {}
+          try { searchControl && searchControl.classList.remove('is-loading') } catch (e) {}
         }
       }
     })()
@@ -178,6 +193,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       const hash = url.hash ? url.hash.replace(/^#/, '') : null;
       history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''));
       try { renderByQuery(); } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e); }
+      try { closeMobileMenu() } catch (e) {}
     }
   });
 
@@ -236,9 +252,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchInput.id = 'nimbi-search'
     if (searchIndexMode === 'eager') {
       searchInput.disabled = true
-      searchInput.classList.add('is-loading')
     }
-    searchItem.appendChild(searchInput)
+
+    searchControl = document.createElement('div')
+    searchControl.className = 'control'
+    if (searchIndexMode === 'eager') searchControl.classList.add('is-loading')
+    searchControl.appendChild(searchInput)
+    searchItem.appendChild(searchControl)
 
     resultsContainer = document.createElement('div')
     resultsContainer.id = 'nimbi-search-results'
@@ -319,13 +339,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         console.warn('[nimbi-cms] eager search index init failed', err)
         searchIndexPromise = Promise.resolve([])
       }
-      searchIndexPromise.finally(() => {
-        const domInput = document.querySelector('input#nimbi-search')
-        if (domInput) {
-          try { domInput.removeAttribute('disabled') } catch (e) {}
-          try { domInput.classList.remove('is-loading') } catch (e) {}
-        }
-      })
+        searchIndexPromise.finally(() => {
+          const domInput = document.querySelector('input#nimbi-search')
+          if (domInput) {
+            try { domInput.removeAttribute('disabled') } catch (e) {}
+            try { searchControl && searchControl.classList.remove('is-loading') } catch (e) {}
+          }
+        })
     }
   }
 
@@ -416,6 +436,21 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   navbar.appendChild(brand)
   navbar.appendChild(menu)
   navbarWrap.appendChild(navbar)
+  
+  // Close mobile menu when clicking/touching outside the navbar
+  try {
+    const outsideHandler = (ev) => {
+      try {
+        const burgerEl = navbar && navbar.querySelector ? navbar.querySelector('.navbar-burger') : document.querySelector('.navbar-burger')
+        if (!burgerEl || !burgerEl.classList.contains('is-active')) return
+        const navEl = (burgerEl && burgerEl.closest) ? burgerEl.closest('.navbar') : navbar
+        if (navEl && navEl.contains(ev.target)) return
+        closeMobileMenu()
+      } catch (e) { /* ignore */ }
+    }
+    document.addEventListener('click', outsideHandler, true)
+    document.addEventListener('touchstart', outsideHandler, true)
+  } catch (e) { /* ignore */ }
   
 
   try {

@@ -96,6 +96,12 @@
     padding: 2rem
 }
 
+/* When a site navbar is present and sticky, add top padding so content
+   is not rendered beneath the navbar. Preserve the existing 2rem padding
+   on other sides and add the navbar height on top. */
+.nimbi-site-navbar + .nimbi-cms .nimbi-content {
+    padding-top: calc(var(--nimbi-site-navbar-height) + 2rem);
+}
 .nimbi-toc {
     margin-bottom: 1rem
 }
@@ -156,6 +162,17 @@
 
     .nimbi-cms {
         padding: 0
+    }
+
+    /* Ensure the nav column is hidden on small screens (matches markup).
+       Use high-specificity selector and !important to override Bulma helpers. */
+    .column.is-full-mobile.is-3-tablet.nimbi-nav-wrap {
+        display: none !important;
+    }
+
+    /* On small screens hide the table-of-contents to reduce clutter */
+    .nimbi-toc {
+        display: none !important;
     }
 }
 
