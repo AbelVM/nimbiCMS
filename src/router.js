@@ -163,10 +163,26 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
     try {
       const u = new URL(href, location.href)
       if (u.origin !== location.origin) continue
+      // If the link explicitly points to a markdown file, add it to
+      // localCandidates for potential discovery.
       const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/) 
       if (mdMatch) {
         let candidate = normalizePath(mdMatch[1])
         if (candidate) localCandidates.add(candidate)
+        continue
+      }
+      // Otherwise, consider HTML or other page links as candidates. If the
+      // anchor text slugifies to the decoded slug, return the absolute URL
+      // for that page so callers can fetch it directly.
+      const linkText = (linkEl.textContent || '').trim()
+      const baseName = (u.pathname || '').replace(/^.*\//, '')
+      if (linkText && slugify(linkText) === decoded) return u.toString()
+      if (baseName && slugify(baseName.replace(/\.(html?|md)$/i, '')) === decoded) return u.toString()
+      // If the pathname looks like HTML, add as a candidate for discovery
+      if (/\.(html?)$/i.test(u.pathname)) {
+        // store relative path without leading slash
+        let rel = u.pathname.replace(/^\//, '')
+        localCandidates.add(rel)
         continue
       }
       const p = u.pathname || ''
@@ -312,6 +328,28 @@ export async function fetchPageData(raw, contentBase) {
   }
 
   if (!anchor && hashAnchor) anchor = hashAnchor
+
+  // If resolution produced an absolute URL or a root-relative path, attempt
+  // to fetch it directly as HTML before trying markdown candidates. This
+  // allows discovered nav links (returned as absolute URLs by
+  // tryDiscoverFromIndex) to be loaded as pages.
+  try {
+    if (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/'))) {
+      const abs = resolved.startsWith('/') ? new URL(resolved, location.origin).toString() : resolved
+      try {
+        const res = await fetch(abs)
+        if (res && res.ok) {
+          const raw = await res.text()
+          const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
+          const rawLower = (raw || '').toLowerCase()
+          const looksLikeHtml = (ct && ct.indexOf && ct.indexOf('text/html') !== -1) || rawLower.indexOf('<!doctype') !== -1 || rawLower.indexOf('<html') !== -1
+          if (looksLikeHtml) {
+            return { data: { raw, isHtml: true }, pagePath: abs.replace(/^\//, ''), anchor }
+          }
+        }
+      } catch (e) { /* ignore absolute fetch failures */ }
+    }
+  } catch (e) { /* ignore */ }
 
   const pageCandidates = buildPageCandidates(resolved)
 
@@ -478,6 +516,31 @@ export async function fetchPageData(raw, contentBase) {
         }
       }
     } catch (_) { /* ignore fallback errors */ }
+
+    // Generic assets fallback: allow resolving a slug to a static HTML
+    // under the /assets/ directory. This permits loading standalone HTML
+    // pages (like an embedded playground) by slug without special-casing
+    // individual names in the router.
+    try {
+      const dec = decodeURIComponent(String(resolved || ''))
+      if (dec && !/\.(md|html?)$/i.test(dec)) {
+        const candidates = [
+          `/assets/${dec}.html`,
+          `/assets/${dec}/index.html`
+        ]
+        for (const abs of candidates) {
+          try {
+            const res = await fetch(abs, { method: 'GET' })
+            if (res && res.ok) {
+              const raw = await res.text()
+              return { data: { raw, isHtml: true }, pagePath: abs.replace(/^\//, ''), anchor }
+            }
+          } catch (e) {
+            /* ignore single-candidate failures */
+          }
+        }
+      }
+    } catch (e) { console.warn('[router] assets fallback failed', e) }
 
     throw new Error('no page data');
   }

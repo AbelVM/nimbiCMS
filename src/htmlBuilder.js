@@ -478,9 +478,24 @@ function computeSlug(parsed, article, pagePath, anchor) {
   const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
   let slugKey = ''
   try {
-    if (h1Text) slugKey = slugify(h1Text)
-    if (!slugKey && parsed && parsed.meta && parsed.meta.title) slugKey = slugify(parsed.meta.title)
-    if (!slugKey && pagePath) slugKey = slugify(String(pagePath))
+    // Choose the display title in the following order of precedence:
+    // 1) HTML <title> (parsed.meta.title)
+    // 2) first H1 found
+    // 3) first H2 found
+    // 4) fallback to pagePath
+    let displayTitle = ''
+    try {
+      if (parsed && parsed.meta && parsed.meta.title) displayTitle = String(parsed.meta.title).trim()
+    } catch (e) { /* ignore */ }
+    if (!displayTitle && h1Text) displayTitle = h1Text
+    if (!displayTitle) {
+      try {
+        const h2 = article.querySelector('h2')
+        if (h2 && h2.textContent) displayTitle = String(h2.textContent).trim()
+      } catch (e) { /* ignore */ }
+    }
+    if (!displayTitle && pagePath) displayTitle = String(pagePath)
+    if (displayTitle) slugKey = slugify(displayTitle)
     if (!slugKey) slugKey = '_home'
     try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { console.warn('[htmlBuilder] computeSlug set slug mapping failed', err) }
     try {
@@ -695,7 +710,13 @@ function parseHtml(raw) {
     heads.forEach(h => {
       tocEntries.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id })
     })
-    return { html: doc.body.innerHTML, meta: {}, toc: tocEntries }
+    // Extract HTML <title> into meta if present so callers can prefer it
+    const metaObj = {}
+    try {
+      const titleTag = doc.querySelector('title')
+      if (titleTag && titleTag.textContent && String(titleTag.textContent).trim()) metaObj.title = String(titleTag.textContent).trim()
+    } catch (e) { /* ignore title extraction failures */ }
+    return { html: doc.body.innerHTML, meta: metaObj, toc: tocEntries }
   } catch (err) { console.warn('[htmlBuilder] parseHtml failed', err); return { html: raw || '', meta: {}, toc: [] } }
 }
 
@@ -780,6 +801,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     article.innerHTML = parsed.html
     try { rewriteRelativeAssets(article, pagePath, contentBase) } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle', err) }
     try { addHeadingIds(article) } catch (err) { console.warn('[htmlBuilder] addHeadingIds failed', err) }
+    // Scripts will be executed after the article is appended to the DOM.
     try {
       const codeEls = article.querySelectorAll('pre code, code[class]')
       codeEls.forEach(el => {
@@ -814,6 +836,56 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const toc = buildTocElement(t, parsed.toc, pagePath)
     return { article, parsed, toc, topH1, h1Text, slugKey }
   }
+
+/**
+ * Execute any script tags contained within an `article` element.
+ * This should be called after the `article` is appended to the document
+ * so that scripts which query the DOM find their target elements.
+ * @param {HTMLElement} article - Article element containing script tags
+ */
+export function executeEmbeddedScripts(article) {
+  if (!article || !article.querySelectorAll) return
+  try {
+    const scripts = Array.from(article.querySelectorAll('script'))
+    for (const s of scripts) {
+      try {
+        const newScript = document.createElement('script')
+        for (const attr of Array.from(s.attributes || [])) {
+          try { newScript.setAttribute(attr.name, attr.value) } catch (e) {}
+        }
+        if (!s.src) {
+          // Execute inline scripts in module scope to avoid redeclaring
+          // top-level identifiers on subsequent injections.
+          try { newScript.type = 'module' } catch (e) {}
+          newScript.textContent = s.textContent || ''
+        }
+        // If this is an external script and an identical src is already
+        // present on the page, skip adding it again to avoid duplicate
+        // execution and potential side-effects.
+        if (s.src) {
+          try {
+            const exists = document.querySelector && document.querySelector(`script[src="${s.src}"]`)
+            if (exists) {
+              // remove the inert original script but do not re-add
+              s.parentNode && s.parentNode.removeChild(s)
+              continue
+            }
+          } catch (e) { /* ignore query failures */ }
+        }
+        const srcLabel = s.src || '<inline>'
+        newScript.addEventListener('error', (ev) => {
+          try { console.warn('[htmlBuilder] injected script error', { src: srcLabel, ev }) } catch (e) {}
+        })
+        newScript.addEventListener('load', () => {
+          try { console.info('[htmlBuilder] injected script loaded', { src: srcLabel, hasNimbi: !!(window && window.nimbiCMS) }) } catch (e) {}
+        })
+        ;(document.head || document.body || document.documentElement).appendChild(newScript)
+        s.parentNode && s.parentNode.removeChild(s)
+        try { console.info('[htmlBuilder] executed injected script', srcLabel) } catch (e) {}
+      } catch (e) { console.warn('[htmlBuilder] execute injected script failed', e) }
+    }
+  } catch (e) { /* ignore */ }
+}
 
 /**
  * Render a simple "not found" message into the provided container.

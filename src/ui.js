@@ -9,7 +9,7 @@
 export { addHook, onPageLoad, onNavBuild, transformHtml, runHooks, _clearHooks } from './nimbi-cms.js'
 
 import { fetchPageData } from './router.js'
-import { prepareArticle, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton, createNavTree } from './htmlBuilder.js'
+import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton, createNavTree } from './htmlBuilder.js'
 import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 import { attachImagePreview } from './imagePreview.js'
@@ -65,6 +65,9 @@ export function createUI(opts) {
     try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { console.warn('[nimbi-cms] transformHtml hooks failed', e) }
 
     contentWrap.appendChild(article)
+
+    // Execute any embedded scripts now that the article is in the DOM.
+    try { executeEmbeddedScripts(article) } catch (e) { console.warn('[nimbi-cms] executeEmbeddedScripts failed', e) }
 
     // Attach image preview to all images in the page.
     try { attachImagePreview(article, { t }) } catch (e) { console.warn('[nimbi-cms] attachImagePreview failed', e) }

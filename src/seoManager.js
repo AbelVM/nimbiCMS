@@ -211,12 +211,28 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
       descOverride = found
     } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
 
-    try { setMetaTags(parsed, h1Text, firstImageUrl, descOverride) } catch (e) { console.warn('[seoManager] setMetaTags failed', e) }
-    try { setStructuredData(parsed, slugKey, h1Text, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
+    // Choose display title in order: HTML <title>, first H1, first H2, pagePath
+    let displayTitle = ''
+    try {
+      if (metaTitle) displayTitle = metaTitle
+    } catch (e) { /* ignore */ }
+    if (!displayTitle) {
+      try { if (topH1 && topH1.textContent) displayTitle = String(topH1.textContent).trim() } catch (e) { /* ignore */ }
+    }
+    if (!displayTitle) {
+      try {
+        const h2 = article.querySelector('h2')
+        if (h2 && h2.textContent) displayTitle = String(h2.textContent).trim()
+      } catch (e) { /* ignore */ }
+    }
+    if (!displayTitle) displayTitle = pagePath || ''
+
+    try { setMetaTags(parsed, displayTitle || undefined, firstImageUrl, descOverride) } catch (e) { console.warn('[seoManager] setMetaTags failed', e) }
+    try { setStructuredData(parsed, slugKey, displayTitle || undefined, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
     const siteName = getSiteNameFromMeta()
-    if (h1Text) {
-      if (siteName) document.title = `${siteName} - ${h1Text}`
-      else document.title = `${initialDocumentTitle || 'Site'} - ${h1Text}`
+    if (displayTitle) {
+      if (siteName) document.title = `${siteName} - ${displayTitle}`
+      else document.title = `${initialDocumentTitle || 'Site'} - ${displayTitle}`
     } else if (metaTitle) {
       document.title = metaTitle
     } else {

@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -18,44 +19,47 @@
 
   <link rel="icon" href="/assets/logo.png">
   <style>
-    html,body,#app { height: 100%; margin: 0; }
-    #app { min-height: 100vh; display: block; }
+    html,
+    body,
+    #app {
+      height: 100%;
+      margin: 0;
+    }
+
+    #app {
+      min-height: 100vh;
+      display: block;
+    }
   </style>
   <link rel="preload" href="/dist/nimbi-cms.css" as="style" onload="this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="/dist/nimbi-cms.css"></noscript>
+  <noscript>
+    <link rel="stylesheet" href="/dist/nimbi-cms.css">
+  </noscript>
 </head>
+
 <body>
   <div id="app"></div>
 
   <script src="/dist/nimbi-cms.js" defer></script>
   <script defer>
-    window.addEventListener('DOMContentLoaded', function(){
+    window.addEventListener('DOMContentLoaded', function () {
       if (!window.nimbiCMS) {
         console.warn('nimbiCMS UMD bundle not found at /dist/nimbi-cms.js');
         return;
       }
-
-      const initializer = window.nimbiCMS.initCMS
-      if (typeof initializer !== 'function') {
-        console.warn('nimbiCMS found but initializer is not a function', initializer)
-        return
+      try {
+        nimbiCMS.initCMS({
+          el: '#app',
+          contentPath: '.',
+          indexDepth: 3,
+          bulmaCustomize: 'materia',
+          homePage: 'README.md'
+        });
+      } catch (e) {
+        console.error('[index.html] initCMS failed', e);
       }
-
-        try {
-          initializer({
-            el: '#app',
-            contentPath: '.',
-            indexDepth: 3,
-            searchIndex: true,
-            defaultStyle: 'light', 
-            bulmaCustomize: 'materia',
-            homePage: 'README.md'
-          });
-        } catch (e) {
-          console.error('[index.html] initCMS failed', e);
-        }
     });
   </script>
 </body>
+
 </html>
-    

@@ -292,6 +292,7 @@ export function attachImagePreview(opts: any): any
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
 export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
+export function executeEmbeddedScripts(article: any): any
 export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): any
 
 

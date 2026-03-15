@@ -394,7 +394,15 @@ export function observeCodeBlocks(root = document) {
                 await registerLanguage(canonical)
               } catch (err) { console.warn('[codeblocksManager] registerLanguage failed', err) }
               try {
-                
+                // Ensure the element contains the raw code as textContent
+                // (not innerHTML) so highlight.js does not complain about
+                // unescaped HTML. Then clear any previous highlighted flag
+                // and invoke highlightElement.
+                try {
+                  const raw = el.textContent || el.innerText || ''
+                  if (raw != null) el.textContent = raw
+                } catch (e) { /* ignore */ }
+                try { if (el && el.dataset && el.dataset.highlighted) delete el.dataset.highlighted } catch (_) {}
                 hljs.highlightElement(el)
               } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed', err) }
             } else {
@@ -434,7 +442,14 @@ export function observeCodeBlocks(root = document) {
             await registerLanguage(canonical)
           } catch (err) { console.warn('[codeblocksManager] registerLanguage failed (no observer)', err) }
         }
-        try { hljs.highlightElement(el) } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed (no observer)', err) }
+        try {
+          try {
+            const raw = el.textContent || el.innerText || ''
+            if (raw != null) el.textContent = raw
+          } catch (e) {}
+          try { if (el && el.dataset && el.dataset.highlighted) delete el.dataset.highlighted } catch (_) {}
+          hljs.highlightElement(el)
+        } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed (no observer)', err) }
       } catch (_) { console.warn('[codeblocksManager] loadSupportedLanguages fallback ignored error', _) }
     })
     return
@@ -458,20 +473,39 @@ export function observeCodeBlocks(root = document) {
  */
 export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = document.querySelector('link[data-hl-theme]')
-  if (existing) existing.remove()
+  const existingTheme = existing && existing.getAttribute ? existing.getAttribute('data-hl-theme') : null
 
-  let currentHighlightTheme = theme || 'monokai'
-  if (currentHighlightTheme === 'monokai') {
+  // Interpret the special value 'default' as a request to revert to the
+  // bundled theme (whatever that bundle provides). Do not hardcode the
+  // bundle's theme name here; restoring the bundled default is achieved
+  // by removing any injected theme link.
+  const requested = (theme === undefined || theme === null) ? 'default' : String(theme)
+  if (requested === 'default') {
+    // revert to bundled default by removing any injected theme link
+    try { if (existing && existing.parentNode) existing.parentNode.removeChild(existing) } catch (e) { /* ignore */ }
     return
   }
+
+  if (existingTheme === requested) return
+
   if (!useCdn) {
-    console.warn('Requested highlight theme not bundled; set useCdn=true to load from CDN')
+    console.warn('Requested highlight theme not bundled; set useCdn=true to load theme from CDN')
     return
   }
+
+  const currentHighlightTheme = requested
   const href = `https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/styles/${currentHighlightTheme}.css`
-  const l = document.createElement('link')
-  l.rel = 'stylesheet'
-  l.href = href
-  l.setAttribute('data-hl-theme', currentHighlightTheme)
-  document.head.appendChild(l)
+  const newLink = document.createElement('link')
+  newLink.rel = 'stylesheet'
+  newLink.href = href
+  newLink.setAttribute('data-hl-theme', currentHighlightTheme)
+
+  // Append new link and remove old link after new stylesheet loads to avoid
+  // a flash of the default theme while switching.
+  newLink.addEventListener('load', () => {
+    try {
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing)
+    } catch (e) { /* ignore */ }
+  })
+  document.head.appendChild(newLink)
 }
