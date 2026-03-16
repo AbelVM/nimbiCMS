@@ -142,13 +142,28 @@ function isSafeContentPath(p) {
  *  - must be a simple basename (no slashes)
  *  - allowed chars: A-Za-z0-9._- and must end with .md or .html
  */
-function isSafePageBasename(name) {
+/**
+ * Validates a page path for `homePage` / `notFoundPage`.
+ * Rules:
+ *  - must be a string
+ *  - must not contain ".." segments
+ *  - must not be an absolute URL (protocol://) or start with //
+ *  - must not start with a leading slash (we normalize to relative)
+ *  - path segments may include A-Za-z0-9._- and may contain single-level
+ *    subpaths (e.g. "assets/brochure.md").
+ */
+function isSafePagePath(name) {
   if (typeof name !== 'string') return false
   const s = name.trim()
   if (!s) return false
-  if (s.includes('/') || s.includes('\\')) return false
   if (s.includes('..')) return false
-  if (!/^[A-Za-z0-9._-]+\.(md|html)$/.test(s)) return false
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(s)) return false // protocol://
+  if (s.startsWith('//')) return false
+  // disallow absolute filesystem-ish paths
+  if (s.startsWith('/') || /^[A-Za-z]:\\/.test(s)) return false
+  // allow optional relative ./ prefix (will be normalized elsewhere)
+  const normalized = s.replace(/^\.\//, '')
+  if (!/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(md|html)$/.test(normalized)) return false
   return true
 }
 
@@ -242,7 +257,7 @@ export async function initCMS(options = {}) {
     finalOptions.bulmaCustomize = queryOpts.bulmaCustomize
   }
 
-  const {
+  let {
     el,
     contentPath = '/content',
           crawlMaxQueue = 1000,
@@ -261,6 +276,14 @@ export async function initCMS(options = {}) {
     homePage = '_home.md',
     notFoundPage = '_404.md'
   } = finalOptions
+
+  // Normalize common relative path prefixes (e.g. "./assets/brochure.md")
+  try {
+    if (typeof homePage === 'string' && homePage.startsWith('./')) homePage = homePage.replace(/^\.\//, '')
+  } catch (e) {}
+  try {
+    if (typeof notFoundPage === 'string' && notFoundPage.startsWith('./')) notFoundPage = notFoundPage.replace(/^\.\//, '')
+  } catch (e) {}
 
   const showError = (err) => {
     try {
@@ -299,14 +322,14 @@ export async function initCMS(options = {}) {
       throw new TypeError('initCMS(options): "contentPath" contains unsafe characters or patterns')
     }
   }
-  if (finalOptions.homePage != null) {
-    if (!isSafePageBasename(finalOptions.homePage)) {
-      throw new TypeError('initCMS(options): "homePage" must be a simple basename ending with .md or .html')
+  if (homePage != null) {
+    if (!isSafePagePath(homePage)) {
+      throw new TypeError('initCMS(options): "homePage" must be a relative path (no leading "/") ending with .md or .html')
     }
   }
-  if (finalOptions.notFoundPage != null) {
-    if (!isSafePageBasename(finalOptions.notFoundPage)) {
-      throw new TypeError('initCMS(options): "notFoundPage" must be a simple basename ending with .md or .html')
+  if (notFoundPage != null) {
+    if (!isSafePagePath(notFoundPage)) {
+      throw new TypeError('initCMS(options): "notFoundPage" must be a relative path (no leading "/") ending with .md or .html')
     }
   }
 

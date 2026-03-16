@@ -1,4 +1,5 @@
-[Home](README.md)
+[Home](/assets/brochure.md)
+[Read Me](README.md)
 [API](docs/README.md)
 [Playground](/assets/playground.html)
 [License](LICENSE.md)

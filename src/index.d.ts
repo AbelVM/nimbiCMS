@@ -279,7 +279,7 @@ export function setLang(lang: string): void
 
 // --- from src/init.js
 export function parseInitOptionsFromQuery(queryString: string): object
-export const currentHighlightTheme: any
+export const currentHighlightTheme: string
 export const initialDocumentTitle: string
 
 
