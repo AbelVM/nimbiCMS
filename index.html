@@ -47,7 +47,9 @@
       try {
         nimbiCMS.initCMS({
           el: '#app',
-          contentPath: '.',
+          // Use repo-relative content path so gh-pages serves files from the
+          // repository subpath (avoids requests to root `/`)
+          contentPath: './',
           indexDepth: 3,
           bulmaCustomize: 'materia',
           homePage: 'assets/brochure.md',
