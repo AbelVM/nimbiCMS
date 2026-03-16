@@ -7,8 +7,6 @@ date: 2026-03-16
 <img src="./assets/logo.png" alt="logo" style="height:256px;width:256px;" />
 
 # nimbiCMS
- 
-[![npm version](https://img.shields.io/npm/v/nimbi-cms.svg)](https://www.npmjs.com/package/nimbi-cms) [![jsDelivr](https://img.shields.io/jsdelivr/npm/hm/nimbi-cms)](https://www.jsdelivr.com/package/npm/nimbi-cms) [![unpkg](https://img.shields.io/badge/unpkg-nimbicms-blue?logo=unpkg)](https://unpkg.com/nimbi-cms)
 
 Lightweight, lightspeed, SEO-first client-side CMS
 
@@ -21,6 +19,8 @@ Just drop your Markdown files into a folder, serve the site (GitHub Pages, S3, e
 ![lighthouse results](./assets/lighthouse.png)
 
 Editing content via the GitHub web editor works too—just save and refresh to see updates.
+
+The code lives at [https://github.com/AbelVM/nimbiCMS](https://github.com/AbelVM/nimbiCMS)
 
 ## Features
 
