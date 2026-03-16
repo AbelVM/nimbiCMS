@@ -1,7 +1,7 @@
 import { createNavTree } from './htmlBuilder.js'
 import { t } from './l10nManager.js'
 import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
-import { isExternalLink, normalizePath, safe } from './utils/helpers.js'
+import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './slugManager.js'
 
 // Safe getter for properties on dynamically-imported modules. Some tests
@@ -144,7 +144,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           }
           const a = document.createElement('a')
           a.className = 'block'
-          a.href = '?page=' + encodeURIComponent(it.slug)
+          a.href = buildPageUrl(it.slug)
           a.textContent = it.title
           a.addEventListener('click', () => { try { resultsEl.style.display = 'none' } catch (_) {} })
           wrap.appendChild(a)
@@ -173,17 +173,18 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       const u = new URL(rawHref, location.href)
       const p = u.searchParams.get('page')
       if (p) {
-        brandItem.href = '?page=' + encodeURIComponent(decodeURIComponent(p))
+        const page = decodeURIComponent(p)
+        brandItem.href = buildPageUrl(page)
       } else {
-        brandItem.href = '?page=' + encodeURIComponent(homePage)
+        brandItem.href = buildPageUrl(homePage)
         brandItem.textContent = t('home')
       }
     } catch (e) {
-      brandItem.href = '?page=' + encodeURIComponent(homePage)
+      brandItem.href = buildPageUrl(homePage)
       brandItem.textContent = t('home')
     }
   } else {
-    brandItem.href = '?page=' + encodeURIComponent(homePage)
+    brandItem.href = buildPageUrl(homePage)
     brandItem.textContent = t('home')
   }
   // Attempt to resolve/insert a small logo according to `logoOption`.
@@ -253,7 +254,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       const url = new URL(href, location.href);
       const pageParam = url.searchParams.get('page');
       const hash = url.hash ? url.hash.replace(/^#/, '') : null;
-      history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''));
+      history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash));
       try { renderByQuery(); } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e); }
       try { closeMobileMenu() } catch (e) {}
     }
@@ -369,7 +370,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         }
         const a = document.createElement('a')
         a.className = 'dropdown-item nimbi-search-result'
-        a.href = '?page=' + encodeURIComponent(it.slug)
+        a.href = buildPageUrl(it.slug)
         a.textContent = it.title
         a.addEventListener('click', () => {
           if (dropdown) dropdown.classList.remove('is-active')
@@ -467,7 +468,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const parts = mdRaw.split(/::|#/, 2)
         const mdPath = parts[0]
         const frag = parts[1]
-        item.href = '?page=' + encodeURIComponent(mdPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+        item.href = buildPageUrl(mdPath, frag)
       } else if (/\.html(?:$|[#?])/.test(href) || href.endsWith('.html')) {
         let raw = normalizePath(href)
         const parts = raw.split(/::|#/, 2)
@@ -489,15 +490,15 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                 const slugKey = slugify(titleText)
                 if (slugKey) {
                   try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
-                  item.href = '?page=' + encodeURIComponent(slugKey) + (frag ? '#' + encodeURIComponent(frag) : '')
+                  item.href = buildPageUrl(slugKey, frag)
                 } else {
-                  item.href = '?page=' + encodeURIComponent(htmlPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+                  item.href = buildPageUrl(htmlPath, frag)
                 }
               } else {
-                item.href = '?page=' + encodeURIComponent(htmlPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+                item.href = buildPageUrl(htmlPath, frag)
               }
             } catch (ee) {
-              item.href = '?page=' + encodeURIComponent(htmlPath) + (frag ? '#' + encodeURIComponent(frag) : '')
+              item.href = buildPageUrl(htmlPath, frag)
             }
           } else {
             item.href = href
@@ -569,7 +570,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const hash = url.hash ? url.hash.replace(/^#/, '') : null
         if (pageParam) {
           ev.preventDefault()
-          history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+          history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
           try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
         }
       } catch (e) { console.warn('[nimbi-cms] navbar click handler failed', e) }
@@ -600,7 +601,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const hash = url.hash ? url.hash.replace(/^#/, '') : null
         if (pageParam) {
           ev.preventDefault()
-          history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+          history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
           try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
         }
       } catch (e) {

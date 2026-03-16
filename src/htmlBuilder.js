@@ -1,7 +1,7 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
-import { isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
+import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 import { registerThemedElement } from './bulmaManager.js'
 
 // Resolve a path against a base while guarding against invalid-base errors
@@ -107,7 +107,7 @@ export function buildTocElement(t, toc, pagePath = '') {
         try {
           const normPage = String(pagePath || '').replace(/^[\\.\\/]+/, '')
           const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
-          if (display) a.href = `?page=${encodeURIComponent(display)}#${encodeURIComponent(slug)}`
+          if (display) a.href = buildPageUrl(display, slug)
           else a.href = `#${encodeURIComponent(slug)}`
         } catch (err) {
           console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
@@ -303,7 +303,7 @@ async function rewriteAnchors(article, contentBase, pagePath) {
                 const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
                 if (dir) {
                   const newRel = normalizePath(dir + pageParam)
-                  a.setAttribute('href', '?page=' + encodeURIComponent(newRel) + (tmpUrl.hash || ''))
+                  a.setAttribute('href', buildPageUrl(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null))
                   continue
                 }
               }
@@ -374,7 +374,7 @@ async function rewriteAnchors(article, contentBase, pagePath) {
                 } catch (err) { /* ignore iteration errors */ }
               }
               if (slugKey) {
-                a.setAttribute('href', `?page=${encodeURIComponent(slugKey)}`)
+                a.setAttribute('href', buildPageUrl(slugKey))
               } else {
                 // Defer fetching HTML title to resolve slug if possible
                 htmlPending.add(rel)
@@ -447,11 +447,9 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       let slug = null
       try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { console.warn('[htmlBuilder] mdToSlug access failed', err) }
       if (slug) {
-        if (frag) a.setAttribute('href', `?page=${encodeURIComponent(slug)}#${encodeURIComponent(frag)}`)
-        else a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
+        a.setAttribute('href', buildPageUrl(slug, frag))
       } else {
-        if (frag) a.setAttribute('href', `?page=${encodeURIComponent(rel)}#${encodeURIComponent(frag)}`)
-        else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+        a.setAttribute('href', buildPageUrl(rel, frag))
       }
     }
     // Now handle any HTML anchors that were deferred for title extraction
@@ -462,8 +460,8 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       if (!slug) {
         try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { console.warn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
       }
-      if (slug) a.setAttribute('href', `?page=${encodeURIComponent(slug)}`)
-      else a.setAttribute('href', `?page=${encodeURIComponent(rel)}`)
+      if (slug) a.setAttribute('href', buildPageUrl(slug))
+      else a.setAttribute('href', buildPageUrl(rel))
     }
   } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
 }
@@ -504,13 +502,9 @@ function computeSlug(parsed, article, pagePath, anchor) {
     if (!slugKey) slugKey = '_home'
     try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { console.warn('[htmlBuilder] computeSlug set slug mapping failed', err) }
     try {
-      let newUrl = '?page=' + encodeURIComponent(slugKey)
+      const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
       try {
-        const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
-        if (curHash) newUrl += '#' + encodeURIComponent(curHash)
-      } catch (err) { console.warn('[htmlBuilder] computeSlug hash decode failed', err) }
-      try {
-        history.replaceState({ page: slugKey }, '', newUrl)
+        history.replaceState({ page: slugKey }, '', buildPageUrl(slugKey, curHash))
       } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
     } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
   } catch (err) { console.warn('[htmlBuilder] computeSlug failed', err) }
@@ -1040,7 +1034,7 @@ export function attachTocClickHandler(toc) {
               if (!pageParam && hash) {
                 try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               } else {
-                try { history.replaceState({ page: currentPage || pageParam }, '', '?page=' + encodeURIComponent(currentPage || pageParam) + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
+                try { history.replaceState({ page: currentPage || pageParam }, '', buildPageUrl(currentPage || pageParam, hash)) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               }
             } catch (err) { console.warn('[htmlBuilder] update history for anchor failed', err) }
             try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (err) { console.warn('[htmlBuilder] stopPropagation failed', err) }
@@ -1049,7 +1043,7 @@ export function attachTocClickHandler(toc) {
           }
 
           
-          history.pushState({ page: pageParam }, '', '?page=' + encodeURIComponent(pageParam) + (hash ? '#' + encodeURIComponent(hash) : ''))
+          history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
           try {
             if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') {
               try { window.renderByQuery() } catch (err) { console.warn('[htmlBuilder] window.renderByQuery failed', err) }

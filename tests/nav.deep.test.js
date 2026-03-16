@@ -41,6 +41,31 @@ describe('nav deep branches', () => {
     expect(renderByQuery).toHaveBeenCalled()
   })
 
+  it('keeps extra query params when navigating via brand click', async () => {
+    // Ensure that options passed via query string persist through SPA navigation.
+    Object.defineProperty(globalThis, 'location', {
+      value: { href: 'http://example.com/?lang=fr&page=foo', search: '?lang=fr&page=foo', pathname: '/', origin: 'http://example.com' },
+      configurable: true
+    })
+
+    const navbarWrap = document.createElement('header')
+    const container = document.createElement('main')
+    const navHtml = '<a href="http://example.com/?page=foo"></a>'
+    const renderByQuery = vi.fn()
+
+    const pushSpy = vi.spyOn(history, 'pushState')
+    await buildNav(navbarWrap, container, navHtml, '/content/', 'home', (_t) => _t, renderByQuery, false)
+
+    const brand = navbarWrap.querySelector('.navbar .navbar-brand .navbar-item')
+    expect(brand.getAttribute('href')).toContain('lang=fr')
+
+    brand.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(pushSpy).toHaveBeenCalled()
+    const pushedUrl = pushSpy.mock.calls[0][2]
+    expect(pushedUrl).toContain('lang=fr')
+    pushSpy.mockRestore()
+  })
+
   it('creates md link navbar-item with page param for .md links', async () => {
     const navbarWrap = document.createElement('header')
     const container = document.createElement('main')

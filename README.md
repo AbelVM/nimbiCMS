@@ -3,27 +3,41 @@
 
 # nimbiCMS
 
-Lightweight client-side CMS used for local editing and testing.
+Lightweight, lightspeed, SEO-first client-side CMS
 
-## Table of Contents
+## The project
 
-1. [Installation](#installation)
-2. [Quick start](#quick-start)
-3. [Examples](#examples)
-4. [Features](#features)
-5. [Options](#options)
-6. [API](#api)
-7. [Theming](#theming-and-customization)
-8. [Localization](#localization)
-9. [Content workflow](#content-workflow)
-10. [Testing](#testing)
-11. [Troubleshooting](#troubleshooting)
-12. [Bulmaswatch themes](#available-bulmaswatch-themes)
-13. [GitHub Pages](#using-with-github-pages-and-the-github-file-editor)
-14. [Roadmap](#roadmap)
-15. [Changelog](#changelog)
+NimbiCMS is a client-side CMS for static sites that requires **no database, no server build step, and no backend**, just a bunch of Markdown or HTML pages and a minimalistic setup
 
----
+Just drop your Markdown files into a folder, serve the site (GitHub Pages, S3, etc.), and the client will crawl the content, render Markdown to HTML, hook links, manage slugs and anchors, maintain navigation and search functionalities, and update SEO tags on the fly. All that while being compliant, fast and accesible!
+
+![lighthouse results](./assets/lighthouse.png)
+
+Editing content via the GitHub web editor works too—just save and refresh to see updates.
+
+## Features
+
+- Client-side rendering of [GitHub‑flavored Markdown](https://github.github.com/gfm/) via [marked.js](https://marked.js.org/), no need for site compilation
+- No Jekyll, no Hugo, no CI at all
+- Perfect for static servers (GitHub Pages, S3, etc.)
+- Optional client-side search box built from headings and excerpts (enabled by default).
+- Reading time estimation
+- Code is organized into small modules to ease maintenance and testing.
+- Sticky per-page, dynamically generated TOC 
+- [Bulma](https://bulma.io/)‑based UI components.
+- Runtime updates for SEO, Open Graph and Twitter meta tags.
+- Lazily loads images by default, while heuristically marking above‑the‑fold images as eager.
+- Image preview modal with zoom controls, wheel zoom, drag pan, double-click to zoom, and touch pinch support.
+- Syntax highlighting using [highlight.js](https://highlightjs.org/) — languages are auto-registered when detected.
+- Simple theming (light/dark), Bulma and hightlight.js customization options.
+- Simplified deliverables: regardless all the dynamic imports, the bundle is kept in one JS file and one CSS file
+- Bundle is compact size
+  - JS file: 240.15 kB, gzipped 70.09 kB (for UMD bundle)
+  - CSS file: 692.79 kB, gzipped 69.09 kB (includes Bulma)
+- All the heavy work is managed by web workers to avoid hogging the main thread
+- Pluggable architecture through the available hooks
+- Fully typed and [documented](docs/README.md)
+- [MIT licensed](LICENSE.md)
 
 ## Installation
 
@@ -38,13 +52,7 @@ For development with live reload:
 npm run dev
 ```
 
-## Quick start
-
-NimbiCMS is a client-side CMS for static sites that requires **no database, no server build step, and no backend**.
-
-Just drop your Markdown files into a folder, serve the site (GitHub Pages, S3, etc.), and the client will crawl the content, render Markdown to HTML, hook links, manage slugs and anchors, maintain navigation, and update SEO tags.
-
-Editing content via the GitHub web editor works too—just save and refresh to see updates.
+## How to use
 
 ### Basic HTML example
 
@@ -57,9 +65,7 @@ Editing content via the GitHub web editor works too—just save and refresh to s
 </head><body>
 <div id="app" style="height:100vh"></div>
 <script>
-  // UMD bundle exposes global `nimbiCMS`
-  // `contentPath` is optional and defaults to `./content` if omitted
-  nimbiCMS.initCMS({ el: '#app' /*, cacheTtlMinutes: 10 */ })
+  nimbiCMS.initCMS({ el: '#app' })
 </script>
 </body></html>
 ```
@@ -85,172 +91,63 @@ Examples showing how to consume each shipped bundle format produced by the build
 
 ```html
 <script type="module">
-  // import from the ES build artifact
-  import initCMS, { getVersion } from '/dist/nimbi-cms.es.js'
-
-  // If you prefer named imports from the package, bundlers can resolve
-  // the `module` field in package.json to this file.
+  import initCMS from '/dist/nimbi-cms.es.js'
   initCMS({ el: '#app' })
-  // optional: read runtime version
-  getVersion().then(v => console.log('nimbi-cms version', v))
 </script>
 ```
 
 - CJS (Node / CommonJS consumers)
 
 ```js
-// require the CommonJS build
-const { initCMS, getVersion } = require('./dist/nimbi-cms.cjs.js')
-
-// initCMS is available to mount the library in a DOM-like environment
-// (useful in SSR test harnesses or Node environments that provide DOM)
+const { initCMS } = require('./dist/nimbi-cms.cjs.js')
 initCMS({ el: '#app' })
-// optional: read runtime version
-getVersion().then(v => console.log('nimbi-cms version', v))
 ```
 
-Notes:
+#### Notes:
 
 - The UMD build is a single, self-contained `dist/nimbi-cms.js` file that exposes the public API on the `nimbiCMS` global.
 - The ES build is `dist/nimbi-cms.es.js` and is ideal for modern bundlers and `<script type="module">` usage.
 - The CJS build is `dist/nimbi-cms.cjs.js` for CommonJS consumers.
-- CSS is always shipped as `dist/nimbi-cms.css` and should be loaded alongside the script for styling.
-
-## Examples
-
-Quick runnable examples are provided in the `example/` folder. The simplest way to try the project locally:
-
-```bash
-npm install
-npm run build -- --outDir example/dist
-npx http-server example -p 5174
-# then open http://127.0.0.1:5174/example/index.html
-```
-
-You can also run the dev server and open the example page with live reload:
-
-```bash
-npm run dev
-# open http://localhost:5173/example/index.html
-```
-
-Programmatic example (UMD):
+- CSS is always shipped as `dist/nimbi-cms.css` and should be loaded alongside the script for styling. For performance optimization, it's advised to preload the CSS file like:
 
 ```html
-<div id="app"></div>
-<script src="/dist/nimbi-cms.js"></script>
-<script>nimbiCMS.initCMS({ el: '#app', contentPath: './content' })</script>
+<link rel="preload" href="/dist/nimbi-cms.css" as="style" onload="this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="/dist/nimbi-cms.css"></noscript>
 ```
 
-Now create a `content/_navigation.md` file like this:
+### Content Workflow
 
-```markdown
-- [Home](_home.md)
-- [Blog](blog/)
+Drop `.md` and/or `.html` files into your content directory. No build step is necessary; a static server that serves the files is sufficient.
+
+> When loading `.html` files, only the `body` block is parsed. All the code in `head` is overriden, so, if you want some specific styling or script being run for that page, add them to `body`. Check `assets/playground.html` source for an example
+
+**Required files**
+
+- `_home.md` — required by default. You can override this with the `homePage` option to use a different `.md` or `.html` file as the home page.
+
+```javascript
+initCMS({ el: '#app', homePage: 'index.html' })
 ```
 
-(usually you’d add proper titles, links to posts etc.); that file drives the
-sidebar navigation.
+- `_navigation.md` — renders into the navbar; use Markdown links. Example nav markup:
 
-Then follow the normal build & serve steps below:
-
-```bash
-npm install
-npm run build -- --outDir example/dist
+```
+[Home](_home.md)
+[Blog](blog.md)
+[About](about.md)
 ```
 
-Then serve `example/` for local testing:
+- `_404.md` — optional fallback for 404 responses. When the server responds to a requested `.md` path with an HTML document (e.g., an SPA fallback serving `index.html`), the CMS treats that as a missing markdown page and will attempt to load `/_404.md` from the configured content base so a proper 404 page can be rendered instead of the site's index HTML.
 
-```bash
-npx http-server example -p 5174
-# visit http://127.0.0.1:5174/
+```javascript
+initCMS({ el: '#app', notFoundPage: '_404.md' })
 ```
 
-The dev workflow uses Vite; you can start the dev server with:
-
-```bash
-npm run dev
-```
-
-and open the example at `http://localhost:5173/example/index.html`.
-
-## Crawling & Search Options
-
-- `skipRootReadme` (default: `false`): by default the indexer treats a repository-root `README.md` like any other content page and will discover links within it. Set this option to `true` (via `initCMS({ skipRootReadme: true })` or `setSkipRootReadme(true)`) to opt-out and prevent link discovery inside the repository root README.
-
-- External links are never crawled: absolute URLs (e.g. `http:`/`https:`), protocol-relative links (`//`), `mailto:` and other URI schemes are ignored by the crawler to prevent accidental traversal off-site.
-
-## Navbar Logo Option
-
-You can display a small site logo at the leftmost position of the navbar by passing the `navbarLogo` option to `initCMS()`.
-
-- `none` — no logo (default behavior if omitted)
-- `favicon` — use the page's favicon (only PNG favicons are used; other formats fall back to none)
-- `<path>` — a string path or URL to an image (absolute or relative)
-- `copy-first` — extract the first `<img>` from the configured `homePage` and use it as the navbar logo
-- `move-first` — same as `copy-first` but also marks the image as moved by setting the `data-nimbi-logo-moved` attribute on the document element (consumers can remove the original image during render)
-
-Example:
-
-```js
-nimbiCMS.initCMS({ el: '#app', navbarLogo: 'favicon' })
-```
-
-- Markdown escapes are unescaped for search results: titles and heading text extracted from Markdown have common backslash escapes removed so results display `\_clearHooks` as `_clearHooks` for a cleaner UX.
-
-
-Behavior notes for `indexDepth=2` and `indexDepth=3`:
-
-- Search results for H2 (when `indexDepth>=2`) and H3 (when `indexDepth=3`) headings include a subtle parent label showing the containing page's H1. This helps users understand deeper-heading results' context at-a-glance.
-
-Example of how a deeper-heading result may be rendered in the search UI (simplified):
-
-```html
-<div class="search-result">
-  <div class="result-parent">My Page Title</div> <!-- shown for H2/H3 results when configured -->
-  <div class="result-title">Section A</div>
-  <div class="result-excerpt">A short excerpt from the section...</div>
-</div>
-```
-
-- Content lives under `example/content/`.
-- The SPA uses `?page=` query parameters internally.
-- Build output is written to `example/dist` when targeting the example case.
-
-
-## Features
-
-- Client-side rendering of GitHub‑flavored Markdown.
-- Optional client-side search box built from H1 titles and excerpts (enabled by default).
-- Code is now organized into small modules (`router.js`, `markdown.js`, etc.) to ease maintenance and testing.
-- Sticky per-page TOC and Bulma‑based UI components (navbar, menu).
-- Runtime updates for SEO, Open Graph and Twitter meta tags.
-- Lazily loads images by default, while heuristically marking above‑the‑fold
-  images as eager (adds `fetchpriority="high"` where appropriate). A CSS
-  custom property `--nimbi-image-max-height-ratio` lets you tune what counts
-  as "above the fold".
-- Image preview modal with zoom controls, wheel zoom, drag pan, double-click to zoom, and touch pinch support.
-- Syntax highlighting using `highlight.js` — only JS is bundled; other
-  languages are auto-registered when detected.
-- Simple theming (light/dark) and Bulma customization options.
-- UMD build is self‑contained (no separate worker asset required). The markdown
-  renderer now runs in an inlined Web Worker so the distributed bundle remains
-  a single JS file while still off‑loading heavy parsing work off the main
-  thread. Anchor rewriting currently runs in‑thread for portability, with a
-  worker implementation kept in the source for future experimentation.
-
-Worker manager (brief)
-
-The repo includes a small `worker-manager` helper to standardize Worker
-lifecycle and request/response messaging. Use `makeWorkerManager(createWorker, name)`
-for a safe, cancellable request helper and `createWorkerFromRaw()` to build
-Blob-backed workers for inline bundling. Prefer `manager.send(...)` for
-short-lived RPC-style interactions and call `manager.terminate()` during
-teardown for long-lived workers.
+Links are converted to hash‑based navigation (`?page=…`), preserving anchors and URL passed parameters
 
 ## Options
 
-`initCMS(options)` mounts the CMS into a page. The table below summarizes the supported `InitOptions` (see `src/index.d.ts` for the generated declarations).
+`initCMS(InitOptions)` mounts the CMS into a page. The table below summarizes the supported `InitOptions`. This options can be overrrided using URL parameters with the same name.
 
 ### Core
 
@@ -269,8 +166,6 @@ teardown for long-lived workers.
 | `indexDepth` | `1 \| 2 \| 3` | `1` | How deep headings are indexed (H1, H2, H3). |
 | `noIndexing` | `string[]` | — | Paths (relative) to exclude from discovery and indexing. |
 | `skipRootReadme` | `boolean` | `false` | When `true`, skip link discovery inside a repository-root `README.md`. |
-
-> Tip: use `indexDepth` (1–3) to control how deeply headings are indexed for search results; higher values include deeper headings and add a parent-label context for H2/H3 hits.
 
 ### Routing and Pages
 
@@ -312,11 +207,11 @@ teardown for long-lived workers.
 
 ## API
 
-The `nimbi-cms` package exports a small set of helpers in addition to the
-default `initCMS` export. These are available as named imports in ESM and as
-properties on the `nimbiCMS` global in UMD builds.
+The `nimbi-cms` package exports a small set of helpers in addition to the default `initCMS` export. These are available as named imports in ESM and as properties on the `nimbiCMS` global in UMD builds.
 
-> **Note:** the default export (`initCMS`) and the `default` alias are intentionally excluded from this list.
+For a complete listing of exported symbols and TypeScript types, see [the documentation](docs/README.md).
+
+> **Note:** the default export (`initCMS`) and the `default` alias are intentionally excluded from the list below.
 
 ### Version
 
@@ -412,15 +307,17 @@ observeCodeBlocks(document.body)
 setHighlightTheme('monokai', { useCdn: true })
 ```
 
-> For a complete listing of exported symbols and TypeScript types, see [the documentation](docs/README.md).
+## Examples
 
-## HTML Links without Extensions
+This very site is running **nimbiCMS**!
 
-Navigation entries or anchors pointing at HTML pages need not include the
-`.html` suffix.  During startup the CMS will automatically append the
-extension when building slug mappings so that clicking or searching for the
-slug works regardless of whether the original link had the file name or not.
-
+The files used to do so, apart from the bundle, are:
+* index.html
+* README.md (this file)
+* LICENSE.md
+* _navigation.md
+* _404.md
+* assets/playground.html
 
 ## Theming and Customization
 
@@ -488,52 +385,11 @@ import { setLang } from 'nimbi-cms'
 setLang('fr')
 ```
 
-## Content Workflow
-
-Drop `.md` files into your content directory. No build step is necessary; a
-static server that serves the files is sufficient.
-
-**Required files**
-
-- `_home.md` — required by default. You can override this with the `homePage` option to use a different `.md` or `.html` file as the home page.
-  ```js
-  initCMS({ el: '#app', homePage: 'index.html' })
-  ```
-- `_navigation.md` — renders into the navbar; use Markdown links.
-- `_404.md` — optional fallback for 404 responses. When the server responds to a requested `.md` path with an HTML document (e.g., an SPA fallback serving `index.html`), the CMS treats that as a missing markdown page and will attempt to load `/_404.md` from the configured content base so a proper 404 page can be rendered instead of the site's index HTML.
-  ```js
-  initCMS({ el: '#app', notFoundPage: '_404.md' })
-  ```
-
-Example nav markup:
-
-```
-[Home](_home.md)
-[Blog](blog.md)
-[About](about.md)
-```
-
-
-Links are converted to hash‑based navigation (`?page=…`), preserving anchors.
-
-## Testing
-
-A comprehensive Vitest suite covers every module as well as the declaration
-generator itself.  The `tests/genDts.test.js` file runs `npm run gen-dts` and
-inspects the resulting `src/index.d.ts` for a handful of edge‑case types
-(see `src/gen-dts-sample.js` for the corresponding exports).  This ensures
-that future tweaks to `scripts/gen-dts.js` don’t regress the handling of
-unions, nested generics, destructuring, etc.
-
-
-- Anchor/hash behaviour: open
-  `http://127.0.0.1:5174/?page=dummy-html-test-page#some-anchor`.
-- Verify no mass `.md` fetches by inspecting the network tab on an HTML page.
 
 ### Runtime path sanitization
 
 To reduce the risk of accidental exposure or path traversal on static hosts,
-the client now sanitizes and normalizes runtime path options. Important
+the client sanitizes and normalizes runtime path options. Important
 behaviour changes:
 
 - `contentPath`, `homePage`, and `notFoundPage` are not accepted from the
@@ -587,20 +443,18 @@ import initCMS from 'nimbi-cms'
 initCMS({ el: '#app', allowUrlPathOverrides: true })
 ```
 
-Note: enabling `allowUrlPathOverrides` still runs client-side validation; if
-an unsafe value is supplied the call to `initCMS()` will throw a `TypeError`.
-Prefer passing `contentPath`, `homePage`, and `notFoundPage` directly in the
-`options` object from secure script code rather than relying on URL query
-parameters.
+> Note: enabling `allowUrlPathOverrides` still runs client-side validation; if an unsafe value is supplied the call to `initCMS()` will throw a `TypeError`. Prefer passing `contentPath`, `homePage`, and `notFoundPage` directly in the `options` object from secure script code rather than relying on URL query parameters.
 
 ## Available Bulmaswatch themes
 
-default, cerulean, cosmo, cyborg, darkly, flatly, journal, litera, lumen, lux,
-materia, minty, nuclear, pulse, sandstone, simplex, slate, solar, spacelab,
-superhero, united, yeti.
+The list of available Bulma themes is
+
+> default, cerulean, cosmo, cyborg, darkly, flatly, journal, litera, lumen, lux, materia, minty, nuclear, pulse, sandstone, simplex, slate, solar, spacelab, superhero, united, yeti.
 
 See previews at
 <https://jenil.github.io/bulmaswatch/> and load via `bulmaCustomize` option or `ensureBulma` method.
+
+Keep in mind that some themes do not play well with certain color schemas.
 
 ## Using with GitHub Pages and the GitHub file editor
 
@@ -620,19 +474,8 @@ Editing content via the GitHub web editor:
 Tips:
 - Add or update `content/_navigation.md` to control the navigation bar; the nav is re-built when pages are crawled.
 - If you publish `dist/` separately (for example to `gh-pages`), consider a GitHub Action to build and push `dist/` automatically from `main`.
-- To preview locally before pushing, run:
 
-```bash
-npm run build -- --outDir example/dist
-npx http-server example -p 5174
-# visit http://127.0.0.1:5174/
-```
-
-Security note: Avoid exposing sensitive paths via URL query options; do not allow untrusted runtime overrides for `contentPath`, `homePage`, or `notFoundPage` unless you validate them server- or build-side.
-
-## Roadmap
-
-- See the project issue tracker for planned improvements and priorities.
+> Security note: Avoid exposing sensitive paths via URL query options; do not allow untrusted runtime overrides for `contentPath`, `homePage`, or `notFoundPage` unless you validate them server- or build-side.
 
 ## Troubleshooting
 
@@ -648,7 +491,3 @@ Security note: Avoid exposing sensitive paths via URL query options; do not allo
 
 ### Scripts failing / no mount element
 - Make sure the mount element exists (`<div id="app"></div>`) and `initCMS({ el: '#app' })` uses the correct selector.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for details on recent changes, bug fixes, and improvements.

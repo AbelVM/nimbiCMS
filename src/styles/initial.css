@@ -1,6 +1,12 @@
 /* Bulma Base for nimbi mount*/
 /*! minireset.css v0.0.6 | MIT License | github.com/jgthms/minireset.css */
 
+html,
+body {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+}
+
 .nimbi-mount {
 
     /* scoped Bulma variables (was :root) */
@@ -35,6 +41,7 @@
     -moz-osx-font-smoothing: grayscale;
     -webkit-font-smoothing: antialiased;
     min-width: var(--bulma-body-min-width);
+    overflow: auto !important;
     overflow-x: var(--bulma-body-overflow-x);
     overflow-y: var(--bulma-body-overflow-y);
     text-rendering: var(--bulma-body-rendering);

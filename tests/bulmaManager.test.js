@@ -52,6 +52,32 @@ describe('bulmaManager theming helpers', () => {
     expect(link.href).toContain('bulmaswatch.min.css')
   })
 
+  it('keeps bulmaswatch theme link last when other styles are injected later', async () => {
+    const { ensureBulma } = await import('../src/bulmaManager.js')
+    await ensureBulma('solarized')
+
+    const themeLink = document.querySelector('link[data-bulmaswatch-theme="solarized"]')
+    expect(themeLink).toBeTruthy()
+
+    // Simulate bundler injecting another stylesheet after init.
+    const extra = document.createElement('link')
+    extra.rel = 'stylesheet'
+    extra.href = 'bogus.css'
+    document.head.appendChild(extra)
+
+    // MutationObserver callbacks run asynchronously; allow the microtask queue to flush.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(document.head.lastElementChild).toBe(themeLink)
+
+    const extra2 = document.createElement('link')
+    extra2.rel = 'stylesheet'
+    extra2.href = 'bogus2.css'
+    document.head.appendChild(extra2)
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(document.head.lastElementChild).toBe(themeLink)
+  })
+
   it('loads a local override stylesheet when fetch succeeds', async () => {
     global.fetch = vi.fn(async () => ({ ok: true, text: () => Promise.resolve('body{color:red}') }))
     const { ensureBulma } = await import('../src/bulmaManager.js')

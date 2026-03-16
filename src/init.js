@@ -40,9 +40,21 @@ import { ensureBulma, setStyle, registerThemedElement } from './bulmaManager.js'
  */
 export function parseInitOptionsFromQuery(queryString) {
   try {
-    const qs = typeof queryString === 'string' ? queryString : (typeof window !== 'undefined' && window.location ? window.location.search : '')
-    if (!qs) return {}
-    const params = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
+    let qs = typeof queryString === 'string' ? queryString : (typeof window !== 'undefined' && window.location ? window.location.search : '')
+
+  // If the app is embedded in a hash-based routing setup, query params may be
+  // placed inside the hash (e.g. "#/page?bulmaCustomize=solar").  Support that
+  // by falling back to parsing the hash when no search is present.
+  if (!qs && typeof window !== 'undefined' && window.location && window.location.hash) {
+    const hash = window.location.hash
+    const idx = hash.indexOf('?')
+    if (idx !== -1) {
+      qs = hash.slice(idx)
+    }
+  }
+
+  if (!qs) return {}
+  const params = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
     const out = {}
 
     const parseBool = (v) => {
@@ -66,7 +78,9 @@ export function parseInitOptionsFromQuery(queryString) {
       const v = params.get('defaultStyle')
       if (v === 'light' || v === 'dark' || v === 'system') out.defaultStyle = v
     }
-    if (params.has('bulmaCustomize')) out.bulmaCustomize = params.get('bulmaCustomize')
+    if (params.has('bulmaCustomize')) {
+      out.bulmaCustomize = params.get('bulmaCustomize')
+    }
     if (params.has('lang')) out.lang = params.get('lang')
     if (params.has('l10nFile')) {
       const v = params.get('l10nFile')
@@ -181,6 +195,12 @@ export let initialDocumentTitle = ''
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
 export async function initCMS(options = {}) {
+  const debug = typeof window !== 'undefined' && window.__nimbiCMSDebug
+  if (debug) {
+    try {
+      console.info('[nimbi-cms] initCMS called', { options })
+    } catch (_) {}
+  }
 
   if (!options || typeof options !== 'object') {
     throw new TypeError('initCMS(options): options must be an object')
@@ -214,7 +234,13 @@ export async function initCMS(options = {}) {
       delete queryOpts.notFoundPage
     }
   }
+  // `options` is explicit host configuration and generally takes precedence.
+  // However, allow the URL to override the Bulma theme explicitly when present.
+  // This makes `?bulmaCustomize=...` usable even when embedding pages preconfigure a default.
   const finalOptions = Object.assign({}, queryOpts, options)
+  if (queryOpts && typeof queryOpts.bulmaCustomize === 'string' && queryOpts.bulmaCustomize.trim()) {
+    finalOptions.bulmaCustomize = queryOpts.bulmaCustomize
+  }
 
   const {
     el,
@@ -236,9 +262,34 @@ export async function initCMS(options = {}) {
     notFoundPage = '_404.md'
   } = finalOptions
 
+  const showError = (err) => {
+    try {
+      const mount = document.querySelector(el)
+      if (mount && mount instanceof Element) {
+        mount.innerHTML = `<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;">` +
+          `<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(err)}</pre>` +
+          `</div>`
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   const { navbarLogo = 'favicon' } = finalOptions
 
   const { skipRootReadme = false } = finalOptions
+
+  const renderInitError = (err) => {
+    try {
+      const mount = document.querySelector(el)
+      if (mount && mount instanceof Element) {
+        mount.innerHTML = `<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;">` +
+          `<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(err)}</pre></div>`
+      }
+    } catch (e) {
+      // swallow
+    }
+  }
 
   // Validate sanitized overrides (if any) before accepting them. This enforces
   // that runtime values cannot be used to traverse out of the static content
@@ -343,6 +394,12 @@ export async function initCMS(options = {}) {
       try { if (m && typeof m.setSkipRootReadme === 'function') m.setSkipRootReadme(!!skipRootReadme) } catch (e2) { console.warn('[nimbi-cms] setSkipRootReadme failed', e2) }
     }).catch(e => { /* ignore dynamic import errors for tests */ })
   } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
+
+  try {
+    // Main initialization block. Errors will render a visible message so
+    // users see what went wrong instead of a blank page.
+    // eslint-disable-next-line no-implicit-coercion
+    await (async () => {
 
   try {
     mountEl.classList.add('nimbi-mount')
@@ -546,25 +603,20 @@ export async function initCMS(options = {}) {
                     try { mountEl.appendChild(a) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
                   }
 
-                  // Read the URL to link from package.json (homepage or repository.url).
-                  ;(async () => {
+                  // Use the homepage/repository URL injected at build-time.
+                  const injectedHomepage = typeof __NIMBI_CMS_HOMEPAGE__ !== 'undefined' ? __NIMBI_CMS_HOMEPAGE__ : null
+                  const safeLink = (() => {
                     try {
-                      const maybePkg = await import('../package.json', { assert: { type: 'json' } }).catch(() => null)
-                      const pkg = maybePkg && (maybePkg.default || maybePkg)
-                      let homepage = null
-                      if (pkg) {
-                        if (pkg.homepage && typeof pkg.homepage === 'string') homepage = pkg.homepage
-                        else if (pkg.repository) {
-                          if (typeof pkg.repository === 'string') homepage = pkg.repository
-                          else if (pkg.repository.url && typeof pkg.repository.url === 'string') homepage = pkg.repository.url
-                        }
+                      if (injectedHomepage && typeof injectedHomepage === 'string') {
+                        return new URL(injectedHomepage).toString()
                       }
-                      try { if (homepage) new URL(homepage) } catch (e) { homepage = null }
-                      finishWithAnchor(homepage || '#')
                     } catch (e) {
-                      finishWithAnchor('#')
+                      // ignore invalid URL
                     }
+                    return '#'
                   })()
+
+                  finishWithAnchor(safeLink)
                 } catch (err) {
                   console.warn('[nimbi-cms] building version label failed', err)
                 }
@@ -573,7 +625,10 @@ export async function initCMS(options = {}) {
       }
     }).catch((e) => { console.warn('[nimbi-cms] import version module failed', e) })
   } catch (err) { console.warn('[nimbi-cms] version label setup failed', err) }
-  
 
-
+    })()
+  } catch (err) {
+    renderInitError(err)
+    throw err
+  }
 }

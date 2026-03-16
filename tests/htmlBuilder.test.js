@@ -293,13 +293,26 @@ describe('htmlBuilder utilities', () => {
   it('attachTocClickHandler intercepts link clicks and pushes history', () => {
     // stub renderByQuery to prevent errors
     global.renderByQuery = vi.fn()
+    Object.defineProperty(globalThis, 'location', {
+      value: { href: 'http://example.com/?lang=fr&page=test', search: '?lang=fr&page=test', pathname: '/', origin: 'http://example.com' },
+      configurable: true
+    })
+
+    const pushSpy = vi.spyOn(history, 'pushState')
+
     const toc = document.createElement('aside')
     const a = document.createElement('a')
     a.setAttribute('href', '?page=test#foo')
     toc.appendChild(a)
     attachTocClickHandler(toc)
     a.click()
+
     expect(history.state && history.state.page).toBe('test')
+    expect(pushSpy).toHaveBeenCalled()
+    const pushedUrl = pushSpy.mock.calls[0][2]
+    expect(pushedUrl).toContain('lang=fr')
+
+    pushSpy.mockRestore()
   })
 
   it('same-page TOC clicks call scroll and do not trigger SPA render', async () => {

@@ -253,7 +253,47 @@ export function joinPaths(...parts) {
   }
   return joined
 }
+/**
+ * Build a URL that uses the site’s `?page=` query parameter while preserving
+ * any other query parameters currently present in the location search.
+ *
+ * This is useful for ensuring that options passed via URL (e.g. `lang`,
+ * `defaultStyle`, etc.) remain present as the user navigates around the site.
+ *
+ * @param {string} page - The target page slug or path.
+ * @param {string|null} [hash] - Optional hash fragment (without the leading '#').
+ * @param {string} [baseSearch] - Optional base query string (defaults to current location.search).
+ * @returns {string} URL string (e.g. "?page=foo&lang=es#bar").
+ */
+export function buildPageUrl(page, hash = null, baseSearch) {
+  try {
+    const rawSearch = typeof baseSearch === 'string'
+      ? baseSearch
+      : (typeof window !== 'undefined' && window.location ? window.location.search : '')
+    const params = new URLSearchParams(rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch)
 
+    // Ensure `page` always appears first so existing logic that checks for
+    // `?page=` at the start of hrefs continues to work.
+    const pageVal = String(page || '')
+    params.delete('page')
+    const merged = new URLSearchParams()
+    merged.set('page', pageVal)
+    for (const [k, v] of params.entries()) {
+      merged.append(k, v)
+    }
+
+    const query = merged.toString()
+    let url = query ? `?${query}` : ''
+    if (hash) {
+      url += `#${encodeURIComponent(hash)}`
+    }
+    return url || `?page=${encodeURIComponent(pageVal)}`
+  } catch (err) {
+    // Fallback to minimal URL if URLSearchParams is not available or fails.
+    const base = `?page=${encodeURIComponent(String(page || ''))}`
+    return hash ? `${base}#${encodeURIComponent(hash)}` : base
+  }
+}
 /**
  * Safely encode a URL or URL component using encodeURI.  Falls back to the
  * original string if encoding fails.

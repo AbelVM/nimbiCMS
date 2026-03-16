@@ -16,10 +16,11 @@ export default ({ command }) => {
     const __filename = fileURLToPath(import.meta.url)
     const __dirname = dirname(__filename)
     let highlightJsVersion = '11.11.1'
+    let pkg = null
     try {
       const pkgPath = resolve(__dirname, 'package.json')
       const pkgText = fs.readFileSync(pkgPath, 'utf8')
-      const pkg = JSON.parse(pkgText)
+      pkg = JSON.parse(pkgText)
       const dep = pkg && pkg.dependencies && pkg.dependencies['highlight.js']
       if (dep) {
         const m = String(dep).match(/(\d+\.\d+\.\d+)/)
@@ -27,11 +28,18 @@ export default ({ command }) => {
       }
     } catch (_e) {
       // fallback to default version if package.json is inaccessible
+      pkg = null
     }
 
     return defineConfig({
       define: {
-        __HIGHLIGHT_JS_VERSION__: JSON.stringify(highlightJsVersion)
+        __HIGHLIGHT_JS_VERSION__: JSON.stringify(highlightJsVersion),
+        __NIMBI_CMS_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
+        __NIMBI_CMS_HOMEPAGE__: JSON.stringify(
+          (pkg && pkg.homepage) ||
+          (pkg && pkg.repository && (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url)) ||
+          ''
+        )
       },
       worker: { format: 'es', inline: true },
       plugins: [

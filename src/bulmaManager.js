@@ -21,7 +21,31 @@ function injectLink(href, attrs = {}) {
   l.href = href 
   Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v))
   document.head.appendChild(l)
+
+  // If this link is a theme override, keep it last so it can override
+  // earlier Bulma styles that may be injected later (e.g., by bundler).
+  if (attrs['data-bulmaswatch-theme']) {
+    const observer = new MutationObserver(() => {
+      // Ensure theme link is last in the head. Only re-append when it isn't.
+      try {
+        const parent = l.parentNode
+        if (!parent) return
+        const last = parent.lastElementChild
+        if (last !== l) {
+          parent.appendChild(l)
+        }
+      } catch (e) {
+        // ignore
+      }
+    })
+    try {
+      observer.observe(document.head, { childList: true })
+    } catch (e) {
+      // ignore if MutationObserver is unavailable
+    }
+  }
 }
+
 /**
  * Ensure that Bulma or a Bulmaswatch theme is loaded.  Supports local
  * overrides or named themes fetched from unpkg.
@@ -31,6 +55,13 @@ function injectLink(href, attrs = {}) {
  * @returns {Promise<void>} - Promise that resolves when theme loading completes.
  */
 export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
+  const debug = typeof window !== 'undefined' && window.__nimbiCMSDebug
+  if (debug) {
+    try {
+      console.debug('[bulmaManager] ensureBulma called', { bulmaCustomize, pageDir })
+    } catch (_) {}
+  }
+
   if (!bulmaCustomize || bulmaCustomize === 'none') return
 
   const rawLocalCandidates = [pageDir + 'bulma.css', '/bulma.css']
