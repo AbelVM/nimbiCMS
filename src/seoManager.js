@@ -52,6 +52,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
   upsertMeta('property', 'og:title', title)
   const desc = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description || '')
   if (desc && String(desc).trim()) upsertMeta('property', 'og:description', desc)
+  if (desc && String(desc).trim()) upsertMeta('name', 'twitter:description', desc)
   upsertMeta('name', 'twitter:card', meta.twitter_card || 'summary_large_image')
   const img = imageOverride || meta.image
   if (img) {
@@ -199,6 +200,9 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
           let sib = h1El.nextElementSibling
           const parts = []
           while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
+            try {
+              if (sib.classList && sib.classList.contains('nimbi-article-subtitle')) { sib = sib.nextElementSibling; continue }
+            } catch (e) {}
             const txt = (sib.textContent || '').trim()
             if (txt) parts.push(txt)
             sib = sib.nextElementSibling
