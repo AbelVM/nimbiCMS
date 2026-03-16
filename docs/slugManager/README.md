@@ -58,3 +58,4 @@
 - [setSkipRootReadme](functions/setSkipRootReadme.md)
 - [slugify](functions/slugify.md)
 - [unescapeMarkdown](functions/unescapeMarkdown.md)
+- [uniqueSlug](functions/uniqueSlug.md)

@@ -8,6 +8,7 @@
 
 ## Functions
 
+- [buildPageUrl](functions/buildPageUrl.md)
 - [encodeURL](functions/encodeURL.md)
 - [ensureTrailingSlash](functions/ensureTrailingSlash.md)
 - [isExternalLink](functions/isExternalLink.md)
