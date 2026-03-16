@@ -239,9 +239,21 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       // Provide a title attribute for hover/tooltips; mirror `alt` for accessibility
       img.title = label
       img.src = logoSrc
-      // Clear textual content and append image inside the brand link
-      try { brandItem.innerHTML = '' } catch (e) { brandItem.textContent = '' }
-      brandItem.appendChild(img)
+      // Small gap between logo and following label text for readability
+      try { img.style.marginRight = '0.5em' } catch (e) {}
+      // Ensure the localized label remains and insert the image alongside it.
+      // If the brand link has no textual label, set it to the localized `home`/`siteLogo`.
+      try {
+        if (!brandItem.textContent || !String(brandItem.textContent).trim()) {
+          brandItem.textContent = label
+        }
+      } catch (e) { /* ignore setting text failures */ }
+      try {
+        // Prefer placing the image before the label so it appears on the left.
+        brandItem.insertBefore(img, brandItem.firstChild)
+      } catch (e) {
+        try { brandItem.appendChild(img) } catch (e2) { /* ignore append failures */ }
+      }
     } catch (e) { /* ignore image insertion failures */ }
   }
 

@@ -103,7 +103,7 @@ const { initCMS } = require('./dist/nimbi-cms.cjs.js')
 initCMS({ el: '#app' })
 ```
 
-#### Notes:
+**Notes:**
 
 - The UMD build is a single, self-contained `dist/nimbi-cms.js` file that exposes the public API on the `nimbiCMS` global.
 - The ES build is `dist/nimbi-cms.es.js` and is ideal for modern bundlers and `<script type="module">` usage.

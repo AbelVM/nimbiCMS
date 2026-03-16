@@ -253,7 +253,7 @@ function Qi() {
   function y(w) {
     return new RegExp(w.toString() + "|").exec("").length - 1;
   }
-  function v(w, x) {
+  function E(w, x) {
     const R = w && w.exec(x);
     return R && R.index === 0;
   }
@@ -275,7 +275,7 @@ function Qi() {
       return B;
     }).map((K) => `(${K})`).join(x);
   }
-  const U = /\b\B/, Z = "[a-zA-Z]\\w*", W = "[a-zA-Z_]\\w*", he = "\\b\\d+(\\.\\d+)?", P = "(-?)(\\b0[xX][a-fA-F0-9]+|(\\b\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)", O = "\\b(0b[01]+)", Q = "!|!=|!==|%|%=|&|&&|&=|\\*|\\*=|\\+|\\+=|,|-|-=|/=|/|:|;|<<|<<=|<=|<|===|==|=|>>>=|>>=|>=|>>>|>>|>|\\?|\\[|\\{|\\(|\\^|\\^=|\\||\\|=|\\|\\||~", N = (w = {}) => {
+  const U = /\b\B/, Z = "[a-zA-Z]\\w*", W = "[a-zA-Z_]\\w*", he = "\\b\\d+(\\.\\d+)?", _ = "(-?)(\\b0[xX][a-fA-F0-9]+|(\\b\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)", O = "\\b(0b[01]+)", Q = "!|!=|!==|%|%=|&|&&|&=|\\*|\\*=|\\+|\\+=|,|-|-=|/=|/|:|;|<<|<<=|<=|<|===|==|=|>>>=|>>=|>=|>>>|>>|>|\\?|\\[|\\{|\\(|\\^|\\^=|\\||\\|=|\\|\\||~", N = (w = {}) => {
     const x = /^#![ ]*\//;
     return w.binary && (w.begin = g(
       x,
@@ -375,15 +375,15 @@ function Qi() {
         // look for 3 words in a row
       }
     ), K;
-  }, E = re("//", "$"), L = re("/\\*", "\\*/"), T = re("#", "$"), _ = {
+  }, v = re("//", "$"), L = re("/\\*", "\\*/"), T = re("#", "$"), $ = {
     scope: "number",
     begin: he,
     relevance: 0
   }, k = {
     scope: "number",
-    begin: P,
+    begin: _,
     relevance: 0
-  }, $ = {
+  }, P = {
     scope: "number",
     begin: O,
     relevance: 0
@@ -417,13 +417,13 @@ function Qi() {
     __proto__: null,
     APOS_STRING_MODE: X,
     BACKSLASH_ESCAPE: oe,
-    BINARY_NUMBER_MODE: $,
+    BINARY_NUMBER_MODE: P,
     BINARY_NUMBER_RE: O,
     COMMENT: re,
     C_BLOCK_COMMENT_MODE: L,
-    C_LINE_COMMENT_MODE: E,
+    C_LINE_COMMENT_MODE: v,
     C_NUMBER_MODE: k,
-    C_NUMBER_RE: P,
+    C_NUMBER_RE: _,
     END_SAME_AS_BEGIN: function(w) {
       return Object.assign(
         w,
@@ -443,7 +443,7 @@ function Qi() {
     IDENT_RE: Z,
     MATCH_NOTHING_RE: U,
     METHOD_GUARD: ye,
-    NUMBER_MODE: _,
+    NUMBER_MODE: $,
     NUMBER_RE: he,
     PHRASAL_WORDS_MODE: V,
     QUOTE_STRING_MODE: S,
@@ -791,7 +791,7 @@ https://github.com/highlightjs/highlight.js/issues/2277`), xe = A, de = H), ie =
         return M.scope && typeof M.scope == "string" && Te.openNode(He.classNameAliases[M.scope] || M.scope), M.beginScope && (M.beginScope._wrap ? (De(fe, He.classNameAliases[M.beginScope._wrap] || M.beginScope._wrap), fe = "") : M.beginScope._multi && (ir(M.beginScope, D), fe = "")), Y = Object.create(M, { parent: { value: Y } }), Y;
       }
       function ar(M, D, J) {
-        let ue = v(M.endRe, J);
+        let ue = E(M.endRe, J);
         if (ue) {
           if (M["on:end"]) {
             const Re = new e(M);
@@ -1832,13 +1832,13 @@ function jt(t, e = 0, n = !1) {
       try {
         const b = m.getAttribute ? m.getAttribute("loading") : void 0;
         b !== "eager" && m.setAttribute && m.setAttribute("loading", "lazy");
-        const y = m.getBoundingClientRect ? m.getBoundingClientRect() : null, v = m.src || m.getAttribute && m.getAttribute("src"), C = y && y.height > 1 ? y.height : f, I = y ? y.top : 0, U = I + C;
-        y && C > 0 && I <= o && U >= l && (m.setAttribute ? (m.setAttribute("loading", "eager"), m.setAttribute("fetchpriority", "high"), m.setAttribute("data-eager-by-nimbi", "1")) : (m.loading = "eager", m.fetchPriority = "high"), ls(v), h = !0), !g && y && y.top <= o && (g = { img: m, src: v, rect: y, beforeLoading: b });
+        const y = m.getBoundingClientRect ? m.getBoundingClientRect() : null, E = m.src || m.getAttribute && m.getAttribute("src"), C = y && y.height > 1 ? y.height : f, I = y ? y.top : 0, U = I + C;
+        y && C > 0 && I <= o && U >= l && (m.setAttribute ? (m.setAttribute("loading", "eager"), m.setAttribute("fetchpriority", "high"), m.setAttribute("data-eager-by-nimbi", "1")) : (m.loading = "eager", m.fetchPriority = "high"), ls(E), h = !0), !g && y && y.top <= o && (g = { img: m, src: E, rect: y, beforeLoading: b });
       } catch (b) {
         console.warn("[helpers] setEagerForAboveFoldImages per-image failed", b);
       }
     }), !h && g) {
-      const { img: m, src: b, rect: y, beforeLoading: v } = g;
+      const { img: m, src: b, rect: y, beforeLoading: E } = g;
       try {
         m.setAttribute ? (m.setAttribute("loading", "eager"), m.setAttribute("fetchpriority", "high"), m.setAttribute("data-eager-by-nimbi", "1")) : (m.loading = "eager", m.fetchPriority = "high");
       } catch (C) {
@@ -2197,8 +2197,8 @@ async function Jt(t, e = 1, n = void 0) {
             let y;
             for (; y = b.exec(m); )
               h.push(y[1]);
-            const v = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
-            for (; y = v.exec(m); )
+            const E = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
+            for (; y = E.exec(m); )
               h.push(y[1]);
             const C = d && d.includes("/") ? d.substring(0, d.lastIndexOf("/") + 1) : "";
             for (let I of h)
@@ -2233,7 +2233,7 @@ async function Jt(t, e = 1, n = void 0) {
                 const b = g.querySelector("p");
                 if (b && b.textContent && (p = b.textContent.trim()), e >= 2)
                   try {
-                    const y = g.querySelector("h1"), v = y && y.textContent ? y.textContent.trim() : d || "", C = (() => {
+                    const y = g.querySelector("h1"), E = y && y.textContent ? y.textContent.trim() : d || "", C = (() => {
                       try {
                         if (F.has(u)) return F.get(u);
                       } catch {
@@ -2245,9 +2245,9 @@ async function Jt(t, e = 1, n = void 0) {
                         const Z = (U.textContent || "").trim();
                         if (!Z) continue;
                         const W = U.id ? U.id : le(Z), he = C ? `${C}::${W}` : `${le(u)}::${W}`;
-                        let P = "", O = U.nextElementSibling;
+                        let _ = "", O = U.nextElementSibling;
                         for (; O && O.tagName && O.tagName.toLowerCase() === "script"; ) O = O.nextElementSibling;
-                        O && O.textContent && (P = String(O.textContent).trim()), l.push({ slug: he, title: Z, excerpt: P, path: u, parentTitle: v });
+                        O && O.textContent && (_ = String(O.textContent).trim()), l.push({ slug: he, title: Z, excerpt: _, path: u, parentTitle: E });
                       } catch (Z) {
                         console.warn("[slugManager] indexing H2 failed", Z);
                       }
@@ -2258,10 +2258,10 @@ async function Jt(t, e = 1, n = void 0) {
                           try {
                             const W = (Z.textContent || "").trim();
                             if (!W) continue;
-                            const he = Z.id ? Z.id : le(W), P = C ? `${C}::${he}` : `${le(u)}::${he}`;
+                            const he = Z.id ? Z.id : le(W), _ = C ? `${C}::${he}` : `${le(u)}::${he}`;
                             let O = "", Q = Z.nextElementSibling;
                             for (; Q && Q.tagName && Q.tagName.toLowerCase() === "script"; ) Q = Q.nextElementSibling;
-                            Q && Q.textContent && (O = String(Q.textContent).trim()), l.push({ slug: P, title: W, excerpt: O, path: u, parentTitle: v });
+                            Q && Q.textContent && (O = String(Q.textContent).trim()), l.push({ slug: _, title: W, excerpt: O, path: u, parentTitle: E });
                           } catch (W) {
                             console.warn("[slugManager] indexing H3 failed", W);
                           }
@@ -2293,8 +2293,8 @@ async function Jt(t, e = 1, n = void 0) {
               if (e >= 2) {
                 let b = "", y = "";
                 try {
-                  const v = (h.match(/^#\s+(.+)$/m) || [])[1];
-                  b = v ? v.trim() : "", y = (function() {
+                  const E = (h.match(/^#\s+(.+)$/m) || [])[1];
+                  b = E ? E.trim() : "", y = (function() {
                     try {
                       if (F.has(u)) return F.get(u);
                     } catch {
@@ -2312,24 +2312,24 @@ async function Jt(t, e = 1, n = void 0) {
                     } catch (U) {
                       console.warn("[slugManager] indexing markdown H2 failed", U);
                     }
-                } catch (v) {
-                  console.warn("[slugManager] collect markdown H2s failed", v);
+                } catch (E) {
+                  console.warn("[slugManager] collect markdown H2s failed", E);
                 }
                 if (e === 3)
                   try {
-                    const v = /^###\s+(.+)$/gm;
+                    const E = /^###\s+(.+)$/gm;
                     let C;
-                    for (; C = v.exec(h); )
+                    for (; C = E.exec(h); )
                       try {
                         const I = (C[1] || "").trim(), U = Ft(I);
                         if (!I) continue;
-                        const Z = le(I), W = y ? `${y}::${Z}` : `${le(u)}::${Z}`, P = h.slice(v.lastIndex).match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/), O = P && P[1] ? String(P[1]).trim().split(/\r?\n/).join(" ").slice(0, 300) : "";
+                        const Z = le(I), W = y ? `${y}::${Z}` : `${le(u)}::${Z}`, _ = h.slice(E.lastIndex).match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/), O = _ && _[1] ? String(_[1]).trim().split(/\r?\n/).join(" ").slice(0, 300) : "";
                         l.push({ slug: W, title: U, excerpt: O, path: u, parentTitle: b });
                       } catch (I) {
                         console.warn("[slugManager] indexing markdown H3 failed", I);
                       }
-                  } catch (v) {
-                    console.warn("[slugManager] collect markdown H3s failed", v);
+                  } catch (E) {
+                    console.warn("[slugManager] collect markdown H3s failed", E);
                   }
               }
             }
@@ -2799,8 +2799,8 @@ async function Ts(t, e) {
           console.warn("[router] attempting absolute HTML fetch fallback", h);
           const g = await fetch(h);
           if (g && g.ok) {
-            const m = await g.text(), b = g && g.headers && typeof g.headers.get == "function" && g.headers.get("content-type") || "", y = (m || "").toLowerCase(), v = b && b.indexOf && b.indexOf("text/html") !== -1 || y.indexOf("<!doctype") !== -1 || y.indexOf("<html") !== -1;
-            if (v || console.warn("[router] absolute fetch returned non-HTML", { abs: h, contentType: b, snippet: y.slice(0, 200) }), v)
+            const m = await g.text(), b = g && g.headers && typeof g.headers.get == "function" && g.headers.get("content-type") || "", y = (m || "").toLowerCase(), E = b && b.indexOf && b.indexOf("text/html") !== -1 || y.indexOf("<!doctype") !== -1 || y.indexOf("<html") !== -1;
+            if (E || console.warn("[router] absolute fetch returned non-HTML", { abs: h, contentType: b, snippet: y.slice(0, 200) }), E)
               try {
                 const C = h, I = new URL(".", C).toString();
                 try {
@@ -2819,8 +2819,8 @@ async function Ts(t, e) {
                       } catch (X) {
                         console.warn("[router] rewrite helper failed", X);
                       }
-                    }, P = W.querySelectorAll("[src],[href],[srcset],[xlink:href],[poster]"), O = [];
-                    for (const N of Array.from(P || []))
+                    }, _ = W.querySelectorAll("[src],[href],[srcset],[xlink:href],[poster]"), O = [];
+                    for (const N of Array.from(_ || []))
                       try {
                         const oe = N.tagName ? N.tagName.toLowerCase() : "";
                         if (oe === "a") continue;
@@ -2856,10 +2856,10 @@ async function Ts(t, e) {
                         }
                         if (N.hasAttribute("srcset")) {
                           const V = (N.getAttribute("srcset") || "").split(",").map((re) => re.trim()).filter(Boolean).map((re) => {
-                            const [E, L] = re.split(/\s+/, 2);
-                            if (!E || /^(https?:)?\/\//i.test(E) || E.startsWith("/")) return re;
+                            const [v, L] = re.split(/\s+/, 2);
+                            if (!v || /^(https?:)?\/\//i.test(v) || v.startsWith("/")) return re;
                             try {
-                              const T = new URL(E, C).toString();
+                              const T = new URL(v, C).toString();
                               return L ? `${T} ${L}` : T;
                             } catch {
                               return re;
@@ -3099,11 +3099,11 @@ ${o}` : o;
 `, 1)[0], f = !d.trim(), h = 0;
         if (this.options.pedantic ? (h = 2, o = d.trimStart()) : f ? h = e[1].length + 1 : (h = d.search(this.rules.other.nonSpaceChar), h = h > 4 ? 1 : h, o = d.slice(h), h += e[1].length), f && this.rules.other.blankLine.test(p) && (u += p + `
 `, t = t.substring(p.length + 1), l = !0), !l) {
-          let g = this.rules.other.nextBulletRegex(h), m = this.rules.other.hrRegex(h), b = this.rules.other.fencesBeginRegex(h), y = this.rules.other.headingBeginRegex(h), v = this.rules.other.htmlBeginRegex(h), C = this.rules.other.blockquoteBeginRegex(h);
+          let g = this.rules.other.nextBulletRegex(h), m = this.rules.other.hrRegex(h), b = this.rules.other.fencesBeginRegex(h), y = this.rules.other.headingBeginRegex(h), E = this.rules.other.htmlBeginRegex(h), C = this.rules.other.blockquoteBeginRegex(h);
           for (; t; ) {
             let I = t.split(`
 `, 1)[0], U;
-            if (p = I, this.options.pedantic ? (p = p.replace(this.rules.other.listReplaceNesting, "  "), U = p) : U = p.replace(this.rules.other.tabCharGlobal, "    "), b.test(p) || y.test(p) || v.test(p) || C.test(p) || g.test(p) || m.test(p)) break;
+            if (p = I, this.options.pedantic ? (p = p.replace(this.rules.other.listReplaceNesting, "  "), U = p) : U = p.replace(this.rules.other.tabCharGlobal, "    "), b.test(p) || y.test(p) || E.test(p) || C.test(p) || g.test(p) || m.test(p)) break;
             if (U.search(this.rules.other.nonSpaceChar) >= h || !p.trim()) o += `
 ` + U.slice(h);
             else {
@@ -5336,8 +5336,8 @@ async function rn(t) {
                   try {
                     const b = m.getAttribute("src") || "";
                     if (new URL(b, location.href).toString() === h) {
-                      const v = m.parentElement;
-                      m.remove(), v && v.tagName && v.tagName.toLowerCase() === "p" && v.childNodes.length === 0 && v.remove();
+                      const E = m.parentElement;
+                      m.remove(), E && E.tagName && E.tagName.toLowerCase() === "p" && E.childNodes.length === 0 && E.remove();
                       break;
                     }
                   } catch {
@@ -5362,22 +5362,22 @@ async function rn(t) {
                 if (m)
                   try {
                     h.setAttribute && h.setAttribute("class", m);
-                  } catch (v) {
-                    console.warn("[markdown] set code class failed", v), h.className = m;
+                  } catch (E) {
+                    console.warn("[markdown] set code class failed", E), h.className = m;
                   }
                 else
                   try {
                     h.removeAttribute && h.removeAttribute("class");
-                  } catch (v) {
-                    console.warn("[markdown] remove code class failed", v), h.className = "";
+                  } catch (E) {
+                    console.warn("[markdown] remove code class failed", E), h.className = "";
                   }
                 const b = m, y = b.match(/language-([a-zA-Z0-9_+-]+)/) || b.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/);
                 if (!y || !y[1])
                   try {
-                    const v = h.textContent || "";
+                    const E = h.textContent || "";
                     try {
                       if (pe && typeof pe.getLanguage == "function" && pe.getLanguage("plaintext")) {
-                        const C = pe.highlight(v, { language: "plaintext" });
+                        const C = pe.highlight(E, { language: "plaintext" });
                         C && C.value && (h.innerHTML = C.value);
                       }
                     } catch {
@@ -5387,8 +5387,8 @@ async function rn(t) {
                         console.warn("[markdown] hljs.highlightElement failed", I);
                       }
                     }
-                  } catch (v) {
-                    console.warn("[markdown] code auto-detect failed", v);
+                  } catch (E) {
+                    console.warn("[markdown] code auto-detect failed", E);
                   }
               } catch (g) {
                 console.warn("[markdown] processing code blocks failed", g);
@@ -5886,9 +5886,9 @@ async function fi(t, e, n) {
               if (!b)
                 try {
                   const y = String(m || "").replace(/^.*\//, "");
-                  for (const [v, C] of ee || [])
+                  for (const [E, C] of ee || [])
                     if (C === m || C === y) {
-                      b = v;
+                      b = E;
                       break;
                     }
                 } catch {
@@ -6667,28 +6667,28 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
     throw new TypeError("navbarWrap must be an HTMLElement");
   const p = typeof DOMParser < "u" ? new DOMParser() : null, f = p ? p.parseFromString(n || "", "text/html") : null, h = f ? f.querySelectorAll("a") : [];
   await Kt(() => Ta(h, s)), await Kt(() => Ra(h, s));
-  let g = null, m = null, b = null, y = null, v = null, C = null;
+  let g = null, m = null, b = null, y = null, E = null, C = null;
   function I() {
     try {
-      const E = document.querySelector(".navbar-burger"), L = E && E.dataset ? E.dataset.target : null, T = L ? document.getElementById(L) : null;
-      E && E.classList.contains("is-active") && (E.classList.remove("is-active"), E.setAttribute("aria-expanded", "false"), T && T.classList.remove("is-active"));
-    } catch (E) {
-      console.warn && console.warn("[nimbi-cms] closeMobileMenu failed", E);
+      const v = document.querySelector(".navbar-burger"), L = v && v.dataset ? v.dataset.target : null, T = L ? document.getElementById(L) : null;
+      v && v.classList.contains("is-active") && (v.classList.remove("is-active"), v.setAttribute("aria-expanded", "false"), T && T.classList.remove("is-active"));
+    } catch (v) {
+      console.warn && console.warn("[nimbi-cms] closeMobileMenu failed", v);
     }
   }
   const U = () => g || (g = (async () => {
     try {
-      const E = await Promise.resolve().then(() => Gt), L = Cr(E, "buildSearchIndex") || (typeof globalThis < "u" ? globalThis.buildSearchIndex : void 0), T = Cr(E, "buildSearchIndexWorker") || (typeof globalThis < "u" ? globalThis.buildSearchIndexWorker : void 0);
+      const v = await Promise.resolve().then(() => Gt), L = Cr(v, "buildSearchIndex") || (typeof globalThis < "u" ? globalThis.buildSearchIndex : void 0), T = Cr(v, "buildSearchIndexWorker") || (typeof globalThis < "u" ? globalThis.buildSearchIndexWorker : void 0);
       if (l === "lazy" && typeof T == "function")
         try {
-          const _ = await T(s, u, o);
-          if (_ && _.length) return _;
-        } catch (_) {
-          console.warn && console.warn("[nimbi-cms] worker builder threw", _);
+          const $ = await T(s, u, o);
+          if ($ && $.length) return $;
+        } catch ($) {
+          console.warn && console.warn("[nimbi-cms] worker builder threw", $);
         }
       return typeof L == "function" ? await L(s, u, o) : [];
-    } catch (E) {
-      return console.warn("[nimbi-cms] buildSearchIndex failed", E), [];
+    } catch (v) {
+      return console.warn("[nimbi-cms] buildSearchIndex failed", v), [];
     } finally {
       if (m) {
         try {
@@ -6701,30 +6701,30 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
         }
       }
     }
-  })(), g.then((E) => {
+  })(), g.then((v) => {
     try {
       const L = String(m && m.value || "").trim().toLowerCase();
-      if (!L || !Array.isArray(E) || !E.length) return;
-      const T = E.filter((k) => k.title && k.title.toLowerCase().includes(L) || k.excerpt && k.excerpt.toLowerCase().includes(L));
+      if (!L || !Array.isArray(v) || !v.length) return;
+      const T = v.filter((k) => k.title && k.title.toLowerCase().includes(L) || k.excerpt && k.excerpt.toLowerCase().includes(L));
       if (!T || !T.length) return;
-      const _ = document.getElementById("nimbi-search-results");
-      if (!_) return;
-      _.innerHTML = "", T.slice(0, 10).forEach((k) => {
-        const $ = document.createElement("div");
-        if ($.className = "nimbi-search-result", k.parentTitle) {
+      const $ = document.getElementById("nimbi-search-results");
+      if (!$) return;
+      $.innerHTML = "", T.slice(0, 10).forEach((k) => {
+        const P = document.createElement("div");
+        if (P.className = "nimbi-search-result", k.parentTitle) {
           const te = document.createElement("div");
-          te.textContent = k.parentTitle, te.className = "nimbi-search-title nimbi-search-parent", $.appendChild(te);
+          te.textContent = k.parentTitle, te.className = "nimbi-search-title nimbi-search-parent", P.appendChild(te);
         }
         const q = document.createElement("a");
         q.className = "block", q.href = ge(k.slug), q.textContent = k.title, q.addEventListener("click", () => {
           try {
-            _.style.display = "none";
+            $.style.display = "none";
           } catch {
           }
-        }), $.appendChild(q), _.appendChild($);
+        }), P.appendChild(q), $.appendChild(P);
       });
       try {
-        _.style.display = "block";
+        $.style.display = "block";
       } catch {
       }
     } catch {
@@ -6734,25 +6734,25 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
   Z.className = "navbar", Z.setAttribute("role", "navigation"), Z.setAttribute("aria-label", "main navigation");
   const W = document.createElement("div");
   W.className = "navbar-brand";
-  const he = h[0], P = document.createElement("a");
-  if (P.className = "navbar-item", he) {
-    const E = he.getAttribute("href") || "#";
+  const he = h[0], _ = document.createElement("a");
+  if (_.className = "navbar-item", he) {
+    const v = he.getAttribute("href") || "#";
     try {
-      const T = new URL(E, location.href).searchParams.get("page");
+      const T = new URL(v, location.href).searchParams.get("page");
       if (T) {
-        const _ = decodeURIComponent(T);
-        P.href = ge(_);
+        const $ = decodeURIComponent(T);
+        _.href = ge($);
       } else
-        P.href = ge(r), P.textContent = i("home");
+        _.href = ge(r), _.textContent = i("home");
     } catch {
-      P.href = ge(r), P.textContent = i("home");
+      _.href = ge(r), _.textContent = i("home");
     }
   } else
-    P.href = ge(r), P.textContent = i("home");
-  async function O(E) {
+    _.href = ge(r), _.textContent = i("home");
+  async function O(v) {
     try {
-      if (!E || E === "none") return null;
-      if (E === "favicon")
+      if (!v || v === "none") return null;
+      if (v === "favicon")
         try {
           const L = document.querySelector('link[rel~="icon"],link[rel="shortcut icon"]');
           if (!L) return null;
@@ -6761,16 +6761,16 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
         } catch {
           return null;
         }
-      if (E === "copy-first" || E === "move-first")
+      if (v === "copy-first" || v === "move-first")
         try {
           const L = await Ee(r, s);
           if (!L || !L.raw) return null;
           const k = new DOMParser().parseFromString(L.raw, "text/html").querySelector("img");
           if (!k) return null;
-          const $ = k.getAttribute("src") || "";
-          if (!$) return null;
-          const q = new URL($, location.href).toString();
-          if (E === "move-first")
+          const P = k.getAttribute("src") || "";
+          if (!P) return null;
+          const q = new URL(P, location.href).toString();
+          if (v === "move-first")
             try {
               document.documentElement.setAttribute("data-nimbi-logo-moved", q);
             } catch {
@@ -6780,7 +6780,7 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
           return null;
         }
       try {
-        return new URL(E, location.href).toString();
+        return new URL(v, location.href).toString();
       } catch {
         return null;
       }
@@ -6796,28 +6796,38 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
   }
   if (Q)
     try {
-      const E = document.createElement("img");
-      E.className = "nimbi-navbar-logo";
+      const v = document.createElement("img");
+      v.className = "nimbi-navbar-logo";
       const L = i && typeof i == "function" && (i("home") || i("siteLogo")) || "";
-      E.alt = L, E.title = L, E.src = Q;
+      v.alt = L, v.title = L, v.src = Q;
       try {
-        P.innerHTML = "";
+        v.style.marginRight = "0.5em";
       } catch {
-        P.textContent = "";
       }
-      P.appendChild(E);
+      try {
+        (!_.textContent || !String(_.textContent).trim()) && (_.textContent = L);
+      } catch {
+      }
+      try {
+        _.insertBefore(v, _.firstChild);
+      } catch {
+        try {
+          _.appendChild(v);
+        } catch {
+        }
+      }
     } catch {
     }
-  W.appendChild(P), P.addEventListener("click", function(E) {
-    const L = P.getAttribute("href") || "";
+  W.appendChild(_), _.addEventListener("click", function(v) {
+    const L = _.getAttribute("href") || "";
     if (L.startsWith("?page=")) {
-      E.preventDefault();
-      const T = new URL(L, location.href), _ = T.searchParams.get("page"), k = T.hash ? T.hash.replace(/^#/, "") : null;
-      history.pushState({ page: _ }, "", ge(_, k));
+      v.preventDefault();
+      const T = new URL(L, location.href), $ = T.searchParams.get("page"), k = T.hash ? T.hash.replace(/^#/, "") : null;
+      history.pushState({ page: $ }, "", ge($, k));
       try {
         a();
-      } catch ($) {
-        console.warn("[nimbi-cms] renderByQuery failed", $);
+      } catch (P) {
+        console.warn("[nimbi-cms] renderByQuery failed", P);
       }
       try {
         I();
@@ -6830,7 +6840,7 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
   const oe = "nimbi-navbar-menu";
   N.dataset.target = oe, N.innerHTML = '<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>', W.appendChild(N);
   try {
-    N.addEventListener("click", (E) => {
+    N.addEventListener("click", (v) => {
       try {
         const L = N.dataset && N.dataset.target ? N.dataset.target : null, T = L ? document.getElementById(L) : null;
         N.classList.contains("is-active") ? (N.classList.remove("is-active"), N.setAttribute("aria-expanded", "false"), T && T.classList.remove("is-active")) : (N.classList.add("is-active"), N.setAttribute("aria-expanded", "true"), T && T.classList.add("is-active"));
@@ -6838,8 +6848,8 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
         console.warn("[nimbi-cms] navbar burger toggle failed", L);
       }
     });
-  } catch (E) {
-    console.warn("[nimbi-cms] burger event binding failed", E);
+  } catch (v) {
+    console.warn("[nimbi-cms] burger event binding failed", v);
   }
   const X = document.createElement("div");
   X.className = "navbar-menu", X.id = oe;
@@ -6847,63 +6857,63 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
   S.className = "navbar-start";
   let V = null, re = null;
   if (!c)
-    V = null, m = null, y = null, v = null, C = null;
+    V = null, m = null, y = null, E = null, C = null;
   else {
     V = document.createElement("div"), V.className = "navbar-end", re = document.createElement("div"), re.className = "navbar-item", m = document.createElement("input"), m.className = "input", m.type = "search", m.placeholder = i("searchPlaceholder") || "", m.id = "nimbi-search", l === "eager" && (m.disabled = !0), b = document.createElement("div"), b.className = "control", l === "eager" && b.classList.add("is-loading"), b.appendChild(m), re.appendChild(b), y = document.createElement("div"), y.className = "dropdown is-right", y.id = "nimbi-search-dropdown";
-    const E = document.createElement("div");
-    E.className = "dropdown-trigger", E.appendChild(re);
+    const v = document.createElement("div");
+    v.className = "dropdown-trigger", v.appendChild(re);
     const L = document.createElement("div");
-    L.className = "dropdown-menu", L.setAttribute("role", "menu"), v = document.createElement("div"), v.id = "nimbi-search-results", v.className = "dropdown-content nimbi-search-results", C = v, L.appendChild(v), y.appendChild(E), y.appendChild(L), V.appendChild(y);
+    L.className = "dropdown-menu", L.setAttribute("role", "menu"), E = document.createElement("div"), E.id = "nimbi-search-results", E.className = "dropdown-content nimbi-search-results", C = E, L.appendChild(E), y.appendChild(v), y.appendChild(L), V.appendChild(y);
     const T = (k) => {
-      if (v) {
-        if (v.innerHTML = "", !k.length) {
+      if (E) {
+        if (E.innerHTML = "", !k.length) {
           y && y.classList.remove("is-active");
           try {
-            v.style.display = "none";
+            E.style.display = "none";
           } catch {
           }
           try {
-            v.classList.remove("is-open");
+            E.classList.remove("is-open");
           } catch {
           }
           return;
         }
-        k.forEach(($) => {
-          if ($.parentTitle) {
+        k.forEach((P) => {
+          if (P.parentTitle) {
             const te = document.createElement("p");
-            te.textContent = $.parentTitle, te.className = "panel-heading nimbi-search-title nimbi-search-parent", v.appendChild(te);
+            te.textContent = P.parentTitle, te.className = "panel-heading nimbi-search-title nimbi-search-parent", E.appendChild(te);
           }
           const q = document.createElement("a");
-          q.className = "dropdown-item nimbi-search-result", q.href = ge($.slug), q.textContent = $.title, q.addEventListener("click", () => {
+          q.className = "dropdown-item nimbi-search-result", q.href = ge(P.slug), q.textContent = P.title, q.addEventListener("click", () => {
             y && y.classList.remove("is-active");
             try {
-              v.style.display = "none";
+              E.style.display = "none";
             } catch {
             }
             try {
-              v.classList.remove("is-open");
+              E.classList.remove("is-open");
             } catch {
             }
-          }), v.appendChild(q);
+          }), E.appendChild(q);
         }), y && y.classList.add("is-active");
         try {
-          v.style.display = "block";
+          E.style.display = "block";
         } catch {
         }
         try {
-          v.classList.add("is-open");
+          E.classList.add("is-open");
         } catch {
         }
       }
-    }, _ = (k, $) => {
+    }, $ = (k, P) => {
       let q = null;
       return (...te) => {
-        q && clearTimeout(q), q = setTimeout(() => k(...te), $);
+        q && clearTimeout(q), q = setTimeout(() => k(...te), P);
       };
     };
     if (m) {
-      const k = _(async () => {
-        const $ = document.querySelector("input#nimbi-search"), q = String($ && $.value || "").trim().toLowerCase();
+      const k = $(async () => {
+        const P = document.querySelector("input#nimbi-search"), q = String(P && P.value || "").trim().toLowerCase();
         if (!q) {
           T([]);
           return;
@@ -6921,9 +6931,9 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
       } catch {
       }
       try {
-        document.addEventListener("input", ($) => {
+        document.addEventListener("input", (P) => {
           try {
-            $ && $.target && $.target.id === "nimbi-search" && k($);
+            P && P.target && P.target.id === "nimbi-search" && k(P);
           } catch {
           }
         }, !0);
@@ -6951,9 +6961,9 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
       });
     }
     try {
-      const k = ($) => {
+      const k = (P) => {
         try {
-          const q = $ && $.target;
+          const q = P && P.target;
           if (!C || !C.classList.contains("is-open") && C.style && C.style.display !== "block" || q && (C.contains(q) || m && (q === m || m.contains && m.contains(q)))) return;
           y && y.classList.remove("is-active");
           try {
@@ -6971,20 +6981,20 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
     } catch {
     }
   }
-  for (let E = 0; E < h.length; E++) {
-    const L = h[E];
-    if (E === 0) continue;
-    const T = L.getAttribute("href") || "#", _ = document.createElement("a");
-    _.className = "navbar-item";
+  for (let v = 0; v < h.length; v++) {
+    const L = h[v];
+    if (v === 0) continue;
+    const T = L.getAttribute("href") || "#", $ = document.createElement("a");
+    $.className = "navbar-item";
     try {
       if (/^[^#]*\.md(?:$|[#?])/.test(T) || T.endsWith(".md")) {
-        const $ = me(T).split(/::|#/, 2), q = $[0], te = $[1];
-        _.href = ge(q, te);
+        const P = me(T).split(/::|#/, 2), q = P[0], te = P[1];
+        $.href = ge(q, te);
       } else if (/\.html(?:$|[#?])/.test(T) || T.endsWith(".html")) {
-        const $ = me(T).split(/::|#/, 2);
-        let q = $[0];
+        const P = me(T).split(/::|#/, 2);
+        let q = P[0];
         q && !q.toLowerCase().endsWith(".html") && (q = q + ".html");
-        const te = $[1];
+        const te = P[1];
         try {
           const Ae = await Ee(q, s);
           if (Ae && Ae.raw)
@@ -6998,37 +7008,37 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
                   } catch (on) {
                     console.warn("[nimbi-cms] slugToMd/mdToSlug set failed", on);
                   }
-                  _.href = ge(lt, te);
+                  $.href = ge(lt, te);
                 } else
-                  _.href = ge(q, te);
+                  $.href = ge(q, te);
               } else
-                _.href = ge(q, te);
+                $.href = ge(q, te);
             } catch {
-              _.href = ge(q, te);
+              $.href = ge(q, te);
             }
           else
-            _.href = T;
+            $.href = T;
         } catch {
-          _.href = T;
+          $.href = T;
         }
       } else
-        _.href = T;
+        $.href = T;
     } catch (k) {
-      console.warn("[nimbi-cms] nav item href parse failed", k), _.href = T;
+      console.warn("[nimbi-cms] nav item href parse failed", k), $.href = T;
     }
     try {
       const k = L.textContent && String(L.textContent).trim() ? String(L.textContent).trim() : null;
       if (k)
         try {
-          const $ = le(k);
-          if ($) {
-            const q = _.getAttribute && _.getAttribute("href") ? _.getAttribute("href") : "";
+          const P = le(k);
+          if (P) {
+            const q = $.getAttribute && $.getAttribute("href") ? $.getAttribute("href") : "";
             try {
               const Ae = new URL(q, location.href).searchParams.get("page");
               if (Ae) {
                 const ye = decodeURIComponent(Ae);
                 try {
-                  ee.set($, ye), F.set(ye, $);
+                  ee.set(P, ye), F.set(ye, P);
                 } catch (Le) {
                   console.warn("[nimbi-cms] slugToMd/mdToSlug set failed", Le);
                 }
@@ -7037,79 +7047,79 @@ async function Ba(t, e, n, s, r, i, a, c, l = "eager", u = 1, o = void 0, d = "f
               console.warn("[nimbi-cms] nav slug mapping failed", te);
             }
           }
-        } catch ($) {
-          console.warn("[nimbi-cms] nav slug mapping failed", $);
+        } catch (P) {
+          console.warn("[nimbi-cms] nav slug mapping failed", P);
         }
     } catch (k) {
       console.warn("[nimbi-cms] nav slug mapping failed", k);
     }
-    _.textContent = L.textContent || T, S.appendChild(_);
+    $.textContent = L.textContent || T, S.appendChild($);
   }
   X.appendChild(S), V && X.appendChild(V), Z.appendChild(W), Z.appendChild(X), t.appendChild(Z);
   try {
-    const E = (L) => {
+    const v = (L) => {
       try {
         const T = Z && Z.querySelector ? Z.querySelector(".navbar-burger") : document.querySelector(".navbar-burger");
         if (!T || !T.classList.contains("is-active")) return;
-        const _ = T && T.closest ? T.closest(".navbar") : Z;
-        if (_ && _.contains(L.target)) return;
+        const $ = T && T.closest ? T.closest(".navbar") : Z;
+        if ($ && $.contains(L.target)) return;
         I();
       } catch {
       }
     };
-    document.addEventListener("click", E, !0), document.addEventListener("touchstart", E, !0);
+    document.addEventListener("click", v, !0), document.addEventListener("touchstart", v, !0);
   } catch {
   }
   try {
-    X.addEventListener("click", (E) => {
-      const L = E.target && E.target.closest ? E.target.closest("a") : null;
+    X.addEventListener("click", (v) => {
+      const L = v.target && v.target.closest ? v.target.closest("a") : null;
       if (!L) return;
       const T = L.getAttribute("href") || "";
       try {
-        const _ = new URL(T, location.href), k = _.searchParams.get("page"), $ = _.hash ? _.hash.replace(/^#/, "") : null;
+        const $ = new URL(T, location.href), k = $.searchParams.get("page"), P = $.hash ? $.hash.replace(/^#/, "") : null;
         if (k) {
-          E.preventDefault(), history.pushState({ page: k }, "", ge(k, $));
+          v.preventDefault(), history.pushState({ page: k }, "", ge(k, P));
           try {
             a();
           } catch (q) {
             console.warn("[nimbi-cms] renderByQuery failed", q);
           }
         }
-      } catch (_) {
-        console.warn("[nimbi-cms] navbar click handler failed", _);
+      } catch ($) {
+        console.warn("[nimbi-cms] navbar click handler failed", $);
       }
       try {
-        const _ = Z && Z.querySelector ? Z.querySelector(".navbar-burger") : null, k = _ && _.dataset ? _.dataset.target : null, $ = k ? document.getElementById(k) : null;
-        _ && _.classList.contains("is-active") && (_.classList.remove("is-active"), _.setAttribute("aria-expanded", "false"), $ && $.classList.remove("is-active"));
-      } catch (_) {
-        console.warn("[nimbi-cms] mobile menu close failed", _);
+        const $ = Z && Z.querySelector ? Z.querySelector(".navbar-burger") : null, k = $ && $.dataset ? $.dataset.target : null, P = k ? document.getElementById(k) : null;
+        $ && $.classList.contains("is-active") && ($.classList.remove("is-active"), $.setAttribute("aria-expanded", "false"), P && P.classList.remove("is-active"));
+      } catch ($) {
+        console.warn("[nimbi-cms] mobile menu close failed", $);
       }
     });
-  } catch (E) {
-    console.warn("[nimbi-cms] attach content click handler failed", E);
+  } catch (v) {
+    console.warn("[nimbi-cms] attach content click handler failed", v);
   }
   try {
-    e.addEventListener("click", (E) => {
-      const L = E.target && E.target.closest ? E.target.closest("a") : null;
+    e.addEventListener("click", (v) => {
+      const L = v.target && v.target.closest ? v.target.closest("a") : null;
       if (!L) return;
       const T = L.getAttribute("href") || "";
       if (T && !Hr(T))
         try {
-          const _ = new URL(T, location.href), k = _.searchParams.get("page"), $ = _.hash ? _.hash.replace(/^#/, "") : null;
+          const $ = new URL(T, location.href), k = $.searchParams.get("page"), P = $.hash ? $.hash.replace(/^#/, "") : null;
           if (k) {
-            E.preventDefault(), history.pushState({ page: k }, "", ge(k, $));
+            v.preventDefault(), history.pushState({ page: k }, "", ge(k, P));
             try {
               a();
             } catch (q) {
               console.warn("[nimbi-cms] renderByQuery failed", q);
             }
           }
-        } catch (_) {
-          console.warn("[nimbi-cms] container click URL parse failed", _);
+        } catch ($) {
+          console.warn("[nimbi-cms] container click URL parse failed", $);
         }
     });
-  } catch (E) {
-    console.warn("[nimbi-cms] build navbar failed", E);
+  } catch (v) {
+    console.warn("[nimbi-cms] build navbar failed", v);
   }
   return { navbar: Z, linkEls: h };
 }
@@ -7307,11 +7317,11 @@ function Fa(t, e, n, s, r, i, a, c, l, u, o) {
       try {
         const y = c || (r && r.querySelector ? r.querySelector("h1") : null);
         if (y) {
-          let v = y.nextElementSibling;
+          let E = y.nextElementSibling;
           const C = [];
-          for (; v && !(v.tagName && v.tagName.toLowerCase() === "h2"); ) {
-            const I = (v.textContent || "").trim();
-            I && C.push(I), v = v.nextElementSibling;
+          for (; E && !(E.tagName && E.tagName.toLowerCase() === "h2"); ) {
+            const I = (E.textContent || "").trim();
+            I && C.push(I), E = E.nextElementSibling;
           }
           C.length && (b = C.join(" ").replace(/\s+/g, " ").trim()), !b && l && (b = String(l).trim());
         }
@@ -7397,7 +7407,7 @@ function Za() {
   `, t.addEventListener("click", (S) => {
     S.target === t && xn();
   }), t.addEventListener("wheel", (S) => {
-    if (!P()) return;
+    if (!_()) return;
     S.preventDefault();
     const V = S.deltaY < 0 ? xt : -xt;
     Ze(Se + V), u(), o();
@@ -7447,41 +7457,41 @@ function Za() {
   let d = !1, p = 0, f = 0, h = 0, g = 0;
   const m = /* @__PURE__ */ new Map();
   let b = 0, y = 1;
-  const v = (S, V) => {
-    const re = S.x - V.x, E = S.y - V.y;
-    return Math.hypot(re, E);
+  const E = (S, V) => {
+    const re = S.x - V.x, v = S.y - V.y;
+    return Math.hypot(re, v);
   }, C = () => {
     d = !1, m.clear(), b = 0, j && (j.classList.add("is-panning"), j.classList.remove("is-grabbing"));
   };
   let I = 0, U = 0, Z = 0;
   const W = (S) => {
-    const V = Date.now(), re = V - I, E = S.clientX - U, L = S.clientY - Z;
-    I = V, U = S.clientX, Z = S.clientY, re < 300 && Math.hypot(E, L) < 30 && (Ze(Se > 1 ? 1 : 2), u(), S.preventDefault());
+    const V = Date.now(), re = V - I, v = S.clientX - U, L = S.clientY - Z;
+    I = V, U = S.clientX, Z = S.clientY, re < 300 && Math.hypot(v, L) < 30 && (Ze(Se > 1 ? 1 : 2), u(), S.preventDefault());
   }, he = (S) => {
     Ze(Se > 1 ? 1 : 2), u(), S.preventDefault();
-  }, P = () => Ce ? typeof Ce.open == "boolean" ? Ce.open : Ce.classList.contains("is-active") : !1, O = (S, V, re = 1) => {
+  }, _ = () => Ce ? typeof Ce.open == "boolean" ? Ce.open : Ce.classList.contains("is-active") : !1, O = (S, V, re = 1) => {
     if (m.has(re) && m.set(re, { x: S, y: V }), m.size === 2) {
-      const _ = Array.from(m.values()), k = v(_[0], _[1]);
+      const $ = Array.from(m.values()), k = E($[0], $[1]);
       if (b > 0) {
-        const $ = k / b;
-        Ze(y * $);
+        const P = k / b;
+        Ze(y * P);
       }
       return;
     }
     if (!d) return;
-    const E = j.closest(".nimbi-image-preview__image-wrapper");
-    if (!E) return;
+    const v = j.closest(".nimbi-image-preview__image-wrapper");
+    if (!v) return;
     const L = S - p, T = V - f;
-    E.scrollLeft = h - L, E.scrollTop = g - T;
+    v.scrollLeft = h - L, v.scrollTop = g - T;
   }, Q = (S, V, re = 1) => {
-    if (!P()) return;
+    if (!_()) return;
     if (m.set(re, { x: S, y: V }), m.size === 2) {
       const T = Array.from(m.values());
-      b = v(T[0], T[1]), y = Se;
+      b = E(T[0], T[1]), y = Se;
       return;
     }
-    const E = j.closest(".nimbi-image-preview__image-wrapper");
-    !E || !(E.scrollWidth > E.clientWidth || E.scrollHeight > E.clientHeight) || (d = !0, p = S, f = V, h = E.scrollLeft, g = E.scrollTop, j.classList.add("is-panning"), j.classList.remove("is-grabbing"), window.addEventListener("pointermove", N), window.addEventListener("pointerup", oe), window.addEventListener("pointercancel", oe));
+    const v = j.closest(".nimbi-image-preview__image-wrapper");
+    !v || !(v.scrollWidth > v.clientWidth || v.scrollHeight > v.clientHeight) || (d = !0, p = S, f = V, h = v.scrollLeft, g = v.scrollTop, j.classList.add("is-panning"), j.classList.remove("is-grabbing"), window.addEventListener("pointermove", N), window.addEventListener("pointerup", oe), window.addEventListener("pointercancel", oe));
   }, N = (S) => {
     d && (S.preventDefault(), O(S.clientX, S.clientY, S.pointerId));
   }, oe = () => {
@@ -7631,9 +7641,9 @@ function Qa(t, { t: e, zoomStep: n = 0.25 } = {}) {
   }), t.addEventListener("pointermove", (f) => {
     if (l.has(f.pointerId) && l.set(f.pointerId, { x: f.clientX, y: f.clientY }), l.size === 2) {
       f.preventDefault();
-      const y = Array.from(l.values()), v = d(y[0], y[1]);
+      const y = Array.from(l.values()), E = d(y[0], y[1]);
       if (u > 0) {
-        const C = v / u;
+        const C = E / u;
         Ze(o * C);
       }
       return;
@@ -7672,9 +7682,9 @@ function Xa(t) {
   let o = null;
   const d = va(i, [{ path: c, name: i("home"), isIndex: !0, children: [] }]);
   async function p(b, y) {
-    let v, C, I;
+    let E, C, I;
     try {
-      ({ data: v, pagePath: C, anchor: I } = await Ts(b, a));
+      ({ data: E, pagePath: C, anchor: I } = await Ts(b, a));
     } catch (Q) {
       console.error("[nimbi-cms] fetchPageData failed", Q), Rr(e, i, Q);
       return;
@@ -7686,10 +7696,10 @@ function Xa(t) {
       console.warn("[nimbi-cms] scrollToAnchorOrTop failed", Q);
     }
     e.innerHTML = "";
-    const { article: U, parsed: Z, toc: W, topH1: he, h1Text: P, slugKey: O } = await _a(i, v, C, I, a);
-    Fa(i, l, Z, W, U, C, I, he, P, O, v), n.innerHTML = "", W && (n.appendChild(W), Ia(W));
+    const { article: U, parsed: Z, toc: W, topH1: he, h1Text: _, slugKey: O } = await _a(i, E, C, I, a);
+    Fa(i, l, Z, W, U, C, I, he, _, O, E), n.innerHTML = "", W && (n.appendChild(W), Ia(W));
     try {
-      await u("transformHtml", { article: U, parsed: Z, toc: W, pagePath: C, anchor: I, topH1: he, h1Text: P, slugKey: O, data: v });
+      await u("transformHtml", { article: U, parsed: Z, toc: W, pagePath: C, anchor: I, topH1: he, h1Text: _, slugKey: O, data: E });
     } catch (Q) {
       console.warn("[nimbi-cms] transformHtml hooks failed", Q);
     }
@@ -7711,7 +7721,7 @@ function Xa(t) {
     }
     _n(I), za(U, he, { mountOverlay: r, container: s, navWrap: n, t: i });
     try {
-      await u("onPageLoad", { data: v, pagePath: C, anchor: I, article: U, toc: W, topH1: he, h1Text: P, slugKey: O, contentWrap: e, navWrap: n });
+      await u("onPageLoad", { data: E, pagePath: C, anchor: I, article: U, toc: W, topH1: he, h1Text: _, slugKey: O, contentWrap: e, navWrap: n });
     } catch (Q) {
       console.warn("[nimbi-cms] onPageLoad hooks failed", Q);
     }
@@ -7722,8 +7732,8 @@ function Xa(t) {
     const y = location.hash ? decodeURIComponent(location.hash.replace(/^#/, "")) : null;
     try {
       await p(b, y);
-    } catch (v) {
-      console.warn("[nimbi-cms] renderByQuery failed for", b, v), Rr(e, i, v);
+    } catch (E) {
+      console.warn("[nimbi-cms] renderByQuery failed for", b, E), Rr(e, i, E);
     }
   }
   window.addEventListener("popstate", f);
@@ -7744,8 +7754,8 @@ function Xa(t) {
       if (!b) return;
       const y = sessionStorage.getItem(h());
       if (!y) return;
-      const v = JSON.parse(y);
-      v && typeof v.top == "number" && b.scrollTo({ top: v.top, left: v.left || 0, behavior: "auto" });
+      const E = JSON.parse(y);
+      E && typeof E.top == "number" && b.scrollTo({ top: E.top, left: E.left || 0, behavior: "auto" });
     } catch {
     }
   };
@@ -7837,14 +7847,14 @@ async function al(t = {}) {
     if (t && t.allowUrlPathOverrides === !0)
       try {
         console.warn("[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage");
-      } catch (P) {
-        console.warn("[nimbi-cms] allowUrlPathOverrides logging failed", P);
+      } catch (_) {
+        console.warn("[nimbi-cms] allowUrlPathOverrides logging failed", _);
       }
     else {
       try {
         console.warn("[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage");
-      } catch (P) {
-        console.warn("[nimbi-cms] logging ignore of URL overrides failed", P);
+      } catch (_) {
+        console.warn("[nimbi-cms] logging ignore of URL overrides failed", _);
       }
       delete n.contentPath, delete n.homePage, delete n.notFoundPage;
     }
@@ -7866,12 +7876,12 @@ async function al(t = {}) {
     cacheMaxEntries: m,
     markdownExtensions: b,
     availableLanguages: y,
-    homePage: v = "_home.md",
+    homePage: E = "_home.md",
     notFoundPage: C = "_404.md"
-  } = s, { navbarLogo: I = "favicon" } = s, { skipRootReadme: U = !1 } = s, Z = (P) => {
+  } = s, { navbarLogo: I = "favicon" } = s, { skipRootReadme: U = !1 } = s, Z = (_) => {
     try {
       const O = document.querySelector(r);
-      O && O instanceof Element && (O.innerHTML = `<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;"><strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(P)}</pre></div>`);
+      O && O instanceof Element && (O.innerHTML = `<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;"><strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(_)}</pre></div>`);
     } catch {
     }
   };
@@ -7908,30 +7918,30 @@ async function al(t = {}) {
     throw new TypeError('initCMS(options): "cacheTtlMinutes" must be a non‑negative number when provided');
   if (m != null && (typeof m != "number" || !Number.isInteger(m) || m < 0))
     throw new TypeError('initCMS(options): "cacheMaxEntries" must be a non‑negative integer when provided');
-  if (b != null && (!Array.isArray(b) || b.some((P) => !P || typeof P != "object")))
+  if (b != null && (!Array.isArray(b) || b.some((_) => !_ || typeof _ != "object")))
     throw new TypeError('initCMS(options): "markdownExtensions" must be an array of extension objects when provided');
-  if (y != null && (!Array.isArray(y) || y.some((P) => typeof P != "string" || !P.trim())))
+  if (y != null && (!Array.isArray(y) || y.some((_) => typeof _ != "string" || !_.trim())))
     throw new TypeError('initCMS(options): "availableLanguages" must be an array of non-empty strings when provided');
-  if (o != null && (!Array.isArray(o) || o.some((P) => typeof P != "string" || !P.trim())))
+  if (o != null && (!Array.isArray(o) || o.some((_) => typeof _ != "string" || !_.trim())))
     throw new TypeError('initCMS(options): "noIndexing" must be an array of non-empty strings when provided');
   if (U != null && typeof U != "boolean")
     throw new TypeError('initCMS(options): "skipRootReadme" must be a boolean when provided');
-  if (v != null && (typeof v != "string" || !v.trim() || !/\.(md|html)$/.test(v)))
+  if (E != null && (typeof E != "string" || !E.trim() || !/\.(md|html)$/.test(E)))
     throw new TypeError('initCMS(options): "homePage" must be a non-empty string ending with .md or .html');
   if (C != null && (typeof C != "string" || !C.trim() || !/\.(md|html)$/.test(C)))
     throw new TypeError('initCMS(options): "notFoundPage" must be a non-empty string ending with .md or .html');
   const he = !!c;
   try {
-    Promise.resolve().then(() => Gt).then((P) => {
+    Promise.resolve().then(() => Gt).then((_) => {
       try {
-        P && typeof P.setSkipRootReadme == "function" && P.setSkipRootReadme(!!U);
+        _ && typeof _.setSkipRootReadme == "function" && _.setSkipRootReadme(!!U);
       } catch (O) {
         console.warn("[nimbi-cms] setSkipRootReadme failed", O);
       }
-    }).catch((P) => {
+    }).catch((_) => {
     });
-  } catch (P) {
-    console.warn("[nimbi-cms] setSkipRootReadme dynamic import failed", P);
+  } catch (_) {
+    console.warn("[nimbi-cms] setSkipRootReadme dynamic import failed", _);
   }
   try {
     await (async () => {
@@ -7940,8 +7950,8 @@ async function al(t = {}) {
       } catch (k) {
         console.warn("[nimbi-cms] mount element setup failed", k);
       }
-      const P = document.createElement("section");
-      P.className = "section";
+      const _ = document.createElement("section");
+      _.className = "section";
       const O = document.createElement("div");
       O.className = "container nimbi-cms";
       const Q = document.createElement("div");
@@ -7956,16 +7966,16 @@ async function al(t = {}) {
       }
       Q.appendChild(N);
       const oe = document.createElement("main");
-      oe.className = "column nimbi-content", oe.setAttribute("role", "main"), Q.appendChild(oe), O.appendChild(Q), P.appendChild(O);
+      oe.className = "column nimbi-content", oe.setAttribute("role", "main"), Q.appendChild(oe), O.appendChild(Q), _.appendChild(O);
       const X = N, S = oe;
-      W.appendChild(P);
+      W.appendChild(_);
       let V = null;
       try {
         V = W.querySelector(".nimbi-overlay"), V || (V = document.createElement("div"), V.className = "nimbi-overlay", W.appendChild(V));
       } catch (k) {
         V = null, console.warn("[nimbi-cms] mount overlay setup failed", k);
       }
-      const re = location.pathname || "/", E = re.endsWith("/") ? re : re.substring(0, re.lastIndexOf("/") + 1);
+      const re = location.pathname || "/", v = re.endsWith("/") ? re : re.substring(0, re.lastIndexOf("/") + 1);
       try {
         Sn = document.title || "";
       } catch (k) {
@@ -7973,21 +7983,21 @@ async function al(t = {}) {
       }
       let L = i;
       (L === "." || L === "./") && (L = ""), L.startsWith("./") && (L = L.slice(2)), L.startsWith("/") && (L = L.slice(1)), L !== "" && !L.endsWith("/") && (L = L + "/");
-      const T = new URL(E + L, location.origin).toString();
+      const T = new URL(v + L, location.origin).toString();
       try {
         Promise.resolve().then(() => Gt).then((k) => {
           try {
-            k && typeof k.setHomePage == "function" && k.setHomePage(v);
-          } catch ($) {
-            console.warn("[nimbi-cms] setHomePage failed", $);
+            k && typeof k.setHomePage == "function" && k.setHomePage(E);
+          } catch (P) {
+            console.warn("[nimbi-cms] setHomePage failed", P);
           }
         }).catch((k) => {
         });
       } catch (k) {
         console.warn("[nimbi-cms] setHomePage dynamic import failed", k);
       }
-      h && await Or(h, E), y && Array.isArray(y) && Ur(y), f && qr(f);
-      const _ = Xa({ contentWrap: S, navWrap: X, container: O, mountOverlay: V, t: yt, contentBase: T, homePage: v, initialDocumentTitle: Sn, runHooks: cr });
+      h && await Or(h, v), y && Array.isArray(y) && Ur(y), f && qr(f);
+      const $ = Xa({ contentWrap: S, navWrap: X, container: O, mountOverlay: V, t: yt, contentBase: T, homePage: E, initialDocumentTitle: Sn, runHooks: cr });
       if (typeof g == "number" && g >= 0 && typeof gr == "function" && gr(g * 60 * 1e3), typeof m == "number" && m >= 0 && typeof pr == "function" && pr(m), b && Array.isArray(b) && b.length)
         try {
           b.forEach((k) => {
@@ -8000,8 +8010,8 @@ async function al(t = {}) {
         typeof a == "number" && Promise.resolve().then(() => Gt).then(({ setDefaultCrawlMaxQueue: k }) => {
           try {
             k(a);
-          } catch ($) {
-            console.warn("[nimbi-cms] setDefaultCrawlMaxQueue failed", $);
+          } catch (P) {
+            console.warn("[nimbi-cms] setDefaultCrawlMaxQueue failed", P);
           }
         });
       } catch (k) {
@@ -8028,15 +8038,15 @@ async function al(t = {}) {
         console.warn("[nimbi-cms] setNotFoundPage failed", k);
       }
       try {
-        await Ee(v, T);
+        await Ee(E, T);
       } catch (k) {
-        throw v === "_home.md" ? new Error("Required _home.md not found") : new Error(`Required ${v} not found at ${T}${v}: ${k.message}`);
+        throw E === "_home.md" ? new Error("Required _home.md not found") : new Error(`Required ${E} not found at ${T}${E}: ${k.message}`);
       }
-      ns(d), await ts(p, E);
+      ns(d), await ts(p, v);
       try {
         const k = document.createElement("header");
-        k.className = "nimbi-site-navbar", W.insertBefore(k, P);
-        const $ = await Ee("_navigation.md", T), q = await rn($.raw || ""), { navbar: te, linkEls: Ae } = await Ba(k, O, q.html || "", T, v, yt, _.renderByQuery, he, l, u, o, I);
+        k.className = "nimbi-site-navbar", W.insertBefore(k, _);
+        const P = await Ee("_navigation.md", T), q = await rn(P.raw || ""), { navbar: te, linkEls: Ae } = await Ba(k, O, q.html || "", T, E, yt, $.renderByQuery, he, l, u, o, I);
         try {
           await cr("onNavBuild", { navWrap: X, navbar: te, linkEls: Ae, contentBase: T });
         } catch (ye) {
@@ -8100,12 +8110,12 @@ async function al(t = {}) {
       } catch (k) {
         console.warn("[nimbi-cms] build navigation failed", k);
       }
-      await _.renderByQuery();
+      await $.renderByQuery();
       try {
         Promise.resolve().then(() => Ja).then(({ getVersion: k }) => {
-          typeof k == "function" && k().then(($) => {
+          typeof k == "function" && k().then((P) => {
             try {
-              const q = $ || "0.0.0";
+              const q = P || "0.0.0";
               try {
                 const te = (Le) => {
                   const ce = document.createElement("a");
@@ -8134,8 +8144,8 @@ async function al(t = {}) {
             } catch (q) {
               console.warn("[nimbi-cms] building version label failed", q);
             }
-          }).catch(($) => {
-            console.warn("[nimbi-cms] getVersion() failed", $);
+          }).catch((P) => {
+            console.warn("[nimbi-cms] getVersion() failed", P);
           });
         }).catch((k) => {
           console.warn("[nimbi-cms] import version module failed", k);
@@ -8144,8 +8154,8 @@ async function al(t = {}) {
         console.warn("[nimbi-cms] version label setup failed", k);
       }
     })();
-  } catch (P) {
-    throw Z(P), P;
+  } catch (_) {
+    throw Z(_), _;
   }
 }
 async function Va() {

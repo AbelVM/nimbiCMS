@@ -1,4 +1,6 @@
 import 'highlight.js/styles/monokai.css'
+// Project extra styles for the CMS UI (bundled into dist/nimbi-cms.css)
+import './styles/nimbi-cms-extra.css'
 
 export { addHook, onPageLoad, onNavBuild, transformHtml, _clearHooks, runHooks } from './hookManager.js';
 
