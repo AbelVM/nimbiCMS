@@ -127,6 +127,13 @@
     cursor: zoom-in;
 }
 
+/* When an image is wrapped in a link, prefer the pointer cursor so
+   users understand the image is a navigable link rather than an inline
+   zoom affordance. */
+.nimbi-cms a img {
+    cursor: pointer;
+}
+
 .nimbi-content {
     flex: 1;
     max-width: 900px;
