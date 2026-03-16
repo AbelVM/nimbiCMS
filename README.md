@@ -49,9 +49,32 @@ Editing content via the GitHub web editor works too—just save and refresh to s
 
 ## Installation
 
+### From npm
+
 ```bash
-npm install
+npm install nimbi-cms
 npm run build
+```
+
+### From CDN
+
+You can use jsDelivr or unpkg to load the bundles directly in the browser without installing.
+
+```html
+<!-- jsDelivr ESM -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nimbi-cms@1.0.0/dist/nimbi-cms.css">
+<script type="module">
+  import initCMS from 'https://cdn.jsdelivr.net/npm/nimbi-cms@1.0.0/dist/nimbi-cms.es.js'
+  initCMS({ el: '#app' })
+</script>
+
+<!-- UMD (unpkg) -->
+<script src="https://unpkg.com/nimbi-cms@1.0.0/dist/nimbi-cms.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/nimbi-cms@1.0.0/dist/nimbi-cms.css">
+<script>
+  // UMD exposes a global `nimbiCMS`
+  nimbiCMS.initCMS({ el: '#app' })
+</script>
 ```
 
 For development with live reload:
