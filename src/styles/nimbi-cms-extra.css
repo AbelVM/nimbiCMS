@@ -237,6 +237,59 @@
     padding-left: 0.75rem;
 }
 
+/* Search results styling */
+.nimbi-search-panel {
+    margin: 0.25rem 0;
+    border-radius: 6px;
+    box-shadow: none !important;
+}
+/* allow the panel itself to scroll so the parent label remains visible */
+.nimbi-search-panel {
+    max-height: 320px;
+    overflow-y: auto;
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
+}
+
+/* WebKit thin scrollbar styling for the search panel */
+.nimbi-search-panel::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.nimbi-search-panel::-webkit-scrollbar-thumb {
+    background-color: var(--bulma-scrollbar-thumb-color, rgba(0,0,0,0.25));
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.nimbi-search-panel .nimbi-search-parent {
+    font-size: 0.75rem;
+    color: var(--bulma-text-muted, #7a7a7a);
+    padding: 0.25rem 0.75rem 0; /* remove bottom padding */
+    background: transparent; /* match panel background */
+    display: flex;
+    align-items: flex-end; /* vertically align text to bottom */
+    font-weight: 400; /* not bold */
+    margin: 0 0 -0.75rem 0; /* pull following content up slightly */
+}
+.nimbi-search-panel .nimbi-search-result {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    align-items: flex-start;
+}
+.nimbi-search-panel .nimbi-search-result .is-size-6 {
+    line-height: 1.15;
+}
+.nimbi-search-panel .nimbi-search-result:hover {
+    background-color: var(--bulma-table-hover-background, #f5f5f5);
+}
+
+/* Ensure dropdown-content variant respects panel styling */
+.dropdown-content .panel.nimbi-search-panel {
+    margin: 0;
+    box-shadow: none !important;
+}
+
 @media (max-width: 800px) {
     .nimbi-cms {
         padding: 0
@@ -494,9 +547,17 @@
     position: relative;
 }
 
+#nimbi-search-dropdown .dropdown-menu {
+    /* shift the dropdown 1rem to the left and 1rem down so it opens slightly offset */
+    /* Use transform to reliably move the positioned dropdown relative to the trigger.
+       This avoids interference with Bulma's absolute right/left positioning rules. */
+    transform: translate(-1rem, 1rem);
+    transform-origin: top right;
+    z-index: 80;
+}
+
 #nimbi-search-dropdown .dropdown-content {
-    max-height: 320px;
-    overflow-y: auto;
+    /* keep dropdown sizing here; panel handles scrolling */
     width: 340px;
 }
 
@@ -504,6 +565,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+#nimbi-search-results {
+    padding: 0.75rem;
 }
 
 #nimbi-search { width: 240px; }

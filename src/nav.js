@@ -133,24 +133,43 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const resultsEl = document.getElementById('nimbi-search-results')
         if (!resultsEl) return
         resultsEl.innerHTML = ''
-        filteredNow.slice(0,10).forEach(it => {
-          const wrap = document.createElement('div')
-          wrap.className = 'nimbi-search-result'
-          if (it.parentTitle) {
-            const label = document.createElement('div')
-            label.textContent = it.parentTitle
-            label.className = 'nimbi-search-title nimbi-search-parent'
-            wrap.appendChild(label)
-          }
-          const a = document.createElement('a')
-          a.className = 'block'
-          a.href = buildPageUrl(it.slug)
-          a.textContent = it.title
-          a.addEventListener('click', () => { try { resultsEl.style.display = 'none' } catch (_) {} })
-          wrap.appendChild(a)
-          resultsEl.appendChild(wrap)
-        })
-        try { resultsEl.style.display = 'block' } catch (e) {}
+        // Use Bulma panel for search results so items appear as clean blocks
+        try {
+          const panel = document.createElement('div')
+          panel.className = 'panel nimbi-search-panel'
+          filteredNow.slice(0,10).forEach(it => {
+            try {
+              if (it.parentTitle) {
+                const p = document.createElement('p')
+                p.className = 'panel-heading nimbi-search-title nimbi-search-parent'
+                p.textContent = it.parentTitle
+                panel.appendChild(p)
+              }
+              const a = document.createElement('a')
+              a.className = 'panel-block nimbi-search-result'
+              a.href = buildPageUrl(it.slug)
+              a.setAttribute('role', 'button')
+              // Ensure the slug → markdown/path mapping exists so the
+              // router can resolve the page immediately when clicked.
+              try {
+                if (it.path && typeof it.slug === 'string') {
+                  try { slugToMd.set(it.slug, it.path) } catch (ee) {}
+                  try { mdToSlug.set(it.path, it.slug) } catch (ee) {}
+                }
+              } catch (e) {}
+              // Use inner structure so the item doesn't look like a bare link
+              const title = document.createElement('div')
+              title.className = 'is-size-6 has-text-weight-semibold'
+              title.textContent = it.title
+              a.appendChild(title)
+              // excerpts intentionally omitted to keep items compact
+              a.addEventListener('click', () => { try { resultsEl.style.display = 'none' } catch (_) {} })
+              panel.appendChild(a)
+            } catch (e) { /* ignore per-item failures */ }
+          })
+          resultsEl.appendChild(panel)
+          try { resultsEl.style.display = 'block' } catch (e) {}
+        } catch (e) { /* ignore panel render failures */ }
       } catch (e) { /* ignore */ }
     }).catch(()=>{})
 
@@ -373,24 +392,42 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         try { dropdownContent.classList.remove('is-open') } catch (e) {}
         return
       }
-      items.forEach(it => {
-        if (it.parentTitle) {
-          const heading = document.createElement('p')
-          heading.textContent = it.parentTitle
-          heading.className = 'panel-heading nimbi-search-title nimbi-search-parent'
-          dropdownContent.appendChild(heading)
-        }
-        const a = document.createElement('a')
-        a.className = 'dropdown-item nimbi-search-result'
-        a.href = buildPageUrl(it.slug)
-        a.textContent = it.title
-        a.addEventListener('click', () => {
-          if (dropdown) dropdown.classList.remove('is-active')
-          try { dropdownContent.style.display = 'none' } catch (e) {}
-          try { dropdownContent.classList.remove('is-open') } catch (e) {}
+      try {
+        // Wrap dropdown results in a Bulma panel so items render as blocks
+        const panel = document.createElement('div')
+        panel.className = 'panel nimbi-search-panel'
+        items.forEach(it => {
+          if (it.parentTitle) {
+            const heading = document.createElement('p')
+            heading.textContent = it.parentTitle
+            heading.className = 'panel-heading nimbi-search-title nimbi-search-parent'
+            panel.appendChild(heading)
+          }
+          const a = document.createElement('a')
+          a.className = 'panel-block nimbi-search-result'
+          a.href = buildPageUrl(it.slug)
+          a.setAttribute('role', 'button')
+              // Ensure slug mapping is present so first-click navigation works.
+              try {
+                if (it.path && typeof it.slug === 'string') {
+                  try { slugToMd.set(it.slug, it.path) } catch (ee) {}
+                  try { mdToSlug.set(it.path, it.slug) } catch (ee) {}
+                }
+              } catch (e) {}
+          const title = document.createElement('div')
+          title.className = 'is-size-6 has-text-weight-semibold'
+          title.textContent = it.title
+          a.appendChild(title)
+          // excerpts intentionally omitted to keep items compact
+          a.addEventListener('click', () => {
+            if (dropdown) dropdown.classList.remove('is-active')
+            try { dropdownContent.style.display = 'none' } catch (e) {}
+            try { dropdownContent.classList.remove('is-open') } catch (e) {}
+          })
+          panel.appendChild(a)
         })
-        dropdownContent.appendChild(a)
-      })
+        dropdownContent.appendChild(panel)
+      } catch (e) { /* ignore render errors */ }
       if (dropdown) dropdown.classList.add('is-active')
       try { dropdownContent.style.display = 'block' } catch (e) {}
       try { dropdownContent.classList.add('is-open') } catch (e) {}
