@@ -23,7 +23,7 @@ Editing content via the GitHub web editor works too—just save and refresh to s
 - Optional client-side search box built from headings and excerpts (enabled by default).
 - Reading time estimation
 - Code is organized into small modules to ease maintenance and testing.
-- Sticky per-page, dynamically generated TOC 
+- Sticky per-page, dynamically generated TOC.
 - [Bulma](https://bulma.io/)‑based UI components.
 - Runtime updates for SEO, Open Graph and Twitter meta tags.
 - Lazily loads images by default, while heuristically marking above‑the‑fold images as eager.
