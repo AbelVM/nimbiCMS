@@ -6,7 +6,7 @@
     "url": "git+https://github.com/AbelVM/nimbiCMS.git"
   },
   "homepage": "https://abelvm.github.io/nimbiCMS/",
-  "private": true,
+  
   "description": "Lightweight CMS client for static sites with Bulma UI and search/indexing features",
   "keywords": ["cms","static","bulma","search","markdown","nimbi"],
   "author": "Abel Vázquez Montoro",
