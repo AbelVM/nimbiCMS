@@ -165,8 +165,10 @@
 
 .nimbi-article .nimbi-reading-time {
     font-size: 0.75rem;
-    margin-top: 0.25rem;
-    margin-bottom: 0.75rem;
+    /* when inline inside the subtitle, make it flow with the subtitle text */
+    display: inline-block;
+    margin-left: 0.5rem;
+    color: inherit;
 }
 
 .nimbi-article.content {
@@ -271,6 +273,19 @@
     align-items: flex-end; /* vertically align text to bottom */
     font-weight: 400; /* not bold */
     margin: 0 0 -0.75rem 0; /* pull following content up slightly */
+}
+
+/* Tweak H1 / subtitle / reading-time grouping for tighter visual grouping */
+.nimbi-article h1 {
+    margin-bottom: 0.25rem; /* bring following meta closer to the H1 */
+}
+
+.nimbi-article .nimbi-article-subtitle {
+    /* keep the is-6 font size but de-emphasize color to match reading time */
+    margin-top: -1.5rem;
+    margin-bottom: 2rem !important;
+    line-height: 1.1;
+    color: var(--nimbi-reading-time-color, var(--bulma-text-muted, #7a7a7a));
 }
 .nimbi-search-panel .nimbi-search-result {
     display: block;
@@ -501,6 +516,22 @@
 .nimbi-scroll-top:focus {
     outline: 2px solid;
     outline-offset: 2px
+}
+
+/* Make everything outside the main content non-selectable, and re-enable
+   selection inside `.nimbi-content`. This ensures UI chrome (nav, headers,
+   controls) can't be text-selected while allowing article text to be selectable. */
+:root, html, body, .nimbi-cms {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+.nimbi-content, .nimbi-content * {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
 }
 
 .nimbi-scroll-top svg {

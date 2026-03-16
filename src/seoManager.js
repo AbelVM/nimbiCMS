@@ -243,16 +243,36 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
   } catch (e) { console.warn('[seoManager] applyPageMeta failed', e) }
 
   try {
-    const prev = article.querySelector('.nimbi-reading-time')
-    if (prev) prev.remove()
+    // Remove any existing reading-time nodes (standalone or inline)
+    try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (e) {}
     if (h1Text) {
       const rt = readingTime(data.raw || '')
       const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
-      const p = document.createElement('p')
-      p.className = 'nimbi-reading-time'
-      p.textContent = minutes ? t('readingTime', { minutes }) : ''
+      const rtText = minutes ? t('readingTime', { minutes }) : ''
+      if (!rtText) return
       const topH1Elem = article.querySelector('h1')
-      if (topH1Elem) topH1Elem.insertAdjacentElement('afterend', p)
+      if (topH1Elem) {
+        const subtitleEl = article.querySelector('.nimbi-article-subtitle')
+        try {
+          if (subtitleEl) {
+            // Append reading time inside the subtitle, separated by a bullet
+            const span = document.createElement('span')
+            span.className = 'nimbi-reading-time'
+            // prepend separator to ensure it's visually separated
+            span.textContent = ' • ' + rtText
+            subtitleEl.appendChild(span)
+          } else {
+            // create a subtitle to hold the reading time so both live together
+            const sub = document.createElement('p')
+            sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'
+            const span = document.createElement('span')
+            span.className = 'nimbi-reading-time'
+            span.textContent = rtText
+            sub.appendChild(span)
+            try { topH1Elem.parentElement.insertBefore(sub, topH1Elem.nextSibling) } catch (e) { try { topH1Elem.insertAdjacentElement('afterend', sub) } catch (e2) { /* ignore */ } }
+          }
+        } catch (err) { try { const sub = document.createElement('p'); sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'; const span = document.createElement('span'); span.className = 'nimbi-reading-time'; span.textContent = rtText; sub.appendChild(span); topH1Elem.insertAdjacentElement('afterend', sub) } catch (err2) { /* ignore */ } }
+      }
     }
   } catch (ee) { console.warn('[seoManager] reading time update failed', ee) }
 }

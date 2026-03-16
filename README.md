@@ -1,3 +1,8 @@
+---
+title: nimbiCMS
+author: Abel Vázquez Montoro
+date: 2026-03-16
+---
 
 <img src="./assets/logo.png" alt="logo" style="height:256px;width:256px;" />
 
@@ -26,6 +31,7 @@ Editing content via the GitHub web editor works too—just save and refresh to s
 - Sticky per-page, dynamically generated TOC.
 - [Bulma](https://bulma.io/)‑based UI components.
 - Runtime updates for SEO, Open Graph and Twitter meta tags.
+- Markdown headers management ([yaml_metadata_block by pandoc](https://pandoc.org/MANUAL.html#extension-yaml_metadata_block))
 - Lazily loads images by default, while heuristically marking above‑the‑fold images as eager.
 - Image preview modal with zoom controls, wheel zoom, drag pan, double-click to zoom, and touch pinch support.
 - Syntax highlighting using [highlight.js](https://highlightjs.org/) — languages are auto-registered when detected.

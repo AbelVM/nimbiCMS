@@ -508,6 +508,33 @@ function computeSlug(parsed, article, pagePath, anchor) {
       } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
     } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
   } catch (err) { console.warn('[htmlBuilder] computeSlug failed', err) }
+  // If a frontmatter title was present and differs from the first H1 text,
+  // ensure the top H1 element has an id that matches the computed slugKey
+  // so that intra-page links and TOC entries correspond to the chosen slug.
+  try {
+    if (parsed && parsed.meta && parsed.meta.title && topH1) {
+      const metaTitle = String(parsed.meta.title).trim()
+      if (metaTitle && metaTitle !== h1Text) {
+        try {
+          // Assign the slug-derived id to the H1 element (overwrite if needed)
+          if (slugKey) topH1.id = slugKey
+        } catch (e) { /* ignore DOM id assignment failures */ }
+        try {
+          // Also update the parsed.toc entry for the H1 so the TOC reflects the id
+          if (Array.isArray(parsed.toc)) {
+            for (const entry of parsed.toc) {
+              try {
+                if (entry && Number(entry.level) === 1 && String(entry.text).trim() === (h1Text || '').trim()) {
+                  entry.id = slugKey
+                  break
+                }
+              } catch (e) { /* ignore per-entry errors */ }
+            }
+          }
+        } catch (e) { /* ignore parsed.toc update errors */ }
+      }
+    }
+  } catch (e) { /* ignore final slug-to-h1 sync errors */ }
   return { topH1, h1Text, slugKey }
 }
 
@@ -857,6 +884,40 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     // page instead of falling back to the site home when `pagePath` is
     // not populated). This must run before `rewriteAnchorsWorker`.
     const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
+
+    // If frontmatter includes author/date, add a small subtitle below the H1
+    try {
+      if (topH1 && parsed && parsed.meta && (parsed.meta.author || parsed.meta.date)) {
+        // Avoid adding duplicate subtitle elements
+        const existing = topH1.parentElement && topH1.parentElement.querySelector && topH1.parentElement.querySelector('.nimbi-article-subtitle')
+        if (!existing) {
+          const author = parsed.meta.author ? String(parsed.meta.author).trim() : ''
+          const dateRaw = parsed.meta.date ? String(parsed.meta.date).trim() : ''
+          let dateText = ''
+          try {
+            // Try to format ISO-like dates, fall back to raw text
+            const d = new Date(dateRaw)
+            if (dateRaw && !isNaN(d.getTime())) dateText = d.toLocaleDateString()
+            else dateText = dateRaw
+          } catch (e) { dateText = dateRaw }
+          const pieces = []
+          if (author) pieces.push(author)
+          if (dateText) pieces.push(dateText)
+          if (pieces.length) {
+              const sub = document.createElement('p')
+              // Strip any double quotes from author and keep subtitle visually subtle
+              const authorClean = pieces[0] ? String(pieces[0]).replace(/\"/g, '').trim() : ''
+              const rest = pieces.slice(1)
+              const textPieces = []
+              if (authorClean) textPieces.push(authorClean)
+              if (rest.length) textPieces.push(rest.join(' • '))
+              sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'
+              sub.textContent = textPieces.join(' • ')
+              try { topH1.parentElement.insertBefore(sub, topH1.nextSibling) } catch (e) { try { topH1.insertAdjacentElement('afterend', sub) } catch (e2) { /* ignore */ } }
+          }
+        }
+      }
+    } catch (e) { /* ignore subtitle insertion errors */ }
 
     try {
       await rewriteAnchorsWorker(article, contentBase, pagePath)
