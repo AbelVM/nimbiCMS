@@ -492,6 +492,7 @@ Keep in mind that some themes do not play well with certain color schemas.
 Nimbi CMS works well with GitHub Pages and the built-in GitHub web file editor. Minimal steps:
 
 - Enable GitHub Pages for the repository (Settings → Pages) and choose the branch/folder you want to publish (e.g., `gh-pages` or `main` / `/docs`).
+- As your content includes underscore-prefixed files (for example `_navigation.md` or `_home.md`), GitHub's Jekyll processor will ignore them by default. Add an empty `.nojekyll` file at the repository root to disable Jekyll so those files are served
 - Ensure your published site serves the built `dist` assets (upload `dist/` to the chosen branch or use a build step / GitHub Action to publish).
 - Place your content under a folder (default: `content/`) or set `contentPath` when calling `initCMS()` to point somewhere else.
 
