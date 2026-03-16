@@ -1,11 +1,14 @@
 import { it, expect } from 'vitest'
 import { parseMarkdownToHtml } from '../src/markdown.js'
 
-it('assigns ids to headings and returns toc entries', async () => {
-  const res = await parseMarkdownToHtml('# Title\n\n## Subtitle')
+it('assigns unique ids to repeated headings and returns toc entries', async () => {
+  const res = await parseMarkdownToHtml('# Title\n\n## Subtitle\n\n## Subtitle')
   expect(res.toc.some(e => e.text === 'Title')).toBe(true)
   expect(res.html).toContain('id="title"')
-  expect(res.toc.some(e => e.text === 'Subtitle' && e.level === 2)).toBe(true)
+  // Ensure duplicate headings get unique IDs
+  expect(res.html).toContain('id="subtitle"')
+  expect(res.html).toContain('id="subtitle-2"')
+  expect(res.toc.filter(e => e.text === 'Subtitle').length).toBe(2)
 })
 
 it('adds loading=lazy to images without attribute', async () => {

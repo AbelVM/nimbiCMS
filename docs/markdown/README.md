@@ -12,6 +12,7 @@
 
 ## Type Aliases
 
+- [Meta](type-aliases/Meta.md)
 - [ParseResult](type-aliases/ParseResult.md)
 - [RendererResult](type-aliases/RendererResult.md)
 - [TocEntry](type-aliases/TocEntry.md)

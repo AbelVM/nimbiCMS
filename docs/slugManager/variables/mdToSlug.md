@@ -8,5 +8,4 @@
 
 > `const` **mdToSlug**: `Map`\<`string`, `string`\>
 
-Map from markdown path -> slug. Keys are markdown-relative paths,
-values are slug keys (string).
+Reverse mapping of `slugToMd` (markdown path -> slug).

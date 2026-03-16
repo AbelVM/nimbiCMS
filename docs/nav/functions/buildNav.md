@@ -6,7 +6,7 @@
 
 # Function: buildNav()
 
-> **buildNav**(`navbarWrap`, `container`, `navHtml`, `contentBase`, `homePage`, `t`, `renderByQuery`, `effectiveSearchEnabled`, `searchIndexMode?`, `indexDepth?`, `noIndexing?`): `Promise`\<[`NavBuildResult`](../type-aliases/NavBuildResult.md)\>
+> **buildNav**(`navbarWrap`, `container`, `navHtml`, `contentBase`, `homePage`, `t`, `renderByQuery`, `effectiveSearchEnabled`, `searchIndexMode?`, `indexDepth?`, `noIndexing?`, `logoOption?`): `Promise`\<[`NavBuildResult`](../type-aliases/NavBuildResult.md)\>
 
 Build the main navigation bar DOM and wire up SPA navigation callbacks.
 Previously this logic lived directly inside `initCMS` in nimbi-cms.js.
@@ -82,6 +82,10 @@ include H2 headings in the search index when 2; include H3 when 3
 ### noIndexing?
 
 `undefined` = `undefined`
+
+### logoOption?
+
+`string` = `'favicon'`
 
 ## Returns
 

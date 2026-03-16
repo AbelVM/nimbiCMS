@@ -38,4 +38,23 @@ describe('docs indexing', () => {
     const paths = idx.map(e => e.path)
     expect(paths).toContain('hookManager/functions/clearHooks.md')
   })
+
+  it('generates unique slugs when multiple files have identical H1 titles', async () => {
+    // Two markdown files with the same top-level heading
+    const baseDir = join(process.cwd(), 'docs')
+    const manifest = {
+      '/docs/a.md': '# Same title\n\nContent A',
+      '/docs/b.md': '# Same title\n\nContent B'
+    }
+    _setAllMd(manifest)
+    setContentBase('/docs/')
+
+    // The slug map should contain both `same-title` and `same-title-2`
+    const keys = Array.from(slugToMd.keys())
+    expect(keys).toContain('same-title')
+    expect(keys).toContain('same-title-2')
+    // The slug map stores paths relative to the configured content base.
+    expect(slugToMd.get('same-title')).toBe('a.md')
+    expect(slugToMd.get('same-title-2')).toBe('b.md')
+  })
 })

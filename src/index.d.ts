@@ -197,6 +197,7 @@ export const skipRootReadme: boolean
 export function getLanguages(): string[]
 export function _storeSlugMapping(slug: string, rel: string): void
 export function setHomePage(p: string): any
+export function uniqueSlug(base: string, existing: Set<string>): any
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
 export function unescapeMarkdown(s: string): string

@@ -6,10 +6,10 @@
 
 # Variable: slugToMd
 
-> `const` **slugToMd**: `Map`\<`string`, `string` \| \{ `default?`: `string`; `langs?`: \{ \}; \}\>
+> `const` **slugToMd**: `Map`\<`string`, `string` \| [`SlugEntry`](../type-aliases/SlugEntry.md)\>
 
-Mapping from a slug (generated from title/H1) to a markdown path or a
-localized mapping object when `availableLanguages` is used. Values may be
-a string (direct path) or an object with `{ default?: string, langs?: { [lang:string]: string } }`.
+Mapping from a slug (generated from title/H1) to either a markdown path
+(string) or a localized mapping object (`SlugEntry`) when
+`availableLanguages` is used.
 Populated during nav construction, anchor rewriting, or on demand via
 crawling.

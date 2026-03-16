@@ -20,6 +20,14 @@
 
 > **level**: `number`
 
+### parentTitle?
+
+> `optional` **parentTitle**: `string`
+
+### slug?
+
+> `optional` **slug**: `string`
+
 ### text
 
 > **text**: `string`

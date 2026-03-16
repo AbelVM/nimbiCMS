@@ -9,6 +9,7 @@
 ## Type Aliases
 
 - [FetchResult](type-aliases/FetchResult.md)
+- [SlugEntry](type-aliases/SlugEntry.md)
 
 ## Variables
 

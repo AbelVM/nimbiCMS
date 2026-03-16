@@ -22,6 +22,7 @@
 - [buildTocElement](functions/buildTocElement.md)
 - [createNavTree](functions/createNavTree.md)
 - [ensureScrollTopButton](functions/ensureScrollTopButton.md)
+- [executeEmbeddedScripts](functions/executeEmbeddedScripts.md)
 - [initAnchorWorker](functions/initAnchorWorker.md)
 - [preMapMdSlugs](functions/preMapMdSlugs.md)
 - [prepareArticle](functions/prepareArticle.md)

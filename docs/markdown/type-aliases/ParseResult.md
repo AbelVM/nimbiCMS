@@ -18,7 +18,7 @@
 
 ### meta
 
-> **meta**: `Object`
+> **meta**: [`Meta`](Meta.md)
 
 ### toc
 

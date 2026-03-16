@@ -283,11 +283,18 @@ export function setContentBase(contentBase) {
         const slug = slugify(m[1].trim())
         if (slug) {
           try {
+            // Avoid slug collisions when multiple files share the same H1.
+            // For non-localized builds we generate a unique slug via `-2`, `-3`, etc.
+            let slugKey = slug
+            if (!availableLanguages || !availableLanguages.length) {
+              slugKey = uniqueSlug(slugKey, new Set(slugToMd.keys()))
+            }
+
             if (availableLanguages && availableLanguages.length) {
               const parts = rel.split('/')
               const firstSeg = parts[0]
               const isLang = availableLanguages.includes(firstSeg)
-              let entry = slugToMd.get(slug)
+              let entry = slugToMd.get(slugKey)
               if (!entry || typeof entry === 'string') {
                 entry = { default: typeof entry === 'string' ? entry : undefined, langs: {} }
               }
@@ -296,11 +303,11 @@ export function setContentBase(contentBase) {
               } else {
                 entry.default = rel
               }
-              slugToMd.set(slug, entry)
+              slugToMd.set(slugKey, entry)
             } else {
-              slugToMd.set(slug, rel)
+              slugToMd.set(slugKey, rel)
             }
-              mdToSlug.set(rel, slug)
+            mdToSlug.set(rel, slugKey)
           } catch (_e) { console.warn('[slugManager] set slug mapping failed', _e) }
         }
       }
@@ -323,11 +330,31 @@ export function slugify(s) {
     .replace(/ /g, '-')
   // Strip trailing file extensions like '.md' or '.html' if present
   slug = slug.replace(/(?:-?)(?:md|html)$/, '')
-  // Truncate to a safe maximum length and trim trailing hyphens
+  // Collapse repeated dashes caused by removed characters (e.g. "A & B" -> "a--b")
+  slug = slug.replace(/-+/g, '-')
+  // Trim leading/trailing dashes
+  slug = slug.replace(/^-|-$/g, '')
+  // Truncate to a safe maximum length
   if (slug.length > MAX_SLUG_LENGTH) {
     slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, '')
   }
   return slug
+}
+
+/**
+ * Generate a unique slug by appending a numeric suffix if needed.
+ * @param {string} base
+ * @param {Set<string>} existing
+ */
+export function uniqueSlug(base, existing) {
+  if (!existing.has(base)) return base
+  let i = 2
+  let candidate = `${base}-${i}`
+  while (existing.has(candidate)) {
+    i += 1
+    candidate = `${base}-${i}`
+  }
+  return candidate
 }
 
 /**

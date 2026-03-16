@@ -105,8 +105,27 @@ export async function parseMarkdownToHtml(md) {
           const parser = SHARED_DOM_PARSER || new DOMParser()
           const doc = parser.parseFromString(res.html, 'text/html')
           const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+          const usedIds = new Set()
+          const uniqueId = (base) => {
+            if (!base) base = 'heading'
+            let candidate = base
+            let i = 2
+            while (usedIds.has(candidate)) {
+              candidate = `${base}-${i}`
+              i += 1
+            }
+            usedIds.add(candidate)
+            return candidate
+          }
+
           heads.forEach(h => {
-            if (!h.id) h.id = slugify(h.textContent || '')
+            if (!h.id) {
+              const base = slugify(h.textContent || '')
+              h.id = uniqueId(base)
+            } else {
+              // Respect explicit IDs but still avoid collisions
+              h.id = uniqueId(h.id)
+            }
             try {
               const level = Number(h.tagName.substring(1))
               if (level >= 1 && level <= 6) {

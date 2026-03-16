@@ -7,32 +7,46 @@ Lightweight client-side CMS used for local editing and testing.
 
 ## Table of Contents
 
-1. [Quick start](#quick-start)
-2. [Examples](#examples)
-3. [Features](#features)
-4. [Options](#options-and-api)
-5. [Theming](#theming-and-customization)
-6. [Localization](#localization)
-7. [Content workflow](#content-workflow)
-8. [Testing](#testing)
-9. [Bulmaswatch themes](#available-bulmaswatch-themes)
-10. [GitHub Pages](#using-with-github-pages-and-the-github-file-editor)
-11. [Roadmap](#roadmap)
+1. [Installation](#installation)
+2. [Quick start](#quick-start)
+3. [Examples](#examples)
+4. [Features](#features)
+5. [Options](#options)
+6. [API](#api)
+7. [Theming](#theming-and-customization)
+8. [Localization](#localization)
+9. [Content workflow](#content-workflow)
+10. [Testing](#testing)
+11. [Troubleshooting](#troubleshooting)
+12. [Bulmaswatch themes](#available-bulmaswatch-themes)
+13. [GitHub Pages](#using-with-github-pages-and-the-github-file-editor)
+14. [Roadmap](#roadmap)
+15. [Changelog](#changelog)
 
 ---
 
+## Installation
+
+```bash
+npm install
+npm run build
+```
+
+For development with live reload:
+
+```bash
+npm run dev
+```
+
 ## Quick start
 
-Remember this project exists because you want a CMS with **no database, no build step
-on the server, and zero backend**.
-Just drop a few markdown files into a folder, run a static host (e.g. GitHub
-Pages) and the client code does the rest: it crawls the directory, turns
-Markdown into HTML, hooks links, handles slugs and anchors, keeps a nav, and
-updates SEO tags – all in the browser.  You can even edit content via the
-GitHub web editor and refresh to see changes.  Perfect for gh-pages, S3, or
-the kind of lightweight site where you want live preview without any server.
+NimbiCMS is a client-side CMS for static sites that requires **no database, no server build step, and no backend**.
 
-### basic HTML example
+Just drop your Markdown files into a folder, serve the site (GitHub Pages, S3, etc.), and the client will crawl the content, render Markdown to HTML, hook links, manage slugs and anchors, maintain navigation, and update SEO tags.
+
+Editing content via the GitHub web editor works too—just save and refresh to see updates.
+
+### Basic HTML example
 
 ```html
 <!doctype html>
@@ -50,7 +64,7 @@ the kind of lightweight site where you want live preview without any server.
 </body></html>
 ```
 
-### Bundle format usage
+### Bundle formats
 
 Examples showing how to consume each shipped bundle format produced by the build.
 
@@ -160,29 +174,13 @@ npm run dev
 
 and open the example at `http://localhost:5173/example/index.html`.
 
-## Search indexing depth
-
-You can control how deep the client-side search index should go with the `indexDepth` option passed to `initCMS()` or via the URL query parameter `indexDepth` (values `1`, `2`, or `3`).
-
-- `indexDepth: 1` (default) — index only H1 titles and excerpts.
-- `indexDepth: 2` — also index H2 headings; H2 results include a subtle parent label showing the page's H1.
-- `indexDepth: 3` — also index H3 headings; H3 results include a subtle parent label showing the page's H1 for context.
-
-Example (URL param): `?indexDepth=3`
-
-Example (init option):
-
-```js
-nimbiCMS.initCMS({ el: '#app', indexDepth: 3 })
-```
-
-## Crawling & search options
+## Crawling & Search Options
 
 - `skipRootReadme` (default: `false`): by default the indexer treats a repository-root `README.md` like any other content page and will discover links within it. Set this option to `true` (via `initCMS({ skipRootReadme: true })` or `setSkipRootReadme(true)`) to opt-out and prevent link discovery inside the repository root README.
 
 - External links are never crawled: absolute URLs (e.g. `http:`/`https:`), protocol-relative links (`//`), `mailto:` and other URI schemes are ignored by the crawler to prevent accidental traversal off-site.
 
-## Navbar logo option
+## Navbar Logo Option
 
 You can display a small site logo at the leftmost position of the navbar by passing the `navbarLogo` option to `initCMS()`.
 
@@ -219,22 +217,12 @@ Example of how a deeper-heading result may be rendered in the search UI (simplif
 - The SPA uses `?page=` query parameters internally.
 - Build output is written to `example/dist` when targeting the example case.
 
-Notes and recent fixes
-
-- Slug resolution no longer guesses filenames: unmapped slugs return 404
-  unless matched by an explicit nav or a discovered title slug.
-- Improved caching and navigation handling (bfcache, scroll restore, and
-  eager image marking heuristics) to reduce perceptible reloads and layout
-  shifts.
-- Search can be built lazily (`searchIndexMode: 'lazy'`) and falls back to
-  a main-thread build if the worker is unavailable.
 
 ## Features
 
 - Client-side rendering of GitHub‑flavored Markdown.
 - Optional client-side search box built from H1 titles and excerpts (enabled by default).
-- Code is now organized into small modules (`router.js`, `markdown.js`,
-  `router.js`, `markdown.js`, etc.) to ease maintenance and testing.
+- Code is now organized into small modules (`router.js`, `markdown.js`, etc.) to ease maintenance and testing.
 - Sticky per-page TOC and Bulma‑based UI components (navbar, menu).
 - Runtime updates for SEO, Open Graph and Twitter meta tags.
 - Lazily loads images by default, while heuristically marking above‑the‑fold
@@ -282,6 +270,8 @@ teardown for long-lived workers.
 | `noIndexing` | `string[]` | — | Paths (relative) to exclude from discovery and indexing. |
 | `skipRootReadme` | `boolean` | `false` | When `true`, skip link discovery inside a repository-root `README.md`. |
 
+> Tip: use `indexDepth` (1–3) to control how deeply headings are indexed for search results; higher values include deeper headings and add a parent-label context for H2/H3 hits.
+
 ### Routing and Pages
 
 | Option | Type | Default | Description |
@@ -320,168 +310,109 @@ teardown for long-lived workers.
 | `markdownExtensions` | `Array<object>` | — | `marked`-style extension/plugin objects registered at init via `addMarkdownExtension()`. |
 | `markdownPaths` | `string[]` | — | Optional host-provided list of markdown paths used by slug resolution/search. |
 
-## API 
+## API
 
-The `initCMS` function also exposes many helpers and lower-level utilities; consult `src/index.d.ts` for the full, generated public API and types.
+The `nimbi-cms` package exports a small set of helpers in addition to the
+default `initCMS` export. These are available as named imports in ESM and as
+properties on the `nimbiCMS` global in UMD builds.
 
-### Version helper
+> **Note:** the default export (`initCMS`) and the `default` alias are intentionally excluded from this list.
 
-The bundle exposes a small runtime helper so consumers can read the shipped
-package version programmatically and the library shows a subtle build label
-in the bottom-left corner of the mount element when initialized.
+### Version
 
-- `getVersion()` — async function that resolves to the package `version` string (e.g. `0.1.0`). Use this to display the library version in your UI or diagnostics.
-
-When `initCMS()` runs it will append a non-interactive label with the text
-`Ninbi CMS v. ${version}` to the mount element. The label falls back to
-`Ninbi CMS v. 0.0.0` when a runtime package.json import isn't available.
-
-> **TypeScript users:** a `src/index.d.ts` declaration file is shipped with
-> the package that describes the public API. It includes not only the main
-> `initCMS` options but also the lower‑level utilities and maps documented below.
-> 
-> The file is generated by a helper script (`npm run gen-dts`) which scans the
-> source tree for `export` statements and JSDoc comments.  The script also
-> prepends some manual type definitions (like `InitOptions`, `HookContext`,
-> and the core hook helpers) and adds a comment header before each block to
-> indicate the original source file.  This makes it easy to trace a type back
-> to where it lives in `src/`.
-> 
-> If you modify or add exports you should rerun the script; it will overwrite
-> the automatically generated portion of the declaration.  For additional
-> corner‑case coverage we maintain a small sample file (`src/gen-dts-sample.js`)
-> that the unit test exercises, so the generator is exercised against nested
-> 
-> The generated declaration also inserts a brief comment before each export
-> block indicating the originating source file, which makes it easy to trace a
-> type back to its implementation.
-> generics, unions, destructured parameters, and other tricky cases.
-> 
-> To validate the output, use `npm run check-dts` (a thin wrapper around
-> `tsc --noEmit ...`).  This is handy in CI or before publishing to
-> catch accidental syntax errors caused by complex JSDoc expressions.
-
-### Advanced utilities
-
-For plugin authors and power users who want to dig deeper, here’s what you
-can grab from the bundle.  Examples follow each group.
-
-- `runHooks(name, ctx)` – trigger any hook yourself (useful in tests or if
-  you build your own navigation).  
-
-  ```js
-  // manually fire onPageLoad for analytics when you inject HTML
-  import { runHooks } from 'nimbi-cms'
-  runHooks('onPageLoad', { pagePath:'foo.md', article:el })
-  ```
-
-- markdown plug-in helpers: addMarkdownExtension(ext) & setMarkdownExtensions(list) allow runtime registration of marked extensions.
-- Slug/markdown helpers: `slugToMd`, `mdToSlug` (maps), `ensureSlug()`,
-  `crawlForSlug()`, `setContentBase()`, `clearFetchCache()`, and the
-  `fetchCache` map.  Handy if you want to show a list of all slugs or resolve
-  them yourself.
-
-  ```js
-  import { slugToMd, ensureSlug } from 'nimbi-cms'
-  // log all known slugs
-  console.log(Array.from(slugToMd.keys()))
-  // programmatically resolve one
-  ensureSlug('my-page', '/content/').then(p => console.log(p))
-  ```
-
-- Code‑highlight helpers: `registerLanguage()`, `loadSupportedLanguages()`,
-  `SUPPORTED_HLJS_MAP`, `BAD_LANGUAGES`, and `observeCodeBlocks()`.
-  Use this if you want to pre‑register extra languages or tweak the list.
-  The supported-language list is now fetched lazily (only when a code block
-  is encountered or you explicitly call `registerLanguage`), so startup cost
-  is minimal.  You can still manually call `loadSupportedLanguages()` if you
-  prefer eager loading or want to inspect the map.
-
-  ```js
-  import { registerLanguage, observeCodeBlocks } from 'nimbi-cms'
-  registerLanguage('r') // load R syntax from CDN on demand
-  observeCodeBlocks(document.body)
-  ```
-
-- Misc helpers like `slugify()`, `isExternalLink()`, `normalizePath()`,
-  `setLazyload()`, and `safe()` are also exported for reuse in plugins.
-
-  ```js
-  import { slugify } from 'nimbi-cms'
-  console.log(slugify('My super title')) // -> 'my-super-title'
-  ```
-
-- Slug/markdown helpers: `slugToMd`, `mdToSlug` (maps), `ensureSlug()`,
-  `crawlForSlug()`, `setContentBase()`, `clearFetchCache()`, and the
-  `fetchCache` map.  These let you interrogate or modify the slug resolution
-  state directly.
-- Code‑highlight helpers: `registerLanguage()`, `loadSupportedLanguages()`,
-  `SUPPORTED_HLJS_MAP`, `BAD_LANGUAGES`, and the `observeCodeBlocks()` hook.
-- Low‑level helpers such as `slugify()`, `isExternalLink()`, `normalizePath()`,
-  `setLazyload()`, and `safe()` are also available for reuse in plugins.
-
-The TypeScript declaration file includes types for all of these symbols.
-
-- `registerLanguage(name, modulePath)` – dynamically register a highlight.js
-  language (path may be a CDN URL).
-- `setStyle('light'|'dark')` – switch between light and dark modes (adds
-  `data-theme` / `is-dark` class). This is the runtime API for dark/light
-  toggling.
-- `setLang(code)` – change the UI language on the fly. The string argument
-  is a short locale code (e.g. `'de'`, `'fr'`); it falls back to English
-  if the requested dictionary isn’t available.
-- `setThemeVars(vars)` – apply a set of CSS custom properties (`--foo:bar`)
-  on the document root; handy for theming colors/fonts without rebuilding
-  Bulma.
-- `setHighlightTheme(name, { useCdn })` – change the code highlight theme.
-
-Example:
-
-```javascript
-// example
-import initCMS, { setStyle, setThemeVars } from 'nimbi-cms'
-
-setStyle('dark')                    // switch mode
-setThemeVars({ '--primary': '#06c' }) // tweak colors/fonts
-```
-
-### Plugin Hooks
-
-A minimal plugin/extension API lets you run custom code at key moments. The
-following convenience functions are exported; they all accept a callback which
-is invoked with a single context object describing the current state.
-
-- `onPageLoad(fn)` – called **after** a page has been rendered and inserted
-  into the DOM. Useful for analytics, search indexing, or runtime tweaks.
-- `onNavBuild(fn)` – called after the navigation bar is constructed (before
-  it’s attached to the document), when you can mutate links or add extra
-  controls.
-- `transformHtml(fn)` – called just before an article node is appended; you can
-  manipulate the element or inspect the generated HTML string.
-
-A generic `addHook(name,fn)` is also available; supported names are
-`'onPageLoad'`, `'onNavBuild'`, and `'transformHtml'`. Errors thrown by hooks are
-caught and ignored so third‑party code can’t crash the main CMS.
-
-For example:
+- `getVersion()` — returns a `Promise<string>` that resolves to the shipped package version (e.g. `"0.1.0"`). Useful for displaying build metadata or detecting whether the loaded bundle matches a deployed backend.
 
 ```js
-import initCMS, { onPageLoad, onNavBuild } from 'nimbi-cms'
+import { getVersion } from 'nimbi-cms'
+getVersion().then(v => console.log('nimbiCMS version', v))
+```
 
-onNavBuild(({navWrap, navbar, linkEls}) => {
-  const input = document.createElement('input')
-  input.placeholder = 'search…'
-  navWrap.querySelector('.navbar-start').prepend(input)
+### Hooks (extension points)
+
+These helpers let you hook into internal rendering and navigation without forking the source.
+
+- `addHook(name, fn)` — register a callback for one of the supported hook points (`'onPageLoad' | 'onNavBuild' | 'transformHtml'`).
+- `onPageLoad(fn)` — fired after a page is rendered and inserted into the DOM. Useful for analytics, adding UI enhancements, or triggering client-side behavior once content is available.
+- `onNavBuild(fn)` — fired after the navigation HTML is constructed but before it is attached to the document; ideal for mutating nav links, injecting controls, or adding a search input.
+- `transformHtml(fn)` — fired just before an article node is appended; gives you access to the generated DOM element and HTML string so you can alter structure, add attributes, or instrument the output.
+- `runHooks(name, ctx)` — programmatically invoke hook callbacks (useful in tests or when you want to replay a lifecycle event after manually inserting content).
+- `_clearHooks()` — clear all registered hooks. This is mainly intended for unit tests so each test can start with a clean hook slate.
+
+```js
+import { onPageLoad, onNavBuild, transformHtml } from 'nimbi-cms'
+
+onPageLoad(({ pagePath, article }) => {
+  console.log('page rendered', pagePath)
+  // e.g. initialize custom widgets inside the loaded article
 })
 
-onPageLoad(({pagePath, article}) => {
-  console.log('page done', pagePath)
+onNavBuild(({ navWrap }) => {
+  const btn = document.createElement('button')
+  btn.textContent = 'Toggle theme'
+  btn.onclick = () => setStyle('dark')
+  navWrap.querySelector('.navbar-end')?.appendChild(btn)
+})
+
+transformHtml((html, article) => {
+  // Add a data attribute to every rendered page
+  article.dataset.nimbiRendered = 'true'
 })
 ```
 
-These hooks give you an easy entry point for adding analytics, search,
-custom rendering, and other features without needing to fork the source.
+### Theming & Styling helpers
 
+- `ensureBulma(bulmaCustomize?, pageDir?)` — ensures Bulma is loaded. Pass `'local'` to load a local `bulma.css` (looks in the page directory and `/${pageDir}/bulma.css`), or pass a Bulmaswatch theme name (e.g. `'flatly'`) to load from unpkg.
+- `setStyle(style)` — switch between light/dark/system modes by updating `data-theme` and the `is-dark` class on the document. This matches the behavior of the built-in theme toggle.
+- `setThemeVars(vars)` — apply a set of CSS custom properties (e.g. `{ "--primary": "#06c" }`) on the document root for runtime theming without rebuilding.
+
+```js
+import { ensureBulma, setStyle, setThemeVars } from 'nimbi-cms'
+
+// Load a Bulmaswatch theme from unpkg
+ensureBulma('flatly')
+
+// Or load a local bulma.css (useful for self-hosted overrides)
+ensureBulma('local', './content/')
+
+setStyle('dark')
+setThemeVars({ primary: '#06c', 'font-family': 'system-ui' })
+```
+
+### Localization helpers
+
+- `t(key, ...args)` — translate a UI string key using the currently loaded locale dictionary. Supports parameter substitution like `t('helloUser', 'Alice')`.
+- `loadL10nFile(url)` — fetch and merge a JSON localization file into the current dictionary. Does not automatically rerender UI (useful for on-demand language packs).
+- `setLang(code)` — switch the UI language at runtime (e.g. `'en'`, `'de'`). This updates internal strings and affects slug resolution when `availableLanguages` is configured.
+
+```js
+import { t, loadL10nFile, setLang } from 'nimbi-cms'
+
+// Dynamic translation
+console.log(t('navigation'))
+
+// Load an external translations file
+await loadL10nFile('/i18n/l10n.json')
+setLang('de')
+```
+
+### Code highlighting helpers
+
+- `registerLanguage(name, modulePath)` — dynamically register a `highlight.js` language. Useful to lazy-load rarely used languages from a CDN.
+- `loadSupportedLanguages()` — preload the supported languages map used by the on-demand language loader.
+- `observeCodeBlocks(root)` — scan a DOM subtree and apply syntax highlighting to code blocks using the currently registered languages.
+- `setHighlightTheme(name, { useCdn })` — switch the theme used by `highlight.js` (optionally fetch the CSS from CDN when `useCdn=true`).
+- `SUPPORTED_HLJS_MAP` — map of supported highlight.js language identifiers (useful for building language selection UIs).
+- `BAD_LANGUAGES` — list of languages that should not be auto-registered (usually because they are unsupported or conflict with browser file types).
+
+```js
+import { registerLanguage, observeCodeBlocks, setHighlightTheme } from 'nimbi-cms'
+
+registerLanguage('r', 'https://unpkg.com/highlight.js/lib/languages/r.js')
+observeCodeBlocks(document.body)
+setHighlightTheme('monokai', { useCdn: true })
+```
+
+> For a complete listing of exported symbols and TypeScript types, see [the documentation](docs/README.md).
 
 ## HTML Links without Extensions
 
@@ -557,27 +488,19 @@ import { setLang } from 'nimbi-cms'
 setLang('fr')
 ```
 
-## Content workflow
+## Content Workflow
 
 Drop `.md` files into your content directory. No build step is necessary; a
 static server that serves the files is sufficient.
 
 **Required files**
 
-- Home page: by default, `_home.md` is required. You can override this with the `homePage` option to use a different `.md` or `.html` file as the home page.
-- `_navigation.md` – renders into the navbar; use Markdown links.
-- `_404.md` – optional fallback for 404 responses. When the server
-  responds to a requested `.md` path with an HTML document (for example
-  an SPA server that returns `index.html` for unknown routes), the CMS
-  treats that as a missing markdown page and will attempt to load
-  `/_404.md` from the configured content base so a proper 404 page can be
-  rendered instead of the site's index HTML.
-* `homePage` – **string** (optional, default `'_home.md'`). Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`. Example:
+- `_home.md` — required by default. You can override this with the `homePage` option to use a different `.md` or `.html` file as the home page.
   ```js
   initCMS({ el: '#app', homePage: 'index.html' })
   ```
-  This allows you to use either a Markdown or HTML file as the home page.
-* `notFoundPage` – **string** (optional, default `'_404.md'`). Sets the site's not-found page. Can be a `.md` or `.html` file. When the CMS detects a missing markdown request or the server returns HTML for a `.md` path (common with SPA fallbacks), the configured `notFoundPage` will be used if available. Example:
+- `_navigation.md` — renders into the navbar; use Markdown links.
+- `_404.md` — optional fallback for 404 responses. When the server responds to a requested `.md` path with an HTML document (e.g., an SPA fallback serving `index.html`), the CMS treats that as a missing markdown page and will attempt to load `/_404.md` from the configured content base so a proper 404 page can be rendered instead of the site's index HTML.
   ```js
   initCMS({ el: '#app', notFoundPage: '_404.md' })
   ```
@@ -677,7 +600,7 @@ materia, minty, nuclear, pulse, sandstone, simplex, slate, solar, spacelab,
 superhero, united, yeti.
 
 See previews at
-<https://jenil.github.io/bulmaswatch/> and load via `bulmaCustomize`.
+<https://jenil.github.io/bulmaswatch/> and load via `bulmaCustomize` option or `ensureBulma` method.
 
 ## Using with GitHub Pages and the GitHub file editor
 
@@ -710,3 +633,22 @@ Security note: Avoid exposing sensitive paths via URL query options; do not allo
 ## Roadmap
 
 - See the project issue tracker for planned improvements and priorities.
+
+## Troubleshooting
+
+### Content not loading / 404 pages
+- Verify `contentPath` is correct and matches the directory containing your `.md` files.
+- Ensure your static server is serving those files (a 404 is often because the content folder isn’t published or the path is wrong).
+- If you’re using `homePage`/`notFoundPage`, confirm those files exist and are reachable (the default is `_home.md` and `_404.md`).
+
+### Styles not appearing / Bulma missing
+- Ensure `dist/nimbi-cms.css` is loaded alongside `dist/nimbi-cms.js`.
+- If using `bulmaCustomize: 'local'`, confirm `bulma.css` exists in the content path or at `/bulma.css`.
+- If using a Bulmaswatch theme, verify the theme name is correct (see `Available Bulmaswatch themes`).
+
+### Scripts failing / no mount element
+- Make sure the mount element exists (`<div id="app"></div>`) and `initCMS({ el: '#app' })` uses the correct selector.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for details on recent changes, bug fixes, and improvements.

@@ -12,6 +12,11 @@ Generic worker manager to centralize Worker lifecycle and messaging.
 
 - [WorkerManager](interfaces/WorkerManager.md)
 
+## Type Aliases
+
+- [WorkerRequest](type-aliases/WorkerRequest.md)
+- [WorkerResponse](type-aliases/WorkerResponse.md)
+
 ## Functions
 
 - [createWorkerFromRaw](functions/createWorkerFromRaw.md)
