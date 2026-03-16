@@ -7,6 +7,8 @@ date: 2026-03-16
 <img src="./assets/logo.png" alt="logo" style="height:256px;width:256px;" />
 
 # nimbiCMS
+ 
+[![npm version](https://img.shields.io/npm/v/nimbi-cms.svg)](https://www.npmjs.com/package/nimbi-cms) [![jsDelivr](https://img.shields.io/jsdelivr/npm/hm/nimbi-cms)](https://www.jsdelivr.com/package/npm/nimbi-cms) [![bundle size](https://img.shields.io/bundlephobia/minzip/nimbi-cms)](https://bundlephobia.com/package/nimbi-cms)
 
 Lightweight, lightspeed, SEO-first client-side CMS
 
