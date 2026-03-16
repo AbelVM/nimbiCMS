@@ -1,3 +1,5 @@
+import './styles/initial.css'
+import 'bulma/css/bulma.min.css'
 import 'highlight.js/styles/monokai.css'
 // Project extra styles for the CMS UI (bundled into dist/nimbi-cms.css)
 import './styles/nimbi-cms-extra.css'

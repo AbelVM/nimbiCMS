@@ -41,7 +41,7 @@ The code lives at [https://github.com/AbelVM/nimbiCMS](https://github.com/AbelVM
 - Simplified deliverables: regardless all the dynamic imports, the bundle is kept in one JS file and one CSS file
 - Bundle is compact size
   - JS file: 240.15 kB, gzipped 70.09 kB (for UMD bundle)
-  - CSS file: 409.43 kB, gzipped 41.30 kB (includes Bulma)
+  - CSS file: 1,086.52 kB, gzipped 106.60 kB (includes Bulma)
 - All the heavy work is managed by web workers to avoid hogging the main thread
 - Pluggable architecture through the available hooks
 - Fully typed and [documented](docs/README.md)

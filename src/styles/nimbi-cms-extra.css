@@ -1,5 +1,5 @@
 
-@import './initial.css';
+/* @import './initial.css'; */
 
 .nimbi-site-navbar {
     --nimbi-site-navbar-height: 4rem;
@@ -283,9 +283,9 @@
 }
 
 /* Tweak H1 / subtitle / reading-time grouping for tighter visual grouping */
-.nimbi-article h1 {
-    margin-bottom: 0.25rem; /* bring following meta closer to the H1 */
-}
+/* .nimbi-article h1 {
+    margin-bottom: 0.25rem; 
+} */
 
 .nimbi-article .nimbi-article-subtitle {
     /* keep the is-6 font size but de-emphasize color to match reading time */
@@ -298,6 +298,8 @@
     display: block;
     padding: 0.5rem 0.75rem;
     align-items: flex-start;
+    /* Use Bulma's body text color so search results match the overall theme */
+    color: var(--bulma-body-color, inherit);
 }
 .nimbi-search-panel .nimbi-search-result .is-size-6 {
     line-height: 1.15;
