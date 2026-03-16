@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as htmlBuilder from '../src/htmlBuilder.js'
+// bring commonly-used helpers into local scope for cleaner tests
+const { executeEmbeddedScripts, renderNotFound, scrollToAnchorOrTop, attachTocClickHandler, ensureScrollTopButton } = htmlBuilder
 
 describe('htmlBuilder coverage', () => {
   beforeEach(() => {
@@ -105,27 +107,40 @@ describe('htmlBuilder coverage', () => {
   })
 
   it('attachTocClickHandler handles hash-only anchor clicks', () => {
+    // Use fake timers so the scheduled setTimeout in scroll helper runs immediately
+    vi.useFakeTimers()
+
     const container = document.createElement('div')
+    container.className = 'nimbi-cms'
+    // Provide a bounding rect so scrollTo calculation uses container.scrollTo
+    container.getBoundingClientRect = () => ({ top: 0, bottom: 200 })
+    container.scrollTop = 0
+    container.scrollTo = vi.fn()
+    document.body.appendChild(container)
+
     const toc = document.createElement('nav')
     toc.innerHTML = '<a href="#foo">foo</a>'
     container.appendChild(toc)
 
-    const replaceSpy = vi.spyOn(history, 'replaceState')
-    const scrollSpy = vi.spyOn(window, 'scrollTo')
-    const scrollAnchorSpy = vi.spyOn(window, 'scrollTo')
+    // create target anchor element so scroll will be attempted
+    const target = document.createElement('div')
+    target.id = 'foo'
+    target.getBoundingClientRect = () => ({ top: 10, bottom: 20 })
+    container.appendChild(target)
 
-    // Spy on scrollToAnchorOrTop implementation
-    const { scrollToAnchorOrTop } = require('../src/htmlBuilder.js')
-    const scrollSpyFn = vi.spyOn(require('../src/htmlBuilder.js'), 'scrollToAnchorOrTop')
+    const replaceSpy = vi.spyOn(history, 'replaceState')
 
     attachTocClickHandler(toc)
     toc.querySelector('a').dispatchEvent(new MouseEvent('click', { bubbles: true }))
 
+    // Run pending timers so the scroll timeout executes
+    vi.runAllTimers()
+
     expect(replaceSpy).toHaveBeenCalled()
-    expect(scrollSpyFn).toHaveBeenCalledWith('foo')
+    expect(container.scrollTo).toHaveBeenCalled()
 
     replaceSpy.mockRestore()
-    scrollSpyFn.mockRestore()
+    vi.useRealTimers()
   })
 
   it('attachTocClickHandler triggers renderByQuery when page changes', () => {

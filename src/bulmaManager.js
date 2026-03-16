@@ -1,5 +1,5 @@
-import 'bulma/css/bulma.min.css'
-import './styles/nimbi-cms-extra.css'
+// Bulma CSS and project extras are injected dynamically at runtime
+// to avoid importing non-JS assets during Node-based tests.
 
 /** @type {'light'|'dark'|'system'} */
 let currentStyle = 'light'
