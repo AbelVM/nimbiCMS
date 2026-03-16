@@ -7736,13 +7736,9 @@ function Qa(e, { t, zoomStep: n = 0.25 } = {}) {
       /** @type {HTMLImageElement} */
       u
     );
-    if (g.src) {
-      if (f.defaultPrevented !== !0) {
-        const m = g.closest("a");
-        m && m.getAttribute("href") && f.preventDefault();
-      }
-      Ga(g.src, g.alt || "", g.naturalWidth || 0, g.naturalHeight || 0);
-    }
+    if (!g.src) return;
+    const m = g.closest("a");
+    m && m.getAttribute("href") || Ga(g.src, g.alt || "", g.naturalWidth || 0, g.naturalHeight || 0);
   });
   let s = !1, r = 0, i = 0, a = 0, o = 0;
   const l = /* @__PURE__ */ new Map();
@@ -7756,15 +7752,17 @@ function Qa(e, { t, zoomStep: n = 0.25 } = {}) {
       /** @type {HTMLElement} */
       f.target
     );
-    if (!u || u.tagName !== "IMG" || !Ce || !Ce.open) return;
+    if (!u || u.tagName !== "IMG") return;
+    const g = u.closest("a");
+    if (g && g.getAttribute("href") || !Ce || !Ce.open) return;
     if (l.set(f.pointerId, { x: f.clientX, y: f.clientY }), l.size === 2) {
-      const m = Array.from(l.values());
-      h = d(m[0], m[1]), c = ve;
+      const b = Array.from(l.values());
+      h = d(b[0], b[1]), c = ve;
       return;
     }
-    const g = u.closest(".nimbi-image-preview__image-wrapper");
-    if (g && !(ve <= 1)) {
-      f.preventDefault(), s = !0, r = f.clientX, i = f.clientY, a = g.scrollLeft, o = g.scrollTop, u.setPointerCapture(f.pointerId);
+    const m = u.closest(".nimbi-image-preview__image-wrapper");
+    if (m && !(ve <= 1)) {
+      f.preventDefault(), s = !0, r = f.clientX, i = f.clientY, a = m.scrollLeft, o = m.scrollTop, u.setPointerCapture(f.pointerId);
       try {
         u.classList.add("is-grabbing");
       } catch {
@@ -7773,19 +7771,24 @@ function Qa(e, { t, zoomStep: n = 0.25 } = {}) {
   }), e.addEventListener("pointermove", (f) => {
     if (l.has(f.pointerId) && l.set(f.pointerId, { x: f.clientX, y: f.clientY }), l.size === 2) {
       f.preventDefault();
-      const y = Array.from(l.values()), S = d(y[0], y[1]);
+      const S = Array.from(l.values()), L = d(S[0], S[1]);
       if (h > 0) {
-        const L = S / h;
-        Ze(c * L);
+        const I = L / h;
+        Ze(c * I);
       }
       return;
     }
     if (!s) return;
     f.preventDefault();
-    const g = /** @type {HTMLElement} */ f.target.closest(".nimbi-image-preview__image-wrapper");
-    if (!g) return;
-    const m = f.clientX - r, b = f.clientY - i;
-    g.scrollLeft = a - m, g.scrollTop = o - b;
+    const u = (
+      /** @type {HTMLElement} */
+      f.target
+    ), g = u.closest && u.closest("a");
+    if (g && g.getAttribute && g.getAttribute("href")) return;
+    const m = u.closest(".nimbi-image-preview__image-wrapper");
+    if (!m) return;
+    const b = f.clientX - r, y = f.clientY - i;
+    m.scrollLeft = a - b, m.scrollTop = o - y;
   });
   const p = () => {
     s = !1, l.clear(), h = 0;

@@ -535,12 +535,12 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     const img = /** @type {HTMLImageElement} */ (target)
     if (!img.src) return
 
-    // Prevent navigation when images are wrapped in links.
-    if (event.defaultPrevented !== true) {
-      const anchor = img.closest('a')
-      if (anchor && anchor.getAttribute('href')) {
-        event.preventDefault()
-      }
+    // If the image is wrapped in a link, do not open the preview — allow the
+    // link to handle navigation instead. This prevents overriding intentional
+    // anchor behavior (e.g. lightbox links or linked images).
+    const anchor = img.closest('a')
+    if (anchor && anchor.getAttribute('href')) {
+      return
     }
 
     openPreview(img.src, img.alt || '', img.naturalWidth || 0, img.naturalHeight || 0)
@@ -566,6 +566,11 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
   root.addEventListener('pointerdown', (event) => {
     const target = /** @type {HTMLElement} */ (event.target)
     if (!target || target.tagName !== 'IMG') return
+    // If the image is wrapped in a link, do not attach preview drag handlers
+    // or change the cursor — allow the anchor to handle pointer interactions.
+    const linkAncestor = target.closest('a')
+    if (linkAncestor && linkAncestor.getAttribute('href')) return
+
     if (!_modal || !_modal.open) return
 
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
@@ -615,6 +620,9 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     event.preventDefault()
 
     const target = /** @type {HTMLElement} */ (event.target)
+    // If this image is wrapped in a link, don't modify cursor/handle drag here.
+    const linkAncestor = target.closest && target.closest('a')
+    if (linkAncestor && linkAncestor.getAttribute && linkAncestor.getAttribute('href')) return
     const wrapper = target.closest('.nimbi-image-preview__image-wrapper')
     if (!wrapper) return
 
