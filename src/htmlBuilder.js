@@ -947,10 +947,31 @@ export function executeEmbeddedScripts(article) {
           try { newScript.setAttribute(attr.name, attr.value) } catch (e) {}
         }
         if (!s.src) {
-          // Execute inline scripts in module scope to avoid redeclaring
-          // top-level identifiers on subsequent injections.
+          // Prefer running inline scripts via Function to avoid parsing
+          // differences when injecting as a module element. This keeps
+          // behavior closer to how scripts execute when present in
+          // normal HTML pages and avoids some syntax errors when the
+          // content isn't module-compatible. If Function execution
+          // fails, fall back to injecting as a module script element.
+          const inline = s.textContent || ''
+          let executed = false
+          try {
+            // run in global scope
+            const fn = new Function(inline)
+            fn()
+            executed = true
+          } catch (e) {
+            // fall through to module injection below
+            executed = false
+          }
+          if (executed) {
+            // remove original script and continue
+            s.parentNode && s.parentNode.removeChild(s)
+            try { console.info('[htmlBuilder] executed inline script via Function') } catch (e) {}
+            continue
+          }
           try { newScript.type = 'module' } catch (e) {}
-          newScript.textContent = s.textContent || ''
+          newScript.textContent = inline
         }
         // If this is an external script and an identical src is already
         // present on the page, skip adding it again to avoid duplicate
@@ -972,7 +993,18 @@ export function executeEmbeddedScripts(article) {
         newScript.addEventListener('load', () => {
           try { console.info('[htmlBuilder] injected script loaded', { src: srcLabel, hasNimbi: !!(window && window.nimbiCMS) }) } catch (e) {}
         })
-        ;(document.head || document.body || document.documentElement).appendChild(newScript)
+        try {
+          ;(document.head || document.body || document.documentElement).appendChild(newScript)
+        } catch (appendErr) {
+          try {
+            // Try as classic script (no module type)
+            try { newScript.type = 'text/javascript' } catch (e) {}
+            ;(document.head || document.body || document.documentElement).appendChild(newScript)
+          } catch (appendErr2) {
+            // As a last resort, log and skip executing this script to avoid breaking the page
+            try { console.warn('[htmlBuilder] injected script append failed, skipping', { src: srcLabel, err: appendErr2 }) } catch (e) {}
+          }
+        }
         s.parentNode && s.parentNode.removeChild(s)
         try { console.info('[htmlBuilder] executed injected script', srcLabel) } catch (e) {}
       } catch (e) { console.warn('[htmlBuilder] execute injected script failed', e) }

@@ -57,38 +57,7 @@
       <label for="hljs" style="margin-right:0.5rem">Highlight theme:</label>
       <div class="select">
         <select id="hljs">
-          <option value="a11y-dark">a11y-dark</option>
-          <option value="a11y-light">a11y-light</option>
-          <option value="agate">agate</option>
-          <option value="androidstudio">androidstudio</option>
-          <option value="arta">arta</option>
-          <option value="atom-one-dark">atom-one-dark</option>
-          <option value="atom-one-light">atom-one-light</option>
-          <option value="brown-paper">brown-paper</option>
-          <option value="codepen-embed">codepen-embed</option>
-          <option value="darcula">darcula</option>
-          <option value="docco">docco</option>
-          <option value="dracula">dracula</option>
-          <option value="eclipse">eclipse</option>
-          <option value="github">github</option>
-          <option value="googlecode">googlecode</option>
-          <option value="gruvbox-dark">gruvbox-dark</option>
-          <option value="gruvbox-light">gruvbox-light</option>
-          <option value="hybrid">hybrid</option>
-          <option value="idea">idea</option>
-          <option value="ir-black">ir-black</option>
-          <option value="kimbie.dark">kimbie.dark</option>
-          <option value="lightfair">lightfair</option>
-          <option value="mono-blue">mono-blue</option>
-          <option value="monokai">monokai</option>
-          <option value="nord">nord</option>
-          <option value="obsidian">obsidian</option>
-          <option value="paraiso-dark">paraiso-dark</option>
-          <option value="paraiso-light">paraiso-light</option>
-          <option value="solarized-dark">solarized-dark</option>
-          <option value="solarized-light">solarized-light</option>
-          <option value="vs">vs</option>
-          <option value="vs2015">vs2015</option>
+          <!-- populated dynamically from jsDelivr package metadata -->
         </select>
       </div>
     </div>
@@ -111,6 +80,7 @@ function hello(){
     const themeSel = document.getElementById('themeSel');
     const bulmaSel = document.getElementById('bulma');
     const hlSel = document.getElementById('hljs');
+    const DEFAULT_HL = 'monokai';
     const preview = document.getElementById('preview');
 
     function applySettings() {
@@ -138,10 +108,29 @@ function hello(){
         if (api && typeof api.observeCodeBlocks === 'function') {
           api.observeCodeBlocks(preview)
         } else if (window.hljs && typeof window.hljs.highlightElement === 'function') {
+          // let highlight.js re-scan preview area
           const els = preview.querySelectorAll('pre code')
-          els.forEach(el => window.hljs.highlightElement(el))
+          els.forEach(el => {
+            try { window.hljs.highlightElement(el) } catch (e) { /* ignore */ }
+          })
         }
       } catch (e) { console.warn(e) }
+
+      // update the code preview showing a minimal initCMS example
+      try { updateCodePreview() } catch (e) { /* ignore */ }
+    }
+
+    function updateCodePreview() {
+      const bulma = bulmaSel.value
+      const hl = hlSel.value || DEFAULT_HL
+      const style = themeSel.value || 'system'
+      const els = preview.querySelectorAll('pre code')
+      const bulmaVal = (bulma === 'none') ? 'null' : `'${bulma}'`
+      const initCode = `// Minimal initialization example\nnimbiCMS.initCMS({\n  el: '#app',\n  style: '${style}',\n  bulma: ${bulmaVal},\n  highlightTheme: '${hl}',\n  useCdn: true\n});`
+      els.forEach(el => {
+        try { el.textContent = initCode } catch (e) { /* ignore */ }
+        try { if (window.hljs && typeof window.hljs.highlightElement === 'function') window.hljs.highlightElement(el) } catch (e) { /* ignore */ }
+      })
     }
 
     function _isDarkForStyle(style) {
@@ -153,12 +142,13 @@ function hello(){
       const style = themeSel.value
       try { if (api && typeof api.setStyle === 'function') api.setStyle(style) } catch (e) { console.warn(e) }
       if (_isDarkForStyle(style)) preview.classList.add('dark'); else preview.classList.remove('dark');
+      try { applySettings() } catch (e) { /* ignore */ }
     });
 
     bulmaSel.addEventListener('change', applySettings);
     hlSel.addEventListener('change', applySettings);
 
-    (function init() {
+    (async function init() {
       try {
         const mount = document.querySelector('.nimbi-mount')
         const theme = (mount && mount.getAttribute && mount.getAttribute('data-theme')) || document.documentElement.getAttribute('data-theme')
@@ -196,12 +186,67 @@ function hello(){
           hlSel.value = cur
         }
       } catch (e) { }
+      // populate highlight.js theme list, then apply settings
+      try {
+        await (async function populateHLThemes() {
+          const select = document.getElementById('hljs')
+          const fallback = [
+            'monokai', 'github', 'dracula', 'atom-one-dark', 'atom-one-light', 'agate',
+            'vs', 'vs2015', 'stackoverflow-dark', 'stackoverflow-light'
+          ]
+          const version = '11.11.1'
+
+          function addOptions(list) {
+            for (const name of list) {
+              const opt = document.createElement('option')
+              opt.value = name
+              opt.textContent = name
+              // mark default if nothing selected yet
+              if (!select.value && name === DEFAULT_HL) opt.selected = true
+              select.appendChild(opt)
+            }
+          }
+
+          try {
+            const res = await fetch(`https://data.jsdelivr.com/v1/package/npm/highlight.js@${encodeURIComponent(version)}`)
+            if (res.ok) {
+              const pkg = await res.json()
+              const files = pkg && pkg.files && Array.isArray(pkg.files) ? pkg.files : []
+              const branch = files.filter(s => s && s.type === 'directory' && s.name === 'styles')[0]
+              if (branch && Array.isArray(branch.files)) {
+                const styles = branch.files.filter(s => s && s.type === 'file' && typeof s.name === 'string').map(s => s.name)
+                const themes = new Set()
+                for (const f of styles) {
+                  const m = String(f).match(/([^\\/]+?)(?:\.min)?\.css(?:$|[\?#])/) || null
+                  if (m && m[1]) themes.add(m[1])
+                }
+                if (themes.size) { addOptions(Array.from(themes).sort()); return }
+              }
+            }
+          } catch (e) {
+            // ignore and fallback
+          }
+          addOptions(fallback)
+        })()
+      } catch (e) { /* ignore */ }
+
+      await new Promise(r => setTimeout(r, 0))
+      // ensure selected highlight theme survives after options appended
+      try {
+        const desired = (typeof cur !== 'undefined' && cur) ? cur : DEFAULT_HL
+        hlSel.value = desired
+        if (hlSel.value !== desired) {
+          // desired not present; try DEFAULT_HL explicitly
+          hlSel.value = DEFAULT_HL
+        }
+        // last resort: pick the first option if nothing matched
+        if (!hlSel.value && hlSel.options && hlSel.options.length) hlSel.value = hlSel.options[0].value
+      } catch (e) { /* ignore */ }
       applySettings();
       themeSel.dispatchEvent(new Event('change'))
     })();
   </script>
   <style>
-
     .controls {
       display: flex;
       flex-direction: column;

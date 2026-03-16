@@ -6486,11 +6486,26 @@ function Pa(t) {
             } catch {
             }
           if (!n.src) {
+            const i = n.textContent || "";
+            let a = !1;
+            try {
+              new Function(i)(), a = !0;
+            } catch {
+              a = !1;
+            }
+            if (a) {
+              n.parentNode && n.parentNode.removeChild(n);
+              try {
+                console.info("[htmlBuilder] executed inline script via Function");
+              } catch {
+              }
+              continue;
+            }
             try {
               s.type = "module";
             } catch {
             }
-            s.textContent = n.textContent || "";
+            s.textContent = i;
           }
           if (n.src)
             try {
@@ -6511,7 +6526,24 @@ function Pa(t) {
               console.info("[htmlBuilder] injected script loaded", { src: r, hasNimbi: !!(window && window.nimbiCMS) });
             } catch {
             }
-          }), (document.head || document.body || document.documentElement).appendChild(s), n.parentNode && n.parentNode.removeChild(n);
+          });
+          try {
+            (document.head || document.body || document.documentElement).appendChild(s);
+          } catch {
+            try {
+              try {
+                s.type = "text/javascript";
+              } catch {
+              }
+              (document.head || document.body || document.documentElement).appendChild(s);
+            } catch (a) {
+              try {
+                console.warn("[htmlBuilder] injected script append failed, skipping", { src: r, err: a });
+              } catch {
+              }
+            }
+          }
+          n.parentNode && n.parentNode.removeChild(n);
           try {
             console.info("[htmlBuilder] executed injected script", r);
           } catch {
