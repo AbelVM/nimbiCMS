@@ -186,7 +186,7 @@ Links are converted to hash‑based navigation (`?page=…`), preserving anchors
 |---|---:|:---:|---|
 | `el` | `string` \ `Element` | required | CSS selector or DOM element used as the mount target. |
 | `contentPath` | `string` | `/content` | URL path to the content folder serving `.md`/`.html` files; normalized to a relative path with trailing slash. |
-| `allowUrlPathOverrides` | `boolean` | `false` | Opt-in: when `true`, `contentPath`, `homePage`, and `notFoundPage` may be overridden from the page URL (validated). |
+| `allowUrlPathOverrides` | `boolean` | `false` | Opt-in: when `true`, `contentPath`, `homePage`, `notFoundPage`, and `navigationPage` may be overridden using URL params. |
 
 ### Indexing and Search
 
@@ -202,8 +202,11 @@ Links are converted to hash‑based navigation (`?page=…`), preserving anchors
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `homePage` | `string` | `'_home.md'` | Basename for the site home page (`.md` or `.html`). |
-| `notFoundPage` | `string` | `'_404.md'` | Basename for the not-found page (`.md` or `.html`). |
+| `homePage` | `string` | `'_home.md'` | Path for the site home page (`.md` or `.html`). |
+| `notFoundPage` | `string` | `'_404.md'` | Path for the not-found page (`.md` or `.html`). |
+| `navigationPage` | `string` | `'_navigation.md'` | Path for the navigation markdown used to build the navbar (`.md` or `.html`). |
+
+> Note: All these files must be within `contentPath`
 
 ### Styling and Theming
 
@@ -492,7 +495,7 @@ Keep in mind that some themes do not play well with certain color schemas.
 Nimbi CMS works well with GitHub Pages and the built-in GitHub web file editor. Minimal steps:
 
 - Enable GitHub Pages for the repository (Settings → Pages) and choose the branch/folder you want to publish (e.g., `gh-pages` or `main` / `/docs`).
-- As your content includes underscore-prefixed files (for example `_navigation.md` or `_home.md`), GitHub's Jekyll processor will ignore them by default. Add an empty `.nojekyll` file at the repository root to disable Jekyll so those files are served
+- If your content includes underscore-prefixed files (for example `_navigation.md` or `_home.md`), GitHub's Jekyll processor will ignore them by default. Add an empty `.nojekyll` file at the repository root to disable Jekyll so those files are served
 - Ensure your published site serves the built `dist` assets (upload `dist/` to the chosen branch or use a build step / GitHub Action to publish).
 - Place your content under a folder (default: `content/`) or set `contentPath` when calling `initCMS()` to point somewhere else.
 

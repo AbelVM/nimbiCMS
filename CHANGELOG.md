@@ -4,6 +4,7 @@ All notable changes to nimbiCMS will be documented in this file.
 
 ## [Unreleased]
 
+- [FEAT] Add `navigationPage` option to enable custom navigation index
 - [CHORE] Housecleaning: remove leftover comments
 - [CHORE] Improve JSDoc coverage and quality
 
@@ -16,7 +17,7 @@ All notable changes to nimbiCMS will be documented in this file.
 ## [v1.0.1] - 2026-03-16
 
 - [FIX] Do no enable image preview for for images wrapped in links.
-- [DOCS] Document .nojekyll to serve underscore-markdown files in gh-pages.
+- [DOCS] Document `.nojekyll` to serve underscore-markdown files in gh-pages.
 - [FIX] Use repo-relative contentPath to avoid root fetches.
 - [FIX] gh-pages path.
 

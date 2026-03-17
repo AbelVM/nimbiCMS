@@ -92,6 +92,7 @@ export function parseInitOptionsFromQuery(queryString) {
       if (Number.isInteger(n) && n >= 0) out.cacheMaxEntries = n
     }
     if (params.has('homePage')) out.homePage = params.get('homePage')
+    if (params.has('navigationPage')) out.navigationPage = params.get('navigationPage')
     if (params.has('notFoundPage')) out.notFoundPage = params.get('notFoundPage')
     if (params.has('availableLanguages')) {
       out.availableLanguages = params.get('availableLanguages').split(',').map(s => s.trim()).filter(Boolean)
@@ -208,18 +209,19 @@ export async function initCMS(options = {}) {
   }
 
   const queryOpts = parseInitOptionsFromQuery()
-  if (queryOpts && (queryOpts.contentPath || queryOpts.homePage || queryOpts.notFoundPage)) {
+    if (queryOpts && (queryOpts.contentPath || queryOpts.homePage || queryOpts.notFoundPage || queryOpts.navigationPage)) {
     if (options && options.allowUrlPathOverrides === true) {
       try {
-        console.warn('[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage')
+        console.warn('[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage/navigationPage')
       } catch (e) { console.warn('[nimbi-cms] allowUrlPathOverrides logging failed', e) }
     } else {
       try {
-        console.warn('[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage')
+        console.warn('[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage/navigationPage')
       } catch (e) { console.warn('[nimbi-cms] logging ignore of URL overrides failed', e) }
       delete queryOpts.contentPath
       delete queryOpts.homePage
       delete queryOpts.notFoundPage
+        delete queryOpts.navigationPage
     }
   }
   const finalOptions = Object.assign({}, queryOpts, options)
@@ -244,7 +246,8 @@ export async function initCMS(options = {}) {
     markdownExtensions,
     availableLanguages,
     homePage = '_home.md',
-    notFoundPage = '_404.md'
+    notFoundPage = '_404.md',
+    navigationPage = '_navigation.md'
   } = finalOptions
 
   try {
@@ -252,6 +255,9 @@ export async function initCMS(options = {}) {
   } catch (e) {}
   try {
     if (typeof notFoundPage === 'string' && notFoundPage.startsWith('./')) notFoundPage = notFoundPage.replace(/^\.\//, '')
+  } catch (e) {}
+  try {
+    if (typeof navigationPage === 'string' && navigationPage.startsWith('./')) navigationPage = navigationPage.replace(/^[.]\//, '')
   } catch (e) {}
 
   const showError = (err) => {
@@ -294,6 +300,11 @@ export async function initCMS(options = {}) {
   if (notFoundPage != null) {
     if (!isSafePagePath(notFoundPage)) {
       throw new TypeError('initCMS(options): "notFoundPage" must be a relative path (no leading "/") ending with .md or .html')
+    }
+  }
+  if (navigationPage != null) {
+    if (!isSafePagePath(navigationPage)) {
+      throw new TypeError('initCMS(options): "navigationPage" must be a relative path (no leading "/") ending with .md or .html')
     }
   }
 
@@ -507,7 +518,7 @@ export async function initCMS(options = {}) {
     const navbarWrap = document.createElement('header')
     navbarWrap.className = 'nimbi-site-navbar'
     mountEl.insertBefore(navbarWrap, sectionEl)
-    const navMd = await fetchMarkdown('_navigation.md', contentBase)
+    const navMd = await fetchMarkdown(navigationPage, contentBase)
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
     const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing, navbarLogo)
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { console.warn('[nimbi-cms] onNavBuild hooks failed', e) }
