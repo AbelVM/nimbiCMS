@@ -305,7 +305,7 @@ export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, 
 
 
 // --- from src/hookManager.js
-export function runHooks(name: string, ctx: object): Promise<void>
+export function runHooks(name: string, ctx: Record<string,unknown>): Promise<void>
 
 
 

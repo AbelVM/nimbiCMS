@@ -68,7 +68,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
  * @param {string} [imageOverride] - Optional image URL for Open Graph/Twitter.
  * @param {string} [descOverride] - Optional description override.
  * @param {string} [initialDocumentTitle] - Fallback site/document title.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function setMetaTags(data, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   const meta = data.meta || {}
@@ -113,7 +113,7 @@ export function getSiteNameFromMeta() {
  * @param {string} [imageOverride] - Optional override for the image.
  * @param {string} [descOverride] - Optional override for the description.
  * @param {string} [initialDocumentTitle] - Fallback document title.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function setStructuredData(data, pagePath, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
   try {
@@ -166,7 +166,7 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
  * Apply page-level SEO metadata: meta tags, structured data, and document title.
  * @param {Function} t - Localization function used for labels.
  * @param {string} initialDocumentTitle - Fallback title when none present.
- * @param {Object} parsed - Parsed page object with `meta` and other fields.
+ * @param {Record<string,unknown>} parsed - Parsed page object with `meta` and other fields.
  * @param {HTMLElement} toc - Table-of-contents element for the page.
  * @param {HTMLElement} article - Article element containing the page HTML.
  * @param {string} pagePath - The path of the page being rendered.
@@ -175,7 +175,7 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
  * @param {string|null} h1Text - Text of the top H1.
  * @param {string|null} slugKey - Computed slug key for the page.
  * @param {PageData} data - Full page data, including raw markdown for reading time.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
   try {
@@ -217,7 +217,6 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
       descOverride = found
     } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
 
-    // Choose display title in order: HTML <title>, first H1, first H2, pagePath
     let displayTitle = ''
     try {
       if (metaTitle) displayTitle = metaTitle
@@ -247,7 +246,6 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
   } catch (e) { console.warn('[seoManager] applyPageMeta failed', e) }
 
   try {
-    // Remove any existing reading-time nodes (standalone or inline)
     try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (e) {}
     if (h1Text) {
       const rt = readingTime(data.raw || '')
@@ -259,14 +257,11 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
         const subtitleEl = article.querySelector('.nimbi-article-subtitle')
         try {
           if (subtitleEl) {
-            // Append reading time inside the subtitle, separated by a bullet
             const span = document.createElement('span')
             span.className = 'nimbi-reading-time'
-            // prepend separator to ensure it's visually separated
             span.textContent = ' • ' + rtText
             subtitleEl.appendChild(span)
           } else {
-            // create a subtitle to hold the reading time so both live together
             const sub = document.createElement('p')
             sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'
             const span = document.createElement('span')

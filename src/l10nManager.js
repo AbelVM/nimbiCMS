@@ -24,7 +24,7 @@ export let currentLang = detectedLang
  * form `{name}` are interpolated from the `replacements` object.
  *
  * @param {string} key - Translation key to look up in the current locale.
- * @param {Object} [replacements] - Optional replacements for token interpolation.
+ * @param {Record<string,string>} [replacements] - Optional replacements for token interpolation.
  * @returns {string} - The translated string, or an empty string when not found.
  */
 export function t(key, replacements = {}) {
@@ -65,7 +65,7 @@ export async function loadL10nFile(path, pageDir) {
  * Switch the current UI language. Falls back to English if the requested
  * language is not available.
  * @param {string} lang - Language code to switch to (e.g. 'en', 'es').
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function setLang(lang) {
   const short = String(lang).split('-')[0].toLowerCase()

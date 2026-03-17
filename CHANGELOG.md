@@ -1,11 +1,25 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to nimbiCMS will be documented in this file.
 
-## [Unreleased] - 2026-03-16
+## [Unreleased]
 
-### Changed
+- [CHORE] Housecleaning: remove leftover comments
+- [CHORE] Improve JSDoc coverage and quality
 
-- Slug resolution no longer guesses filenames; unmapped slugs now return 404 unless matched by an explicit nav or discovered title slug.
-- Improved caching and navigation handling (bfcache, scroll restore, and eager image marking heuristics) to reduce perceptible reloads and layout shifts.
-- Search can now be built lazily (`searchIndexMode: 'lazy'`) and will fall back to a main-thread build if the worker is unavailable.
+## [v1.0.2] - 2026-03-16
+
+- [FEAT] Bundle size optimizations, 50% bundled CSS size reduction.
+- [FEAT] Playground improved.
+- [FIX] Playground retrieval of highlight.js themes was failing.
+
+## [v1.0.1] - 2026-03-16
+
+- [FIX] Do no enable image preview for for images wrapped in links.
+- [DOCS] Document .nojekyll to serve underscore-markdown files in gh-pages.
+- [FIX] Use repo-relative contentPath to avoid root fetches.
+- [FIX] gh-pages path.
+
+## [v1.0.0] - 2026-03-16
+
+- First release.

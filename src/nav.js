@@ -4,10 +4,6 @@ import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './slugManager.js'
 
-// Safe getter for properties on dynamically-imported modules. Some tests
-// partially mock modules and accessing non-exported named properties can
-// throw under certain mocking strategies; hide such errors and return
-// undefined when the property is not available.
 function safeGet(mod, name) {
   try {
     if (!mod) return undefined
@@ -26,6 +22,7 @@ function safeGet(mod, name) {
 /**
  * @typedef {{slug:string,title:string,excerpt?:string}} SearchIndexEntry
  * @typedef {{navbar:HTMLElement,linkEls:NodeListOf<Element>}} NavBuildResult
+ * @typedef {{html:string,meta:Record<string, unknown>,toc:Array<{level:number,text:string,id?:string}>}} ParsedPage
  */
 
 /**
@@ -82,7 +79,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   let searchOutsideHandler = null
   let indexedCountLog = false
 
-  // Close the mobile hamburger/menu if active
   function closeMobileMenu() {
     try {
       const burgerEl = document.querySelector('.navbar-burger')
@@ -122,7 +118,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       }
     })()
 
-    // Rerun active query when index becomes available
     searchIndexPromise.then((idx) => {
       try {
         const qnow = String(searchInput && searchInput.value || '').trim().toLowerCase()
@@ -133,7 +128,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const resultsEl = document.getElementById('nimbi-search-results')
         if (!resultsEl) return
         resultsEl.innerHTML = ''
-        // Use Bulma panel for search results so items appear as clean blocks
         try {
           const panel = document.createElement('div')
           panel.className = 'panel nimbi-search-panel'
@@ -149,20 +143,16 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               a.className = 'panel-block nimbi-search-result'
               a.href = buildPageUrl(it.slug)
               a.setAttribute('role', 'button')
-              // Ensure the slug → markdown/path mapping exists so the
-              // router can resolve the page immediately when clicked.
               try {
                 if (it.path && typeof it.slug === 'string') {
                   try { slugToMd.set(it.slug, it.path) } catch (ee) {}
                   try { mdToSlug.set(it.path, it.slug) } catch (ee) {}
                 }
               } catch (e) {}
-              // Use inner structure so the item doesn't look like a bare link
               const title = document.createElement('div')
               title.className = 'is-size-6 has-text-weight-semibold'
               title.textContent = it.title
               a.appendChild(title)
-              // excerpts intentionally omitted to keep items compact
               a.addEventListener('click', () => { try { resultsEl.style.display = 'none' } catch (_) {} })
               panel.appendChild(a)
             } catch (e) { /* ignore per-item failures */ }
@@ -206,7 +196,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     brandItem.href = buildPageUrl(homePage)
     brandItem.textContent = t('home')
   }
-  // Attempt to resolve/insert a small logo according to `logoOption`.
   async function resolveLogoSrc(opt) {
     try {
       if (!opt || opt === 'none') return null
@@ -216,7 +205,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           if (!link) return null
           const href = link.getAttribute('href') || ''
           if (!href) return null
-          // Prefer PNG favicon; if not PNG, skip (fallback none)
           if (/\.png(?:\?|$)/i.test(href)) return new URL(href, location.href).toString()
           return null
         } catch (e) { return null }
@@ -238,7 +226,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           return abs
         } catch (e) { return null }
       }
-      // Otherwise treat opt as a direct path
       try {
         return new URL(opt, location.href).toString()
       } catch (e) { return null }
@@ -252,23 +239,17 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     try {
       const img = document.createElement('img')
       img.className = 'nimbi-navbar-logo'
-      // Prefer a localized site label; fall back to a siteLogo key if present
       const label = t && typeof t === 'function' ? (t('home') || t('siteLogo') || '') : ''
       img.alt = label
-      // Provide a title attribute for hover/tooltips; mirror `alt` for accessibility
       img.title = label
       img.src = logoSrc
-      // Small gap between logo and following label text for readability
       try { img.style.marginRight = '0.5em' } catch (e) {}
-      // Ensure the localized label remains and insert the image alongside it.
-      // If the brand link has no textual label, set it to the localized `home`/`siteLogo`.
       try {
         if (!brandItem.textContent || !String(brandItem.textContent).trim()) {
           brandItem.textContent = label
         }
       } catch (e) { /* ignore setting text failures */ }
       try {
-        // Prefer placing the image before the label so it appears on the left.
         brandItem.insertBefore(img, brandItem.firstChild)
       } catch (e) {
         try { brandItem.appendChild(img) } catch (e2) { /* ignore append failures */ }
@@ -303,7 +284,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   burger.innerHTML = '<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>'
   brand.appendChild(burger)
 
-  // Toggle navbar menu on mobile when burger is clicked
   try {
     burger.addEventListener('click', (ev) => {
       try {
@@ -357,8 +337,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchControl.appendChild(searchInput)
     searchItem.appendChild(searchControl)
 
-    // Wrap the search input and results in a Bulma dropdown so Bulma manages
-    // the styling and visibility.
     dropdown = document.createElement('div')
     dropdown.className = 'dropdown is-right'
     dropdown.id = 'nimbi-search-dropdown'
@@ -375,7 +353,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     dropdownContent.id = 'nimbi-search-results'
     dropdownContent.className = 'dropdown-content nimbi-search-results'
 
-    // Keep a reference to satisfy existing tests that expect this element.
     resultsContainer = dropdownContent
 
     dropdownMenu.appendChild(dropdownContent)
@@ -393,7 +370,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         return
       }
       try {
-        // Wrap dropdown results in a Bulma panel so items render as blocks
         const panel = document.createElement('div')
         panel.className = 'panel nimbi-search-panel'
         items.forEach(it => {
@@ -407,7 +383,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           a.className = 'panel-block nimbi-search-result'
           a.href = buildPageUrl(it.slug)
           a.setAttribute('role', 'button')
-              // Ensure slug mapping is present so first-click navigation works.
               try {
                 if (it.path && typeof it.slug === 'string') {
                   try { slugToMd.set(it.slug, it.path) } catch (ee) {}
@@ -418,7 +393,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           title.className = 'is-size-6 has-text-weight-semibold'
           title.textContent = it.title
           a.appendChild(title)
-          // excerpts intentionally omitted to keep items compact
           a.addEventListener('click', () => {
             if (dropdown) dropdown.classList.remove('is-active')
             try { dropdownContent.style.display = 'none' } catch (e) {}
@@ -486,7 +460,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         })
     }
     
-        // Close search results when clicking/tapping outside the input or results box
         try {
           const searchOutsideHandler = (ev) => {
             try {
@@ -592,7 +565,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   navbar.appendChild(menu)
   navbarWrap.appendChild(navbar)
   
-  // Close mobile menu when clicking/touching outside the navbar
   try {
     const outsideHandler = (ev) => {
       try {
@@ -623,7 +595,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
         }
       } catch (e) { console.warn('[nimbi-cms] navbar click handler failed', e) }
-        // On mobile, close the burger/menu after a navigation click
         try {
           const burgerEl = navbar && navbar.querySelector ? navbar.querySelector('.navbar-burger') : null
           const targetId = burgerEl && burgerEl.dataset ? burgerEl.dataset.target : null

@@ -2,4 +2,5 @@
 [Read Me](README.md)
 [API](docs/README.md)
 [Playground](/assets/playground.html)
+[Changelog](CHANGELOG.md)
 [License](LICENSE.md)

@@ -8,12 +8,12 @@ export const indexSet = new Set();
  * Useful when the content base or path list changes at runtime (tests/plugins).
  *
  * @param {string} contentBase - The base path for content (used for API symmetry).
- * @returns {void} - No return value.
+ * @returns {void}
  */
 /**
  * Refresh the internal index set from available markdown paths and slug maps.
  * @param {string} contentBase - Base path for content used by the indexer.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function refreshIndexPaths(contentBase) {
   _ensureMapsTracked();
@@ -35,8 +35,8 @@ function _augmentIndexWithMap(map) {
 
 /**
  * Instrument a map so that any value inserted also populates the index set.
- * @param {{set:function}} map - a Map-like object whose `set` method will be wrapped.
- * @returns {void} - No return value.
+ * @param {{set:function}} map - A Map-like object whose `set` method will be wrapped.
+ * @returns {void}
  */
 function _trackMap(map) {
   if (!map || typeof map.set !== 'function') return;
@@ -49,7 +49,7 @@ function _trackMap(map) {
 
 /**
  * Lazily install tracking wrappers on the slug maps; idempotent.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 let _mapsTracked = false;
 function _ensureMapsTracked() {

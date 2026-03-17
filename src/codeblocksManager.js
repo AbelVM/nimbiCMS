@@ -2,7 +2,6 @@ import hljs from 'highlight.js/lib/core'
 
 export { hljs }
 
-// Injected by the build system (Vite). Falls back to a known compatible version.
 const HIGHLIGHT_JS_VERSION = typeof __HIGHLIGHT_JS_VERSION__ !== 'undefined'
   ? String(__HIGHLIGHT_JS_VERSION__)
   : '11.11.1'
@@ -39,7 +38,6 @@ export const HLJS_ALIAS_MAP = {
   'c#': 'cs'
 }
 
-// Common HTML/markup aliases map to the `xml` language in highlight.js
 HLJS_ALIAS_MAP.html = 'xml'
 HLJS_ALIAS_MAP.xhtml = 'xml'
 HLJS_ALIAS_MAP.markup = 'xml'
@@ -51,7 +49,7 @@ let loadSupportedLanguagesPromise = null
 /**
  * Cache for language import attempts. Keys are canonical language ids;
  * values hold promise/module/ok/ts metadata to support negative caching.
- * @type {Map<string,{promise?:Promise<any>,module?:any,ok?:boolean,ts?:number}>}
+ * @type {Map<string,{promise?:Promise<unknown>,module?:unknown,ok?:boolean,ts?:number}>}
  */
 const languageImportCache = new Map()
 const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
@@ -182,9 +180,6 @@ const registeredLangs = new Set()
  * @returns {Promise<boolean>} - Resolves to `true` when the language is registered.
  */
 export async function registerLanguage(name, modulePath) {
-  // Ensure the supported-languages list is loaded (if available) so we can
-  // filter requests to only known language modules and avoid spurious CDN
-  // hits for names like `links` or `example` which may appear in user docs.
   if (!loadSupportedLanguagesPromise) {
     ;(async () => {
       try {
@@ -215,8 +210,6 @@ export async function registerLanguage(name, modulePath) {
   try {
     const base = (modulePath || name || '').toString().replace(/\.js$/i, '').trim()
     
-    // Prefer canonical/alias-mapped names first to avoid attempting imports
-    // for short aliases like `js` when the canonical module is `javascript`.
     const mappedName = (aliasMap[name] || name || '').toString()
     const mappedBase = (aliasMap[base] || base || '').toString()
     let candidates = Array.from(new Set([
@@ -227,8 +220,6 @@ export async function registerLanguage(name, modulePath) {
       aliasMap[base],
       aliasMap[name]
     ].filter(Boolean))).map(c => String(c).toLowerCase()).filter(c => c && c !== 'undefined')
-    // If we have a populated SUPPORTED_HLJS_MAP, restrict candidates to
-    // entries that are known to be supported (or map via alias).
     if (SUPPORTED_HLJS_MAP.size) {
       candidates = candidates.filter(c => {
         if (SUPPORTED_HLJS_MAP.has(c)) return true
@@ -245,9 +236,6 @@ export async function registerLanguage(name, modulePath) {
         const now = Date.now()
         let cached = languageImportCache.get(candidate)
         if (cached) {
-          // If a previous attempt failed and the negative-cache TTL hasn't
-          // expired yet, avoid retrying immediately. If it has expired,
-          // drop the stale cache so we perform a fresh import below.
           if (cached.ok === false && (now - (cached.ts || 0) >= NEGATIVE_CACHE_TTL_MS)) {
             languageImportCache.delete(candidate)
             cached = undefined
@@ -271,7 +259,6 @@ export async function registerLanguage(name, modulePath) {
           entry.promise = (async () => {
             try {
               try {
-                // attempt local package language module (try with .js and without)
                 try {
                   return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
                 } catch (_withExt) {
@@ -320,12 +307,6 @@ export async function registerLanguage(name, modulePath) {
                     
           }
         } else {
-          // If import returned null but the language is listed in the
-          // supported map, attempt a graceful fallback by registering a
-          // minimal no-op language definition so callers can proceed.
-          // This helps tests that mock virtual language modules and also
-          // provides a safe failure mode in environments where dynamic
-          // imports are restricted.
           try {
             if (SUPPORTED_HLJS_MAP.has(candidate) || SUPPORTED_HLJS_MAP.has(name)) {
               const noopDef = () => ({})
@@ -399,10 +380,6 @@ export function observeCodeBlocks(root = document) {
                 await registerLanguage(canonical)
               } catch (err) { console.warn('[codeblocksManager] registerLanguage failed', err) }
               try {
-                // Ensure the element contains the raw code as textContent
-                // (not innerHTML) so highlight.js does not complain about
-                // unescaped HTML. Then clear any previous highlighted flag
-                // and invoke highlightElement.
                 try {
                   const raw = el.textContent || el.innerText || ''
                   if (raw != null) el.textContent = raw
@@ -480,10 +457,6 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = document.querySelector('link[data-hl-theme]')
   const existingTheme = existing && existing.getAttribute ? existing.getAttribute('data-hl-theme') : null
 
-  // Interpret the special value 'default' or the bundled theme name
-  // 'monokai' as a request to revert to the bundled stylesheet. Treat
-  // the check case-insensitively and remove any injected theme link to
-  // restore the bundle-provided styles.
   const requested = (theme === undefined || theme === null) ? 'default' : String(theme)
   const requestedLower = (requested && String(requested).toLowerCase()) || ''
   if (requestedLower === 'default' || requestedLower === 'monokai') {
@@ -505,8 +478,6 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
   newLink.href = href
   newLink.setAttribute('data-hl-theme', currentHighlightTheme)
 
-  // Append new link and remove old link after new stylesheet loads to avoid
-  // a flash of the default theme while switching.
   newLink.addEventListener('load', () => {
     try {
       if (existing && existing.parentNode) existing.parentNode.removeChild(existing)

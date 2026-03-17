@@ -4,10 +4,8 @@ import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from '.
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 import { registerThemedElement } from './bulmaManager.js'
 
-// Resolve a path against a base while guarding against invalid-base errors
 function resolvePathWithBase(path, base) {
   try {
-    // Prefer constructing with provided base; if that fails, fall back to location.href
     const u = new URL(path, base)
     return u.pathname
   } catch (err) {
@@ -15,7 +13,6 @@ function resolvePathWithBase(path, base) {
       const u2 = new URL(path, typeof location !== 'undefined' ? location.href : 'http://localhost/')
       return u2.pathname
     } catch (err2) {
-      // Last-resort: join as plain path and return normalized string
       try {
         const joined = String((base || '')).replace(/\/$/, '') + '/' + String(path || '').replace(/^\//, '')
         return joined.replace(/\/\\+/g, '/')
@@ -28,7 +25,7 @@ function resolvePathWithBase(path, base) {
 
 /**
  * @typedef {{path:string,name:string,children?:NavItem[]}} NavItem
- * @typedef {{html:string,meta:Object,toc:Array<{level:number,text:string,id?:string}>}} ParsedPage
+ * @typedef {{html:string,meta:Record<string, unknown>,toc:Array<{level:number,text:string,id?:string}>}} ParsedPage
  */
 
 /**
@@ -83,7 +80,6 @@ export function createNavTree(t, tree) {
  */
 export function buildTocElement(t, toc, pagePath = '') {
   const aside = document.createElement('aside')
-  // Hide the TOC on mobile by default; Bulma handles the responsive helper.
   aside.className = 'menu box nimbi-toc-inner is-hidden-mobile'
   const label = document.createElement('p')
   label.className = 'menu-label'
@@ -92,7 +88,6 @@ export function buildTocElement(t, toc, pagePath = '') {
   const ul = document.createElement('ul')
   ul.className = 'menu-list';
 
-  // Build nested lists by heading level (H2 -> top-level, H3+ -> nested)
   try {
     const lastLiAtLevel = {}
     ;(toc || []).forEach(item => {
@@ -118,18 +113,15 @@ export function buildTocElement(t, toc, pagePath = '') {
         if (level === 2) {
           ul.appendChild(li)
           lastLiAtLevel[2] = li
-          // clear deeper trackers
           Object.keys(lastLiAtLevel).forEach(k => { if (Number(k) > 2) delete lastLiAtLevel[k] })
           return
         }
 
-        // For deeper levels, find nearest parent li (level-1, level-2, ...)
         let parentLevel = level - 1
         while (parentLevel > 2 && !lastLiAtLevel[parentLevel]) parentLevel--
         if (parentLevel < 2) parentLevel = 2
         let parentLi = lastLiAtLevel[parentLevel]
         if (!parentLi) {
-          // fallback to appending to root ul
           ul.appendChild(li)
           lastLiAtLevel[level] = li
           return
@@ -147,8 +139,6 @@ export function buildTocElement(t, toc, pagePath = '') {
   } catch (err) { console.warn('[htmlBuilder] buildTocElement failed', err) }
 
   aside.appendChild(ul)
-  // If there are zero or only a single TOC entry, there's not enough content
-  // to warrant showing a TOC panel.
   const itemCount = ul.querySelectorAll('li').length
   if (itemCount <= 1) return null
   return aside
@@ -157,7 +147,7 @@ export function buildTocElement(t, toc, pagePath = '') {
 /**
  * Ensure every heading in the document has an id (slugified from text).
  * @param {Document|HTMLElement} doc - Document or element to scan and add heading ids to.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 function addHeadingIds(doc) {
   const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
@@ -170,7 +160,7 @@ function addHeadingIds(doc) {
  * @param {HTMLElement} el - Container element to search for images.
  * @param {string} pagePath - Page path used to compute relative image URLs.
  * @param {string} contentBase - Base URL or path for site content.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 function lazyLoadImages(el, pagePath, contentBase) {
   try {
@@ -207,7 +197,6 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
       const contentBaseUrl = new URL(contentBase, location.href)
       baseForPage = new URL(pageDir || '.', contentBaseUrl).toString()
     } catch (err) {
-      // fallback: join as plain path relative to current location
       try { baseForPage = new URL(pageDir || '.', location.href).toString() } catch (e) { baseForPage = pageDir || './' }
     }
     const sel = el.querySelectorAll('*')
@@ -225,7 +214,6 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
         }
         if (node.hasAttribute && node.hasAttribute('src')) rewriteAttr('src')
         if (node.hasAttribute && node.hasAttribute('href')) {
-          // prefer not to rewrite anchor links
           if (tag !== 'a') rewriteAttr('href')
         }
         if (node.hasAttribute && node.hasAttribute('xlink:href')) rewriteAttr('xlink:href')
@@ -272,7 +260,6 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         contentBaseUrl = new URL(contentBase, location.href)
         contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
       } catch (err) {
-        // fallback to resolving against current page
         try { contentBaseUrl = new URL(contentBase, location.href); contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname) } catch (e) { contentBaseUrl = null; contentBasePath = '/'; }
       }
       _lastContentBase = contentBase
@@ -290,10 +277,6 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         const href = a.getAttribute('href') || ''
         if (!href) continue
         if (isExternalLink(href)) continue
-        // If the link is a query-only `?page=...` link, ensure the page
-        // value is resolved relative to the current page directory when
-        // appropriate. E.g., on `docs/index.html` convert `?page=modules.html`
-        // -> `?page=docs/modules.html`.
         try {
           if (href.startsWith('?') || href.indexOf('?') !== -1) {
             try {
@@ -329,16 +312,8 @@ async function rewriteAnchors(article, contentBase, pagePath) {
           continue
         }
         try {
-          // Resolve relative HTML anchors against the current page directory
-          // so that `modules.html` on `docs/index.html` becomes `docs/modules.html`.
           let toResolve = href
           if (!href.startsWith('/') && pagePath) {
-            // If the href is an anchor-only link (e.g. "#foo"), resolve it
-            // against the current pagePath so it targets the current page
-            // (`pagePath#foo`) instead of resolving to the content root
-            // which would produce an empty relative path (and fall back to
-            // `_home`). For non-anchor relative links, resolve against the
-            // page directory as before.
             if (href.startsWith('#')) {
               toResolve = pagePath + href
             } else {
@@ -376,7 +351,6 @@ async function rewriteAnchors(article, contentBase, pagePath) {
               if (slugKey) {
                 a.setAttribute('href', buildPageUrl(slugKey))
               } else {
-                // Defer fetching HTML title to resolve slug if possible
                 htmlPending.add(rel)
                 htmlAnchorInfo.push({ node: a, rel })
               }
@@ -452,7 +426,6 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         a.setAttribute('href', buildPageUrl(rel, frag))
       }
     }
-    // Now handle any HTML anchors that were deferred for title extraction
     for (const info of htmlAnchorInfo) {
       const { node: a, rel } = info
       let slug = null
@@ -470,7 +443,7 @@ async function rewriteAnchors(article, contentBase, pagePath) {
  * Compute and replace the current history state slug for the article.
  * Returns the detected top H1, its text, and the chosen slug key.
  *
- * @param {Object} parsed - parsed page metadata
+ * @param {Object} parsed - Parsed page metadata including `meta` and other fields.
  * @param {HTMLElement} article - The article container element to parse.
  * @param {string} [pagePath] - Optional page path used to normalize relative links.
  * @param {string|null} [anchor] - Optional anchor id to scroll to after rendering.
@@ -481,11 +454,6 @@ function computeSlug(parsed, article, pagePath, anchor) {
   const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
   let slugKey = ''
   try {
-    // Choose the display title in the following order of precedence:
-    // 1) HTML <title> (parsed.meta.title)
-    // 2) first H1 found
-    // 3) first H2 found
-    // 4) fallback to pagePath
     let displayTitle = ''
     try {
       if (parsed && parsed.meta && parsed.meta.title) displayTitle = String(parsed.meta.title).trim()
@@ -508,19 +476,14 @@ function computeSlug(parsed, article, pagePath, anchor) {
       } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
     } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
   } catch (err) { console.warn('[htmlBuilder] computeSlug failed', err) }
-  // If a frontmatter title was present and differs from the first H1 text,
-  // ensure the top H1 element has an id that matches the computed slugKey
-  // so that intra-page links and TOC entries correspond to the chosen slug.
   try {
     if (parsed && parsed.meta && parsed.meta.title && topH1) {
       const metaTitle = String(parsed.meta.title).trim()
       if (metaTitle && metaTitle !== h1Text) {
         try {
-          // Assign the slug-derived id to the H1 element (overwrite if needed)
           if (slugKey) topH1.id = slugKey
         } catch (e) { /* ignore DOM id assignment failures */ }
         try {
-          // Also update the parsed.toc entry for the H1 so the TOC reflects the id
           if (Array.isArray(parsed.toc)) {
             for (const entry of parsed.toc) {
               try {
@@ -559,7 +522,6 @@ export async function preScanHtmlSlugs(linkEls, base) {
         const raw = normalizePath(href)
         const parts = raw.split(/::|#/, 2)
         let path = parts[0]
-        // strip query string (e.g. ?page=...) to avoid passing queries into path resolution
         try { const qi = path.indexOf('?'); if (qi !== -1) path = path.slice(0, qi) } catch (e) { /* ignore */ }
         if (!path) continue
         if (!path.includes('.')) {
@@ -736,7 +698,6 @@ function parseHtml(raw) {
     heads.forEach(h => {
       tocEntries.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id })
     })
-    // Extract HTML <title> into meta if present so callers can prefer it
     const metaObj = {}
     try {
       const titleTag = doc.querySelector('title')
@@ -827,7 +788,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     article.innerHTML = parsed.html
     try { rewriteRelativeAssets(article, pagePath, contentBase) } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle', err) }
     try { addHeadingIds(article) } catch (err) { console.warn('[htmlBuilder] addHeadingIds failed', err) }
-    // Scripts will be executed after the article is appended to the DOM.
     try {
       const codeEls = article.querySelectorAll('pre code, code[class]')
       codeEls.forEach(el => {
@@ -846,7 +806,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
 
     lazyLoadImages(article, pagePath, contentBase)
 
-    // Wrap standalone images in Bulma's `image` helper for consistent spacing
     try {
       const imgs = article.querySelectorAll && article.querySelectorAll('img') || []
       imgs.forEach(img => {
@@ -862,7 +821,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       })
     } catch (err) { console.warn('[htmlBuilder] wrap images in Bulma image helper failed', err) }
 
-    // Ensure tables use Bulma's table class for consistent styling
     try {
       const tables = article.querySelectorAll && article.querySelectorAll('table') || []
       tables.forEach(tb => {
@@ -879,23 +837,16 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       })
     } catch (err) { console.warn('[htmlBuilder] add Bulma table class failed', err) }
 
-    // Compute slug early so anchor rewriting can use the page's slug mapping
-    // (helps anchor-only links like `#quick-start` resolve to the current
-    // page instead of falling back to the site home when `pagePath` is
-    // not populated). This must run before `rewriteAnchorsWorker`.
     const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
 
-    // If frontmatter includes author/date, add a small subtitle below the H1
     try {
       if (topH1 && parsed && parsed.meta && (parsed.meta.author || parsed.meta.date)) {
-        // Avoid adding duplicate subtitle elements
         const existing = topH1.parentElement && topH1.parentElement.querySelector && topH1.parentElement.querySelector('.nimbi-article-subtitle')
         if (!existing) {
           const author = parsed.meta.author ? String(parsed.meta.author).trim() : ''
           const dateRaw = parsed.meta.date ? String(parsed.meta.date).trim() : ''
           let dateText = ''
           try {
-            // Try to format ISO-like dates, fall back to raw text
             const d = new Date(dateRaw)
             if (dateRaw && !isNaN(d.getTime())) dateText = d.toLocaleDateString()
             else dateText = dateRaw
@@ -905,7 +856,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           if (dateText) pieces.push(dateText)
           if (pieces.length) {
               const sub = document.createElement('p')
-              // Strip any double quotes from author and keep subtitle visually subtle
               const authorClean = pieces[0] ? String(pieces[0]).replace(/\"/g, '').trim() : ''
               const rest = pieces.slice(1)
               const textPieces = []
@@ -947,25 +897,16 @@ export function executeEmbeddedScripts(article) {
           try { newScript.setAttribute(attr.name, attr.value) } catch (e) {}
         }
         if (!s.src) {
-          // Prefer running inline scripts via Function to avoid parsing
-          // differences when injecting as a module element. This keeps
-          // behavior closer to how scripts execute when present in
-          // normal HTML pages and avoids some syntax errors when the
-          // content isn't module-compatible. If Function execution
-          // fails, fall back to injecting as a module script element.
           const inline = s.textContent || ''
           let executed = false
           try {
-            // run in global scope
             const fn = new Function(inline)
             fn()
             executed = true
           } catch (e) {
-            // fall through to module injection below
             executed = false
           }
           if (executed) {
-            // remove original script and continue
             s.parentNode && s.parentNode.removeChild(s)
             try { console.info('[htmlBuilder] executed inline script via Function') } catch (e) {}
             continue
@@ -973,14 +914,10 @@ export function executeEmbeddedScripts(article) {
           try { newScript.type = 'module' } catch (e) {}
           newScript.textContent = inline
         }
-        // If this is an external script and an identical src is already
-        // present on the page, skip adding it again to avoid duplicate
-        // execution and potential side-effects.
         if (s.src) {
           try {
             const exists = document.querySelector && document.querySelector(`script[src="${s.src}"]`)
             if (exists) {
-              // remove the inert original script but do not re-add
               s.parentNode && s.parentNode.removeChild(s)
               continue
             }
@@ -997,11 +934,9 @@ export function executeEmbeddedScripts(article) {
           ;(document.head || document.body || document.documentElement).appendChild(newScript)
         } catch (appendErr) {
           try {
-            // Try as classic script (no module type)
             try { newScript.type = 'text/javascript' } catch (e) {}
             ;(document.head || document.body || document.documentElement).appendChild(newScript)
           } catch (appendErr2) {
-            // As a last resort, log and skip executing this script to avoid breaking the page
             try { console.warn('[htmlBuilder] injected script append failed, skipping', { src: srcLabel, err: appendErr2 }) } catch (e) {}
           }
         }
@@ -1102,7 +1037,7 @@ export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguag
 /**
  * Attach a click handler to a generated TOC so clicks perform SPA navigation.
  * @param {HTMLElement} toc - Table-of-contents element to attach SPA navigation handlers to.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function attachTocClickHandler(toc) {
     try {
@@ -1166,7 +1101,7 @@ export function attachTocClickHandler(toc) {
 /**
  * Scroll to a specific anchor ID inside the CMS container or to top.
  * @param {string|null} anchor - Element id (without '#') or null to scroll to top.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function scrollToAnchorOrTop(anchor) {
     const containerEl = document.querySelector('.nimbi-cms') || null
@@ -1198,26 +1133,14 @@ export function scrollToAnchorOrTop(anchor) {
   }
 
 /**
- * Create or update a scroll-to-top button and toggle the TOC/menu label
- * visibility.  Observes the supplied `topH1` element if present; on pages
+ * Create or update a scroll-to-top button and toggle TOC/menu label
+ * visibility. Observes the supplied `topH1` element if present; on pages
  * without a top heading we fall back to a simple scroll-position listener.
  *
- * @param {HTMLElement} article - Article element to monitor for scroll/top visibility.
- * @param {HTMLElement|null} topH1 - Top-level H1 element for intersection observation.
- * @param {object} opts - Options object for mounting and container overrides.
- */
-/**
- * Create or update a scroll-to-top button and toggle TOC visibility.
- * @param {HTMLElement} article - Article element to monitor for scroll/top visibility.
- * @param {HTMLElement|null} topH1 - Top-level H1 element for intersection observation.
- * @param {object} opts - Options object for mounting and container overrides.
- * @returns {void} - No return value.
- */
-/**
- * Create or update a scroll-to-top button and toggle TOC/menu label visibility.
  * @param {HTMLElement} article - The article element produced by `prepareArticle`.
  * @param {HTMLElement|null} topH1 - The top-level H1 element for the article, if present.
  * @param {object} opts - Options object controlling rendering behavior.
+ * @returns {void}
  */
 export function ensureScrollTopButton(article, topH1, { mountOverlay = null, container = null, mountEl = null, navWrap = null, t = null } = {}) {
   try {
@@ -1231,8 +1154,6 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
 
     if (!btn) {
       btn = document.createElement('button')
-      // follow Bulma button styling while keeping our hook class
-      // use a subtle 'light' modifier by default so the button is non-dominant
       btn.className = 'nimbi-scroll-top button is-primary is-rounded is-small'
       btn.setAttribute('aria-label', tFn('scrollToTop'))
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>'
@@ -1245,8 +1166,6 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
         try { document.body.appendChild(btn) } catch (err2) { console.warn('[htmlBuilder] append scroll top button failed', err2) }
       }
       try {
-        // Positioning and visual styles are controlled via CSS (.nimbi-scroll-top)
-        // Ensure the button follows the current theme
         try { registerThemedElement(btn) } catch (e) { /* ignore */ }
       } catch (err) { console.warn('[htmlBuilder] set scroll-top button theme registration failed', err) }
       btn.addEventListener('click', () => {

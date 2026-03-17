@@ -18,23 +18,23 @@ export function addHook(name, fn) {
 
 /**
  * Register a callback to be invoked after each page is rendered.
- * @param {(ctx:object)=>void|Promise<void>} fn - Callback invoked with the render context.
- * @returns {void} - No return value.
+ * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback invoked with the render context.
+ * @returns {void}
  */
 export function onPageLoad(fn) { addHook('onPageLoad', fn); }
 
 /**
  * Register a callback once the navigation DOM has been built.
- * @param {(ctx:object)=>void|Promise<void>} fn - Callback invoked with the navigation context.
- * @returns {void} - No return value.
+ * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback invoked with the navigation context.
+ * @returns {void}
  */
 export function onNavBuild(fn) { addHook('onNavBuild', fn); }
 
 /**
  * Register a callback that can mutate the article element before it is
  * appended to the document. The callback receives the render context.
- * @param {(ctx:object)=>void|Promise<void>} fn - Callback which can modify the render context or DOM.
- * @returns {void} - No return value.
+ * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback which can modify the render context or DOM.
+ * @returns {void}
  */
 export function transformHtml(fn) { addHook('transformHtml', fn); }
 
@@ -43,7 +43,7 @@ export function transformHtml(fn) { addHook('transformHtml', fn); }
  * supplied context object. Errors from individual callbacks are swallowed.
  *
  * @param {string} name - Hook name to invoke (e.g. 'onPageLoad').
- * @param {object} ctx - Context object passed to each callback.
+ * @param {Record<string,unknown>} ctx - Context object passed to each callback.
  * @returns {Promise<void>} - Resolves once all registered callbacks have completed.
  */
 export async function runHooks(name, ctx) {

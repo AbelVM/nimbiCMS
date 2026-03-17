@@ -7,7 +7,7 @@ export let RESOLUTION_CACHE_MAX = 100
 /**
  * Change maximum cache size at runtime.
  * @param {number} n - Maximum number of cached resolution entries.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function setResolutionCacheMax(n) {
   RESOLUTION_CACHE_MAX = n
@@ -27,10 +27,6 @@ export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000 // five minutes
  * Accepts a value in milliseconds; passing a non‑positive value disables
  * expiration.  This is the recommended API for external code rather than
  * mutating the namespace object directly (which is read‑only in ESM).
- * @param {number} ms - Time-to-live (milliseconds) for cached resolution entries.
- */
-/**
- * Modify the resolution cache time-to-live (milliseconds).
  * @param {number} ms - Time-to-live (milliseconds) for cached resolution entries.
  */
 export function setResolutionCacheTtl(ms) {
@@ -71,7 +67,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
 }
 /**
  * Empties the internal markdown index set. Only exposed for testing.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function _clearIndexCache() {
   indexSet.clear();
@@ -99,16 +95,11 @@ export function resolutionCacheGet(key) {
   return record.value
 }
 /**
- * Store a resolution result in the runtime resolution cache. Evicts oldest
- * entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
+ * Store a resolution result in the runtime resolution cache and evict the
+ * oldest entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
  * @param {string} key - Cache key string.
  * @param {{resolved:string,anchor:string|null}} value - Resolution record to store.
- * @returns {void} - No return value.
- */
-/**
- * Store a resolution in the runtime cache and evict oldest entries if needed.
- * @param {string} key - key parameter
- * @param {{resolved:string,anchor:string|null}} value
+ * @returns {void}
  */
 export function resolutionCacheSet(key, value) {
   _purgeExpiredEntries()
@@ -163,24 +154,17 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
     try {
       const u = new URL(href, location.href)
       if (u.origin !== location.origin) continue
-      // If the link explicitly points to a markdown file, add it to
-      // localCandidates for potential discovery.
       const mdMatch = (u.hash || u.pathname).match(/([^#?]+\.md)(?:$|[?#])/) || (u.pathname || '').match(/([^#?]+\.md)(?:$|[?#])/) 
       if (mdMatch) {
         let candidate = normalizePath(mdMatch[1])
         if (candidate) localCandidates.add(candidate)
         continue
       }
-      // Otherwise, consider HTML or other page links as candidates. If the
-      // anchor text slugifies to the decoded slug, return the absolute URL
-      // for that page so callers can fetch it directly.
       const linkText = (linkEl.textContent || '').trim()
       const baseName = (u.pathname || '').replace(/^.*\//, '')
       if (linkText && slugify(linkText) === decoded) return u.toString()
       if (baseName && slugify(baseName.replace(/\.(html?|md)$/i, '')) === decoded) return u.toString()
-      // If the pathname looks like HTML, add as a candidate for discovery
       if (/\.(html?)$/i.test(u.pathname)) {
-        // store relative path without leading slash
         let rel = u.pathname.replace(/^\//, '')
         localCandidates.add(rel)
         continue
@@ -220,12 +204,6 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
 /**
  * Given a resolved identifier (possibly slug, path, or HTML), produce an
  * ordered list of candidate markdown/html filenames to attempt fetching.
- *
- * @param {string} resolved - resolved parameter
- * @returns {string[]} - Array of candidate filenames to attempt fetching.
- */
-/**
- * Given a resolved identifier, return ordered candidate filenames to fetch.
  * @param {string} resolved - resolved parameter
  * @returns {string[]} - Array of candidate filenames to attempt fetching.
  */
@@ -329,10 +307,6 @@ export async function fetchPageData(raw, contentBase) {
 
   if (!anchor && hashAnchor) anchor = hashAnchor
 
-  // If resolution produced an absolute URL or a root-relative path, attempt
-  // to fetch it directly as HTML before trying markdown candidates. This
-  // allows discovered nav links (returned as absolute URLs by
-  // tryDiscoverFromIndex) to be loaded as pages.
   try {
     if (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/'))) {
       const abs = resolved.startsWith('/') ? new URL(resolved, location.origin).toString() : resolved
@@ -353,21 +327,11 @@ export async function fetchPageData(raw, contentBase) {
 
   const pageCandidates = buildPageCandidates(resolved)
 
-  // If the caller provided an explicit path (contains .md or .html) we should
-  // respect it even if it points to an `index.html`.  `buildPageCandidates`
-  // historically filtered out `index.html` to prefer directory slugs, which
-  // caused explicit links like `docs/index.html` to produce no candidates and
-  // later throw `no page data`.  Allow explicit originals to be fetched.
   const originalWasExplicit = String(originalRaw || '').includes('.md') || String(originalRaw || '').includes('.html')
   if (originalWasExplicit && pageCandidates.length === 0 && (String(resolved).includes('.md') || String(resolved).includes('.html'))) {
     pageCandidates.push(resolved)
   }
 
-  // If resolution produced an explicit markdown/html path (for example a
-  // slug resolved to `docs/index.html`), ensure we attempt to fetch that
-  // path even when the original request was a slug without an extension.
-  // This handles cases where `ensureSlug()` or index discovery returns an
-  // explicit file path.
   if (pageCandidates.length === 0 && (String(resolved).includes('.md') || String(resolved).includes('.html'))) {
     pageCandidates.push(resolved)
   }
@@ -401,11 +365,6 @@ export async function fetchPageData(raw, contentBase) {
 
   if (!data) {
     try { console.error('[router] fetchPageData: no page data for', { originalRaw, resolved, pageCandidates, contentBase, fetchError: (fetchError && (fetchError.message || String(fetchError))) || null }) } catch (_e) {}
-    // If the original request was an explicit HTML path (e.g. "docs/index.html")
-    // and fetching via the configured `contentBase` failed, try fetching the
-    // absolute URL relative to the current page. This covers cases where the
-    // nav links point to top-level HTML pages (like docs/index.html) that are
-    // not served from the `contentBase` directory.
     try {
       if (originalWasExplicit && String(originalRaw || '').toLowerCase().includes('.html')) {
         try {
@@ -426,7 +385,6 @@ export async function fetchPageData(raw, contentBase) {
                   const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
                   if (parser) {
                     const doc = parser.parseFromString(raw || '', 'text/html')
-                    // Rewrite asset URLs (src, srcset, link[href]) that are relative
                     const rewrite = (attr, el) => {
                       try {
                         const val = el.getAttribute(attr) || ''
@@ -434,7 +392,6 @@ export async function fetchPageData(raw, contentBase) {
                         if (/^(https?:)?\/\//i.test(val)) return
                         if (val.startsWith('/')) return
                         if (val.startsWith('#')) return
-                        // Resolve relative to the fetched document location
                         try {
                           const resolved = new URL(val, absUrl).toString()
                           el.setAttribute(attr, resolved)
@@ -446,7 +403,6 @@ export async function fetchPageData(raw, contentBase) {
                     for (const el of Array.from(els || [])) {
                       try {
                         const tag = el.tagName ? el.tagName.toLowerCase() : ''
-                        // Skip normal anchor links; those are handled by the SPA rewrite
                         if (tag === 'a') continue
                         if (el.hasAttribute('src')) {
                           const before = el.getAttribute('src')
@@ -496,7 +452,6 @@ export async function fetchPageData(raw, contentBase) {
                     return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
                   }
                 } catch (e) { /* parsing failed, fall back */ }
-                // Fallback: inject base tag so relative URLs without leading slash resolve
                 let rawWithBase = raw
                 if (!/<base\s+[^>]*>/i.test(raw)) {
                   if (/<head[^>]*>/i.test(raw)) {
@@ -517,10 +472,6 @@ export async function fetchPageData(raw, contentBase) {
       }
     } catch (_) { /* ignore fallback errors */ }
 
-    // Generic assets fallback: allow resolving a slug to a static HTML
-    // under the /assets/ directory. This permits loading standalone HTML
-    // pages (like an embedded playground) by slug without special-casing
-    // individual names in the router.
     try {
       const dec = decodeURIComponent(String(resolved || ''))
       if (dec && !/\.(md|html?)$/i.test(dec)) {

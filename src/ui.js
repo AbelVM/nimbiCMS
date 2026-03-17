@@ -18,6 +18,22 @@ import { attachImagePreview } from './imagePreview.js'
 
 /**
  * Initialize UI rendering helpers for a mounted CMS instance.
+ * @typedef {Object} UIOptions
+ * @property {HTMLElement} contentWrap - Container element where article content is rendered
+ * @property {HTMLElement} navWrap - Element used to render navigation/TOC
+ * @property {HTMLElement} container - Layout container element used for image eagerness and scrolling
+ * @property {HTMLElement|null} [mountOverlay] - Optional overlay mount used by UI helpers
+ * @property {Function} t - Localization function (key => string)
+ * @property {string} contentBase - Base URL/path for content fetches
+ * @property {string} homePage - Default home page path or slug
+ * @property {string} initialDocumentTitle - Document title at initialization
+ * @property {Function} runHooks - Hook runner function provided by `hookManager`
+ *
+ * @typedef {Object} UIReturn
+ * @property {() => Promise<void>} renderByQuery - Render current page based on URL query.
+ * @property {HTMLElement} siteNav - Pre-built site navigation element.
+ * @property {() => (string|null)} getCurrentPagePath - Returns the currently rendered page path or null.
+ *
  * @param {UIOptions} opts - configuration options and DOM mounts for the UI
  * @returns {UIReturn} - helpers and entrypoints for rendering the site
  */
@@ -68,10 +84,8 @@ export function createUI(opts) {
 
     contentWrap.appendChild(article)
 
-    // Execute any embedded scripts now that the article is in the DOM.
     try { executeEmbeddedScripts(article) } catch (e) { console.warn('[nimbi-cms] executeEmbeddedScripts failed', e) }
 
-    // Attach image preview to all images in the page.
     try { attachImagePreview(article, { t }) } catch (e) { console.warn('[nimbi-cms] attachImagePreview failed', e) }
 
     try {
@@ -115,7 +129,6 @@ export function createUI(opts) {
       }
       sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data))
     } catch (e) {
-      // ignore
     }
   }
 
@@ -130,12 +143,9 @@ export function createUI(opts) {
         containerEl.scrollTo({ top: data.top, left: (data.left || 0), behavior: 'auto' })
       }
     } catch (e) {
-      // ignore
     }
   }
 
-  // When the page is restored from bfcache, restore scroll position and re-run
-  // the eager-image marker so images keep the expected loading priority.
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
       try {
@@ -147,7 +157,6 @@ export function createUI(opts) {
     }
   })
 
-  // Store scroll position whenever the page is about to be hidden.
   window.addEventListener('pagehide', () => {
     try {
       saveScrollPosition()

@@ -8404,8 +8404,8 @@ async function ll(t = {}) {
 }
 async function Ja() {
   try {
-    if ("1.0.1".trim())
-      return "1.0.1";
+    if ("1.0.2".trim())
+      return "1.0.2";
   } catch {
   }
   return "0.0.0";

@@ -7,7 +7,7 @@ Imagine publishing a complete, polished website without a build pipeline, a serv
 
 ## Why NimbiCMS?
 
-NimbiCMS lets you publish directly from Markdown. Our runtime renders GitHub‑flavored Markdown with `marked.js`, generates a sticky table of contents, estimates reading time, and keeps meta tags (Open Graph, Twitter) accurate as visitors navigate. Authors write in their favorite editor, push to a static host (GitHub Pages, S3, Netlify), and the site updates with no build step.
+NimbiCMS lets you publish directly from Markdown. Our runtime renders GitHub‑flavored Markdown, generates a sticky table of contents, estimates reading time, and keeps meta tags (Open Graph, Twitter) accurate as visitors navigate. Authors write in their favorite editor, push to a static host (GitHub Pages, S3, Netlify), and the site updates with no build step.
 
 Search and indexing are flexible: enable an eager index on load for smaller sites, or use lazy indexing for large collections to keep initial load fast. Heavy tasks run in web workers so the main thread stays snappy for users.
 

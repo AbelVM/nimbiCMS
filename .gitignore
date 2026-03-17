@@ -33,6 +33,10 @@ coverage/
 .cache/
 *.tgz
 *.bak
+*.bak1
+*.bak2
+*.bak3
+*.bak4
 notes.md
 notes.txt
 docs-typedoc.json

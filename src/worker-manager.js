@@ -14,13 +14,13 @@
 /**
  * Shape of a request sent to the worker manager. `type` is the worker action
  * name and `id` is injected by the manager when sending.
- * @typedef {{type:string,id?:string} & Record<string, any>} WorkerRequest
+ * @typedef {{type:string,id?:string} & Record<string, unknown>} WorkerRequest
  */
 
 /**
  * Shape of a worker response message. `id` matches the request id and
  * either `result` or `error` is present.
- * @typedef {{id?:string,result?:any,error?:string}} WorkerResponse
+ * @typedef {{id?:string,result?:unknown,error?:string}} WorkerResponse
  */
 /**
  * Create a worker manager that lazily instantiates a Worker and provides
@@ -34,7 +34,7 @@ export function makeWorkerManager(createWorker, name = 'worker') {
 
   /**
    * Return the underlying Worker instance, creating it lazily.
-   * @returns {(Worker|null)} - Worker instance or null if unavailable.
+   * @returns {(Worker|null)}
    */
   function get() {
     if (!_w) {
@@ -63,7 +63,7 @@ export function makeWorkerManager(createWorker, name = 'worker') {
 
   /**
    * Terminate and clear the managed worker.
-   * @returns {void} - No return value.
+   * @returns {void}
    */
   function terminate() {
     try {
@@ -77,17 +77,11 @@ export function makeWorkerManager(createWorker, name = 'worker') {
   }
 
   /**
-   * Send a message to the worker and wait for a response.
-   * @param {object} msg - Message payload for the worker.
-   * @param {number} [timeout=1000] - Timeout in milliseconds.
-   * @returns {Promise<unknown>} - Promise resolving to the worker response.
-   */
-  /**
-   * Send a message to the managed worker and await a typed response.
-   * @param {WorkerRequest} msg - Message payload for the worker.
-   * @param {number} [timeout=1000] - Timeout in milliseconds.
-   * @returns {Promise<any>} - Promise resolving to the worker response `result`.
-   */
+  * Send a message to the worker and wait for a response.
+  * @param {WorkerRequest} msg - Message payload for the worker.
+  * @param {number} [timeout=1000] - Timeout in milliseconds.
+  * @returns {Promise<unknown>} - Promise resolving to the worker response `result`.
+  */
   function send(msg, timeout = 1000) {
     return new Promise((resolve, reject) => {
       const w = get()
@@ -145,12 +139,6 @@ export function makeWorkerManager(createWorker, name = 'worker') {
  *
  * @param {string} code - JavaScript source code for the worker as a string.
  * @returns {(Worker|null)} A Worker instance configured with `type: 'module'`, or `null` if creation failed.
- */
-/**
- * Build a Blob URL from raw worker source and return a Worker (module).
- * Returns null if the environment cannot create a Blob-based Worker.
- * @param {string} code - JavaScript source for the worker
- * @returns {(Worker|null)} - A Worker instance configured with `type: 'module'`, or `null` if creation failed.
  */
 export function createWorkerFromRaw(code) {
   try {

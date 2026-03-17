@@ -1,5 +1,5 @@
 import { expectType } from 'tsd'
-import initCMS, { InitOptions, ParsedPage, NavTreeItem, ResolutionRecord, parseMarkdownToHtml } from './index';
+import initCMS, { InitOptions, ParsedPage, NavTreeItem, ResolutionRecord, parseMarkdownToHtml } from '../src/index';
 
 /* basic initCMS options */
 expectType<Promise<void>>(initCMS({ el: '#app' } as InitOptions))

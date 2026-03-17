@@ -1,5 +1,3 @@
-// Bulma CSS and project extras are injected dynamically at runtime
-// to avoid importing non-JS assets during Node-based tests.
 
 /** @type {'light'|'dark'|'system'} */
 let currentStyle = 'light'
@@ -11,8 +9,8 @@ let currentStyle = 'light'
 /**
  * Insert a stylesheet link into the document head if not already present.
  * @param {string} href - stylesheet URL to insert
- * @param {Record<string,string>} [attrs] - optional attributes to set on the link element
- * @returns {void} - No return value.
+ * @param {Record<string,string>} [attrs] - Optional attributes to set on the link element.
+ * @returns {void}
  */
 function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return
@@ -22,13 +20,7 @@ function injectLink(href, attrs = {}) {
   Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v))
   document.head.appendChild(l)
 
-  // If this link is a theme override, keep it last so it can override
-  // earlier Bulma styles that may be injected later (e.g., by bundler).
   if (attrs['data-bulmaswatch-theme']) {
-    // Keep the theme link last in <head>. Use a guarded MutationObserver
-    // that will re-append the theme link when other styles are injected,
-    // but avoid tight re-append loops by tracking a per-link move count
-    // and temporarily disconnecting while we adjust the DOM.
     try {
       if (l.getAttribute('data-bulmaswatch-observer')) return
       let moveCount = Number(l.getAttribute('data-bulmaswatch-move-count') || 0)
@@ -41,7 +33,6 @@ function injectLink(href, attrs = {}) {
           const last = parent.lastElementChild
           if (last === l) return
           if (moveCount >= 1000) {
-            // safety guard: give up after a very high number of moves
             l.setAttribute('data-bulmaswatch-move-stopped', '1')
             return
           }
@@ -57,21 +48,17 @@ function injectLink(href, attrs = {}) {
         l.setAttribute('data-bulmaswatch-observer', '1')
         l.setAttribute('data-bulmaswatch-move-count', String(moveCount))
       } catch (e) { /* ignore */ }
-      // Ensure it's at the end now once
       const parent = document.head
       if (parent && parent.lastElementChild !== l) parent.appendChild(l)
     } catch (e) {
-      // ignore
     }
   }
 }
 
 async function ensureBaseBulma() {
-  // Try local copies first (served by the dev server), then fallback to CDN.
   const localCandidates = ['/dist/bulma.min.css', '/dist/bulma.css', '/bulma.css']
   for (const p of localCandidates) {
     try {
-      // Use HEAD where supported to avoid downloading full CSS just to test.
       const res = await fetch(p, { method: 'HEAD' })
       if (res && res.ok) {
         if (!document.querySelector(`link[href="${p}"]`)) {
@@ -79,7 +66,6 @@ async function ensureBaseBulma() {
           l.rel = 'stylesheet'
           l.href = p
           l.setAttribute('data-bulma-base', '1')
-          // Insert before our bundle if present
           const ourCss = document.querySelector('link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]')
           if (ourCss && ourCss.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
           else document.head.appendChild(l)
@@ -87,11 +73,9 @@ async function ensureBaseBulma() {
         return
       }
     } catch (e) {
-      // ignore and try next
     }
   }
 
-  // Fallback to CDN (protocol-relative to match page protocol)
   try {
     const href = (location && location.protocol && location.protocol === 'file:') ? 'https://unpkg.com/bulma/css/bulma.min.css' : '//unpkg.com/bulma/css/bulma.min.css'
     if (!document.querySelector(`link[href="${href}"]`)) {
@@ -121,9 +105,9 @@ function removeThemeAndOverrides() {
  * Ensure that Bulma or a Bulmaswatch theme is loaded.  Supports local
  * overrides or named themes fetched from unpkg.
  *
- * @param {string} bulmaCustomize - 'none' | 'local' | theme name to load from unpkg
- * @param {string} pageDir - directory to probe for a local `bulma.css` when using 'local'
- * @returns {Promise<void>} - Promise that resolves when theme loading completes.
+ * @param {string} bulmaCustomize - 'none' | 'local' | theme name to load from unpkg.
+ * @param {string} pageDir - Directory to probe for a local `bulma.css` when using 'local'.
+ * @returns {Promise<void>} - Resolves when theme loading completes.
  */
 export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
   const debug = typeof window !== 'undefined' && window.__nimbiCMSDebug
@@ -135,15 +119,8 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
 
   if (!bulmaCustomize) return
 
-  // When explicitly asked for 'none' we should ensure Bulma's base CSS is
-  // present but remove any Bulmaswatch theme overrides so the default Bulma
-  // look is used. This keeps the page layout functional when the user
-  // chooses "None (default)" in the playground.
   if (bulmaCustomize === 'none') {
     try {
-        // Inject base Bulma if not present. Insert it before our bundle CSS
-        // (`dist/nimbi-cms.css`) so Bulma's base rules apply and our
-        // component CSS can override them as needed.
         const candidates = [
           (location && location.protocol && location.protocol === 'file:') ? 'https://unpkg.com/bulma/css/bulma.min.css' : '//unpkg.com/bulma/css/bulma.min.css',
           'https://unpkg.com/bulma/css/bulma.min.css'
@@ -160,15 +137,12 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
           l.rel = 'stylesheet'
           l.href = href
           l.setAttribute('data-bulma-base', '1')
-          // Prefer inserting before our dist css so Bulma is the foundation.
           const ourCss = document.querySelector('link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]')
           if (ourCss && ourCss.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
           else document.head.appendChild(l)
         }
     } catch (e) { /* ignore */ }
     try {
-      // Remove any Bulmaswatch theme links or local override styles so the
-      // original Bulma styling takes effect.
       const themeLinks = Array.from(document.querySelectorAll('link[data-bulmaswatch-theme]'))
       for (const tl of themeLinks) {
         if (tl && tl.parentNode) tl.parentNode.removeChild(tl)
@@ -183,14 +157,11 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
     return
   }
 
-  // (rate-limit guard removed)
 
   const rawLocalCandidates = [pageDir + 'bulma.css', '/bulma.css']
   const localCandidates = Array.from(new Set(rawLocalCandidates))
 
   if (bulmaCustomize === 'local') {
-    // Remove any previous Bulmaswatch theme links so local override isn't
-    // mixed with a previously loaded theme.
     removeThemeAndOverrides()
     if (document.querySelector('style[data-bulma-override]')) return
     for (const p of localCandidates) {
@@ -212,7 +183,6 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
   try {
     const theme = String(bulmaCustomize).trim()
     if (!theme) return
-    // Remove any previously applied theme/overrides before injecting new theme
     removeThemeAndOverrides()
     const href = `https://unpkg.com/bulmaswatch/${encodeURIComponent(theme)}/bulmaswatch.min.css`
     injectLink(href, { 'data-bulmaswatch-theme': theme })
@@ -259,7 +229,7 @@ export function setStyle(style) {
  * directly. Property names should be provided without the leading `--`.
  *
  * @param {Record<string,string>} vars - Map of CSS variable names (without `--`) to values.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 /**
  * Apply CSS custom properties to the document root (keys without `--`).
@@ -281,8 +251,6 @@ export function setThemeVars(vars) {
  */
 export function registerThemedElement(el) {
   if (!el || !(el instanceof HTMLElement)) return () => {}
-  // Find the nearest mount; prefer `.nimbi-mount` so Bulma's styles
-  // propagate naturally from the container.
   const mount = (el.closest && el.closest('.nimbi-mount')) || null
   try {
     if (mount) {
@@ -291,6 +259,5 @@ export function registerThemedElement(el) {
       else mount.removeAttribute('data-theme')
     }
   } catch (_) { /* ignore */ }
-  // No ongoing observation required; attribute on the mount propagates.
   return () => {}
 }

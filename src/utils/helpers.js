@@ -1,14 +1,8 @@
-/** Generic helpers reused throughout the codebase */
 /**
  * Return true if the href points to an external or special link.  This
  * matches absolute URLs and mailto/tel schemes.
  *
  * @param {string} href - URL or href string to evaluate
- * @returns {boolean}
- */
-/**
- * Determine whether an href is external (absolute URL or mailto/tel).
- * @param {string} href
  * @returns {boolean}
  */
 export function isExternalLink(href) {
@@ -23,11 +17,6 @@ export function isExternalLink(href) {
  * @param {string} p - input path to normalize (remove leading ./ or /)
  * @returns {string}
  */
-/**
- * Normalize a path by stripping leading dots and slashes.
- * @param {string} p
- * @returns {string}
- */
 export function normalizePath(p) {
   return String(p || '').replace(/^[.\/]+/, '')
 }
@@ -39,11 +28,6 @@ export function normalizePath(p) {
  * @param {string} u - input path or URL to trim trailing slashes from
  * @returns {string}
  */
-/**
- * Remove trailing slashes from a path or URL.
- * @param {string} u - input path or URL to ensure a trailing slash on
- * @returns {string}
- */
 export function trimTrailingSlash(u) {
   return String(u || '').replace(/\/+$/, '')
 }
@@ -52,11 +36,6 @@ export function trimTrailingSlash(u) {
  * Ensure the given URL/path ends with a single slash.  This wraps
  * `trimTrailingSlash` and appends '/'.
  *
- * @param {string} u
- * @returns {string}
- */
-/**
- * Ensure the path ends with a single trailing slash.
  * @param {string} u
  * @returns {string}
  */
@@ -88,7 +67,6 @@ export function setLazyload(img) {
 function preloadImage(url) {
   try {
     if (!url || typeof document === 'undefined' || !document.head) return
-    // Avoid preloading data URLs and updates that already exist
     if (url.startsWith('data:')) return
     const existing = document.head.querySelector(`link[rel="preload"][as="image"][href="${url}"]`)
     if (existing) return
@@ -115,12 +93,6 @@ function preloadImage(url) {
  * @param {HTMLElement} container - Root element containing the images.
  * @param {number} [marginPx=0] - Extra pixels past the visible bottom that should still be considered above-the-fold.
  * @param {boolean} [debug=false] - If true, logs debug info for each image.
- */
-/**
- * Mark above-the-fold images as eager and set high fetch priority.
- * @param {HTMLElement} container
- * @param {number} [marginPx=0]
- * @param {boolean} [debug=false]
  */
 export function setEagerForAboveFoldImages(container, marginPx = 0, debug = false) {
   try {
@@ -198,7 +170,6 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
           firstVisibleImage = { img, src, rect, beforeLoading }
         }
 
-        // debug logging removed
       } catch (err) {
         console.warn('[helpers] setEagerForAboveFoldImages per-image failed', err)
       }
@@ -215,7 +186,6 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
           img.loading = 'eager'
           img.fetchPriority = 'high'
         }
-        // debug logging removed
       } catch (err) {
         console.warn('[helpers] setEagerForAboveFoldImages fallback failed', err)
       }
@@ -231,11 +201,6 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
  * segment starts with a slash, in which case the result is absolute).
  * Similar to `path.posix.join` but for URL-like paths.
  *
- * @param {...string} parts
- * @returns {string}
- */
-/**
- * Join URL-like path segments producing a normalized path string.
  * @param {...string} parts
  * @returns {string}
  */
@@ -272,8 +237,6 @@ export function buildPageUrl(page, hash = null, baseSearch) {
       : (typeof window !== 'undefined' && window.location ? window.location.search : '')
     const params = new URLSearchParams(rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch)
 
-    // Ensure `page` always appears first so existing logic that checks for
-    // `?page=` at the start of hrefs continues to work.
     const pageVal = String(page || '')
     params.delete('page')
     const merged = new URLSearchParams()
@@ -289,7 +252,6 @@ export function buildPageUrl(page, hash = null, baseSearch) {
     }
     return url || `?page=${encodeURIComponent(pageVal)}`
   } catch (err) {
-    // Fallback to minimal URL if URLSearchParams is not available or fails.
     const base = `?page=${encodeURIComponent(String(page || ''))}`
     return hash ? `${base}#${encodeURIComponent(hash)}` : base
   }
@@ -299,11 +261,6 @@ export function buildPageUrl(page, hash = null, baseSearch) {
  * original string if encoding fails.
  *
  * @param {string} u - URL or component to encode safely
- * @returns {string}
- */
-/**
- * Encode a URL or component with a safe fallback on failure.
- * @param {string} u
  * @returns {string}
  */
 export function encodeURL(u) {
@@ -323,11 +280,6 @@ export function encodeURL(u) {
  * a Promise, the returned Promise will resolve to `undefined` on rejection.
  * Useful for replacing frequent `try { ... } catch (_) {}` patterns.
  *
- * @param {() => any|Promise<any>} fn
- * @returns {any|Promise<any>|undefined}
- */
-/**
- * Execute a function and swallow errors, returning undefined on failure.
  * @param {() => any|Promise<any>} fn
  * @returns {any|Promise<any>|undefined}
  */

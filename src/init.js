@@ -42,9 +42,6 @@ export function parseInitOptionsFromQuery(queryString) {
   try {
     let qs = typeof queryString === 'string' ? queryString : (typeof window !== 'undefined' && window.location ? window.location.search : '')
 
-  // If the app is embedded in a hash-based routing setup, query params may be
-  // placed inside the hash (e.g. "#/page?bulmaCustomize=solar").  Support that
-  // by falling back to parsing the hash when no search is present.
   if (!qs && typeof window !== 'undefined' && window.location && window.location.hash) {
     const hash = window.location.hash
     const idx = hash.indexOf('?')
@@ -115,7 +112,6 @@ export function parseInitOptionsFromQuery(queryString) {
   }
 }
 
-// --- Path sanitization helpers -------------------------------------------
 /**
  * Rejects suspicious paths that could lead to path traversal or external URLs.
  * Returns true if the path is safe to use as a content path segment.
@@ -131,17 +127,10 @@ function isSafeContentPath(p) {
   if (p.includes('..')) return false
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(p)) return false // protocol://
   if (p.startsWith('//')) return false
-  // disallow absolute filesystem-ish paths
   if (p.startsWith('/') || /^[A-Za-z]:\\/.test(p)) return false
   return true
 }
 
-/**
- * Validates a page basename for `homePage` / `notFoundPage`.
- * Rules:
- *  - must be a simple basename (no slashes)
- *  - allowed chars: A-Za-z0-9._- and must end with .md or .html
- */
 /**
  * Validates a page path for `homePage` / `notFoundPage`.
  * Rules:
@@ -159,9 +148,7 @@ function isSafePagePath(name) {
   if (s.includes('..')) return false
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(s)) return false // protocol://
   if (s.startsWith('//')) return false
-  // disallow absolute filesystem-ish paths
   if (s.startsWith('/') || /^[A-Za-z]:\\/.test(s)) return false
-  // allow optional relative ./ prefix (will be normalized elsewhere)
   const normalized = s.replace(/^\.\//, '')
   if (!/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(md|html)$/.test(normalized)) return false
   return true
@@ -186,8 +173,7 @@ export let initialDocumentTitle = ''
  * Throws a `TypeError` when options are of the wrong type so configuration
  * mistakes are surfaced early (e.g. passing a number for `contentPath`).
  *
- * @param {Object} options - options parameter
- * @param {Object} options - Initialization options provided by the caller.
+ * @param {Record<string,unknown>} [options={}] - Initialization options provided by the caller.
  * @param {boolean} [options.allowUrlPathOverrides=false] - advanced opt-in that
  *   allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via
  *   URL query parameters. This is disabled by default for security; enabling
@@ -203,7 +189,7 @@ export let initialDocumentTitle = ''
  * @param {string|null} [options.l10nFile] - path to localization file
  * @param {number} [options.cacheTtlMinutes=5] - resolution cache time‑to‑live in minutes
  * @param {number} [options.cacheMaxEntries] - maximum number of resolution cache entries (defaults to module constant)
- * @param {Array<object>} [options.markdownExtensions] - list of marked extensions to register on init
+ * @param {Array<Record<string,unknown>>} [options.markdownExtensions] - list of marked extensions to register on init
  * @param {string} [options.homePage] - Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`.
  * @param {string} [options.notFoundPage] - Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, defaults to `'_404.md'`.
  * @param {boolean} [options.skipRootReadme=false] - when true, the indexer will skip link discovery inside a repository-root `README.md`; set to `false` to treat the root README like other content pages.
@@ -221,20 +207,8 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): options must be an object')
   }
 
-  // Merge user-supplied options with any options provided via URL query
-  // parameters. Explicit `options` take precedence over query params.
-  //
-  // SECURITY: for safety, do not allow sensitive path-related options to be
-  // overridden via URL query parameters by default. Allowing `contentPath`,
-  // `homePage` or `notFoundPage` from the URL can enable path traversal or
-  // unintended exposure of server-served files if the backend is not
-  // explicitly hardened. These query params are still parsed (useful for
-  // tests), but are ignored at runtime unless the host page explicitly
-  // enables URL-based overrides via a deliberate opt-in mechanism.
   const queryOpts = parseInitOptionsFromQuery()
   if (queryOpts && (queryOpts.contentPath || queryOpts.homePage || queryOpts.notFoundPage)) {
-    // Only honor URL-provided path overrides when the embedding page has
-    // explicitly passed `allowUrlPathOverrides: true` to `initCMS()`.
     if (options && options.allowUrlPathOverrides === true) {
       try {
         console.warn('[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage')
@@ -243,15 +217,11 @@ export async function initCMS(options = {}) {
       try {
         console.warn('[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage')
       } catch (e) { console.warn('[nimbi-cms] logging ignore of URL overrides failed', e) }
-      // Remove any path-like overrides from queryOpts to avoid accidental exposure
       delete queryOpts.contentPath
       delete queryOpts.homePage
       delete queryOpts.notFoundPage
     }
   }
-  // `options` is explicit host configuration and generally takes precedence.
-  // However, allow the URL to override the Bulma theme explicitly when present.
-  // This makes `?bulmaCustomize=...` usable even when embedding pages preconfigure a default.
   const finalOptions = Object.assign({}, queryOpts, options)
   if (queryOpts && typeof queryOpts.bulmaCustomize === 'string' && queryOpts.bulmaCustomize.trim()) {
     finalOptions.bulmaCustomize = queryOpts.bulmaCustomize
@@ -277,7 +247,6 @@ export async function initCMS(options = {}) {
     notFoundPage = '_404.md'
   } = finalOptions
 
-  // Normalize common relative path prefixes (e.g. "./assets/brochure.md")
   try {
     if (typeof homePage === 'string' && homePage.startsWith('./')) homePage = homePage.replace(/^\.\//, '')
   } catch (e) {}
@@ -294,7 +263,6 @@ export async function initCMS(options = {}) {
           `</div>`
       }
     } catch (e) {
-      // ignore
     }
   }
 
@@ -310,13 +278,9 @@ export async function initCMS(options = {}) {
           `<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(err)}</pre></div>`
       }
     } catch (e) {
-      // swallow
     }
   }
 
-  // Validate sanitized overrides (if any) before accepting them. This enforces
-  // that runtime values cannot be used to traverse out of the static content
-  // tree or reference absolute/protocol URLs.
   if (finalOptions.contentPath != null) {
     if (!isSafeContentPath(finalOptions.contentPath)) {
       throw new TypeError('initCMS(options): "contentPath" contains unsafe characters or patterns')
@@ -410,8 +374,6 @@ export async function initCMS(options = {}) {
 
   const effectiveSearchEnabled = !!searchEnabled
 
-  // Apply crawler/readme behavior option early so subsequent index builds
-  // honor the caller's preference.
   try {
     import('./slugManager.js').then(m => {
       try { if (m && typeof m.setSkipRootReadme === 'function') m.setSkipRootReadme(!!skipRootReadme) } catch (e2) { console.warn('[nimbi-cms] setSkipRootReadme failed', e2) }
@@ -419,34 +381,25 @@ export async function initCMS(options = {}) {
   } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
 
   try {
-    // Main initialization block. Errors will render a visible message so
-    // users see what went wrong instead of a blank page.
     // eslint-disable-next-line no-implicit-coercion
     await (async () => {
 
   try {
     mountEl.classList.add('nimbi-mount')
-    // layout and overflow are handled via CSS classes and variables
   } catch (e) { console.warn('[nimbi-cms] mount element setup failed', e) }
 
-  // Wrap the CMS content in Bulma layout elements to let Bulma manage
-  // spacing and alignment (section + container + columns).
   const sectionEl = document.createElement('section')
   sectionEl.className = 'section'
 
   const container = document.createElement('div')
   container.className = 'container nimbi-cms'
   try {
-    // Use CSS for container layout defaults; explicit heights are set via
-    // the `--nimbi-cms-height` variable elsewhere when needed.
-    // `-webkit-overflow-scrolling: touch` is covered by CSS defaults
   } catch (e) { console.warn('[nimbi-cms] container style setup failed', e) }
 
   const cols = document.createElement('div')
   cols.className = 'columns'
 
   const navCol = document.createElement('div')
-  // Hide the sidebar on mobile devices and show it on tablet+ using Bulma helpers.
   navCol.className = 'column is-hidden-mobile is-3-tablet nimbi-nav-wrap'
   navCol.setAttribute('role', 'navigation')
   try {
@@ -464,8 +417,6 @@ export async function initCMS(options = {}) {
 
   container.appendChild(cols)
 
-  // Bulma container is now wrapped in a section so it can be styled
-  // with Bulma spacing helpers.
   sectionEl.appendChild(container)
 
   const navWrap = navCol
@@ -490,13 +441,9 @@ export async function initCMS(options = {}) {
   const pageDir = pagePath.endsWith('/') ? pagePath : pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
   try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; console.warn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
-  // treat '.' or './' as "current directory root" (no extra path)
   if (cp === '.' || cp === './') cp = ''
   if (cp.startsWith('./')) cp = cp.slice(2)
   if (cp.startsWith('/')) cp = cp.slice(1)
-  // Normalize `cp` so that:
-  // - an empty string means "same directory as the current page" (no extra '/'),
-  // - non-empty values always end with a trailing '/'.
   if (cp !== '' && !cp.endsWith('/')) cp = cp + '/'
   const contentBase = new URL(pageDir + cp, location.origin).toString()
   try {
@@ -506,9 +453,6 @@ export async function initCMS(options = {}) {
   } catch (e) { console.warn('[nimbi-cms] setHomePage dynamic import failed', e) }
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (availableLanguages && Array.isArray(availableLanguages)) {
-    // Set the list of languages used for slug resolution and navigation mapping.
-    // This controls whether paths like `en/foo.md` are treated as per-language
-    // variants of the same slug.
     setLanguages(availableLanguages)
   }
   if (lang) setLang(lang)
@@ -562,7 +506,6 @@ export async function initCMS(options = {}) {
   try {
     const navbarWrap = document.createElement('header')
     navbarWrap.className = 'nimbi-site-navbar'
-    // Place navbar before the Bulma section container to allow sticky behavior.
     mountEl.insertBefore(navbarWrap, sectionEl)
     const navMd = await fetchMarkdown('_navigation.md', contentBase)
     const parsedNav = await parseMarkdownToHtml(navMd.raw || '')
@@ -576,7 +519,6 @@ export async function initCMS(options = {}) {
           try { mountEl.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { console.warn('[nimbi-cms] set CSS var failed', err) }
           try { container.style.paddingTop = '' } catch (err) { console.warn('[nimbi-cms] set container paddingTop failed', err) }
           try {
-            // set explicit pixel height to avoid layout differences across browsers
             const mountH = (mountEl && mountEl.getBoundingClientRect && Math.round(mountEl.getBoundingClientRect().height)) || (mountEl && mountEl.clientHeight) || 0
             if (mountH > 0) {
               const explicit = Math.max(0, mountH - navHeight)
@@ -602,7 +544,6 @@ export async function initCMS(options = {}) {
   }
   await ui.renderByQuery()
   
-  // Show a subtle version label in the bottom-left corner (non-blocking).
   try {
     import('./version.js').then(({ getVersion }) => {
       if (typeof getVersion === 'function') {
@@ -610,23 +551,18 @@ export async function initCMS(options = {}) {
           try {
                 const v = ver || '0.0.0'
                 try {
-                  // Build a linked version label that uses `package.json.homepage`
-                  // or `package.json.repository.url` if `homepage` is not present.
                     const finishWithAnchor = (href) => {
                     const a = document.createElement('a')
-                    // Apply Bulma `tag` classes; consumers can override via CSS.
                     a.className = 'nimbi-version-label tag is-small'
                     a.textContent = `Ninbi CMS v. ${v}`
                     a.href = href || '#'
                     a.target = '_blank'
                     a.rel = 'noopener noreferrer nofollow'
                     a.setAttribute('aria-label', `Ninbi CMS version ${v}`)
-                    // Visual and positioning styles are in CSS; register theme
                     try { registerThemedElement(a) } catch (e) { /* ignore */ }
                     try { mountEl.appendChild(a) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
                   }
 
-                  // Use the homepage/repository URL injected at build-time.
                   const injectedHomepage = typeof __NIMBI_CMS_HOMEPAGE__ !== 'undefined' ? __NIMBI_CMS_HOMEPAGE__ : null
                   const safeLink = (() => {
                     try {
@@ -634,7 +570,6 @@ export async function initCMS(options = {}) {
                         return new URL(injectedHomepage).toString()
                       }
                     } catch (e) {
-                      // ignore invalid URL
                     }
                     return '#'
                   })()

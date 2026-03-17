@@ -24,8 +24,6 @@ let _updateZoomLabel = () => {}
 let _zoomStep = 0.25
 
 function _createModal() {
-  // If modal was created previously but removed from the DOM (e.g. in tests),
-  // recreate it so we can still open the preview.
   if (_modal && document.contains(_modal)) return _modal
   _modal = null
 
@@ -58,14 +56,12 @@ function _createModal() {
     </div>
   `
 
-  // Close when clicking outside the content area
   modal.addEventListener('click', (event) => {
     if (event.target === modal) {
       closePreview()
     }
   })
 
-  // Zoom with scroll wheel (desktop) when hovering the modal.
   modal.addEventListener('wheel', (event) => {
     if (!isModalOpen()) return
     event.preventDefault()
@@ -81,7 +77,6 @@ function _createModal() {
       return
     }
 
-    // Arrow keys allow panning when zoomed in.
     if (_zoom > 1) {
       const wrapper = modal.querySelector('.nimbi-image-preview__image-wrapper')
       if (!wrapper) return
@@ -143,17 +138,14 @@ function _createModal() {
   resetBtn.addEventListener('click', () => { fitToScreen(); updateZoomLabel(); showZoomHud() })
   closeBtn.addEventListener('click', closePreview)
 
-  // Localize tooltip titles
   fitBtn.title = _label('imagePreviewFit', 'Fit to screen')
   originalBtn.title = _label('imagePreviewOriginal', 'Original size')
   zoomOut.title = _label('imagePreviewZoomOut', 'Zoom out')
   zoomIn.title = _label('imagePreviewZoomIn', 'Zoom in')
   closeBtn.title = _label('imagePreviewClose', 'Close')
 
-  // Accessibility: icon-only buttons need explicit labels
   closeBtn.setAttribute('aria-label', _label('imagePreviewClose', 'Close'))
 
-  // Drag-to-pan support (when the image overflows) and pinch-to-zoom on touch.
   let isDragging = false
   let dragStartX = 0
   let dragStartY = 0
@@ -179,14 +171,12 @@ function _createModal() {
     isDragging = false
     pointers.clear()
     initialPinchDistance = 0
-    // Keep cursor consistent during and after drag.
     if (_img) {
       _img.classList.add('is-panning')
       _img.classList.remove('is-grabbing')
     }
   }
 
-  // Double-tap & double-click support for quick zoom.
   let lastTapTime = 0
   let lastTapX = 0
   let lastTapY = 0
@@ -199,7 +189,6 @@ function _createModal() {
     lastTapX = event.clientX
     lastTapY = event.clientY
 
-    // Consider it a double-tap if two taps happened within 300ms and within 30px.
     if (dt < 300 && Math.hypot(dx, dy) < 30) {
       setZoom(_zoom > 1 ? 1 : 2)
       updateZoomLabel()
@@ -215,8 +204,6 @@ function _createModal() {
 
   const isModalOpen = () => {
     if (!_modal) return false
-    // <dialog>.open exists in browsers that support it. In other environments
-    // (e.g., jsdom), use our `is-active` class.
     if (typeof _modal.open === 'boolean') return _modal.open
     return _modal.classList.contains('is-active')
   }
@@ -226,7 +213,6 @@ function _createModal() {
       pointers.set(id, { x: clientX, y: clientY })
     }
 
-    // Handle pinch-to-zoom
     if (pointers.size === 2) {
       const coords = Array.from(pointers.values())
       const dist = getDistance(coords[0], coords[1])
@@ -254,7 +240,6 @@ function _createModal() {
     pointers.set(id, { x: clientX, y: clientY })
 
     if (pointers.size === 2) {
-      // Begin pinch gesture
       const coords = Array.from(pointers.values())
       initialPinchDistance = getDistance(coords[0], coords[1])
       initialPinchZoom = _zoom
@@ -264,7 +249,6 @@ function _createModal() {
     const wrapper = _img.closest('.nimbi-image-preview__image-wrapper')
     if (!wrapper) return
 
-    // Only drag when the image is actually scrollable inside the wrapper.
     const canScroll = wrapper.scrollWidth > wrapper.clientWidth || wrapper.scrollHeight > wrapper.clientHeight
     if (!canScroll) return
 
@@ -276,7 +260,6 @@ function _createModal() {
     _img.classList.add('is-panning')
     _img.classList.remove('is-grabbing')
 
-    // Track pointer move/up on the whole window so dragging still works if pointer leaves image.
     window.addEventListener('pointermove', windowPointerMove)
     window.addEventListener('pointerup', windowPointerUp)
     window.addEventListener('pointercancel', windowPointerUp)
@@ -295,7 +278,6 @@ function _createModal() {
     window.removeEventListener('pointercancel', windowPointerUp)
   }
 
-  // Pointer events (modern browsers)
   _img.addEventListener('pointerdown', (event) => {
     event.preventDefault()
     startDrag(event.clientX, event.clientY, event.pointerId)
@@ -317,7 +299,6 @@ function _createModal() {
   _img.addEventListener('dblclick', handleDoubleClick)
   _img.addEventListener('pointercancel', endDrag)
 
-  // Fallback for environments without pointer event support (jsdom, older browsers)
   _img.addEventListener('mousedown', (event) => {
     event.preventDefault()
     startDrag(event.clientX, event.clientY, 1)
@@ -331,7 +312,6 @@ function _createModal() {
     endDrag()
   })
 
-  // Also attach to the wrapper so event bubbling works in all environments.
   const wrapper = modal.querySelector('.nimbi-image-preview__image-wrapper')
   if (wrapper) {
     wrapper.addEventListener('pointerdown', (event) => {
@@ -372,28 +352,23 @@ function setZoom(value) {
   const clamped = Number.isFinite(num) ? Math.max(0.1, Math.min(4, num)) : 1
   _zoom = clamped
 
-  // When zooming with explicit width/height, avoid default max-width constraints so
-  // the zoom scale is accurate even when the image is larger than the wrapper.
   const rect = _img.getBoundingClientRect()
   const naturalWidth = _naturalWidth || _img.naturalWidth || _img.width || rect.width || 0
   const naturalHeight = _naturalHeight || _img.naturalHeight || _img.height || rect.height || 0
 
   if (naturalWidth && naturalHeight) {
-    // Allow scaling below/above wrapper size without max constraints.
     _img.style.setProperty('--nimbi-preview-img-max-width', 'none')
     _img.style.setProperty('--nimbi-preview-img-max-height', 'none')
 
     _img.style.setProperty('--nimbi-preview-img-width', `${naturalWidth * _zoom}px`)
     _img.style.setProperty('--nimbi-preview-img-height', `${naturalHeight * _zoom}px`)
     _img.style.setProperty('--nimbi-preview-img-transform', 'none')
-    // Backwards-compatible inline styles for tests and environments
     try {
       _img.style.width = `${naturalWidth * _zoom}px`
       _img.style.height = `${naturalHeight * _zoom}px`
       _img.style.transform = 'none'
     } catch (e) {}
   } else {
-    // Fallback when dimensions aren't known yet.
     _img.style.setProperty('--nimbi-preview-img-max-width', '')
     _img.style.setProperty('--nimbi-preview-img-max-height', '')
     _img.style.setProperty('--nimbi-preview-img-width', '')
@@ -402,7 +377,6 @@ function setZoom(value) {
     try { _img.style.transform = `scale(${_zoom})` } catch (e) {}
   }
 
-  // Always use the pan cursor for consistency.
   if (_img) {
     _img.classList.add('is-panning')
     _img.classList.remove('is-grabbing')
@@ -449,7 +423,6 @@ function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
   _img.alt = alt
   _img.style.transform = 'scale(1)'
 
-  // Capture natural dimensions so “original size” works correctly.
   const captureNaturalSize = () => {
     _naturalWidth = _img.naturalWidth || _img.width || 0
     _naturalHeight = _img.naturalHeight || _img.height || 0
@@ -457,11 +430,9 @@ function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
 
   captureNaturalSize()
 
-  // Apply initial fit immediately (works when DOM sizes are deterministically set)
   fitToScreen()
   _updateZoomLabel()
 
-  // Also rerun after paint so we handle any late layout changes.
   requestAnimationFrame(() => {
     fitToScreen()
     _updateZoomLabel()
@@ -483,10 +454,8 @@ function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
     if (!modal.open) modal.showModal()
   }
 
-  // Always mark it as active so internal drag/pan code can reliably detect open state
   modal.classList.add('is-active')
 
-  // Lock body scroll while preview is open
   try {
     document.documentElement.classList.add('nimbi-image-preview-open')
   } catch (e) {}
@@ -504,7 +473,6 @@ function closePreview() {
   }
   _modal.classList.remove('is-active')
 
-  // Restore body scroll when preview closes
   try {
     document.documentElement.classList.remove('nimbi-image-preview-open')
   } catch (e) {}
@@ -524,20 +492,14 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     return result || def
   }
 
-  // apply configured zoom step to module-level variable so modal handlers
-  // (created in `_createModal`) can access it.
   _zoomStep = zoomStep
 
-  // Delegate clicks so newly-inserted images are also covered.
   root.addEventListener('click', (event) => {
     const target = /** @type {HTMLElement} */ (event.target)
     if (!target || target.tagName !== 'IMG') return
     const img = /** @type {HTMLImageElement} */ (target)
     if (!img.src) return
 
-    // If the image is wrapped in a link, do not open the preview — allow the
-    // link to handle navigation instead. This prevents overriding intentional
-    // anchor behavior (e.g. lightbox links or linked images).
     const anchor = img.closest('a')
     if (anchor && anchor.getAttribute('href')) {
       return
@@ -546,7 +508,6 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     openPreview(img.src, img.alt || '', img.naturalWidth || 0, img.naturalHeight || 0)
   })
 
-  // Drag-to-pan support when zoomed, plus pinch-to-zoom on touch devices.
   let isDragging = false
   let dragStartX = 0
   let dragStartY = 0
@@ -566,8 +527,6 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
   root.addEventListener('pointerdown', (event) => {
     const target = /** @type {HTMLElement} */ (event.target)
     if (!target || target.tagName !== 'IMG') return
-    // If the image is wrapped in a link, do not attach preview drag handlers
-    // or change the cursor — allow the anchor to handle pointer interactions.
     const linkAncestor = target.closest('a')
     if (linkAncestor && linkAncestor.getAttribute('href')) return
 
@@ -576,7 +535,6 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
     if (pointers.size === 2) {
-      // Begin pinch gesture
       const coords = Array.from(pointers.values())
       initialPinchDistance = getDistance(coords[0], coords[1])
       initialPinchZoom = _zoom
@@ -586,7 +544,6 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     const wrapper = target.closest('.nimbi-image-preview__image-wrapper')
     if (!wrapper) return
 
-    // Only drag when zoomed in
     if (_zoom <= 1) return
 
     event.preventDefault()
@@ -604,7 +561,6 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
     }
 
-    // Handle pinch-to-zoom
     if (pointers.size === 2) {
       event.preventDefault()
       const coords = Array.from(pointers.values())
@@ -620,7 +576,6 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     event.preventDefault()
 
     const target = /** @type {HTMLElement} */ (event.target)
-    // If this image is wrapped in a link, don't modify cursor/handle drag here.
     const linkAncestor = target.closest && target.closest('a')
     if (linkAncestor && linkAncestor.getAttribute && linkAncestor.getAttribute('href')) return
     const wrapper = target.closest('.nimbi-image-preview__image-wrapper')
@@ -636,7 +591,6 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     isDragging = false
     pointers.clear()
     initialPinchDistance = 0
-    // normalize preview image cursor/class state
     try {
       const preview = document.querySelector('[data-nimbi-preview-image]')
       if (preview) {

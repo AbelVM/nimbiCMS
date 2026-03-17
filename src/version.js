@@ -13,7 +13,6 @@ export async function getVersion() {
       return __NIMBI_CMS_VERSION__
     }
   } catch (e) {
-    // noop
   }
   return '0.0.0'
 }

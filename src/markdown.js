@@ -20,8 +20,8 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
 /**
  * Generic metadata object returned alongside parsed content. Common keys
  * include `title`, `description`, `author`, etc. Consumers can inspect
- * additional keys as needed.
- * @typedef {Object.<string, string|number|boolean|any>} Meta
+ * additional keys as needed. Nested objects are represented as plain objects.
+ * @typedef {Record<string, unknown>} Meta
  */
 
 /**
@@ -38,7 +38,7 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
  */
 
 /**
- * @typedef {{html:string,meta?:Object}} RendererResult
+ * @typedef {{html:string,meta?:Meta}} RendererResult
  */
 
 /**
@@ -123,13 +123,11 @@ export async function parseMarkdownToHtml(md) {
               const base = slugify(h.textContent || '')
               h.id = uniqueId(base)
             } else {
-              // Respect explicit IDs but still avoid collisions
               h.id = uniqueId(h.id)
             }
             try {
               const level = Number(h.tagName.substring(1))
               if (level >= 1 && level <= 6) {
-                // Responsive size mapping (mobile -> tablet -> desktop)
                 const resp = {
                   1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
                   2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
@@ -146,8 +144,6 @@ export async function parseMarkdownToHtml(md) {
           })
 
           try {
-            // If a logo was moved into the navbar (move-first), remove the
-            // matching image from the rendered document to avoid duplication.
             try {
               const moved = (typeof document !== 'undefined' && document.documentElement && document.documentElement.getAttribute) ? document.documentElement.getAttribute('data-nimbi-logo-moved') : null
               if (moved) {
@@ -159,7 +155,6 @@ export async function parseMarkdownToHtml(md) {
                     if (abs === moved) {
                       const parent = img.parentElement
                       img.remove()
-                      // If the parent is a <p> that is now empty, remove it too.
                       if (parent && parent.tagName && parent.tagName.toLowerCase() === 'p' && parent.childNodes.length === 0) {
                         parent.remove()
                       }
@@ -257,8 +252,6 @@ export async function parseMarkdownToHtml(md) {
       })
 
     try {
-        // If a logo was moved into the navbar (move-first), remove the
-        // matching image from the rendered document to avoid duplication.
         try {
           const moved = (typeof document !== 'undefined' && document.documentElement && document.documentElement.getAttribute) ? document.documentElement.getAttribute('data-nimbi-logo-moved') : null
           if (moved) {

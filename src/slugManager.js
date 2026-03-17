@@ -1,4 +1,3 @@
-/** Responsible for slug ↔ markdown mappings, slug generation, and runtime discovery. */
 /**
  * Responsible for slug ↔ markdown mappings, slug generation,
  * and runtime discovery.
@@ -8,7 +7,7 @@
  * Localized slug mapping entry. When multilingual sites are configured the
  * value stored for a slug may be an object with a `default` path and a
  * `langs` map with per-language paths.
- * @typedef {{default?:string, langs?: Object.<string,string>}} SlugEntry
+ * @typedef {{default?:string, langs?: Record<string,string>}} SlugEntry
  */
 
 /**
@@ -83,8 +82,7 @@ function _sendToWorker(msg) {
 /**
  * Build the search index using the slug worker when available.
  * @param {string} contentBase - Base URL where markdown content is hosted
- * @param {string} contentBase - base URL where markdown content is hosted
- * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>} - resolved search index entries
+ * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>} - Resolved search index entries.
  */
 export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
   const w = initSlugWorker()
@@ -93,11 +91,9 @@ export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noInde
   try {
     return await _sendToWorker({ type: 'buildSearchIndex', contentBase, indexDepth, noIndexing })
   } catch (err) {
-    // If the worker fails, fall back to main thread index build.
     try {
       return await buildSearchIndex(contentBase, indexDepth, noIndexing)
     } catch (fallbackErr) {
-      // If that also fails, log the fallback error and propagate the original worker error.
       console.warn('[slugManager] buildSearchIndex fallback failed', fallbackErr)
       throw err
     }
@@ -111,7 +107,7 @@ export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noInde
  * @param {string} slug - slug to resolve
  * @param {string} base - base content URL used for discovery
  * @param {number} maxQueue - maximum concurrency/queue length for worker
- * @returns {Promise<string|null>} - resolved markdown path or null if not found
+ * @returns {Promise<string|null>} - Resolved markdown path or `null` if not found.
  */
 export async function crawlForSlugWorker(slug, base, maxQueue) {
   const w = initSlugWorker()
@@ -123,7 +119,7 @@ export async function crawlForSlugWorker(slug, base, maxQueue) {
  * Store a slug -> markdown path mapping, respecting configured languages.
  * @param {string} slug - Slug key to associate with a markdown path.
  * @param {string} rel - Markdown path (relative to content base) to associate with the slug.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function _storeSlugMapping(slug, rel) {
   if (!slug) return
@@ -163,7 +159,7 @@ export const slugResolvers = new Set()
 export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.add(fn) }
 /**
  * Unregister a previously added resolver.
- * @param {(slug:string)=>any} fn - Previously registered resolver to remove.
+ * @param {(slug:string)=>void|null} fn - Previously registered resolver to remove.
  * @returns {void} - No return value.
  */
 export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.delete(fn) }
@@ -283,8 +279,6 @@ export function setContentBase(contentBase) {
         const slug = slugify(m[1].trim())
         if (slug) {
           try {
-            // Avoid slug collisions when multiple files share the same H1.
-            // For non-localized builds we generate a unique slug via `-2`, `-3`, etc.
             let slugKey = slug
             if (!availableLanguages || !availableLanguages.length) {
               slugKey = uniqueSlug(slugKey, new Set(slugToMd.keys()))
@@ -328,13 +322,9 @@ export function slugify(s) {
     .toLowerCase()
     .replace(/[^a-z0-9\- ]/g, '')
     .replace(/ /g, '-')
-  // Strip trailing file extensions like '.md' or '.html' if present
   slug = slug.replace(/(?:-?)(?:md|html)$/, '')
-  // Collapse repeated dashes caused by removed characters (e.g. "A & B" -> "a--b")
   slug = slug.replace(/-+/g, '-')
-  // Trim leading/trailing dashes
   slug = slug.replace(/^-|-$/g, '')
-  // Truncate to a safe maximum length
   if (slug.length > MAX_SLUG_LENGTH) {
     slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, '')
   }
@@ -391,18 +381,13 @@ export function isExternalLink(href) {
  */
 export function isExternalLinkWithBase(href, contentBase) {
   if (!href) return false
-  // protocol-relative
   if (href.startsWith('//')) return true
-  // absolute / scheme-based URLs
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
-    // If contentBase is provided and both are absolute URLs, check origin
     if (contentBase && typeof contentBase === 'string') {
       try {
         const h = new URL(href)
         const base = new URL(contentBase)
-        // external if different origin
         if (h.origin !== base.origin) return true
-        // same origin: external if path does not start with contentBase path
         return !h.pathname.startsWith(base.pathname)
       } catch (err) {
         return true
@@ -410,8 +395,6 @@ export function isExternalLinkWithBase(href, contentBase) {
     }
     return true
   }
-  // absolute path starting with '/': consider internal if it resolves
-  // under the configured contentBase (when provided and absolute).
   if (href.startsWith('/') && contentBase && typeof contentBase === 'string') {
     try {
       const abs = new URL(href, contentBase)
@@ -419,7 +402,6 @@ export function isExternalLinkWithBase(href, contentBase) {
       if (abs.origin !== base.origin) return true
       return !abs.pathname.startsWith(base.pathname)
     } catch (err) {
-      // If we can't parse, be conservative and treat as external.
       return true
     }
   }
@@ -440,9 +422,6 @@ export function isExternalLinkWithBase(href, contentBase) {
  */
 export function unescapeMarkdown(s) {
   if (s == null) return s
-  // Per CommonMark/Markdown Guide, these characters may be escaped
-  // with a single backslash: \\ ` * _ { } [ ] ( ) # + - . !
-  // Only remove the backslash when it precedes one of these characters.
   return String(s).replace(/\\([\\`*_{}\[\]()#+\-.!])/g, (_m, ch) => ch)
 }
 
@@ -506,14 +485,8 @@ export let fetchMarkdown = async function(path, base) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
         url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
       } else if (baseClean.startsWith('/')) {
-        // Prefer relative-path fetches when the content base is absolute
-        // from the server root (e.g. '/content/'). This matches browser
-        // behaviour and keeps tests that assert relative URLs happy.
         url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
       } else {
-        // Make a fully-qualified URL for fetch in environments where
-        // relative URLs are rejected (node/undici). Use location.origin
-        // when available, otherwise fall back to http://localhost.
         const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
         const basePath = baseClean.startsWith('/') ? baseClean : ('/' + baseClean)
         url = origin + basePath.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
@@ -604,16 +577,11 @@ export const crawlCache = new Map()
  */
 function _stripCodeAndComments(raw) {
   if (!raw || typeof raw !== 'string') return ''
-  // Remove fenced code blocks ```lang ... ```
   let s = raw.replace(/```[\s\S]*?```/g, '')
-  // Remove <pre>...</pre> and <code>...</code> blocks
   s = s.replace(/<pre[\s\S]*?<\/pre>/gi, '')
   s = s.replace(/<code[\s\S]*?<\/code>/gi, '')
-  // Remove HTML comments
   s = s.replace(/<!--([\s\S]*?)-->/g, '')
-  // Remove indented code block lines (4+ spaces)
   s = s.replace(/^ {4,}.*$/gm, '')
-  // Remove inline code spans `...`
   s = s.replace(/`[^`]*`/g, '')
   return s
 }
@@ -623,7 +591,6 @@ export let searchIndex = []
 
 let _indexPromise = null
 export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing = undefined) {
-  // Compute excludes early so we can decide whether a cached index is valid.
   const earlyExcludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : []
   try {
     const nf = normalizePath(String(notFoundPage || ''))
@@ -631,7 +598,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
   } catch (err) {}
 
   if (searchIndex && searchIndex.length && indexDepth === 1) {
-    // If the cached index already contains any excluded paths, ignore it
     const containsExcluded = searchIndex.some(e => {
       try { return earlyExcludes.includes(normalizePath(String(e.path || ''))) } catch (_) { return false }
     })
@@ -645,7 +611,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       const nf = normalizePath(String(notFoundPage || ''))
       if (nf && !excludes.includes(nf)) excludes.push(nf)
     } catch (err) { /* ignore normalization errors */ }
-    // No hardcoded exclusions here — honor caller-provided `noIndexing`.
 
     const isExcluded = (p) => {
       if (!excludes || !excludes.length) return false
@@ -683,28 +648,17 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         try {
           const md = await fetchMarkdown(p, contentBase)
           if (md && md.raw) {
-            // If fetchMarkdown returned the fallback not-found page (status 404),
-            // don't treat it as a valid page for discovery or indexing.
             if (md.status === 404) continue
             let raw = md.raw
             const hrefs = []
-            // Avoid treating repository README files as site content entry points
-            // Many projects include example links (About, Blog, etc.) in README
-            // that aren't intended to be crawled by the site indexer.
             const baseName = String(p || '').replace(/^.*\//, '')
             if (/^readme(?:\.md)?$/i.test(baseName)) {
-              // Skip link discovery for README files at the repository root
-              // (e.g. README.md) by default. Allow README files inside
-              // content subdirs such as `docs/index/README.md` to be crawled.
-              // This behavior is configurable via `skipRootReadme`.
               if (skipRootReadme) {
                 if (!p || !p.includes('/')) {
                   continue
                 }
               }
             }
-            // Strip code blocks and comments so we don't index links inside
-            // code samples or HTML comments.
             const clean = _stripCodeAndComments(raw)
             const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
             let m
@@ -718,17 +672,11 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
             const pageDirForLinks = (p && p.includes('/')) ? p.substring(0, p.lastIndexOf('/') + 1) : ''
                 for (let href of hrefs) {
               try {
-                // Skip external links (http:, protocol-relative `//`, mailto:, etc.)
                 if (isExternalLinkWithBase(href, contentBase)) continue
-                // Skip parent-relative links which resolve outside the content
-                // directory (e.g. ../modules.html)
                 if (href.startsWith('..') || href.indexOf('/../') !== -1) continue
-                // Resolve simple relative links against the page directory so
-                // `modules.html` inside `docs/index.html` becomes `docs/modules.html`.
                 if (pageDirForLinks && !href.startsWith('./') && !href.startsWith('/') && !href.startsWith('../')) {
                   href = pageDirForLinks + href
                 }
-                // Normalize and only follow markdown/html targets
                 href = normalizePath(href)
                 if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
                 href = href.split(/[?#]/)[0]
@@ -763,7 +711,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       try {
         const md = await fetchMarkdown(path, contentBase)
         if (md && md.raw) {
-          // Skip indexing fetched fallback 404 content
           if (md.status === 404) continue
           let title = ''
           let excerpt = ''
@@ -775,7 +722,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
               if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
               const p = doc.querySelector('p')
               if (p && p.textContent) excerpt = p.textContent.trim()
-              // If indexing H2s (indexDepth >= 2), collect them as separate entries with parentTitle
                 if (indexDepth >= 2) {
                 try {
                   const topH1 = doc.querySelector('h1')
@@ -792,14 +738,12 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                       const anchor = h2.id ? h2.id : slugify(h2Text)
                       const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
                       let h2Excerpt = ''
-                      // Try to find a following paragraph sibling
                       let sib = h2.nextElementSibling
                       while (sib && sib.tagName && sib.tagName.toLowerCase() === 'script') sib = sib.nextElementSibling
                       if (sib && sib.textContent) h2Excerpt = String(sib.textContent).trim()
                       idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
                     } catch (err) { console.warn('[slugManager] indexing H2 failed', err) }
                   }
-                  // If indexing H3s as well, collect them too
                   if (indexDepth === 3) {
                     try {
                       const h3s = Array.from(doc.querySelectorAll('h3'))
@@ -825,8 +769,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
             const raw = md.raw
             const h1m = raw.match(/^#\s+(.+)$/m)
             title = h1m ? h1m[1].trim() : ''
-            // Unescape any Markdown-escaped characters so search UI shows
-            // natural text (e.g. "\\_clearHooks" -> "_clearHooks").
             try { title = unescapeMarkdown(title) } catch (_) {}
             const parts = raw.split(/\r?\n\s*\r?\n/)
             if (parts.length > 1) {
@@ -835,7 +777,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                 if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
               }
             }
-            // If markdown and indexDepth >= 2, extract H2 sections
             if (indexDepth >= 2) {
               let parentTitle = ''
               let pageSlug = ''
@@ -852,7 +793,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                     if (!h2Text) continue
                     const anchor = slugify(h2Text)
                     const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
-                    // attempt to capture a short excerpt: next paragraph after the heading
                     const after = raw.slice(h2re.lastIndex)
                     const paraMatch = after.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
                     const h2Excerpt = paraMatch && paraMatch[1] ? String(paraMatch[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
@@ -860,7 +800,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                   } catch (err) { console.warn('[slugManager] indexing markdown H2 failed', err) }
                 }
               } catch (err) { console.warn('[slugManager] collect markdown H2s failed', err) }
-              // If markdown and indexDepth === 3, extract H3 sections
               if (indexDepth === 3) {
                 try {
                   const h3re = /^###\s+(.+)$/gm
@@ -893,16 +832,12 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         console.warn('[slugManager] buildSearchIndex: entry fetch failed', err)
       }
     }
-    // Ensure any entries matching the caller-provided `noIndexing` excludes
-    // are removed from the final index. This covers cases where entries
-    // were discovered or generated before exclusions were applied.
     try {
       const finalIdx = idx.filter(entry => {
         try { return !isExcluded(String(entry.path || '')) } catch (_) { return true }
       })
       searchIndex = finalIdx
     } catch (err) {
-      // On any unexpected error during filtering, fall back to the raw index.
       console.warn('[slugManager] filtering index by excludes failed', err)
       searchIndex = idx
     }
@@ -975,8 +910,6 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
-          // Skip external links; allow absolute paths that live under
-          // `contentBase` when possible.
           if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
             const sub = relDir + href
@@ -1051,7 +984,6 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
-          // Ignore external links; allow absolute paths under `contentBase`.
           if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
             const sub = relDir + href
@@ -1171,7 +1103,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   }
 
   try {
-    // Prefer configured `homePage` when available, falling back to `_home.md`.
     const homeCandidates = []
     if (homePage && typeof homePage === 'string' && homePage.trim()) homeCandidates.push(homePage)
     if (!homeCandidates.includes('_home.md')) homeCandidates.push('_home.md')
@@ -1190,7 +1121,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
           }
         }
       } catch (e) {
-        // try next candidate
       }
     }
   } catch (e) {
