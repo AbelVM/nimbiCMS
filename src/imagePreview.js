@@ -420,6 +420,22 @@ function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
   _naturalWidth = naturalWidth || 0
   _naturalHeight = naturalHeight || 0
   _img.src = src
+  // Derive a sensible alt if none provided: prefer provided alt, otherwise
+  // fall back to a decoded filename (without extension) so the preview is
+  // readable to assistive tech instead of leaving it empty unless truly decorative.
+  try {
+    if (!alt) {
+      try {
+        const u = new URL(src, typeof location !== 'undefined' ? location.href : '')
+        const p = u.pathname || ''
+        const fn = p.substring(p.lastIndexOf('/') + 1) || src
+        const label = fn.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ')
+        alt = _label('imagePreviewDefaultAlt', label || 'Image')
+      } catch (e) {
+        alt = _label('imagePreviewDefaultAlt', 'Image')
+      }
+    }
+  } catch (e) {}
   _img.alt = alt
   _img.style.transform = 'scale(1)'
 

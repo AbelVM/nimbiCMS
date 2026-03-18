@@ -9,8 +9,10 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - [FEAT] Enhanced workers life cycle management
 - [FEAT] Smoother page transitions
 - [FEAT] Add `navigationPage` option to enable custom navigation index
-- [CHORE] Housecleaning: remove leftover comments
-- [CHORE] Improve JSDoc coverage and quality
+- [A11Y] Keyboard navigation added to search results
+- [A11Y] Enforced WCAG 2.0, 2.1, 2.2 on level A, AA and AAA as well as a number of best practices
+- [CHORE] Housecleaning: removed leftover comments
+- [CHORE] Improved JSDoc coverage and quality
 
 ## [v1.0.2] - 2026-03-16
 
@@ -20,10 +22,10 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 ## [v1.0.1] - 2026-03-16
 
-- [FIX] Do no enable image preview for for images wrapped in links.
+- [FIX] Disabled image preview for for images wrapped in links.
 - [DOCS] Document `.nojekyll` to serve underscore-markdown files in gh-pages.
 - [FIX] Use repo-relative contentPath to avoid root fetches.
-- [FIX] gh-pages path.
+- [FIX] Fixed gh-pages path.
 
 ## [v1.0.0] - 2026-03-16
 

@@ -1,4 +1,3 @@
-
 /* @import './initial.css'; */
 
 .nimbi-site-navbar {
@@ -24,10 +23,12 @@
     /* Ensure card background variable exists for environments where
        the Bulma-derived theme doesn't expose it. Scope to the CMS so
        we don't override global themes. */
-/*     --bulma-card-background-color: var(--bulma-card-background, var(--bulma-scheme-main, var(--bulma-background)));
- */    position: relative;
+    /*     --bulma-card-background-color: var(--bulma-card-background, var(--bulma-scheme-main, var(--bulma-background)));
+ */
+    position: relative;
     overflow-x: hidden !important;
-    overflow: auto; /* allow vertical scrolling by default */
+    overflow: auto;
+    /* allow vertical scrolling by default */
     width: 100%;
     box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
@@ -43,6 +44,7 @@
     margin-left: 0;
     margin-right: 0;
 }
+
 .nimbi-cms .column {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
@@ -87,18 +89,18 @@
 /* Limit the section wrapper height to the mount height minus the navbar.
    This ensures the overall mount does not exceed its container when
    embedded inside a fixed-height host. */
-.nimbi-mount > section {
+.nimbi-mount>section {
     flex: 1 1 auto;
     min-height: 0;
     height: calc(100% - var(--nimbi-site-navbar-height));
     overflow: hidden;
 }
 
-.nimbi-mount > section > .nimbi-cms {
+.nimbi-mount>section>.nimbi-cms {
     height: 100%;
 }
 
-.nimbi-mount > .nimbi-site-navbar + .nimbi-cms {
+.nimbi-mount>.nimbi-site-navbar+.nimbi-cms {
     /* Expose the computed cms height so other components can reference it. */
     /* Prefer mount-relative height so the portal can be embedded in a
        fixed-height container. */
@@ -112,7 +114,7 @@
 }
 
 /* Fallback for when `.nimbi-cms` is not a sibling of `.nimbi-site-navbar` */
-.nimbi-site-navbar + .nimbi-cms {
+.nimbi-site-navbar+.nimbi-cms {
     --nimbi-cms-height: calc(100vh - var(--nimbi-site-navbar-height));
     height: var(--nimbi-cms-height);
     overflow: auto;
@@ -148,6 +150,7 @@
     transition: opacity 220ms ease, transform 220ms ease;
     will-change: opacity, transform;
 }
+
 .nimbi-content.is-inactive {
     opacity: 0;
     transform: translateY(6px);
@@ -157,9 +160,10 @@
 /* When a site navbar is present and sticky, add top padding so content
    is not rendered beneath the navbar. Preserve the existing 2rem padding
    on other sides and add the navbar height on top. */
-.nimbi-site-navbar + .nimbi-cms .nimbi-content {
+.nimbi-site-navbar+.nimbi-cms .nimbi-content {
     padding-top: calc(var(--nimbi-site-navbar-height) + 2rem);
 }
+
 .nimbi-toc-inner {
     margin-bottom: 1rem;
     /* Keep the TOC within the visible area by capping its height to a
@@ -192,8 +196,7 @@
     color: inherit;
 }
 
-.nimbi-article.content {
-}
+.nimbi-article.content {}
 
 .nimbi-toc-inner ul {
     list-style: none;
@@ -221,11 +224,15 @@
 .nimbi-toc-inner ul ul {
     margin-left: 0.75rem;
     padding-left: 0.5rem;
-    font-size: 0.95em; /* slightly smaller than H2 level */
+    font-size: 0.95em;
+    /* slightly smaller than H2 level */
 }
+
 .nimbi-toc-inner ul ul a {
-    font-weight: 400; /* less bold for H3 entries */
+    font-weight: 400;
+    /* less bold for H3 entries */
 }
+
 .nimbi-toc-inner ul ul li {
     margin: 0.25rem 0;
 }
@@ -235,7 +242,7 @@
     font-size: 0.92em;
 }
 
-.nimbi-toc-inner .menu-list{
+.nimbi-toc-inner .menu-list {
     overflow-y: auto;
     overflow-x: hidden;
     max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6 - 4rem) !important;
@@ -267,11 +274,13 @@
     border-radius: 6px;
     box-shadow: none !important;
 }
+
 /* allow the panel itself to scroll so the parent label remains visible */
 .nimbi-search-panel {
     max-height: 320px;
     overflow-y: auto;
-    scrollbar-width: thin; /* Firefox */
+    scrollbar-width: thin;
+    /* Firefox */
     scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
 }
 
@@ -280,21 +289,28 @@
     width: 8px;
     height: 8px;
 }
+
 .nimbi-search-panel::-webkit-scrollbar-thumb {
-    background-color: var(--bulma-scrollbar-thumb-color, rgba(0,0,0,0.25));
+    background-color: var(--bulma-scrollbar-thumb-color, rgba(0, 0, 0, 0.25));
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
+
 .nimbi-search-panel .nimbi-search-parent {
     font-size: 0.75rem;
     color: var(--bulma-text-muted, #7a7a7a);
-    padding: 0.25rem 0.75rem 0; /* remove bottom padding */
-    background: transparent; /* match panel background */
+    padding: 0.25rem 0.75rem 0;
+    /* remove bottom padding */
+    background: transparent;
+    /* match panel background */
     display: flex;
-    align-items: flex-end; /* vertically align text to bottom */
-    font-weight: 400; /* not bold */
-    margin: 0 0 -0.75rem 0; /* pull following content up slightly */
+    align-items: flex-end;
+    /* vertically align text to bottom */
+    font-weight: 400;
+    /* not bold */
+    margin: 0 0 -0.75rem 0;
+    /* pull following content up slightly */
 }
 
 /* Tweak H1 / subtitle / reading-time grouping for tighter visual grouping */
@@ -309,6 +325,7 @@
     line-height: 1.1;
     color: var(--nimbi-reading-time-color, var(--bulma-text-muted, #7a7a7a));
 }
+
 .nimbi-search-panel .nimbi-search-result {
     display: block;
     padding: 0.5rem 0.75rem;
@@ -316,9 +333,11 @@
     /* Use Bulma's body text color so search results match the overall theme */
     color: var(--bulma-body-color, inherit);
 }
+
 .nimbi-search-panel .nimbi-search-result .is-size-6 {
     line-height: 1.15;
 }
+
 .nimbi-search-panel .nimbi-search-result:hover {
     background-color: var(--bulma-table-hover-background, #f5f5f5);
 }
@@ -326,17 +345,20 @@
 /* Selected result for keyboard navigation */
 .nimbi-search-panel .nimbi-search-result.is-selected {
     background-color: var(--bulma-table-hover-background, #e9eef6);
-    outline: none;
 }
 
-/* Remove default focus ring for the results container and items */
-.nimbi-search-panel:focus,
+/* Provide an accessible focus style for keyboard users. Keep outline:none
+   but present a visible focus ring and subtle background so focused items
+   remain discoverable. */
+
 .nimbi-search-panel:focus-visible,
-.nimbi-search-results:focus,
+.nimbi-search-panel:focus,
 .nimbi-search-results:focus-visible,
+.nimbi-search-results:focus,
 .nimbi-search-panel .nimbi-search-results:focus,
 .nimbi-search-panel .nimbi-search-results:focus-visible {
     outline: none;
+    box-shadow: var(--bulma-shadow);
 }
 
 /* Ensure dropdown-content variant respects panel styling */
@@ -371,19 +393,23 @@
 .nimbi-mount {
     position: relative;
 }
+
 .nimbi-mount {
     overflow-x: hidden;
 }
+
 .nimbi-mount .nimbi-site-navbar,
 .nimbi-mount .nimbi-nav-wrap {
     position: sticky;
 }
+
 .nimbi-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
     z-index: 70;
 }
+
 .nimbi-overlay .nimbi-scroll-top {
     position: absolute;
     right: 1rem;
@@ -398,8 +424,7 @@
     border-radius: 10px;
 }
 
-.nimbi-image-preview::backdrop {
-}
+.nimbi-image-preview::backdrop {}
 
 .nimbi-image-preview .nimbi-image-preview__content {
     width: 80vw;
@@ -474,8 +499,7 @@
     height: 8px;
 }
 
-.nimbi-image-preview__image-wrapper::-webkit-scrollbar-track {
-}
+.nimbi-image-preview__image-wrapper::-webkit-scrollbar-track {}
 
 .nimbi-image-preview__image-wrapper::-webkit-scrollbar-thumb {
     background-color: var(--bulma-scrollbar-thumb-color);
@@ -504,7 +528,9 @@
 }
 
 /* Smooth transform transitions when zooming */
-.nimbi-image-preview img { transition: transform 120ms ease; }
+.nimbi-image-preview img {
+    transition: transform 120ms ease;
+}
 
 .nimbi-image-preview .nimbi-image-preview__controls {
     display: flex;
@@ -520,7 +546,7 @@
     align-items: center;
 }
 
-.nimbi-image-preview .nimbi-image-preview__controls .nimbi-image-preview__group + .nimbi-image-preview__group {
+.nimbi-image-preview .nimbi-image-preview__controls .nimbi-image-preview__group+.nimbi-image-preview__group {
     margin-left: 0.75rem;
     padding-left: 0.75rem;
     border-left: 1px solid var(--bulma-border-weak);
@@ -545,8 +571,7 @@
     z-index: 1;
 }
 
-.nimbi-image-preview .nimbi-image-preview__close:hover {
-}
+.nimbi-image-preview .nimbi-image-preview__close:hover {}
 
 .nimbi-scroll-top.show {
     opacity: 1;
@@ -561,13 +586,18 @@
 /* Make everything outside the main content non-selectable, and re-enable
    selection inside `.nimbi-content`. This ensures UI chrome (nav, headers,
    controls) can't be text-selected while allowing article text to be selectable. */
-:root, html, body, .nimbi-cms {
+:root,
+html,
+body,
+.nimbi-cms {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
 }
-.nimbi-content, .nimbi-content * {
+
+.nimbi-content,
+.nimbi-content * {
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
@@ -589,7 +619,36 @@
     user-select: none;
     transition: opacity 150ms ease;
 }
-.nimbi-version-label:hover { opacity: 0.95 }
+
+/* Ensure sufficient contrast on light and dark themes while remaining theme-aware.
+   Use CSS variables so theme builds can override if necessary. */
+.nimbi-version-label {
+    color: var(--nimbi-version-label-color, #333);
+}
+
+.nimbi-version-label:hover {
+    opacity: 0.95
+}
+
+/* Dark theme override when mount or document is set to dark */
+[data-theme="dark"] .nimbi-version-label,
+.nimbi-mount[data-theme="dark"] .nimbi-version-label {
+    color: var(--nimbi-version-label-color-dark, #ddd);
+}
+
+/* Stronger specificity for link/tag cases where Bulma's `.tag` sets color later
+   in the cascade. Use !important sparingly to ensure the label remains readable. */
+a.nimbi-version-label,
+.nimbi-version-label.tag {
+    color: var(--nimbi-version-label-color, #111) !important;
+}
+
+[data-theme="dark"] a.nimbi-version-label,
+[data-theme="dark"] .nimbi-version-label.tag,
+.nimbi-mount[data-theme="dark"] a.nimbi-version-label,
+.nimbi-mount[data-theme="dark"] .nimbi-version-label.tag {
+    color: var(--nimbi-version-label-color-dark, #eee) !important;
+}
 
 /* Provide reasonable defaults for light/dark modifiers; Bulma's
    is-dark / is-light classes can override colors as needed. */
@@ -597,19 +656,29 @@
 /* NOTE: Color and background are managed by Bulma's theme variables.
    This file avoids setting them explicitly so Bulma can take the wheel. */
 /* Image preview cursor state classes */
-.nimbi-image-preview img.is-panning { cursor: all-scroll }
-.nimbi-image-preview img.is-grabbing { cursor: grabbing }
+.nimbi-image-preview img.is-panning {
+    cursor: all-scroll
+}
 
-.nimbi-cms, .nimbi-nav-wrap, .menu-list {
-    scrollbar-width: thin; 
+.nimbi-image-preview img.is-grabbing {
+    cursor: grabbing
+}
+
+.nimbi-cms,
+.nimbi-nav-wrap,
+.menu-list {
+    scrollbar-width: thin;
     scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
 }
 
-.nimbi-cms::-webkit-scrollbar, .nimbi-nav-wrap::-webkit-scrollbar {
+.nimbi-cms::-webkit-scrollbar,
+.nimbi-nav-wrap::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
-.nimbi-cms::-webkit-scrollbar-track, .nimbi-nav-wrap::-webkit-scrollbar-track {
+
+.nimbi-cms::-webkit-scrollbar-track,
+.nimbi-nav-wrap::-webkit-scrollbar-track {
     /* default track background; Bulma theming applies automatically */
 }
 
@@ -642,30 +711,39 @@
     padding: 0.75rem;
 }
 
-#nimbi-search { width: 240px; }
+#nimbi-search {
+    width: 240px;
+}
 
 /* Bulma handles dropdown show/hide via the .is-active class. */
 
-.nimbi-cms::-webkit-scrollbar-thumb, .nimbi-nav-wrap::-webkit-scrollbar-thumb {
+.nimbi-cms::-webkit-scrollbar-thumb,
+.nimbi-nav-wrap::-webkit-scrollbar-thumb {
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
-.nimbi-cms::-webkit-scrollbar-thumb:hover, .nimbi-nav-wrap::-webkit-scrollbar-thumb:hover {
-}
+
+.nimbi-cms::-webkit-scrollbar-thumb:hover,
+.nimbi-nav-wrap::-webkit-scrollbar-thumb:hover {}
 
 /* Make HTML tables horizontally scrollable when they're wider than the article */
 .nimbi-article {
     /* allow horizontal scrolling when tables overflow the article width */
     overflow-x: auto;
 }
+
 .nimbi-article table,
 .nimbi-cms table {
     display: table;
-    width: 100%;         /* make table span the full container width */
-    min-width: 100%;     /* ensure generated tables span full width */
-    max-width: 100%;     /* do not exceed container width */
-    table-layout: fixed; /* allow predictable column sizing */
+    width: 100%;
+    /* make table span the full container width */
+    min-width: 100%;
+    /* ensure generated tables span full width */
+    max-width: 100%;
+    /* do not exceed container width */
+    table-layout: fixed;
+    /* allow predictable column sizing */
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: auto;
@@ -693,18 +771,21 @@
     min-width: 160px;
     width: 26%;
 }
+
 .nimbi-article table th:nth-child(2),
 .nimbi-article table td:nth-child(2),
 .nimbi-cms table th:nth-child(2),
 .nimbi-cms table td:nth-child(2) {
     width: 15%;
 }
+
 .nimbi-article table th:nth-child(3),
 .nimbi-article table td:nth-child(3),
 .nimbi-cms table th:nth-child(3),
 .nimbi-cms table td:nth-child(3) {
     width: 12%;
 }
+
 .nimbi-article table th:nth-child(4),
 .nimbi-article table td:nth-child(4),
 .nimbi-cms table th:nth-child(4),
@@ -714,10 +795,12 @@
 
 /* On narrow screens, let the browser auto-layout and stack as needed */
 @media (max-width: 700px) {
+
     .nimbi-article table,
     .nimbi-cms table {
         table-layout: auto;
     }
+
     .nimbi-article table th:first-child,
     .nimbi-article table td:first-child,
     .nimbi-cms table th:first-child,
@@ -725,6 +808,7 @@
         min-width: 120px;
         width: auto;
     }
+
     .nimbi-article table th:nth-child(2),
     .nimbi-article table td:nth-child(2),
     .nimbi-cms table th:nth-child(2),
@@ -740,19 +824,22 @@
         width: auto;
     }
 }
+
 .nimbi-article table::-webkit-scrollbar {
     height: 8px;
 }
+
 .nimbi-article table::-webkit-scrollbar-track {
     /* default track background; Bulma theming applies automatically */
 }
+
 .nimbi-article table::-webkit-scrollbar-thumb {
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
-.nimbi-article table::-webkit-scrollbar-thumb:hover {
-}
+
+.nimbi-article table::-webkit-scrollbar-thumb:hover {}
 
 /* Desktop: limit long menu-lists to 80% of the visible CMS area */
 @media (min-width: 801px) {
@@ -768,7 +855,8 @@
    a persistent scrollbar (e.g. `overflow-y: scroll`). Ensure the
    page-level overflow defaults to `auto` so an empty/thumbnail-less
    scrollbar doesn't appear when no content is overflowing. */
-html, body {
+html,
+body {
     overflow-x: auto !important;
     overflow-y: auto !important;
 }

@@ -69,6 +69,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   await safe(() => preScanHtmlSlugs(linkEls, contentBase))
   await safe(() => preMapMdSlugs(linkEls, contentBase))
 
+  try {
+    if (container && container instanceof HTMLElement) {
+      if (!container.hasAttribute || !container.hasAttribute('role')) {
+        try { container.setAttribute('role', 'main') } catch (e) {}
+      }
+    }
+  } catch (e) {}
   
   let searchIndexPromise = null
   let searchInput = null
@@ -350,6 +357,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchInput.type = 'search'
     searchInput.placeholder = t('searchPlaceholder') || ''
     searchInput.id = 'nimbi-search'
+    try {
+      const ariaLabel = (t && typeof t === 'function' ? t('searchAria') : null) || searchInput.placeholder || 'Search'
+      try { searchInput.setAttribute('aria-label', ariaLabel) } catch (e) {}
+      try { searchInput.setAttribute('aria-controls', 'nimbi-search-results') } catch (e) {}
+      try { searchInput.setAttribute('aria-autocomplete', 'list') } catch (e) {}
+      try { searchInput.setAttribute('role', 'combobox') } catch (e) {}
+    } catch (e) {}
     if (searchIndexMode === 'eager') {
       searchInput.disabled = true
     }
