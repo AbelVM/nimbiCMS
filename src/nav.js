@@ -92,6 +92,29 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     } catch (err) { console.warn && console.warn('[nimbi-cms] closeMobileMenu failed', err) }
   }
 
+  /* Helper: run the provided `renderByQuery` with a small visual transition.
+     Adds `.is-inactive` to the main content then calls the renderer; when
+     the renderer completes (or throws) the class is removed on the next
+     animation frame so layout has a chance to settle. */
+  async function runRenderWithTransition() {
+    const contentEl = (typeof document !== 'undefined') ? document.querySelector('.nimbi-content') : null
+    try { if (contentEl) contentEl.classList.add('is-inactive') } catch (e) {}
+    try {
+      const r = renderByQuery && renderByQuery()
+      if (r && typeof r.then === 'function') await r
+    } catch (e) {
+      try { console.warn && console.warn('[nimbi-cms] renderByQuery failed', e) } catch (_) {}
+    } finally {
+      try {
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => { try { if (contentEl) contentEl.classList.remove('is-inactive') } catch (e) {} })
+        } else {
+          try { if (contentEl) contentEl.classList.remove('is-inactive') } catch (e) {}
+        }
+      } catch (e) { try { if (contentEl) contentEl.classList.remove('is-inactive') } catch (e2) {} }
+    }
+  }
+
   const ensureSearchIndex = () => {
     if (searchIndexPromise) return searchIndexPromise
     searchIndexPromise = (async () => {
@@ -267,7 +290,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       const pageParam = url.searchParams.get('page');
       const hash = url.hash ? url.hash.replace(/^#/, '') : null;
       history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash));
-      try { renderByQuery(); } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e); }
+      runRenderWithTransition()
       try { closeMobileMenu() } catch (e) {}
     }
   });
@@ -592,7 +615,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         if (pageParam) {
           ev.preventDefault()
           history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
-          try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
+          runRenderWithTransition()
         }
       } catch (e) { console.warn('[nimbi-cms] navbar click handler failed', e) }
         try {
@@ -622,7 +645,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         if (pageParam) {
           ev.preventDefault()
           history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
-          try { renderByQuery() } catch (e) { console.warn('[nimbi-cms] renderByQuery failed', e) }
+          runRenderWithTransition()
         }
       } catch (e) {
         console.warn('[nimbi-cms] container click URL parse failed', e)

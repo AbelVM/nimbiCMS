@@ -140,6 +140,20 @@
     padding: 2rem
 }
 
+/* Smooth page content transitions: toggle `is-inactive` during navigation
+   to fade/move content while the renderer updates the DOM. JS should add
+  /remove the class around route changes (e.g. add before fetch, remove
+   after insert). */
+.nimbi-content {
+    transition: opacity 220ms ease, transform 220ms ease;
+    will-change: opacity, transform;
+}
+.nimbi-content.is-inactive {
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+}
+
 /* When a site navbar is present and sticky, add top padding so content
    is not rendered beneath the navbar. Preserve the existing 2rem padding
    on other sides and add the navbar height on top. */

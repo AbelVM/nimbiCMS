@@ -1,11 +1,12 @@
 # Changelog
 
-All notable changes to nimbiCMS will be documented in this file.
+All notable changes to **nimbiCMS** will be documented in this file.
 
 ## [Unreleased]
 
-- [FEAT] Parallel indexing  
+- [FEAT] Parallel indexing, highly improved search box availability time  
 - [FEAT] Workers pool
+- [FEAT] Smoother page transitions
 - [FEAT] Add `navigationPage` option to enable custom navigation index
 - [CHORE] Housecleaning: remove leftover comments
 - [CHORE] Improve JSDoc coverage and quality
