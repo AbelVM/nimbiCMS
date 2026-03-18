@@ -3,7 +3,14 @@ import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
 import { registerThemedElement } from './bulmaManager.js'
+import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
+import anchorWorkerCode from './worker/anchorWorker.js?raw'
+import * as AnchorModule from './worker/anchorWorker.js'
 
+// Debug gating for noisy htmlBuilder warnings. Consumers can enable
+// verbose logs by setting `globalThis.__nimbiCMSDebug = true`.
+const _hbShouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
+function _hbWarn(...args) { try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {} }
 function resolvePathWithBase(path, base) {
   try {
     const u = new URL(path, base)
@@ -715,7 +722,7 @@ function parseHtml(raw) {
  * @param {string} raw - markdown text to scan
  */
 async function ensureLanguages(raw) {
-  const langsArray = (md.detectFenceLanguages ? md.detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP) : new Set())
+  const langsArray = (md.detectFenceLanguagesAsync ? await md.detectFenceLanguagesAsync(raw || '', SUPPORTED_HLJS_MAP) : md.detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP))
   const langs = new Set(langsArray)
   const promises = []
   for (const l of langs) {
@@ -872,7 +879,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     try {
       await rewriteAnchorsWorker(article, contentBase, pagePath)
     } catch (err) {
-      console.warn('[htmlBuilder] rewriteAnchorsWorker failed, falling back to main thread', err)
+      _hbWarn('[htmlBuilder] rewriteAnchorsWorker failed, falling back to main thread', err)
       await rewriteAnchors(article, contentBase, pagePath)
     }
 
@@ -968,65 +975,59 @@ export function renderNotFound(contentWrap, t, e) {
   }
 
  
-let _anchorWorker = null
-import anchorWorkerCode from './worker/anchorWorker.js?raw'
-
-/**
- * @returns {Worker|null} - A Worker instance used for anchor processing, or null if unsupported.
- */
-export function initAnchorWorker() {
-  if (!_anchorWorker) {
+const _anchorManager = makeWorkerManager(() => {
+  // Prefer blob-based worker when environment supports it.
+  const w = createWorkerFromRaw(anchorWorkerCode)
+  // In test environments (Vitest) blob-based Workers may exist but not run
+  // their module code; prefer the inline shim to keep tests deterministic.
+  if (w) {
     try {
-      let url = null
-      if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && anchorWorkerCode) {
-        try {
-          const blob = new Blob([anchorWorkerCode], { type: 'application/javascript' })
-          url = URL.createObjectURL(blob)
-        } catch (err) { url = null; console.warn('[htmlBuilder] createObjectURL failed', err) }
-      }
-      if (url) {
-        _anchorWorker = new Worker(url, { type: 'module' })
-      } else {
-        _anchorWorker = null
-      }
-    } catch (e) {
-      console.warn('[htmlBuilder] anchor worker init failed', e)
-      _anchorWorker = null
-    }
+      if (!(typeof process !== 'undefined' && process.env && process.env.VITEST)) return w
+    } catch (e) { return w }
   }
-  return _anchorWorker
-}
 
-function _sendToAnchorWorker(msg) {
-  return new Promise((resolve, reject) => {
-    const w = initAnchorWorker()
-    if (!w) return reject(new Error('worker unavailable'))
-    const id = String(Math.random())
-    msg.id = id
-    const h = ev => {
-      const data = ev.data || {}
-      if (data.id !== id) return
-      w.removeEventListener('message', h)
-      if (data.error) reject(new Error(data.error))
-      else resolve(data.result)
-    }
-    w.addEventListener('message', h)
-    w.postMessage(msg)
-  })
-}
+  // Inline shim for Node/test env: call exported handler and emulate Worker API.
+  const listeners = { message: [], error: [] }
+  return {
+    addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
+    removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
+    postMessage(msg) {
+      setTimeout(async () => {
+        try {
+          const out = await AnchorModule.handleAnchorWorkerMessage(msg)
+          const ev = { data: out }
+          ;(listeners.message || []).forEach(fn => fn(ev))
+        } catch (e) {
+          const ev = { data: { id: msg && msg.id, error: String(e) } }
+          ;(listeners.message || []).forEach(fn => fn(ev))
+        }
+      }, 0)
+    },
+    terminate() { Object.keys(listeners).forEach(k => listeners[k].length = 0) }
+  }
+}, 'anchor')
 
 /**
- * Try to rewrite anchors using a dedicated worker. If the worker is not
- * available this is a thin wrapper that falls back to the in-thread
- * `rewriteAnchors` implementation.
- *
- * @param {HTMLElement} article - Article element to process.
- * @param {string} contentBase - Base URL or path for site content.
- * @param {string} [pagePath] - Optional page path for relative resolution.
- * @returns {Promise<void>} - Resolves when anchor rewriting completes (or falls back to sync implementation).
+ * @returns {Worker|null}
+ */
+export function initAnchorWorker() { return _anchorManager.get() }
+
+function _sendToAnchorWorker(msg) { return _anchorManager.send(msg, 2000) }
+
+/**
+ * Rewrite anchors using the dedicated anchor worker. Enforce worker usage —
+ * reject when the worker is unavailable to make bundling and tree-shaking
+ * consistent.
  */
 export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
-  return rewriteAnchors(article, contentBase, pagePath)
+  const w = initAnchorWorker()
+  if (!w) throw new Error('anchor worker unavailable')
+  if (!article || typeof article.innerHTML !== 'string') throw new Error('invalid article element')
+  const html = String(article.innerHTML)
+  const res = await _sendToAnchorWorker({ type: 'rewriteAnchors', html, contentBase, pagePath })
+  if (res && typeof res === 'string') {
+    try { article.innerHTML = res } catch (e) { console.warn('[htmlBuilder] applying rewritten anchors failed', e) }
+  }
 }
 
  

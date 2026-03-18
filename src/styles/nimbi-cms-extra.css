@@ -223,6 +223,7 @@
 
 .nimbi-toc-inner .menu-list{
     overflow-y: auto;
+    overflow-x: hidden;
     max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6 - 4rem) !important;
 }
 
@@ -728,7 +729,8 @@
     .nimbi-nav-wrap .menu-list {
         /* number * length: ratio first, then computed cms height */
         max-height: calc(var(--nimbi-menu-max-ratio) * var(--nimbi-cms-height));
-        overflow: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
     }
 }
 

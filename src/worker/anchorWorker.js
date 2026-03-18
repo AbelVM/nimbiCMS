@@ -31,3 +31,24 @@ onmessage = async (ev) => {
     postMessage({ id: msg.id, error: String(e) })
   }
 }
+
+// Exported handler for inline invocation in non-Worker environments (tests).
+export async function handleAnchorWorkerMessage(msg) {
+  try {
+    if (msg && msg.type === 'rewriteAnchors') {
+      const { id, html, contentBase, pagePath } = msg
+      try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(html || '', 'text/html')
+        const article = doc.body
+        await _rewriteAnchors(article, contentBase, pagePath)
+        return { id, result: doc.body.innerHTML }
+      } catch (e) {
+        return { id, error: String(e) }
+      }
+    }
+    return { id: msg && msg.id, error: 'unsupported message' }
+  } catch (e) {
+    return { id: msg && msg.id, error: String(e) }
+  }
+}

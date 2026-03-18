@@ -182,6 +182,7 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 // --- from src/worker-manager.js
+export function makeWorkerPool(createWorker: any, name: any, size: any): any
 
 
 
@@ -264,6 +265,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
 
 
 // --- from src/markdown.js
+export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<string,string>): Promise<Set<string>>
 
 
 
@@ -336,9 +338,12 @@ export function registerThemedElement(el: any): () => void
 
 // --- from src/worker/slugWorker.js
 
+
 // --- from src/worker/renderer.js
 
+
 // --- from src/worker/anchorWorker.js
+
 
 // --- from src/utils/l10n-defaults.js
 export const DEFAULT_L10N: Record<string, L10nEntry>

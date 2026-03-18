@@ -63,41 +63,32 @@ import * as l10n from './l10nManager.js'
 let _slugWorker = null
 import slugWorkerCode from './worker/slugWorker.js?raw'
 
-import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
+import { makeWorkerPool, createWorkerFromRaw } from './worker-manager.js'
 
-const _slugWorkerManager = makeWorkerManager(() => createWorkerFromRaw(slugWorkerCode), 'slugManager')
+const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
+const _slugWorkerManager = makeWorkerPool(() => createWorkerFromRaw(slugWorkerCode), 'slugManager', poolSize)
 
 /**
  * Lazily return a worker instance used for slug-related background tasks.
- * @returns {Worker|null} - A Worker instance or null if workers are unavailable.
+ * @returns {Worker|null}
  */
-export function initSlugWorker() {
-  return _slugWorkerManager.get()
-}
+export function initSlugWorker() { return _slugWorkerManager.get() }
 
-function _sendToWorker(msg) {
-  return _slugWorkerManager.send(msg)
-}
+function _sendToWorker(msg) { return _slugWorkerManager.send(msg, 5000) }
 
 /**
  * Build the search index using the slug worker when available.
  * @param {string} contentBase - Base URL where markdown content is hosted
  * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>} - Resolved search index entries.
  */
-export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
-  const w = initSlugWorker()
-  if (!w) return buildSearchIndex(contentBase, indexDepth, noIndexing)
 
-  try {
-    return await _sendToWorker({ type: 'buildSearchIndex', contentBase, indexDepth, noIndexing })
-  } catch (err) {
-    try {
-      return await buildSearchIndex(contentBase, indexDepth, noIndexing)
-    } catch (fallbackErr) {
-      console.warn('[slugManager] buildSearchIndex fallback failed', fallbackErr)
-      throw err
-    }
-  }
+export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
+  // dynamic import of this module's namespace ensures test spies that
+  // replace `initSlugWorker` on the module object are observed here.
+  const ns = await import('./slugManager.js')
+  const w = ns.initSlugWorker && ns.initSlugWorker()
+  if (!w) throw new Error('slug worker required but unavailable')
+  return await _sendToWorker({ type: 'buildSearchIndex', contentBase, indexDepth, noIndexing })
 }
 
 
@@ -110,9 +101,10 @@ export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noInde
  * @returns {Promise<string|null>} - Resolved markdown path or `null` if not found.
  */
 export async function crawlForSlugWorker(slug, base, maxQueue) {
-  const w = initSlugWorker()
-  if (w) return _sendToWorker({ type: 'crawlForSlug', slug, base, maxQueue })
-  return crawlForSlug(slug, base, maxQueue)
+  const ns = await import('./slugManager.js')
+  const w = ns.initSlugWorker && ns.initSlugWorker()
+  if (!w) throw new Error('slug worker required but unavailable')
+  return _sendToWorker({ type: 'crawlForSlug', slug, base, maxQueue })
 }
 
 /**
@@ -641,58 +633,68 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
     try {
       const visited = new Set(paths)
       const queue = [...paths]
-      if (visited.size === 0) {
-      }
-      while (queue.length && visited.size <= defaultCrawlMaxQueue) {
-        const p = queue.shift()
-        try {
-          const md = await fetchMarkdown(p, contentBase)
-          if (md && md.raw) {
-            if (md.status === 404) continue
-            let raw = md.raw
-            const hrefs = []
-            const baseName = String(p || '').replace(/^.*\//, '')
-            if (/^readme(?:\.md)?$/i.test(baseName)) {
-              if (skipRootReadme) {
-                if (!p || !p.includes('/')) {
-                  continue
+
+      // Use bounded concurrency for discovery fetches to improve throughput
+      const fetchConcurrency = Math.max(1, poolSize)
+
+      const worker = async () => {
+        while (true) {
+          if (visited.size > defaultCrawlMaxQueue) break
+          const p = queue.shift()
+          if (!p) break
+          try {
+            const md = await fetchMarkdown(p, contentBase)
+            if (md && md.raw) {
+              if (md.status === 404) continue
+              let raw = md.raw
+              const hrefs = []
+              const baseName = String(p || '').replace(/^.*\//, '')
+              if (/^readme(?:\.md)?$/i.test(baseName)) {
+                if (skipRootReadme) {
+                  if (!p || !p.includes('/')) {
+                    continue
+                  }
                 }
               }
+              const clean = _stripCodeAndComments(raw)
+              const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
+              let m
+              while ((m = mdLinkRe.exec(clean))) {
+                hrefs.push(m[1])
+              }
+              const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
+              while ((m = htmlLinkRe.exec(clean))) {
+                hrefs.push(m[1])
+              }
+              const pageDirForLinks = (p && p.includes('/')) ? p.substring(0, p.lastIndexOf('/') + 1) : ''
+              for (let href of hrefs) {
+                try {
+                  if (isExternalLinkWithBase(href, contentBase)) continue
+                  if (href.startsWith('..') || href.indexOf('/../') !== -1) continue
+                  if (pageDirForLinks && !href.startsWith('./') && !href.startsWith('/') && !href.startsWith('../')) {
+                    href = pageDirForLinks + href
+                  }
+                  href = normalizePath(href)
+                  if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
+                  href = href.split(/[?#]/)[0]
+                  if (isExcluded(href)) continue
+                  if (!visited.has(href)) {
+                    visited.add(href)
+                    queue.push(href)
+                    paths.push(href)
+                  }
+                } catch (err) { console.warn('[slugManager] href processing failed', href, err) }
+              }
             }
-            const clean = _stripCodeAndComments(raw)
-            const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
-            let m
-            while ((m = mdLinkRe.exec(clean))) {
-              hrefs.push(m[1])
-            }
-            const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
-            while ((m = htmlLinkRe.exec(clean))) {
-              hrefs.push(m[1])
-            }
-            const pageDirForLinks = (p && p.includes('/')) ? p.substring(0, p.lastIndexOf('/') + 1) : ''
-                for (let href of hrefs) {
-              try {
-                if (isExternalLinkWithBase(href, contentBase)) continue
-                if (href.startsWith('..') || href.indexOf('/../') !== -1) continue
-                if (pageDirForLinks && !href.startsWith('./') && !href.startsWith('/') && !href.startsWith('../')) {
-                  href = pageDirForLinks + href
-                }
-                href = normalizePath(href)
-                if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
-                href = href.split(/[?#]/)[0]
-                if (isExcluded(href)) continue
-                if (!visited.has(href)) {
-                  visited.add(href)
-                  queue.push(href)
-                  paths.push(href)
-                }
-              } catch (err) { console.warn('[slugManager] href processing failed', href, err) }
-            }
+          } catch (e) {
+            console.warn('[slugManager] discovery fetch failed for', p, e)
           }
-        } catch (e) {
-          console.warn('[slugManager] discovery fetch failed for', p, e)
         }
       }
+
+      const workers = []
+      for (let i = 0; i < fetchConcurrency; i++) workers.push(worker())
+      await Promise.all(workers)
     } catch (e) {
       console.warn('[slugManager] discovery loop failed', e)
     }

@@ -4,6 +4,8 @@ All notable changes to nimbiCMS will be documented in this file.
 
 ## [Unreleased]
 
+- [FEAT] Parallel indexing  
+- [FEAT] Workers pool
 - [FEAT] Add `navigationPage` option to enable custom navigation index
 - [CHORE] Housecleaning: remove leftover comments
 - [CHORE] Improve JSDoc coverage and quality

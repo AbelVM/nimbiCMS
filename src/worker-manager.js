@@ -32,6 +32,13 @@
 export function makeWorkerManager(createWorker, name = 'worker') {
   let _w = null
 
+  // Debug gating: only emit noisy warnings if consumer enables debug mode
+  // by setting `window.__nimbiCMSDebug = true` in the host environment.
+  const _shouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
+  function _warn(...args) {
+    try { if (_shouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {}
+  }
+
   /**
    * Return the underlying Worker instance, creating it lazily.
    * @returns {(Worker|null)}
@@ -43,19 +50,19 @@ export function makeWorkerManager(createWorker, name = 'worker') {
         _w = w || null
         if (w) {
           w.addEventListener('error', () => {
-            try {
-              if (_w === w) {
-                _w = null
-                w.terminate && w.terminate()
+              try {
+                if (_w === w) {
+                  _w = null
+                  w.terminate && w.terminate()
+                }
+              } catch (err) {
+                _warn('[' + name + '] worker termination failed', err)
               }
-            } catch (err) {
-              console.warn('[' + name + '] worker termination failed', err)
-            }
-          })
+            })
         }
       } catch (e) {
         _w = null
-        console.warn('[' + name + '] worker init failed', e)
+        _warn('[' + name + '] worker init failed', e)
       }
     }
     return _w
@@ -72,22 +79,23 @@ export function makeWorkerManager(createWorker, name = 'worker') {
         _w = null
       }
     } catch (e) {
-      console.warn('[' + name + '] worker termination failed', e)
+      _warn('[' + name + '] worker termination failed', e)
     }
   }
 
   /**
   * Send a message to the worker and wait for a response.
   * @param {WorkerRequest} msg - Message payload for the worker.
-  * @param {number} [timeout=1000] - Timeout in milliseconds.
+  * @param {number} [timeout=10000] - Timeout in milliseconds.
   * @returns {Promise<unknown>} - Promise resolving to the worker response `result`.
   */
-  function send(msg, timeout = 1000) {
+  function send(msg, timeout = 10000) {
     return new Promise((resolve, reject) => {
       const w = get()
       if (!w) return reject(new Error('worker unavailable'))
+      // debug: removed
       const id = String(Math.random())
-      msg.id = id
+      const outMsg = Object.assign({}, msg, { id })
 
       let timeoutId = null
       const cleanup = () => {
@@ -107,29 +115,156 @@ export function makeWorkerManager(createWorker, name = 'worker') {
 
       const errHandler = (ev) => {
         cleanup()
-        console.warn('[' + name + '] worker error event', ev)
+        // Only log verbose worker event objects when debug mode is enabled.
+        _warn('[' + name + '] worker error event', ev)
         try {
           if (_w === w) { _w = null; w.terminate && w.terminate() }
-        } catch (err) { console.warn('[' + name + '] worker termination failed', err) }
+        } catch (err) { _warn('[' + name + '] worker termination failed', err) }
         reject(new Error(ev && ev.message || 'worker error'))
       }
 
-      timeoutId = setTimeout(() => {
+        timeoutId = setTimeout(() => {
         cleanup()
-        console.warn('[' + name + '] worker timed out')
-        try { if (_w === w) { _w = null; w.terminate && w.terminate() } } catch (err) { console.warn('[' + name + '] worker termination on timeout failed', err) }
+        _warn('[' + name + '] worker timed out')
+        try { if (_w === w) { _w = null; w.terminate && w.terminate() } } catch (err) { _warn('[' + name + '] worker termination on timeout failed', err) }
         reject(new Error('worker timeout'))
       }, timeout)
 
       w.addEventListener('message', handler)
       w.addEventListener('error', errHandler)
-      try { w.postMessage(msg) } catch (e) { cleanup(); reject(e) }
+      try { w.postMessage(outMsg) } catch (e) { cleanup(); reject(e) }
     })
   }
 
   /** @type {WorkerManager} */
   const api = { get, send, terminate }
   return api
+}
+
+/**
+ * Create a simple pool of workers to allow parallel work.
+ * @param {function(): (Worker|null)} createWorker - factory for a single Worker instance
+ * @param {string} [name='worker-pool'] - friendly name
+ * @param {number} [size=2] - number of workers in the pool
+ * @returns {Object} - manager with `get`, `send`, and `terminate`
+ */
+export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
+  const _ws = new Array(size).fill(null)
+  let _idx = 0
+
+  // Debug gating for pool as well
+  const _poolShouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
+  function _poolWarn(...args) { try { if (_poolShouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {} }
+
+  function _create(i) {
+    if (!_ws[i]) {
+      try {
+        const w = createWorker()
+        _ws[i] = w || null
+        if (w) {
+          w.addEventListener('error', () => {
+            try { if (_ws[i] === w) { _ws[i] = null; w.terminate && w.terminate() } } catch (err) { _poolWarn('[' + name + '] worker termination failed', err) }
+          })
+        }
+      } catch (e) { _ws[i] = null; _poolWarn('[' + name + '] worker init failed', e) }
+    }
+    return _ws[i]
+  }
+
+  // Track last-used timestamps and per-slot idle timers so we can reuse
+  // workers while still reclaiming truly idle ones.
+  const _lastUsed = new Array(size).fill(0)
+  const _idleTimers = new Array(size).fill(null)
+  const IDLE_MS = 30 * 1000 // 30s default idle timeout
+
+  function _markUsed(i) {
+    try {
+      _lastUsed[i] = Date.now()
+      if (_idleTimers[i]) { clearTimeout(_idleTimers[i]); _idleTimers[i] = null }
+      // schedule termination if idle for long enough
+      _idleTimers[i] = setTimeout(() => {
+        try {
+          if (_ws[i]) { _ws[i].terminate && _ws[i].terminate(); _ws[i] = null }
+        } catch (e) { _poolWarn('[' + name + '] idle termination failed', e) }
+        _idleTimers[i] = null
+      }, IDLE_MS)
+    } catch (e) { /* swallow */ }
+  }
+
+  function get() {
+    // return any existing worker (first available), creating the first slot lazily
+    for (let i = 0; i < _ws.length; i++) {
+      const w = _create(i)
+      if (w) return w
+    }
+    return null
+  }
+
+  function terminate() {
+    for (let i = 0; i < _ws.length; i++) {
+      try { if (_ws[i]) { _ws[i].terminate && _ws[i].terminate(); _ws[i] = null } } catch (e) { _poolWarn('[' + name + '] worker termination failed', e) }
+    }
+  }
+
+  function send(msg, timeout = 10000) {
+    // timeout default is intentionally larger to accommodate slower environments/tests
+    return new Promise((resolve, reject) => {
+      // round-robin select
+      const start = (_idx++) % _ws.length
+      // debug: removed
+      const trySend = (attempt) => {
+        const i = (start + attempt) % _ws.length
+        const w = _create(i)
+        if (!w) {
+          if (attempt + 1 < _ws.length) return trySend(attempt + 1)
+          return reject(new Error('worker pool unavailable'))
+        }
+
+        const id = String(Math.random())
+        const outMsg = Object.assign({}, msg, { id })
+        // debug: removed
+        let timeoutId = null
+        const cleanup = () => {
+          if (timeoutId) clearTimeout(timeoutId)
+          w.removeEventListener('message', handler)
+          w.removeEventListener('error', errHandler)
+        }
+
+        const handler = (ev) => {
+          const data = ev.data || {}
+          if (data.id !== id) return
+          cleanup()
+          if (data.error) reject(new Error(data.error))
+          else resolve(data.result)
+        }
+
+        const errHandler = (ev) => {
+          cleanup()
+          _poolWarn('[' + name + '] worker error event', ev)
+          try { if (_ws[i] === w) { _ws[i] = null; w.terminate && w.terminate() } } catch (err) { _poolWarn('[' + name + '] worker termination failed', err) }
+          reject(new Error(ev && ev.message || 'worker error'))
+        }
+
+        timeoutId = setTimeout(() => {
+          cleanup()
+          _poolWarn('[' + name + '] worker timed out')
+          try { if (_ws[i] === w) { _ws[i] = null; w.terminate && w.terminate() } } catch (err) { _poolWarn('[' + name + '] worker termination on timeout failed', err) }
+          reject(new Error('worker timeout'))
+        }, timeout)
+
+        w.addEventListener('message', handler)
+        w.addEventListener('error', errHandler)
+        try {
+          _markUsed(i)
+          w.postMessage(outMsg)
+        } catch (e) { cleanup(); reject(e) }
+      }
+
+      trySend(0)
+    })
+  }
+
+  return { get, send, terminate }
 }
 
 /**
@@ -143,12 +278,24 @@ export function makeWorkerManager(createWorker, name = 'worker') {
 export function createWorkerFromRaw(code) {
   try {
     if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && code) {
-      const blob = new Blob([code], { type: 'application/javascript' })
-      const workerUrl = URL.createObjectURL(blob)
-      return new Worker(workerUrl, { type: 'module' })
+      // cache Blob URLs for identical code to avoid recreating object URLs
+      try {
+        if (!createWorkerFromRaw._blobUrlCache) createWorkerFromRaw._blobUrlCache = new Map()
+        const cache = createWorkerFromRaw._blobUrlCache
+        let workerUrl = cache.get(code)
+        if (!workerUrl) {
+          const blob = new Blob([code], { type: 'application/javascript' })
+          workerUrl = URL.createObjectURL(blob)
+          cache.set(code, workerUrl)
+        }
+        return new Worker(workerUrl, { type: 'module' })
+      } catch (err) {
+        try { if (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug && console && typeof console.warn === 'function') console.warn('[worker-manager] createWorkerFromRaw failed', err) } catch (e) {}
+      }
     }
   } catch (err) {
-    console.warn('[worker-manager] createWorkerFromRaw failed', err)
+    // Only warn in debug mode
+    try { if (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug && console && typeof console.warn === 'function') console.warn('[worker-manager] createWorkerFromRaw failed', err) } catch (e) {}
   }
   return null
 }

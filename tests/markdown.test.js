@@ -134,10 +134,10 @@ describe('markdown utilities', () => {
   })
 
   it('parseMarkdownToHtml falls back when worker unavailable', async () => {
+    vi.resetModules()
     const mdmod = await import('../src/markdown.js')
     const spy = vi.spyOn(mdmod, 'initRendererWorker').mockReturnValue(null)
-    const res = await mdmod.parseMarkdownToHtml('# foo')
-    expect(res.html).toContain('foo')
+    await expect(mdmod.parseMarkdownToHtml('# foo')).rejects.toThrow()
     spy.mockRestore()
   })
 

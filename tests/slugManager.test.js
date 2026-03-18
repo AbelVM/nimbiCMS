@@ -362,13 +362,10 @@ describe('slugManager module', () => {
 
   // worker wrapper tests --------------------------------------------------
   it('buildSearchIndexWorker delegates to local function when worker unavailable', async () => {
-    // force fallback by mocking initSlugWorker to return null
+    // enforce worker required: mock initSlugWorker to return null and expect rejection
     const spy = vi.spyOn(slugMgr, 'initSlugWorker').mockReturnValue(null)
     slugMgr.searchIndex.splice(0)
-    // pre-populate searchIndex so local call returns predictable value
-    slugMgr.searchIndex.push('x')
-    const res = await slugMgr.buildSearchIndexWorker('http://base/')
-    expect(res).toEqual(['x'])
+    await expect(slugMgr.buildSearchIndexWorker('http://base/')).rejects.toThrow()
     spy.mockRestore()
   })
 
@@ -377,8 +374,7 @@ describe('slugManager module', () => {
     slugMgr.crawlCache.clear && slugMgr.crawlCache.clear()
     // seed crawlCache with known value
     slugMgr.crawlCache.set('slug', 'foo.md')
-    const res = await slugMgr.crawlForSlugWorker('slug', 'http://base/')
-    expect(res).toBe('foo.md')
+    await expect(slugMgr.crawlForSlugWorker('slug', 'http://base/')).rejects.toThrow()
     spy.mockRestore()
   })
 

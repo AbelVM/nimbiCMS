@@ -12,8 +12,7 @@ it('parseMarkdownToHtml falls back when worker emits error event', async () => {
     }
   }))
   const { parseMarkdownToHtml } = await import('../src/markdown.js')
-  const res = await parseMarkdownToHtml('# ErrCase')
-  expect(res.html).toContain('ErrCase')
+  await expect(parseMarkdownToHtml('# ErrCase')).rejects.toThrow()
 })
 
 it('parseMarkdownToHtml falls back when worker returns data.error', async () => {
@@ -28,8 +27,7 @@ it('parseMarkdownToHtml falls back when worker returns data.error', async () => 
     }
   }))
   const { parseMarkdownToHtml } = await import('../src/markdown.js')
-  const res = await parseMarkdownToHtml('# DataErr')
-  expect(res.html).toContain('DataErr')
+  await expect(parseMarkdownToHtml('# DataErr')).rejects.toThrow()
 })
 
 it('parseMarkdownToHtml falls back on worker timeout', async () => {
@@ -44,6 +42,5 @@ it('parseMarkdownToHtml falls back on worker timeout', async () => {
     }
   }))
   const { parseMarkdownToHtml } = await import('../src/markdown.js')
-  const res = await parseMarkdownToHtml('# TimeoutCase')
-  expect(res.html).toContain('TimeoutCase')
+  await expect(parseMarkdownToHtml('# TimeoutCase')).rejects.toThrow()
 })

@@ -36,3 +36,27 @@ onmessage = async (ev) => {
     postMessage({ id: msg.id, error: String(e) })
   }
 }
+
+// Exported handler for inline invocation in non-Worker environments (tests).
+// Returns an object suitable to post back to the caller: either `{ id, result }` or `{ id, error }`.
+export async function handleSlugWorkerMessage(msg) {
+  try {
+    if (msg.type === 'buildSearchIndex') {
+      const { id, contentBase, indexDepth, noIndexing } = msg
+      try {
+        const res = await buildSearchIndex(contentBase, indexDepth, noIndexing)
+        return { id, result: res }
+      } catch (e) { return { id, error: String(e) } }
+    }
+    if (msg.type === 'crawlForSlug') {
+      const { id, slug, base, maxQueue } = msg
+      try {
+        const res = await crawlForSlug(slug, base, maxQueue)
+        return { id, result: res === undefined ? null : res }
+      } catch (e) { return { id, error: String(e) } }
+    }
+    return { id: msg && msg.id, error: 'unsupported message' }
+  } catch (e) {
+    return { id: msg && msg.id, error: String(e) }
+  }
+}
