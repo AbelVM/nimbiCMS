@@ -32,8 +32,6 @@
 export function makeWorkerManager(createWorker, name = 'worker') {
   let _w = null
 
-  // Debug gating: only emit noisy warnings if consumer enables debug mode
-  // by setting `window.__nimbiCMSDebug = true` in the host environment.
   const _shouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
   function _warn(...args) {
     try { if (_shouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {}
@@ -93,7 +91,6 @@ export function makeWorkerManager(createWorker, name = 'worker') {
     return new Promise((resolve, reject) => {
       const w = get()
       if (!w) return reject(new Error('worker unavailable'))
-      // debug: removed
       const id = String(Math.random())
       const outMsg = Object.assign({}, msg, { id })
 
@@ -115,7 +112,6 @@ export function makeWorkerManager(createWorker, name = 'worker') {
 
       const errHandler = (ev) => {
         cleanup()
-        // Only log verbose worker event objects when debug mode is enabled.
         _warn('[' + name + '] worker error event', ev)
         try {
           if (_w === w) { _w = null; w.terminate && w.terminate() }
@@ -152,7 +148,6 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
   const _ws = new Array(size).fill(null)
   let _idx = 0
 
-  // Debug gating for pool as well
   const _poolShouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
   function _poolWarn(...args) { try { if (_poolShouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {} }
 
@@ -171,8 +166,6 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
     return _ws[i]
   }
 
-  // Track last-used timestamps and per-slot idle timers so we can reuse
-  // workers while still reclaiming truly idle ones.
   const _lastUsed = new Array(size).fill(0)
   const _idleTimers = new Array(size).fill(null)
   const IDLE_MS = 30 * 1000 // 30s default idle timeout
@@ -181,7 +174,6 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
     try {
       _lastUsed[i] = Date.now()
       if (_idleTimers[i]) { clearTimeout(_idleTimers[i]); _idleTimers[i] = null }
-      // schedule termination if idle for long enough
       _idleTimers[i] = setTimeout(() => {
         try {
           if (_ws[i]) { _ws[i].terminate && _ws[i].terminate(); _ws[i] = null }
@@ -192,7 +184,6 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
   }
 
   function get() {
-    // return any existing worker (first available), creating the first slot lazily
     for (let i = 0; i < _ws.length; i++) {
       const w = _create(i)
       if (w) return w
@@ -207,11 +198,8 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
   }
 
   function send(msg, timeout = 10000) {
-    // timeout default is intentionally larger to accommodate slower environments/tests
     return new Promise((resolve, reject) => {
-      // round-robin select
       const start = (_idx++) % _ws.length
-      // debug: removed
       const trySend = (attempt) => {
         const i = (start + attempt) % _ws.length
         const w = _create(i)
@@ -222,7 +210,6 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
 
         const id = String(Math.random())
         const outMsg = Object.assign({}, msg, { id })
-        // debug: removed
         let timeoutId = null
         const cleanup = () => {
           if (timeoutId) clearTimeout(timeoutId)
@@ -278,7 +265,6 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
 export function createWorkerFromRaw(code) {
   try {
     if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && code) {
-      // cache Blob URLs for identical code to avoid recreating object URLs
       try {
         if (!createWorkerFromRaw._blobUrlCache) createWorkerFromRaw._blobUrlCache = new Map()
         const cache = createWorkerFromRaw._blobUrlCache
@@ -294,7 +280,6 @@ export function createWorkerFromRaw(code) {
       }
     }
   } catch (err) {
-    // Only warn in debug mode
     try { if (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug && console && typeof console.warn === 'function') console.warn('[worker-manager] createWorkerFromRaw failed', err) } catch (e) {}
   }
   return null

@@ -11,7 +11,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - [FEAT] Add `navigationPage` option to enable custom navigation index
 - [A11Y] Keyboard navigation added to search results
 - [A11Y] Enforced WCAG 2.0, 2.1, 2.2 on level A, AA and AAA as well as a number of best practices
-- [CHORE] Housecleaning: removed leftover comments
+- [CHORE] Housecleaning: removed leftovers
 - [CHORE] Improved JSDoc coverage and quality
 
 ## [v1.0.2] - 2026-03-16

@@ -252,25 +252,15 @@ export async function initCMS(options = {}) {
 
   try {
     if (typeof homePage === 'string' && homePage.startsWith('./')) homePage = homePage.replace(/^\.\//, '')
-  } catch (e) {}
+  } catch (_e) {}
   try {
     if (typeof notFoundPage === 'string' && notFoundPage.startsWith('./')) notFoundPage = notFoundPage.replace(/^\.\//, '')
-  } catch (e) {}
+  } catch (_e) {}
   try {
     if (typeof navigationPage === 'string' && navigationPage.startsWith('./')) navigationPage = navigationPage.replace(/^[.]\//, '')
-  } catch (e) {}
+  } catch (_e) {}
 
-  const showError = (err) => {
-    try {
-      const mount = document.querySelector(el)
-      if (mount && mount instanceof Element) {
-        mount.innerHTML = `<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;">` +
-          `<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(err)}</pre>` +
-          `</div>`
-      }
-    } catch (e) {
-    }
-  }
+  
 
   const { navbarLogo = 'favicon' } = finalOptions
 
@@ -283,7 +273,7 @@ export async function initCMS(options = {}) {
         mount.innerHTML = `<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;">` +
           `<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(err)}</pre></div>`
       }
-    } catch (e) {
+    } catch (_e) {
     }
   }
 
@@ -392,7 +382,7 @@ export async function initCMS(options = {}) {
   } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
 
   try {
-    // eslint-disable-next-line no-implicit-coercion
+     
     await (async () => {
 
   try {

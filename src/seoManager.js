@@ -202,7 +202,7 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
           while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
             try {
               if (sib.classList && sib.classList.contains('nimbi-article-subtitle')) { sib = sib.nextElementSibling; continue }
-            } catch (e) {}
+            } catch (_e) {}
             const txt = (sib.textContent || '').trim()
             if (txt) parts.push(txt)
             sib = sib.nextElementSibling
@@ -220,15 +220,15 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
     let displayTitle = ''
     try {
       if (metaTitle) displayTitle = metaTitle
-    } catch (e) { /* ignore */ }
+    } catch (_e) { /* ignore */ }
     if (!displayTitle) {
-      try { if (topH1 && topH1.textContent) displayTitle = String(topH1.textContent).trim() } catch (e) { /* ignore */ }
+      try { if (topH1 && topH1.textContent) displayTitle = String(topH1.textContent).trim() } catch (_e) { /* ignore */ }
     }
     if (!displayTitle) {
       try {
         const h2 = article.querySelector('h2')
         if (h2 && h2.textContent) displayTitle = String(h2.textContent).trim()
-      } catch (e) { /* ignore */ }
+      } catch (_e) { /* ignore */ }
     }
     if (!displayTitle) displayTitle = pagePath || ''
 
@@ -246,7 +246,7 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
   } catch (e) { console.warn('[seoManager] applyPageMeta failed', e) }
 
   try {
-    try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (e) {}
+    try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (_e) {}
     if (h1Text) {
       const rt = readingTime(data.raw || '')
       const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0

@@ -72,6 +72,4 @@ export function setLang(lang) {
   currentLang = L10N[short] ? short : 'en'
 }
 
-function getLang() {
-  return currentLang
-}
+

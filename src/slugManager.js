@@ -83,8 +83,6 @@ function _sendToWorker(msg) { return _slugWorkerManager.send(msg, 5000) }
  */
 
 export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
-  // dynamic import of this module's namespace ensures test spies that
-  // replace `initSlugWorker` on the module object are observed here.
   const ns = await import('./slugManager.js')
   const w = ns.initSlugWorker && ns.initSlugWorker()
   if (!w) throw new Error('slug worker required but unavailable')
@@ -219,7 +217,7 @@ function _deriveCommonPrefix(paths) {
   return lastSlash === -1 ? prefix : prefix.slice(0, lastSlash + 1)
 }
 
-import { refreshIndexPaths, indexSet } from './indexManager.js'
+import { refreshIndexPaths } from './indexManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 
 /**
@@ -634,7 +632,6 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       const visited = new Set(paths)
       const queue = [...paths]
 
-      // Use bounded concurrency for discovery fetches to improve throughput
       const fetchConcurrency = Math.max(1, poolSize)
 
       const worker = async () => {

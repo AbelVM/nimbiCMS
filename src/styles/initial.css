@@ -1,5 +1,5 @@
 @charset "UTF-8";
-/* Bulma Utilities */
+
 :root {
   --bulma-control-radius: var(--bulma-radius);
   --bulma-control-radius-small: var(--bulma-radius-small);
@@ -12,7 +12,7 @@
   --bulma-control-focus-shadow-l: 50%;
 }
 
-/* Bulma Themes */
+
 :root {
   --bulma-scheme-h: 221;
   --bulma-scheme-s: 14%;
@@ -5916,7 +5916,7 @@
 }
 
 
-/* Bulma Base for nimbi mount*/
+
 /*! minireset.css v0.0.6 | MIT License | github.com/jgthms/minireset.css */
 
 html,
@@ -5927,7 +5927,7 @@ body {
 
 .nimbi-mount {
 
-    /* scoped Bulma variables (was :root) */
+    
     --bulma-body-background-color: var(--bulma-scheme-main);
     --bulma-body-size: 1em;
     --bulma-body-min-width: 300px;

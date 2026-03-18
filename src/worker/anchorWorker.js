@@ -32,7 +32,6 @@ onmessage = async (ev) => {
   }
 }
 
-// Exported handler for inline invocation in non-Worker environments (tests).
 export async function handleAnchorWorkerMessage(msg) {
   try {
     if (msg && msg.type === 'rewriteAnchors') {

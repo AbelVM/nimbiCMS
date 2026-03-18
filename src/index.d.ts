@@ -273,6 +273,7 @@ export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<stri
 
 
 
+
 // --- from src/l10nManager.js
 export function loadL10nFile(path: string, pageDir: string): Promise<void>
 export function setLang(lang: string): void
@@ -343,6 +344,10 @@ export function registerThemedElement(el: any): () => void
 
 
 // --- from src/worker/anchorWorker.js
+
+
+// --- from src/utils/renderer-manager.js
+
 
 
 // --- from src/utils/l10n-defaults.js

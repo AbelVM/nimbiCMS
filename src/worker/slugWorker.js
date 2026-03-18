@@ -37,8 +37,6 @@ onmessage = async (ev) => {
   }
 }
 
-// Exported handler for inline invocation in non-Worker environments (tests).
-// Returns an object suitable to post back to the caller: either `{ id, result }` or `{ id, error }`.
 export async function handleSlugWorkerMessage(msg) {
   try {
     if (msg.type === 'buildSearchIndex') {

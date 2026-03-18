@@ -401,7 +401,6 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       if (!dropdownContent) return
       dropdownContent.innerHTML = ''
 
-      // selection state for keyboard navigation
       let selectedIndex = -1
       function updateSelection(i) {
         try {

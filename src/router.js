@@ -321,9 +321,9 @@ export async function fetchPageData(raw, contentBase) {
             return { data: { raw, isHtml: true }, pagePath: abs.replace(/^\//, ''), anchor }
           }
         }
-      } catch (e) { /* ignore absolute fetch failures */ }
+      } catch (_e) { /* ignore absolute fetch failures */ }
     }
-  } catch (e) { /* ignore */ }
+  } catch (_e) { /* ignore */ }
 
   const pageCandidates = buildPageCandidates(resolved)
 

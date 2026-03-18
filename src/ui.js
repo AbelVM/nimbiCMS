@@ -128,7 +128,7 @@ export function createUI(opts) {
         left: containerEl.scrollLeft || 0
       }
       sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data))
-    } catch (e) {
+    } catch (_e) {
     }
   }
 
@@ -142,7 +142,7 @@ export function createUI(opts) {
       if (data && typeof data.top === 'number') {
         containerEl.scrollTo({ top: data.top, left: (data.left || 0), behavior: 'auto' })
       }
-    } catch (e) {
+    } catch (_e) {
     }
   }
 

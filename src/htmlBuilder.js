@@ -7,8 +7,6 @@ import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
 import * as AnchorModule from './worker/anchorWorker.js'
 
-// Debug gating for noisy htmlBuilder warnings. Consumers can enable
-// verbose logs by setting `globalThis.__nimbiCMSDebug = true`.
 const _hbShouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
 function _hbWarn(...args) { try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {} }
 function resolvePathWithBase(path, base) {
@@ -976,17 +974,13 @@ export function renderNotFound(contentWrap, t, e) {
 
  
 const _anchorManager = makeWorkerManager(() => {
-  // Prefer blob-based worker when environment supports it.
   const w = createWorkerFromRaw(anchorWorkerCode)
-  // In test environments (Vitest) blob-based Workers may exist but not run
-  // their module code; prefer the inline shim to keep tests deterministic.
   if (w) {
     try {
       if (!(typeof process !== 'undefined' && process.env && process.env.VITEST)) return w
     } catch (e) { return w }
   }
 
-  // Inline shim for Node/test env: call exported handler and emulate Worker API.
   const listeners = { message: [], error: [] }
   return {
     addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },

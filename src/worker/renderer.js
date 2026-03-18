@@ -1,9 +1,6 @@
 import * as _markedModule from 'marked'
 import { parseFrontmatter } from '../utils/frontmatter.js'
 
-// Support different shapes of the `marked` import (named export or namespace)
-// without accessing a non-existent `default` property which triggers build
-// warnings when the package doesn't export a default in ESM build.
 const marked = (_markedModule && (_markedModule.marked || _markedModule)) || undefined
 
 /**
@@ -26,14 +23,10 @@ const HLJS_CDN_BASE = 'https://cdn.jsdelivr.net/npm/highlight.js'
 async function ensureHljs() {
   if (hljs) return hljs
   try {
-    // In worker context prefer CDN-hosted core (browser-friendly path),
-    // falling back to local import if CDN import fails. Tests that import
-    // this module directly can mock the CDN path to simulate failures.
     try {
       const mod = await import(HLJS_CDN_BASE + '/lib/core.js')
       hljs = mod.default || mod
     } catch (e) {
-      // If CDN import fails in a worker context, treat hljs as unavailable.
       hljs = null
     }
   } catch (e) {
@@ -52,14 +45,11 @@ function extractToc(md) {
   return toc
 }
 
-// Configure marke(d) options if available
 if (marked && typeof marked.setOptions === 'function') {
   marked.setOptions({
   gfm: true,
   headerIds: true,
   mangle: false,
-    // marked expects a `highlight`/`highlighted` hook depending on version;
-    // provide a handler that defends against missing `hljs`.
     highlighted: (code, lang) => {
     try {
       if (hljs && lang && typeof hljs.getLanguage === 'function' && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value
@@ -95,7 +85,6 @@ onmessage = async (ev) => {
       return
     }
 
-    // support detection-only messages
     if (msg.type === 'detect') {
       const mdText = msg.md || ''
       const supported = msg.supported || []
@@ -122,17 +111,9 @@ onmessage = async (ev) => {
 
     const { id, md } = msg
     const { content, data } = parseFrontmatter(md || '')
-    // Ensure highlight.js is available before parsing so the `highlighted`
-    // option used by `marked` can call into `hljs`.
     await ensureHljs().catch(() => {})
-    // Render HTML with marked (code highlighting happens via the highlighted option above)
     let html = marked.parse(content)
-    // debug logs removed
-
-    // Post-process headings and images using conservative string transforms
-    // Generate unique ids for headings and build TOC. Use a counting map so
-    // existing ids (from marked) are normalized and duplicates are renamed
-    // deterministically (e.g., subtitle, subtitle-2).
+    
     const heads = []
     const idCounts = new Map()
     const slugify = (s) => {
@@ -141,7 +122,6 @@ onmessage = async (ev) => {
     html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
       const level = Number(lvl)
       const text = inner.replace(/<[^>]+>/g, '').trim()
-      // try to pick a base from any existing id attribute, otherwise slugify the text
       let existingId = null
       const idMatch = (attrs || '').match(/\sid="([^"]+)"/)
       if (idMatch) existingId = idMatch[1]
@@ -151,7 +131,6 @@ onmessage = async (ev) => {
       idCounts.set(base, idx)
       const candidate = idx === 1 ? base : base + '-' + idx
       heads.push({ level, text, id: candidate })
-      // add classes similar to main-thread post-processing
       const resp = {
         1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
         2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
@@ -162,29 +141,22 @@ onmessage = async (ev) => {
       }
       const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
       const classes = (resp[level] + ' ' + weight).trim()
-      // strip existing id/class and emit a single id + class list
       const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
       const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
       return `<h${level} ${newAttrs}>${inner}</h${level}>`
     })
 
-    // mark images with data-want-lazy if loading not present
-    // mark images with loading="lazy" if loading not present
     html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
       if (/\bloading=/.test(attrs)) return `<img${attrs}>`
       if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`
       return `<img${attrs} loading="lazy">`
     })
-    // debug logs removed
     postMessage({ id, result: { html, meta: data || {}, toc: heads } })
   } catch (e) {
     postMessage({ id: msg.id, error: String(e) })
   }
 }
 
-// Exported handler to allow running the same logic inline in non-Worker
-// environments (tests / Node). Returns an object suitable to post back to
-// the caller: either `{ id, result }` or `{ id, error }`.
 export async function handleWorkerMessage(msg) {
   try {
     if (msg && msg.type === 'register') {

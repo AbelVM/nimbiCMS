@@ -6,19 +6,15 @@ import { makeWorkerPool } from './worker-manager.js'
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
 function _createRendererInstance() {
-  // Prefer real Worker when available (browser). In Node/test environments
-  // create a lightweight inline shim that calls the exported handler.
   if (typeof Worker !== 'undefined') {
     try { return new RendererWorker() } catch (e) { /* fallthrough to inline */ }
   }
 
-  // Inline shim that matches Worker API minimally for our manager
   const listeners = { message: [], error: [] }
   const w = {
     addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
     removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
     postMessage(msg) {
-      // async invoke the worker handler and dispatch a message event
       setTimeout(async () => {
         try {
           const out = await RendererModule.handleWorkerMessage(msg)
@@ -78,11 +74,9 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
  * Lazily return or create a renderer worker instance (may return null).
  * @returns {Worker|null} - A Worker instance or null if workers are unavailable.
  */
-export function initRendererWorker() {
-  return _rendererManager.get()
-}
+export const initRendererWorker = () => _rendererManager.get()
 
-function _sendToRenderer(msg) {
+export const _sendToRenderer = (msg) => {
   /** @returns {Promise<RendererResult>} */
   return _rendererManager.send(msg, 3000)
 }
@@ -117,7 +111,6 @@ export function setMarkdownExtensions(plugins) {
   } catch (e) { console.warn('[markdown] failed to apply markdown extensions', e) }
 }
 import { parseFrontmatter } from './utils/frontmatter.js'
-import { slugify } from './slugManager.js'
 import hljs from 'highlight.js/lib/core'
 import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
 
@@ -129,9 +122,6 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
  * @returns {Promise<ParseResult>} - Promise resolving to the parsed HTML, metadata, and table-of-contents.
  */
 export async function parseMarkdownToHtml(md) {
-  // If plugins are registered, parse on the main thread so marked plugins
-  // (which may contain functions) are honored. This keeps plugin semantics
-  // intact while enforcing workers for the common path.
   if (markdownPlugins && markdownPlugins.length) {
     const { content, data } = parseFrontmatter(md || '')
     marked.setOptions({ gfm: true, mangle: false, headerIds: false, headerPrefix: '' })
@@ -152,22 +142,21 @@ export async function parseMarkdownToHtml(md) {
 
   
 
-  // Call through the module namespace so test spies can override `initRendererWorker`.
+  // Obtain worker; in Vitest we import the module namespace so test spies
+  // can override `initRendererWorker`. Outside tests avoid self-import.
   let w
-  try {
-    const ns = await import('./markdown.js')
-    w = ns.initRendererWorker && ns.initRendererWorker()
-  } catch (e) {
+  if (typeof process !== 'undefined' && process.env && process.env.VITEST) {
+    try {
+      const ns = await import('./markdown.js')
+      w = ns.initRendererWorker && ns.initRendererWorker()
+    } catch (e) {
+      w = initRendererWorker && initRendererWorker()
+    }
+  } else {
     w = initRendererWorker && initRendererWorker()
   }
-  // Special-case: if the markdown contains fenced code blocks without an
-  // explicit language and a local `hljs` instance provides plaintext
-  // highlighting, perform the parse on the main thread so tests that
-  // monkey-patch `hljs` are honored.
   try {
     if (typeof hljs !== 'undefined' && hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
-      // debug: removed
-      // quick heuristic: look for fences that start with ``` followed by newline
       if (/```\s*\n/.test(String(md || ''))) {
         const { content, data } = parseFrontmatter(md || '')
         marked.setOptions({ gfm: true, headerIds: true, mangle: false, highlighted: (code, lang) => {
@@ -180,19 +169,14 @@ export async function parseMarkdownToHtml(md) {
           } catch (e) { return code }
         } })
         let html = marked.parse(content)
-        // If marked didn't apply highlighting for plain fences, post-process
-        // code blocks without explicit language and use hljs to highlight.
         try {
           html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (full, code) => {
-            // Try hljs.highlight first; if it throws, fall back to
-            // hljs.highlightElement (which expects an element-like object)
             try {
               if (code && hljs && typeof hljs.highlight === 'function') {
                 try {
                   const out = hljs.highlight(code, { language: 'plaintext' })
                   return `<pre><code>${out && out.value ? out.value : out}</code></pre>`
                 } catch (e) {
-                  // attempt highlightElement fallback
                   try {
                     if (hljs && typeof hljs.highlightElement === 'function') {
                       const el = { innerHTML: code }
@@ -206,7 +190,6 @@ export async function parseMarkdownToHtml(md) {
             return full
           })
         } catch (e) {}
-        // replicate renderer post-processing for headings and images
         const heads = []
         const used = new Set()
         const slugifyLocal = (s) => { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
@@ -229,7 +212,6 @@ export async function parseMarkdownToHtml(md) {
           }
           const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
           const classes = (resp[level] + ' ' + weight).trim()
-          // strip any existing id/class attributes and inject our id + classes
           const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
           const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
           return `<h${level} ${newAttrs}>${inner}</h${level}>`
@@ -246,8 +228,6 @@ export async function parseMarkdownToHtml(md) {
   if (!w) throw new Error('renderer worker required but unavailable')
   const res = await _sendToRenderer({ type: 'render', md })
   if (!res || typeof res !== 'object' || res.html === undefined) throw new Error('renderer worker returned invalid response')
-  // Normalize heading ids and TOC on the main thread to ensure deterministic
-  // unique ids (covers cases where worker output may contain duplicate ids).
   try {
     const idCounts = new Map()
     const toc = []
@@ -280,9 +260,6 @@ export async function parseMarkdownToHtml(md) {
       const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
       return `<h${level} ${newAttrs}>${inner}</h${level}>`
     })
-    // If the page has a moved logo marker, remove any img elements whose
-    // resolved src matches that marker to avoid duplicating the logo in the
-    // rendered HTML (tests set document.documentElement data-nimbi-logo-moved).
     try {
       const moved = (typeof document !== 'undefined' && document.documentElement && document.documentElement.getAttribute)
         ? document.documentElement.getAttribute('data-nimbi-logo-moved') || '' : ''
@@ -300,7 +277,6 @@ export async function parseMarkdownToHtml(md) {
           })
           html = doc.body.innerHTML
         } else {
-          // fallback: string removal for simple cases
           try {
             const escaped = moved.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             html = html.replace(new RegExp(`<img[^>]*src=\\"${escaped}\\"[^>]*>`, 'g'), '')
@@ -334,7 +310,6 @@ export async function parseMarkdownToHtml(md) {
 export function detectFenceLanguages(md, supportedMap) {
   const set = new Set()
   const re = /```\s*([a-zA-Z0-9_\-+]+)?/g
-  // synchronous fallback when worker is not desired
   const STOP = new Set([
     'then', 'now', 'if', 'once', 'so', 'and', 'or', 'but', 'when', 'the', 'a', 'an', 'as',
     'let', 'const', 'var', 'export', 'import', 'from', 'true', 'false', 'null', 'npm',
@@ -389,10 +364,7 @@ export function detectFenceLanguages(md, supportedMap) {
  * @returns {Promise<Set<string>>}
  */
 export async function detectFenceLanguagesAsync(mdText, supportedMap) {
-  // If plugins are registered we prefer synchronous detection to avoid
-  // involving workers during plugin-driven main-thread parsing (tests).
   if (markdownPlugins && markdownPlugins.length) return detectFenceLanguages(mdText || '', supportedMap)
-  // In test environments prefer sync detection to avoid flaky worker behavior
   if (typeof process !== 'undefined' && process.env && process.env.VITEST) return detectFenceLanguages(mdText || '', supportedMap)
   const w = initRendererWorker && initRendererWorker()
   if (w) {

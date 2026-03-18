@@ -1,4 +1,4 @@
-/* @import './initial.css'; */
+
 
 .nimbi-site-navbar {
     --nimbi-site-navbar-height: 4rem;
@@ -12,7 +12,7 @@
 }
 
 .nimbi-site-navbar .navbar {
-    /* background: var(--bulma-body-background-color, white) */
+    
     border-radius: 0;
 }
 
@@ -20,21 +20,17 @@
     display: block;
     padding: 0;
     margin: 0;
-    /* Ensure card background variable exists for environments where
-       the Bulma-derived theme doesn't expose it. Scope to the CMS so
-       we don't override global themes. */
-    /*     --bulma-card-background-color: var(--bulma-card-background, var(--bulma-scheme-main, var(--bulma-background)));
- */
+    
+    
     position: relative;
     overflow-x: hidden !important;
     overflow: auto;
-    /* allow vertical scrolling by default */
+    
     width: 100%;
     box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
 
-    /* Limit height to the parent section so the CMS can’t grow beyond the mount.
-       This allows the section to enforce overall height constraints. */
+    
     max-height: 100%;
     min-height: 0;
     flex: 1 1 auto;
@@ -60,8 +56,7 @@
     width: 100%;
     position: sticky;
     top: var(--nimbi-site-navbar-height);
-    /* Use the computed CMS height so the sidebar never exceeds the
-       available vertical space inside the mount. */
+    
     max-height: calc(var(--nimbi-cms-height, 100vh) - var(--nimbi-site-navbar-height));
     overflow: auto;
     margin-right: 1rem;
@@ -86,9 +81,7 @@
     height: 100%;
 }
 
-/* Limit the section wrapper height to the mount height minus the navbar.
-   This ensures the overall mount does not exceed its container when
-   embedded inside a fixed-height host. */
+
 .nimbi-mount>section {
     flex: 1 1 auto;
     min-height: 0;
@@ -101,26 +94,25 @@
 }
 
 .nimbi-mount>.nimbi-site-navbar+.nimbi-cms {
-    /* Expose the computed cms height so other components can reference it. */
-    /* Prefer mount-relative height so the portal can be embedded in a
-       fixed-height container. */
+    
+    
     --nimbi-cms-height: calc(100% - var(--nimbi-site-navbar-height));
-    /* fraction (number) used to limit menu-list height: default 0.8 = 80% */
+    
     --nimbi-menu-max-ratio: 0.6;
-    /* fraction (number) used to limit image height: default 0.6 = 60% */
+    
     --nimbi-image-max-height-ratio: 0.6;
     height: var(--nimbi-cms-height);
     overflow: auto;
 }
 
-/* Fallback for when `.nimbi-cms` is not a sibling of `.nimbi-site-navbar` */
+
 .nimbi-site-navbar+.nimbi-cms {
     --nimbi-cms-height: calc(100vh - var(--nimbi-site-navbar-height));
     height: var(--nimbi-cms-height);
     overflow: auto;
 }
 
-/* Ensure images don’t overflow the “above the fold” viewport area. */
+
 .nimbi-cms img {
     max-height: calc(var(--nimbi-cms-height) * var(--nimbi-image-max-height-ratio, 0.6));
     width: auto;
@@ -129,9 +121,7 @@
     cursor: zoom-in;
 }
 
-/* When an image is wrapped in a link, prefer the pointer cursor so
-   users understand the image is a navigable link rather than an inline
-   zoom affordance. */
+
 .nimbi-cms a img {
     cursor: pointer;
 }
@@ -142,10 +132,7 @@
     padding: 2rem
 }
 
-/* Smooth page content transitions: toggle `is-inactive` during navigation
-   to fade/move content while the renderer updates the DOM. JS should add
-  /remove the class around route changes (e.g. add before fetch, remove
-   after insert). */
+
 .nimbi-content {
     transition: opacity 220ms ease, transform 220ms ease;
     will-change: opacity, transform;
@@ -157,17 +144,14 @@
     pointer-events: none;
 }
 
-/* When a site navbar is present and sticky, add top padding so content
-   is not rendered beneath the navbar. Preserve the existing 2rem padding
-   on other sides and add the navbar height on top. */
+
 .nimbi-site-navbar+.nimbi-cms .nimbi-content {
     padding-top: calc(var(--nimbi-site-navbar-height) + 2rem);
 }
 
 .nimbi-toc-inner {
     margin-bottom: 1rem;
-    /* Keep the TOC within the visible area by capping its height to a
-       percentage of the CMS viewport. */
+    
     max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6);
     overflow: hidden;
 }
@@ -190,7 +174,7 @@
 
 .nimbi-article .nimbi-reading-time {
     font-size: 0.75rem;
-    /* when inline inside the subtitle, make it flow with the subtitle text */
+    
     display: inline-block;
     margin-left: 0.5rem;
     color: inherit;
@@ -216,21 +200,17 @@
     text-decoration: underline
 }
 
-/* TOC hierarchy: make deeper headings (H3/H4+) visually subordinate
-   - indent nested lists (H3 entries are represented as ul ul)
-   - reduce font size and weight so H2 > H3 is clear
-   - further de-emphasize deeper levels (ul ul ul)
- */
+
 .nimbi-toc-inner ul ul {
     margin-left: 0.75rem;
     padding-left: 0.5rem;
     font-size: 0.95em;
-    /* slightly smaller than H2 level */
+    
 }
 
 .nimbi-toc-inner ul ul a {
     font-weight: 400;
-    /* less bold for H3 entries */
+    
 }
 
 .nimbi-toc-inner ul ul li {
@@ -248,10 +228,10 @@
     max-height: calc(var(--nimbi-cms-height, 100vh) * 0.6 - 4rem) !important;
 }
 
-/* Stronger specificity to override Bulma's .menu-list rules for nested TOC links */
+
 .nimbi-toc-inner .menu-list li ul {
     margin-left: 0.6rem;
-    /* keep a bit of padding so the text sits away from Bulma's left border */
+    
     padding-left: 0.5rem;
 }
 
@@ -259,7 +239,7 @@
 .nimbi-toc-inner .menu-list li li a {
     font-size: 0.95em;
     font-weight: 400;
-    /* increase gap between the left vertical rule and the link text for H3 */
+    
     padding-left: 0.5rem;
 }
 
@@ -268,23 +248,23 @@
     padding-left: 0.75rem;
 }
 
-/* Search results styling */
+
 .nimbi-search-panel {
     margin: 0.25rem 0;
     border-radius: 6px;
     box-shadow: none !important;
 }
 
-/* allow the panel itself to scroll so the parent label remains visible */
+
 .nimbi-search-panel {
     max-height: 320px;
     overflow-y: auto;
     scrollbar-width: thin;
-    /* Firefox */
+    
     scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
 }
 
-/* WebKit thin scrollbar styling for the search panel */
+
 .nimbi-search-panel::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -301,25 +281,23 @@
     font-size: 0.75rem;
     color: var(--bulma-text-muted, #7a7a7a);
     padding: 0.25rem 0.75rem 0;
-    /* remove bottom padding */
+    
     background: transparent;
-    /* match panel background */
+    
     display: flex;
     align-items: flex-end;
-    /* vertically align text to bottom */
+    
     font-weight: 400;
-    /* not bold */
+    
     margin: 0 0 -0.75rem 0;
-    /* pull following content up slightly */
+    
 }
 
-/* Tweak H1 / subtitle / reading-time grouping for tighter visual grouping */
-/* .nimbi-article h1 {
-    margin-bottom: 0.25rem; 
-} */
+
+
 
 .nimbi-article .nimbi-article-subtitle {
-    /* keep the is-6 font size but de-emphasize color to match reading time */
+    
     margin-top: -1.5rem;
     margin-bottom: 2rem !important;
     line-height: 1.1;
@@ -330,7 +308,7 @@
     display: block;
     padding: 0.5rem 0.75rem;
     align-items: flex-start;
-    /* Use Bulma's body text color so search results match the overall theme */
+    
     color: var(--bulma-body-color, inherit);
 }
 
@@ -342,14 +320,12 @@
     background-color: var(--bulma-table-hover-background, #f5f5f5);
 }
 
-/* Selected result for keyboard navigation */
+
 .nimbi-search-panel .nimbi-search-result.is-selected {
     background-color: var(--bulma-table-hover-background, #e9eef6);
 }
 
-/* Provide an accessible focus style for keyboard users. Keep outline:none
-   but present a visible focus ring and subtle background so focused items
-   remain discoverable. */
+
 
 .nimbi-search-panel:focus-visible,
 .nimbi-search-panel:focus,
@@ -361,7 +337,7 @@
     box-shadow: var(--bulma-shadow);
 }
 
-/* Ensure dropdown-content variant respects panel styling */
+
 .dropdown-content .panel.nimbi-search-panel {
     margin: 0;
     box-shadow: none !important;
@@ -374,8 +350,7 @@
 }
 
 .nimbi-scroll-top {
-    /* Allow Bulma's .button rules to control color, border-radius and padding.
-       Keep position and minimal sizing here to ensure consistent placement. */
+    
     position: fixed;
     right: 1rem;
     bottom: 1.25rem;
@@ -417,7 +392,7 @@
     pointer-events: auto;
 }
 
-/* Image preview modal */
+
 .nimbi-image-preview {
     border: none;
     padding: 0;
@@ -442,10 +417,7 @@
     overflow: auto;
 }
 
-/* Override Bulma's default .modal-content fixed width (640px) when inside
-   the image-preview dialog so the preview can be responsive. Keep the
-   intent of our `.nimbi-image-preview__content` sizing but ensure the
-   wrapping .modal-content doesn't constrain it. */
+
 .nimbi-image-preview .modal-content {
     width: auto !important;
     max-width: none !important;
@@ -465,12 +437,10 @@
     }
 }
 
-/* Ensure the wrapping .modal-content uses the full viewport width on small screens
-   so the preview content aligns with the modal background edge. */
+
 @media (max-width: 768px) {
     .nimbi-image-preview .modal-content {
-        /* Use 100% of the dialog's content area and ensure padding is included
-           in the measurement so the element never exceeds the dialog width. */
+        
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
@@ -517,8 +487,7 @@
     touch-action: none;
 }
 
-/* Allow JS to control image size/transform via CSS variables.
-   Fallbacks keep behavior consistent when variables are not set. */
+
 .nimbi-image-preview img {
     width: var(--nimbi-preview-img-width, auto);
     height: var(--nimbi-preview-img-height, auto);
@@ -527,7 +496,7 @@
     transform: var(--nimbi-preview-img-transform, none);
 }
 
-/* Smooth transform transitions when zooming */
+
 .nimbi-image-preview img {
     transition: transform 120ms ease;
 }
@@ -583,9 +552,7 @@
     outline-offset: 2px
 }
 
-/* Make everything outside the main content non-selectable, and re-enable
-   selection inside `.nimbi-content`. This ensures UI chrome (nav, headers,
-   controls) can't be text-selected while allowing article text to be selectable. */
+
 :root,
 html,
 body,
@@ -609,7 +576,7 @@ body,
     height: 18px
 }
 
-/* Version label: positioned bottom-left and theme-aware */
+
 .nimbi-version-label {
     position: absolute;
     left: 8px;
@@ -620,8 +587,7 @@ body,
     transition: opacity 150ms ease;
 }
 
-/* Ensure sufficient contrast on light and dark themes while remaining theme-aware.
-   Use CSS variables so theme builds can override if necessary. */
+
 .nimbi-version-label {
     color: var(--nimbi-version-label-color, #333);
 }
@@ -630,14 +596,13 @@ body,
     opacity: 0.95
 }
 
-/* Dark theme override when mount or document is set to dark */
+
 [data-theme="dark"] .nimbi-version-label,
 .nimbi-mount[data-theme="dark"] .nimbi-version-label {
     color: var(--nimbi-version-label-color-dark, #ddd);
 }
 
-/* Stronger specificity for link/tag cases where Bulma's `.tag` sets color later
-   in the cascade. Use !important sparingly to ensure the label remains readable. */
+
 a.nimbi-version-label,
 .nimbi-version-label.tag {
     color: var(--nimbi-version-label-color, #111) !important;
@@ -650,12 +615,10 @@ a.nimbi-version-label,
     color: var(--nimbi-version-label-color-dark, #eee) !important;
 }
 
-/* Provide reasonable defaults for light/dark modifiers; Bulma's
-   is-dark / is-light classes can override colors as needed. */
 
-/* NOTE: Color and background are managed by Bulma's theme variables.
-   This file avoids setting them explicitly so Bulma can take the wheel. */
-/* Image preview cursor state classes */
+
+
+
 .nimbi-image-preview img.is-panning {
     cursor: all-scroll
 }
@@ -679,25 +642,24 @@ a.nimbi-version-label,
 
 .nimbi-cms::-webkit-scrollbar-track,
 .nimbi-nav-wrap::-webkit-scrollbar-track {
-    /* default track background; Bulma theming applies automatically */
+    
 }
 
-/* Search results dropdown uses Bulma dropdown helpers */
+
 #nimbi-search-dropdown {
     position: relative;
 }
 
 #nimbi-search-dropdown .dropdown-menu {
-    /* shift the dropdown 1rem to the left and 1rem down so it opens slightly offset */
-    /* Use transform to reliably move the positioned dropdown relative to the trigger.
-       This avoids interference with Bulma's absolute right/left positioning rules. */
+    
+    
     transform: translate(-1rem, 1rem);
     transform-origin: top right;
     z-index: 80;
 }
 
 #nimbi-search-dropdown .dropdown-content {
-    /* keep dropdown sizing here; panel handles scrolling */
+    
     width: 340px;
 }
 
@@ -715,7 +677,7 @@ a.nimbi-version-label,
     width: 240px;
 }
 
-/* Bulma handles dropdown show/hide via the .is-active class. */
+
 
 .nimbi-cms::-webkit-scrollbar-thumb,
 .nimbi-nav-wrap::-webkit-scrollbar-thumb {
@@ -727,9 +689,9 @@ a.nimbi-version-label,
 .nimbi-cms::-webkit-scrollbar-thumb:hover,
 .nimbi-nav-wrap::-webkit-scrollbar-thumb:hover {}
 
-/* Make HTML tables horizontally scrollable when they're wider than the article */
+
 .nimbi-article {
-    /* allow horizontal scrolling when tables overflow the article width */
+    
     overflow-x: auto;
 }
 
@@ -737,33 +699,31 @@ a.nimbi-version-label,
 .nimbi-cms table {
     display: table;
     width: 100%;
-    /* make table span the full container width */
+    
     min-width: 100%;
-    /* ensure generated tables span full width */
+    
     max-width: 100%;
-    /* do not exceed container width */
+    
     table-layout: fixed;
-    /* allow predictable column sizing */
+    
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: auto;
 }
 
-/* Ensure table cells wrap long content instead of forcing overflow */
+
 .nimbi-article table th,
 .nimbi-article table td,
 .nimbi-cms table th,
 .nimbi-cms table td {
-    /* Allow wrapping at natural break points (spaces/hyphens) but avoid
-       breaking words mid-word. Long unbreakable words will overflow and
-       cause horizontal scroll if necessary. */
+    
     white-space: normal;
     word-break: normal;
     overflow-wrap: normal;
     hyphens: none;
 }
 
-/* Prefer wider first column for option tables and sensible column splits */
+
 .nimbi-article table th:first-child,
 .nimbi-article table td:first-child,
 .nimbi-cms table th:first-child,
@@ -793,7 +753,7 @@ a.nimbi-version-label,
     width: 47%;
 }
 
-/* On narrow screens, let the browser auto-layout and stack as needed */
+
 @media (max-width: 700px) {
 
     .nimbi-article table,
@@ -830,7 +790,7 @@ a.nimbi-version-label,
 }
 
 .nimbi-article table::-webkit-scrollbar-track {
-    /* default track background; Bulma theming applies automatically */
+    
 }
 
 .nimbi-article table::-webkit-scrollbar-thumb {
@@ -841,33 +801,30 @@ a.nimbi-version-label,
 
 .nimbi-article table::-webkit-scrollbar-thumb:hover {}
 
-/* Desktop: limit long menu-lists to 80% of the visible CMS area */
+
 @media (min-width: 801px) {
     .nimbi-nav-wrap .menu-list {
-        /* number * length: ratio first, then computed cms height */
+        
         max-height: calc(var(--nimbi-menu-max-ratio) * var(--nimbi-cms-height));
         overflow-y: auto;
         overflow-x: hidden;
     }
 }
 
-/* Fix: Bulma wires html overflow to CSS variables which can force
-   a persistent scrollbar (e.g. `overflow-y: scroll`). Ensure the
-   page-level overflow defaults to `auto` so an empty/thumbnail-less
-   scrollbar doesn't appear when no content is overflowing. */
+
 html,
 body {
     overflow-x: auto !important;
     overflow-y: auto !important;
 }
 
-/* When image preview is open, prevent the page behind from scrolling. */
+
 .nimbi-image-preview-open {
     overflow: hidden !important;
     touch-action: none !important;
 }
 
-/* Navbar logo: small image fitted to navbar height, Bulma-friendly class */
+
 .nimbi-navbar-logo {
     display: block;
     max-height: calc(var(--nimbi-site-navbar-height, 4rem) - 0.6rem);
