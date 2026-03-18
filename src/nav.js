@@ -386,12 +386,74 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     const showResults = (items) => {
       if (!dropdownContent) return
       dropdownContent.innerHTML = ''
-      if (!items.length) {
-        if (dropdown) dropdown.classList.remove('is-active')
-        try { dropdownContent.style.display = 'none' } catch (e) {}
-        try { dropdownContent.classList.remove('is-open') } catch (e) {}
-        return
+
+      // selection state for keyboard navigation
+      let selectedIndex = -1
+      function updateSelection(i) {
+        try {
+          const prev = dropdownContent.querySelector('.nimbi-search-result.is-selected')
+          if (prev) prev.classList.remove('is-selected')
+          const all = dropdownContent.querySelectorAll('.nimbi-search-result')
+          if (!all || !all.length) return
+          if (i < 0) { selectedIndex = -1; return }
+          if (i >= all.length) i = all.length - 1
+          const el = all[i]
+          if (el) {
+            el.classList.add('is-selected')
+            selectedIndex = i
+            try { el.scrollIntoView({ block: 'nearest' }) } catch (e) {}
+          }
+        } catch (e) { /* ignore selection errors */ }
       }
+
+      function resultsKeydown(ev) {
+        try {
+          const key = ev.key
+          const all = dropdownContent.querySelectorAll('.nimbi-search-result')
+          if (!all || !all.length) return
+          if (key === 'ArrowDown') {
+            ev.preventDefault()
+            const next = selectedIndex < 0 ? 0 : Math.min(all.length - 1, selectedIndex + 1)
+            updateSelection(next)
+            return
+          }
+          if (key === 'ArrowUp') {
+            ev.preventDefault()
+            const prev = selectedIndex <= 0 ? 0 : selectedIndex - 1
+            updateSelection(prev)
+            return
+          }
+          if (key === 'Enter') {
+            ev.preventDefault()
+            const el = dropdownContent.querySelector('.nimbi-search-result.is-selected') || dropdownContent.querySelector('.nimbi-search-result')
+            if (el) {
+              try { el.click() } catch (e) {}
+            }
+            return
+          }
+          if (key === 'Escape') {
+            try { dropdown.classList.remove('is-active') } catch (e) {}
+            try { dropdownContent.style.display = 'none' } catch (e) {}
+            try { dropdownContent.classList.remove('is-open') } catch (e) {}
+            try { dropdownContent.removeAttribute('tabindex') } catch (e) {}
+            try { dropdownContent.removeEventListener('keydown', resultsKeydown) } catch (e) {}
+            try { if (searchInput) searchInput.focus() } catch (e) {}
+            try { if (searchInput) searchInput.removeEventListener('keydown', inputKeyHandler) } catch (e) {}
+            return
+          }
+        } catch (e) { /* ignore */ }
+      }
+
+      function inputKeyHandler(ev) {
+        try {
+          if (ev && ev.key === 'ArrowDown') {
+            ev.preventDefault()
+            try { dropdownContent.focus() } catch (e) {}
+            updateSelection(0)
+          }
+        } catch (e) {}
+      }
+
       try {
         const panel = document.createElement('div')
         panel.className = 'panel nimbi-search-panel'
@@ -420,6 +482,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             if (dropdown) dropdown.classList.remove('is-active')
             try { dropdownContent.style.display = 'none' } catch (e) {}
             try { dropdownContent.classList.remove('is-open') } catch (e) {}
+            try { dropdownContent.removeAttribute('tabindex') } catch (e) {}
+            try { dropdownContent.removeEventListener('keydown', resultsKeydown) } catch (e) {}
+            try { if (searchInput) searchInput.removeEventListener('keydown', inputKeyHandler) } catch (e) {}
           })
           panel.appendChild(a)
         })
@@ -428,6 +493,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       if (dropdown) dropdown.classList.add('is-active')
       try { dropdownContent.style.display = 'block' } catch (e) {}
       try { dropdownContent.classList.add('is-open') } catch (e) {}
+      try { dropdownContent.setAttribute('tabindex', '0') } catch (e) {}
+      try { dropdownContent.addEventListener('keydown', resultsKeydown) } catch (e) {}
+      try { if (searchInput) searchInput.addEventListener('keydown', inputKeyHandler) } catch (e) {}
     }
 
     const debounce = (fn, delay) => {

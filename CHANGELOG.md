@@ -4,8 +4,9 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 ## [Unreleased]
 
-- [FEAT] Parallel indexing, highly improved search box availability time  
+- [FEAT] Parallel indexing, highly improved search box initial availability time  
 - [FEAT] Workers pool
+- [FEAT] Enhanced workers life cycle management
 - [FEAT] Smoother page transitions
 - [FEAT] Add `navigationPage` option to enable custom navigation index
 - [CHORE] Housecleaning: remove leftover comments
