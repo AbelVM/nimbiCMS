@@ -21,5 +21,3 @@ Table-of-contents element to attach SPA navigation handlers to.
 ## Returns
 
 `void`
-
-- No return value.

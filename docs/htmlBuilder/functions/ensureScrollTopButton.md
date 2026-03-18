@@ -8,7 +8,9 @@
 
 > **ensureScrollTopButton**(`article`, `topH1`, `opts?`): `void`
 
-Create or update a scroll-to-top button and toggle TOC/menu label visibility.
+Create or update a scroll-to-top button and toggle TOC/menu label
+visibility. Observes the supplied `topH1` element if present; on pages
+without a top heading we fall back to a simple scroll-position listener.
 
 ## Parameters
 

@@ -1,6 +1,6 @@
 {
   "name": "nimbi-cms",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AbelVM/nimbiCMS.git"
@@ -26,15 +26,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:example": "sh -c \"npm run build -- --outDir example/dist --config vite.config.js && vite example --port 5173 &\"",
     "build": "vite build --config vite.config.js",
-    "build:lib": "vite build --config vite.config.js",
     "build:analyze": "ANALYZE=1 vite build --config vite.config.js",
     "preview": "vite preview",
     "test": "npx vitest run",
     "a11y:scan": "node scripts/a11y-runner.js",
     "gen-dts": "node scripts/gen-dts.js",
-    "prepare": "npm run build:lib && npm run gen-dts",
+    "prepare": "npm run build && npm run gen-dts && npm run docs",
     "check-dts": "npx tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck",
     "type-test": "npx tsd",
     "docs": "typedoc --options typedoc.json"
@@ -47,17 +45,18 @@
   "devDependencies": {
     "@fullhuman/postcss-purgecss": "^8.0.0",
     "@vitest/coverage-v8": "^4.0.18",
+    "axe-core": "^4.11.1",
     "comment-parser": "^0.7.6",
     "cssnano": "^7.1.3",
     "eslint": "^10.0.3",
     "eslint-plugin-unused-imports": "^4.4.1",
     "glob": "^10.4.1",
     "jsdom": "^28.1.0",
+    "postcss": "^8.5.8",
     "postcss-discard-duplicates": "^7.0.2",
     "postcss-merge-rules": "^7.0.8",
     "postcss-preset-env": "^11.2.0",
     "puppeteer": "^24.39.1",
-    "purgecss": "^8.0.0",
     "reading-time": "^1.5.0",
     "rollup-plugin-visualizer": "^5.8.0",
     "serve": "^14.2.6",
@@ -68,8 +67,7 @@
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-restart": "^2.0.0",
-    "vitest": "^4.0.18",
-    "axe-core": "^4.11.1"
+    "vitest": "^4.0.18"
   },
   "main": "dist/nimbi-cms.cjs.js",
   "module": "dist/nimbi-cms.es.js",

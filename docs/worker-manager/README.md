@@ -21,3 +21,4 @@ Generic worker manager to centralize Worker lifecycle and messaging.
 
 - [createWorkerFromRaw](functions/createWorkerFromRaw.md)
 - [makeWorkerManager](functions/makeWorkerManager.md)
+- [makeWorkerPool](functions/makeWorkerPool.md)

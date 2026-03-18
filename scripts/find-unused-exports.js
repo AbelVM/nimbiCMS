@@ -1,3 +1,9 @@
+/**
+ * find-unused-exports.js — list exported symbols for manual validation.
+ *
+ * Usage:
+ *   node scripts/find-unused-exports.js > tmp/exports.json
+ */
 const fs = require('fs');
 const path = require('path');
 

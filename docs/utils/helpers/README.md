@@ -9,6 +9,7 @@
 ## Functions
 
 - [buildPageUrl](functions/buildPageUrl.md)
+- [decodeHtmlEntities](functions/decodeHtmlEntities.md)
 - [encodeURL](functions/encodeURL.md)
 - [ensureTrailingSlash](functions/ensureTrailingSlash.md)
 - [isExternalLink](functions/isExternalLink.md)

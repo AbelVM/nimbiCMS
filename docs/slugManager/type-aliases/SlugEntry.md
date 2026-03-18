@@ -18,4 +18,4 @@
 
 ### langs?
 
-> `optional` **langs**: `Object`\<`string`, `string`\>
+> `optional` **langs**: `Record`\<`string`, `string`\>

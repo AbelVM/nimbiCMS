@@ -1,3 +1,9 @@
+/**
+ * strip-comments.cjs — remove full-line `//` comments while preserving JSDoc blocks.
+ *
+ * Usage:
+ *   node scripts/strip-comments.cjs
+ */
 const fs = require('fs')
 const path = require('path')
 

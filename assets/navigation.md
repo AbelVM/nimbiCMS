@@ -2,5 +2,6 @@
 [Read Me](README.md)
 [API](docs/README.md)
 [Playground](/assets/playground.html)
+[Free cloud!](/assets/github.md)
 [Changelog](CHANGELOG.md)
 [License](LICENSE.md)

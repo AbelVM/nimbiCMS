@@ -35,4 +35,4 @@ maximum concurrency/queue length for worker
 
 `Promise`\<`string` \| `null`\>
 
-- resolved markdown path or null if not found
+- Resolved markdown path or `null` if not found.

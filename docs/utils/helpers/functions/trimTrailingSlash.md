@@ -8,7 +8,8 @@
 
 > **trimTrailingSlash**(`u`): `string`
 
-Remove trailing slashes from a path or URL.
+Remove one or more trailing slashes from a URL or path.  This is handy
+when composing base paths to avoid the dreaded `//` sequence.
 
 ## Parameters
 
@@ -16,7 +17,7 @@ Remove trailing slashes from a path or URL.
 
 `string`
 
-input path or URL to ensure a trailing slash on
+input path or URL to trim trailing slashes from
 
 ## Returns
 

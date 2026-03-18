@@ -134,16 +134,10 @@ export function _storeSlugMapping(slug, rel) {
 
 export const slugResolvers = new Set()
 /**
- * Register a custom resolver function.  The function should accept a slug
+ * Register a custom resolver function. The function should accept a slug
  * string and return a markdown path (or promise thereof) or `null` if not
  * resolved.
  * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn - Resolver function to add.
- * @returns {void} - No return value.
- */
-/**
- * Register a custom slug resolver function. The function should accept a
- * slug (string) and return a markdown path (or promise thereof) or `null`.
- * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn - fn parameter
  * @returns {void} - No return value.
  */
 export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.add(fn) }
@@ -187,8 +181,15 @@ export function setHomePage(p) {
   homePage = String(p || '')
 }
 
-export function _setAllMd(obj) {
-  _allMd = obj || {}
+/**
+ * Internal helper to replace the in-memory mapping of slug -> markdown.
+ * Intended for bulk updates from an indexer or worker.
+ *
+ * @param {Record<string,string>} mdMap - Mapping of slug (string) to markdown source.
+ * @returns {void}
+ */
+export function _setAllMd(mdMap) {
+  _allMd = mdMap || {}
 }
 
 /** @type {Map<string,string>} */
@@ -322,9 +323,12 @@ export function slugify(s) {
 }
 
 /**
- * Generate a unique slug by appending a numeric suffix if needed.
- * @param {string} base
- * @param {Set<string>} existing
+ * Ensure a candidate slug is unique against an existing set.
+ * If `base` collides, a numeric suffix is appended ("-2", "-3", ...).
+ *
+ * @param {string} base - Candidate slug.
+ * @param {Set<string>} existing - Set of already-used slugs.
+ * @returns {string} - A slug that does not appear in `existing`.
  */
 export function uniqueSlug(base, existing) {
   if (!existing.has(base)) return base

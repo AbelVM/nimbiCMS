@@ -23,8 +23,10 @@
 
 ## Functions
 
+- [\_sendToRenderer](functions/sendToRenderer.md)
 - [addMarkdownExtension](functions/addMarkdownExtension.md)
 - [detectFenceLanguages](functions/detectFenceLanguages.md)
+- [detectFenceLanguagesAsync](functions/detectFenceLanguagesAsync.md)
 - [initRendererWorker](functions/initRendererWorker.md)
 - [parseMarkdownToHtml](functions/parseMarkdownToHtml.md)
 - [setMarkdownExtensions](functions/setMarkdownExtensions.md)

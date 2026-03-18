@@ -198,7 +198,7 @@ export const skipRootReadme: boolean
 export function getLanguages(): string[]
 export function _storeSlugMapping(slug: string, rel: string): void
 export function setHomePage(p: string): any
-export function uniqueSlug(base: string, existing: Set<string>): any
+export function uniqueSlug(base: string, existing: Set<string>): string
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
 export function unescapeMarkdown(s: string): string
@@ -280,6 +280,9 @@ export function setLang(lang: string): void
 
 
 
+// --- from src/jsdoc-typedefs.js
+
+
 // --- from src/init.js
 export function parseInitOptionsFromQuery(queryString: string): object
 export const currentHighlightTheme: string
@@ -338,13 +341,13 @@ export function setThemeVars(vars: Record<string,string>): void
 export function registerThemedElement(el: any): () => void
 
 // --- from src/worker/slugWorker.js
-
+export function handleSlugWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/renderer.js
-
+export function handleWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/anchorWorker.js
-
+export function handleAnchorWorkerMessage(msg: object): Promise<object>
 
 // --- from src/utils/renderer-manager.js
 
@@ -352,7 +355,6 @@ export function registerThemedElement(el: any): () => void
 
 // --- from src/utils/l10n-defaults.js
 export const DEFAULT_L10N: Record<string, L10nEntry>
-
 
 // --- from src/utils/helpers.js
 export function normalizePath(p: string): string
@@ -362,11 +364,14 @@ export function setEagerForAboveFoldImages(container: any, marginPx: number, deb
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
 export function encodeURL(u: string): string
 export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
+export function decodeHtmlEntities(s: string): string
 
 
 
 
 // --- from src/utils/frontmatter.js
 export function parseFrontmatter(md: string): {content:string, data: Record<string,string>}
+
+// --- from src/utils/emojiMap.js
 
 // --- from src/lib/index.js

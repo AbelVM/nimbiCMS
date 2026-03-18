@@ -14,7 +14,7 @@ Unregister a previously added resolver.
 
 ### fn
 
-(`slug`) => `any`
+(`slug`) => `void` \| `null`
 
 Previously registered resolver to remove.
 

@@ -1,3 +1,9 @@
+/**
+ * scan-jsdoc.js — list exported functions missing JSDoc blocks.
+ *
+ * Usage:
+ *   node scripts/scan-jsdoc.js
+ */
 const fs=require('fs');
 const paths=[
 './src/markdown.js','./src/ui.js','./src/hookManager.js','./src/version.js','./src/seoManager.js','./src/htmlBuilder.js','./src/gen-dts-sample.js','./src/lib/index.js','./src/nimbi-cms.js','./src/router.js','./src/worker-manager.js','./src/l10nManager.js','./src/init.js','./src/imagePreview.js','./src/nav.js','./src/codeblocksManager.js','./src/indexManager.js','./src/worker/slugWorker.js','./src/worker/renderer.js','./src/worker/anchorWorker.js','./src/utils/frontmatter.js','./src/utils/helpers.js','./src/utils/l10n-defaults.js','./src/slugManager.js','./src/bulmaManager.js'

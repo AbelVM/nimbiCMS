@@ -27,5 +27,3 @@ Markdown path (relative to content base) to associate with the slug.
 ## Returns
 
 `void`
-
-- No return value.

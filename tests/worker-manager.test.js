@@ -1,4 +1,52 @@
 import { describe, it, expect } from 'vitest'
+import { makeWorkerManager } from '../src/worker-manager.js'
+
+describe('worker-manager behaviors', () => {
+  it('send rejects when worker unavailable', async () => {
+    const mgr = makeWorkerManager(() => null, 'test')
+    await expect(mgr.send({ type: 'x' }, 10)).rejects.toThrow(/worker unavailable/)
+  })
+
+  it('send resolves when worker replies with result', async () => {
+    const fake = (() => {
+      const listeners = { message: [], error: [] }
+      return {
+        addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
+        removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
+        postMessage(msg) {
+          setTimeout(() => {
+            const data = { id: msg.id, result: 'ok' }
+            ;(listeners.message || []).forEach(fn => fn({ data }))
+          }, 0)
+        },
+        terminate() {}
+      }
+    })()
+
+    const mgr = makeWorkerManager(() => fake, 'test')
+    const res = await mgr.send({ type: 'ping' }, 1000)
+    expect(res).toBe('ok')
+  })
+
+  it('send rejects on worker error event', async () => {
+    const bad = (() => {
+      const listeners = { message: [], error: [] }
+      return {
+        addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
+        removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
+        postMessage(msg) {
+          setTimeout(() => {
+            ;(listeners.error || []).forEach(fn => fn({ message: 'fail' }))
+          }, 0)
+        },
+        terminate() {}
+      }
+    })()
+    const mgr = makeWorkerManager(() => bad, 'test')
+    await expect(mgr.send({ type: 'x' }, 1000)).rejects.toThrow(/fail|worker error/)
+  })
+})
+import { describe, it, expect } from 'vitest'
 import { makeWorkerPool } from '../src/worker-manager.js'
 
 function makeMockWorkerFactory(opts = {}) {

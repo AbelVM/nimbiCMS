@@ -51,5 +51,3 @@ Fallback document title.
 ## Returns
 
 `void`
-
-- No return value.

@@ -8,13 +8,16 @@
 
 > **normalizePath**(`p`): `string`
 
-Normalize a path by stripping leading dots and slashes.
+Normalize a path by stripping leading dots and slashes.  Useful for
+converting user-supplied paths into canonical relative identifiers.
 
 ## Parameters
 
 ### p
 
 `string`
+
+input path to normalize (remove leading ./ or /)
 
 ## Returns
 

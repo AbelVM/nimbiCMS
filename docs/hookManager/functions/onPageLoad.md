@@ -21,5 +21,3 @@ Callback invoked with the render context.
 ## Returns
 
 `void`
-
-- No return value.

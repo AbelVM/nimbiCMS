@@ -8,7 +8,8 @@
 
 > **buildPageCandidates**(`resolved`): `string`[]
 
-Given a resolved identifier, return ordered candidate filenames to fetch.
+Given a resolved identifier (possibly slug, path, or HTML), produce an
+ordered list of candidate markdown/html filenames to attempt fetching.
 
 ## Parameters
 

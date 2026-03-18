@@ -17,7 +17,7 @@ Returns the detected top H1, its text, and the chosen slug key.
 
 `Object`
 
-parsed page metadata
+Parsed page metadata including `meta` and other fields.
 
 ### article
 

@@ -1,3 +1,128 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { attachImagePreview } from '../src/imagePreview.js'
+
+describe('imagePreview', () => {
+  beforeEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('opens modal and derives alt text from filename when alt missing', async () => {
+    const root = document.createElement('div')
+    const img = document.createElement('img')
+    img.src = 'https://example.com/images/my_photo-01.jpg'
+    root.appendChild(img)
+    document.body.appendChild(root)
+
+    attachImagePreview(root)
+
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    await new Promise(r => setTimeout(r, 0))
+
+    const modalImg = document.querySelector('[data-nimbi-preview-image]')
+    expect(modalImg).toBeTruthy()
+    expect(document.querySelector('.nimbi-image-preview').classList.contains('is-active')).toBe(true)
+    expect(modalImg.alt).toMatch(/my photo|my_photo|my-photo/i)
+    expect(document.documentElement.classList.contains('nimbi-image-preview-open')).toBe(true)
+  })
+
+  it('zoom in button updates zoom label', async () => {
+    const root = document.createElement('div')
+    const img = document.createElement('img')
+    img.src = 'https://example.com/img.png'
+    // simulate known natural size
+    Object.defineProperty(img, 'naturalWidth', { value: 800, configurable: true })
+    Object.defineProperty(img, 'naturalHeight', { value: 600, configurable: true })
+    root.appendChild(img)
+    document.body.appendChild(root)
+
+    attachImagePreview(root)
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 0))
+
+    const zoomLabel = document.querySelector('[data-nimbi-preview-zoom-label]')
+    const zoomIn = document.querySelector('[data-nimbi-preview-zoom-in]')
+    expect(zoomLabel).toBeTruthy()
+    const before = zoomLabel.textContent
+    zoomIn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 0))
+    const after = zoomLabel.textContent
+    expect(after).not.toBe(before)
+    expect(Number(after.replace('%', ''))).toBeGreaterThan(Number(before.replace('%', '')))
+  })
+
+  it('double-click toggles between 100% and 200% zoom', async () => {
+    const root = document.createElement('div')
+    const img = document.createElement('img')
+    img.src = '/img/a.png'
+    Object.defineProperty(img, 'naturalWidth', { value: 400, configurable: true })
+    Object.defineProperty(img, 'naturalHeight', { value: 300, configurable: true })
+    root.appendChild(img)
+    document.body.appendChild(root)
+
+    attachImagePreview(root)
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 0))
+
+    const zoomLabel = document.querySelector('[data-nimbi-preview-zoom-label]')
+    const modalImg = document.querySelector('[data-nimbi-preview-image]')
+    expect(zoomLabel).toBeTruthy()
+
+    modalImg.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 0))
+    expect(Number(zoomLabel.textContent.replace('%', ''))).toBeGreaterThan(100)
+
+    modalImg.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 0))
+    expect(Number(zoomLabel.textContent.replace('%', ''))).toBeLessThanOrEqual(100)
+  })
+
+  it('pointer drag pans wrapper when zoom > 1', async () => {
+    const root = document.createElement('div')
+    const img = document.createElement('img')
+    img.src = '/img/large.png'
+    Object.defineProperty(img, 'naturalWidth', { value: 1200, configurable: true })
+    Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true })
+    root.appendChild(img)
+    document.body.appendChild(root)
+
+    attachImagePreview(root)
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 0))
+
+    const zoomIn = document.querySelector('[data-nimbi-preview-zoom-in]')
+    zoomIn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 0))
+
+    const wrapper = document.querySelector('.nimbi-image-preview__image-wrapper')
+    const modal = document.querySelector('.nimbi-image-preview')
+    // emulate dialog open state (jsdom lacks dialog.showModal)
+    if (modal) modal.open = true
+    // ensure wrapper reports overflow so dragging can start
+    Object.defineProperty(wrapper, 'clientWidth', { value: 200, configurable: true })
+    Object.defineProperty(wrapper, 'clientHeight', { value: 150, configurable: true })
+    Object.defineProperty(wrapper, 'scrollWidth', { value: 1200, configurable: true })
+    Object.defineProperty(wrapper, 'scrollHeight', { value: 800, configurable: true })
+
+    const modalImg = document.querySelector('[data-nimbi-preview-image]')
+    // initial scroll
+    wrapper.scrollLeft = 0
+
+    modalImg.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 100, clientY: 100, pointerId: 1 }))
+    await new Promise(r => setTimeout(r, 0))
+    // move left so scrollLeft increases (scrollLeft = scrollStartX - dx)
+    modalImg.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 80, clientY: 100, pointerId: 1 }))
+    await new Promise(r => setTimeout(r, 0))
+    modalImg.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 80, clientY: 100, pointerId: 1 }))
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(wrapper.scrollLeft).not.toBe(0)
+  })
+})
 import { describe, it, expect, beforeEach } from 'vitest'
 import { attachImagePreview } from '../src/imagePreview.js'
 

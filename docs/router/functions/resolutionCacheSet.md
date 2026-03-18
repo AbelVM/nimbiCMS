@@ -8,7 +8,8 @@
 
 > **resolutionCacheSet**(`key`, `value`): `void`
 
-Store a resolution in the runtime cache and evict oldest entries if needed.
+Store a resolution result in the runtime resolution cache and evict the
+oldest entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
 
 ## Parameters
 
@@ -16,9 +17,11 @@ Store a resolution in the runtime cache and evict oldest entries if needed.
 
 `string`
 
-key parameter
+Cache key string.
 
 ### value
+
+Resolution record to store.
 
 #### anchor
 

@@ -22,5 +22,3 @@ Callback which can modify the render context or DOM.
 ## Returns
 
 `void`
-
-- No return value.

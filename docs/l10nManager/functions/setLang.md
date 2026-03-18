@@ -22,5 +22,3 @@ Language code to switch to (e.g. 'en', 'es').
 ## Returns
 
 `void`
-
-- No return value.

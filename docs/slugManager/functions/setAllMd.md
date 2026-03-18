@@ -6,13 +6,18 @@
 
 # Function: \_setAllMd()
 
-> **\_setAllMd**(`obj`): `void`
+> **\_setAllMd**(`mdMap`): `void`
+
+Internal helper to replace the in-memory mapping of slug -> markdown.
+Intended for bulk updates from an indexer or worker.
 
 ## Parameters
 
-### obj
+### mdMap
 
-`any`
+`Record`\<`string`, `string`\>
+
+Mapping of slug (string) to markdown source.
 
 ## Returns
 

@@ -21,5 +21,3 @@ Maximum number of cached resolution entries.
 ## Returns
 
 `void`
-
-- No return value.

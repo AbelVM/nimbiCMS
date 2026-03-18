@@ -1,3 +1,9 @@
+/**
+ * select-dead-candidates.cjs — pick a small set of likely-dead-code candidates for manual review.
+ *
+ * Usage:
+ *   node scripts/select-dead-candidates.cjs
+ */
 const fs = require('fs');
 const path = require('path');
 const candidates = JSON.parse(fs.readFileSync(path.join(__dirname,'..','tmp','dead-code-aggressive.json'),'utf8'))||[];

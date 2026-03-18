@@ -8,7 +8,8 @@
 
 > **ensureTrailingSlash**(`u`): `string`
 
-Ensure the path ends with a single trailing slash.
+Ensure the given URL/path ends with a single slash.  This wraps
+`trimTrailingSlash` and appends '/'.
 
 ## Parameters
 

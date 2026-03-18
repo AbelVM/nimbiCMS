@@ -1,4 +1,10 @@
+:root{
+    --nimbi-color:#fe019a;
+}
 
+.nimbi-mount code:not(pre > code){
+    color: var(--nimbi-color) !important;
+}
 
 .nimbi-site-navbar {
     --nimbi-site-navbar-height: 4rem;

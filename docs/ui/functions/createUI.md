@@ -6,7 +6,7 @@
 
 # Function: createUI()
 
-> **createUI**(`opts`): `UIReturn`
+> **createUI**(`opts`): [`UIReturn`](../interfaces/UIReturn.md)
 
 Initialize UI rendering helpers for a mounted CMS instance.
 
@@ -14,12 +14,12 @@ Initialize UI rendering helpers for a mounted CMS instance.
 
 ### opts
 
-`UIOptions`
+[`UIOptions`](../interfaces/UIOptions.md)
 
 configuration options and DOM mounts for the UI
 
 ## Returns
 
-`UIReturn`
+[`UIReturn`](../interfaces/UIReturn.md)
 
 - helpers and entrypoints for rendering the site

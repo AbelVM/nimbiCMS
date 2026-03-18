@@ -1,3 +1,9 @@
+/**
+ * find-dead-code.cjs — scan for local unused functions and symbols (conservative).
+ *
+ * Usage:
+ *   node scripts/find-dead-code.cjs > tmp/dead-code.json
+ */
 const fs = require('fs');
 const path = require('path');
 

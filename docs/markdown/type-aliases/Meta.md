@@ -6,6 +6,6 @@
 
 # Type Alias: Meta
 
-> **Meta**\<\> = `Object`\<`string`, `string` \| `number` \| `boolean` \| `any`\>
+> **Meta**\<\> = `Record`\<`string`, `unknown`\>
 
 ## Type Parameters

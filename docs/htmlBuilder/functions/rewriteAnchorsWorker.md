@@ -6,34 +6,26 @@
 
 # Function: rewriteAnchorsWorker()
 
-> **rewriteAnchorsWorker**(`article`, `contentBase`, `pagePath?`): `Promise`\<`void`\>
+> **rewriteAnchorsWorker**(`article`, `contentBase`, `pagePath`): `Promise`\<`void`\>
 
-Try to rewrite anchors using a dedicated worker. If the worker is not
-available this is a thin wrapper that falls back to the in-thread
-`rewriteAnchors` implementation.
+Rewrite anchors using the dedicated anchor worker. Enforce worker usage —
+reject when the worker is unavailable to make bundling and tree-shaking
+consistent.
 
 ## Parameters
 
 ### article
 
-`HTMLElement`
-
-Article element to process.
+`any`
 
 ### contentBase
 
-`string`
+`any`
 
-Base URL or path for site content.
+### pagePath
 
-### pagePath?
-
-`string`
-
-Optional page path for relative resolution.
+`any`
 
 ## Returns
 
 `Promise`\<`void`\>
-
-- Resolves when anchor rewriting completes (or falls back to sync implementation).

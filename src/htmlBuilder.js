@@ -1,7 +1,7 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
-import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash } from './utils/helpers.js'
+import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
 import { registerThemedElement } from './bulmaManager.js'
 import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
@@ -102,8 +102,9 @@ export function buildTocElement(t, toc, pagePath = '') {
 
         const li = document.createElement('li')
         const a = document.createElement('a')
-        const slug = item.id || slugify(item.text || '')
-        a.textContent = item.text || ''
+        const text = decodeHtmlEntities(item.text || '')
+        const slug = item.id || slugify(text)
+        a.textContent = text
         try {
           const normPage = String(pagePath || '').replace(/^[\\.\\/]+/, '')
           const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage

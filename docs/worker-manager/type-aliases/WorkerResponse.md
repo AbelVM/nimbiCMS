@@ -22,4 +22,4 @@
 
 ### result?
 
-> `optional` **result**: `any`
+> `optional` **result**: `unknown`

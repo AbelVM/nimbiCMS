@@ -1,6 +1,29 @@
 import * as _markedModule from 'marked'
 import { parseFrontmatter } from '../../src/utils/frontmatter.js'
 
+// Lightweight local HTML entity decoder to avoid importing utils in worker
+function decodeHtmlEntitiesLocal(s) {
+  try {
+    if (!s && s !== 0) return ''
+    const str = String(s)
+    const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
+    return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, g) => {
+      if (!g) return m
+      if (g[0] === '#') {
+        try {
+          if (g[1] === 'x' || g[1] === 'X') return String.fromCharCode(parseInt(g.slice(2), 16))
+          return String.fromCharCode(parseInt(g.slice(1), 10))
+        } catch (e) {
+          return m
+        }
+      }
+      return (named[g] !== undefined) ? named[g] : m
+    })
+  } catch (err) {
+    return String(s || '')
+  }
+}
+
 const marked = (_markedModule && (_markedModule.marked || _markedModule)) || undefined
 
 /**
@@ -15,6 +38,14 @@ const marked = (_markedModule && (_markedModule.marked || _markedModule)) || und
  *   and reply with `{ id, result: { html: string, meta: Record<string,string>, toc: Array<{level:number,text:string}> } }`.
  *
  * On error the worker posts `{ id, error: string }`.
+ */
+
+/**
+ * Worker `onmessage` handler for renderer tasks is defined below. The worker
+ * listens for messages like `{ type: 'register', name, url }`, `{ type: 'detect', id, md, supported }`,
+ * or rendering requests `{ id, md }` and replies with `{ id, result }` or `{ id, error }`.
+ *
+ * The top-level `onmessage` assignment directly handles posting results; see function body below.
  */
 
 let hljs = null
@@ -64,6 +95,11 @@ if (marked && typeof marked.setOptions === 'function') {
   })
 }
 
+/**
+ * Worker `onmessage` handler implementation for renderer (attached to global `onmessage`).
+ * @param {MessageEvent} ev - Event carrying the request data in `ev.data`.
+ * @returns {Promise<void>} Posts worker reply messages (`{id, result}` or `{id, error}`).
+ */
 globalThis.onmessage = async (ev) => {
   const msg = ev.data || {}
   try {
@@ -121,7 +157,8 @@ globalThis.onmessage = async (ev) => {
     }
     html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
       const level = Number(lvl)
-      const text = inner.replace(/<[^>]+>/g, '').trim()
+      let text = inner.replace(/<[^>]+>/g, '').trim()
+      try { text = decodeHtmlEntitiesLocal(text) } catch (e) {}
       let existingId = null
       const idMatch = (attrs || '').match(/\sid="([^"]+)"/)
       if (idMatch) existingId = idMatch[1]
@@ -157,6 +194,11 @@ globalThis.onmessage = async (ev) => {
   }
 }
 
+/**
+ * Helper to process renderer worker messages outside of a Worker.
+ * @param {Object} msg - Message object sent to the renderer (see worker accepted messages above).
+ * @returns {Promise<Object>} Response shaped like worker replies: `{id, result}` or `{id, error}`.
+ */
 export async function handleWorkerMessage(msg) {
   try {
     if (msg && msg.type === 'register') {
@@ -208,7 +250,8 @@ export async function handleWorkerMessage(msg) {
     }
     html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
       const level = Number(lvl)
-      const text = inner.replace(/<[^>]+>/g, '').trim()
+      let text = inner.replace(/<[^>]+>/g, '').trim()
+      try { text = decodeHtmlEntitiesLocal(text) } catch (e) {}
       let existingId = null
       const idMatch = (attrs || '').match(/\sid="([^"]+)"/)
       if (idMatch) existingId = idMatch[1]

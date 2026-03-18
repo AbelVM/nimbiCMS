@@ -2,12 +2,13 @@ import { buildSearchIndex, crawlForSlug } from '../slugManager.js'
 
 /**
  * Worker entrypoint for slug-related background tasks.
- *
- * Accepted messages (via `postMessage`):
- * - `{ type: 'buildSearchIndex', id: string, contentBase: string }` -> posts `{id, result}`
- * - `{ type: 'crawlForSlug', id: string, slug: string, base?: string, maxQueue?: number }` -> posts `{id, result}`
- *
- * On error the worker posts `{id, error: string}`.
+ */
+
+/**
+ * Worker `onmessage` handler for slug-related background tasks.
+ * @param {MessageEvent} ev - Message event; `ev.data` should be the request
+ * (e.g. `{ type: 'buildSearchIndex', id, contentBase }` or `{ type: 'crawlForSlug', id, slug, base?, maxQueue? }`).
+ * @returns {Promise<void>} Posts `{id, result}` or `{id, error}` back to the caller.
  */
 onmessage = async (ev) => {
   const msg = ev.data || {}
@@ -37,6 +38,11 @@ onmessage = async (ev) => {
   }
 }
 
+/**
+ * Helper to process slug-worker messages outside of a Worker.
+ * @param {Object} msg - Message object for slug worker (see onmessage shapes above).
+ * @returns {Promise<Object>} Response object matching worker posts (`{id, result}` or `{id, error}`).
+ */
 export async function handleSlugWorkerMessage(msg) {
   try {
     if (msg.type === 'buildSearchIndex') {

@@ -1,3 +1,68 @@
+import { describe, it, expect, beforeEach } from 'vitest'
+import * as l10n from '../src/l10nManager.js'
+import {
+  slugify,
+  uniqueSlug,
+  _storeSlugMapping,
+  setLanguages,
+  resolveSlugPath,
+  setFetchMarkdown,
+  fetchMarkdown,
+  ensureSlug,
+  slugToMd,
+  mdToSlug,
+  _setAllMd,
+  setContentBase,
+  clearFetchCache,
+  clearListCaches
+} from '../src/slugManager.js'
+
+describe('slugManager basic behaviors', () => {
+  beforeEach(() => {
+    // reset internal maps/caches
+    try { slugToMd.clear() } catch (e) {}
+    try { mdToSlug.clear() } catch (e) {}
+    setLanguages([])
+    try { l10n.setLang('en') } catch (e) {}
+    clearFetchCache()
+    clearListCaches()
+    _setAllMd({})
+    try { setContentBase() } catch (e) {}
+  })
+
+  it('slugify and uniqueSlug produce expected values', () => {
+    expect(slugify('Hello, World!')).toBe('hello-world')
+    const existing = new Set(['a', 'a-2', 'a-3'])
+    expect(uniqueSlug('a', existing)).toBe('a-4')
+  })
+
+  it('stores language-aware mappings and resolves by current language', () => {
+    setLanguages(['en', 'fr'])
+    _storeSlugMapping('s', 'page.md')
+    _storeSlugMapping('s', 'fr/page.md')
+    try { l10n.setLang('fr') } catch (e) {}
+    expect(resolveSlugPath('s')).toBe('fr/page.md')
+    try { l10n.setLang('en') } catch (e) {}
+    expect(resolveSlugPath('s')).toBe('page.md')
+  })
+
+  it('ensureSlug resolves using candidate fetch when other lookups fail', async () => {
+    // stub fetchMarkdown so candidate fetch will succeed for 'decoded.md'
+    const _orig = fetchMarkdown
+    try {
+      setFetchMarkdown(async (path, base) => {
+        if (path === 'decoded.md' || path === 'decoded.html') return { raw: '# Title\n' }
+        throw new Error('not found')
+      })
+
+      const res = await ensureSlug('decoded', 'http://example.com')
+      expect(res).toBeTruthy()
+      expect(res.endsWith('.md') || res.endsWith('.html')).toBe(true)
+    } finally {
+      setFetchMarkdown(_orig)
+    }
+  })
+})
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as slugMgr from '../src/slugManager.js'
 import { setLang, currentLang } from '../src/l10nManager.js'

@@ -6,7 +6,7 @@
 
 # Type Alias: WorkerRequest
 
-> **WorkerRequest**\<\> = `object` & `Record`\<`string`, `any`\>
+> **WorkerRequest**\<\> = `object` & `Record`\<`string`, `unknown`\>
 
 ## Type Declaration
 

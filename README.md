@@ -8,11 +8,11 @@ date: 2026-03-16
 
 # nimbiCMS
 
-Lightweight, lightspeed, SEO-first client-side CMS
+Lightweight, lightspeed, SEO-first client-side Content Management System
 
 ## The project
 
-NimbiCMS is a client-side CMS for static sites that requires **no database, no server build step, and no backend**, just a bunch of Markdown or HTML pages and a minimalistic setup
+nimbiCMS is a client-side CMS for static sites that requires **no database, no server build step, and no backend**, just a bunch of Markdown or HTML pages and a minimalistic setup
 
 Just drop your Markdown files into a folder, serve the site (GitHub Pages, S3, etc.), and the client will crawl the content, render Markdown to HTML, hook links, manage slugs and anchors, maintain navigation and search functionalities, and update SEO tags on the fly. All that while being compliant, fast and accesible!
 
@@ -162,7 +162,7 @@ initCMS({ el: '#app', homePage: 'index.html' })
 
 - `_navigation.md` — renders into the navbar; use Markdown links. Example nav markup:
 
-```
+```markdown
 [Home](_home.md)
 [Blog](blog.md)
 [About](about.md)
@@ -513,6 +513,8 @@ Tips:
 > Security note: Avoid exposing sensitive paths via URL query options; do not allow untrusted runtime overrides for `contentPath`, `homePage`, or `notFoundPage` unless you validate them server- or build-side.
 
 ## Troubleshooting
+
+If you find a bug, have a feature request or a question, just [open an issue](https://github.com/AbelVM/nimbiCMS/issues)
 
 ### Content not loading / 404 pages
 - Verify `contentPath` is correct and matches the directory containing your `.md` files.

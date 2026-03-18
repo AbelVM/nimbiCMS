@@ -6,6 +6,11 @@
 
 # ui
 
+## Interfaces
+
+- [UIOptions](interfaces/UIOptions.md)
+- [UIReturn](interfaces/UIReturn.md)
+
 ## Functions
 
 - [createUI](functions/createUI.md)

@@ -21,5 +21,3 @@ Base path for content used by the indexer.
 ## Returns
 
 `void`
-
-- No return value.

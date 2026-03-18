@@ -2,6 +2,7 @@ import { marked } from 'marked'
 import RendererWorker from './worker/renderer.js?worker&inline'
 import * as RendererModule from './worker/renderer.js'
 import { makeWorkerPool } from './worker-manager.js'
+import emojimap from './utils/emojiMap.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
@@ -91,7 +92,7 @@ export const markdownPlugins = []
  * @param {MarkdownPlugin} plugin - Markdown plugin object to register with `marked`.
  */
 export function addMarkdownExtension(plugin) {
-    if (plugin && typeof plugin === 'object') {
+  if (plugin && (typeof plugin === 'object' || typeof plugin === 'function')) {
     markdownPlugins.push(plugin)
     try { marked.use(plugin) } catch (e) { console.warn('[markdown] failed to apply plugin', e) }
   }
@@ -123,7 +124,8 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
  */
 export async function parseMarkdownToHtml(md) {
   if (markdownPlugins && markdownPlugins.length) {
-    const { content, data } = parseFrontmatter(md || '')
+    let { content, data } = parseFrontmatter(md || '')
+    try { content = String(content || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
     marked.setOptions({ gfm: true, mangle: false, headerIds: false, headerPrefix: '' })
     try { markdownPlugins.forEach(p => marked.use(p)) } catch (e) { console.warn('[markdown] apply plugins failed', e) }
     const html = marked.parse(content)
@@ -131,9 +133,64 @@ export async function parseMarkdownToHtml(md) {
       const parser = SHARED_DOM_PARSER || (typeof DOMParser !== 'undefined' ? new DOMParser() : null)
       if (parser) {
         const doc = parser.parseFromString(html, 'text/html')
+        // add heading ids and build toc
         const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
         const docToc = []
-        heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
+        const used = new Set()
+        const slugifyLocal = (s) => { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+        const classesFor = (level) => {
+          const resp = {
+            1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
+            2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
+            3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
+            4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
+            5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
+            6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
+          }
+          const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
+          return (resp[level] + ' ' + weight).trim()
+        }
+        heads.forEach(h => {
+          try {
+            const level = Number(h.tagName.substring(1))
+            const text = (h.textContent || '').trim()
+            let base = slugifyLocal(text) || 'heading'
+            let candidate = base
+            let i = 2
+            while (used.has(candidate)) { candidate = base + '-' + i; i += 1 }
+            used.add(candidate)
+            h.id = candidate
+            h.className = classesFor(level)
+            docToc.push({ level, text, id: candidate })
+          } catch (e) {}
+        })
+
+        // ensure images have loading=lazy unless explicitly set or opted-out
+        try {
+          doc.querySelectorAll('img').forEach(img => {
+            try {
+              const attrs = img.getAttribute && img.getAttribute('loading')
+              const want = img.getAttribute && img.getAttribute('data-want-lazy')
+              if (!attrs && !want) img.setAttribute && img.setAttribute('loading', 'lazy')
+            } catch (e) {}
+          })
+        } catch (e) {}
+
+        // clean code element classes like language-undefined
+        try {
+          doc.querySelectorAll('pre code, code[class]').forEach(el => {
+            try {
+              const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
+              const cleaned = String(raw || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+              if (cleaned) {
+                try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned }
+              } else {
+                try { el.removeAttribute && el.removeAttribute('class') } catch (err) { el.className = '' }
+              }
+            } catch (e) {}
+          })
+        } catch (e) {}
+
         return { html: doc.body.innerHTML, meta: data || {}, toc: docToc }
       }
     } catch (e) { /* fall through to return raw html */ }
@@ -155,10 +212,12 @@ export async function parseMarkdownToHtml(md) {
   } else {
     w = initRendererWorker && initRendererWorker()
   }
+  try { md = String(md || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
   try {
     if (typeof hljs !== 'undefined' && hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
       if (/```\s*\n/.test(String(md || ''))) {
-        const { content, data } = parseFrontmatter(md || '')
+        let { content, data } = parseFrontmatter(md || '')
+        try { content = String(content || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
         marked.setOptions({ gfm: true, headerIds: true, mangle: false, highlighted: (code, lang) => {
           try {
             if (lang && hljs.getLanguage && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value

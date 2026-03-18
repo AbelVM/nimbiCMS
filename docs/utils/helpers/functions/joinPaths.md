@@ -8,7 +8,10 @@
 
 > **joinPaths**(...`parts`): `string`
 
-Join URL-like path segments producing a normalized path string.
+Join multiple path segments ensuring there is exactly one slash between
+them and no leading/trailing slashes on the result (unless the first
+segment starts with a slash, in which case the result is absolute).
+Similar to `path.posix.join` but for URL-like paths.
 
 ## Parameters
 
@@ -16,6 +19,10 @@ Join URL-like path segments producing a normalized path string.
 
 ...`string`[]
 
+Path segments to join (strings). Empty segments are ignored.
+
 ## Returns
 
 `string`
+
+Joined path string without duplicate slashes.

@@ -18,7 +18,7 @@
 
 ### meta
 
-> **meta**: `Object`
+> **meta**: `Record`\<`string`, `unknown`\>
 
 ### toc
 

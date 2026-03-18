@@ -1,3 +1,9 @@
+/**
+ * find-unused-exports2.cjs — alternative export scanner including .d.ts files.
+ *
+ * Usage:
+ *   node scripts/find-unused-exports2.cjs > tmp/exports2.json
+ */
 const fs = require('fs');
 const path = require('path');
 

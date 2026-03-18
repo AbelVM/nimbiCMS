@@ -1,3 +1,9 @@
+/**
+ * merge-jsdoc.cjs — detect and merge adjacent/duplicate JSDoc blocks.
+ *
+ * Usage:
+ *   node scripts/merge-jsdoc.cjs
+ */
 const fs = require('fs');
 const path = require('path');
 

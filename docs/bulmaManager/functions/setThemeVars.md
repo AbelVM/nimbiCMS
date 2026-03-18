@@ -8,7 +8,9 @@
 
 > **setThemeVars**(`vars`): `void`
 
-Apply CSS custom properties to the document root (keys without `--`).
+Apply an object of CSS custom properties to the document root. This makes
+it easy for consumers to theme colors/fonts/etc. without touching Bulma
+directly. Property names should be provided without the leading `--`.
 
 ## Parameters
 
@@ -21,5 +23,3 @@ Map of CSS variable names (without `--`) to values.
 ## Returns
 
 `void`
-
-- No return value.

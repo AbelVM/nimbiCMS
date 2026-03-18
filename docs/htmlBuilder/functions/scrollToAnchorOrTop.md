@@ -21,5 +21,3 @@ Element id (without '#') or null to scroll to top.
 ## Returns
 
 `void`
-
-- No return value.

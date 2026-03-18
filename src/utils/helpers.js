@@ -201,8 +201,8 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
  * segment starts with a slash, in which case the result is absolute).
  * Similar to `path.posix.join` but for URL-like paths.
  *
- * @param {...string} parts
- * @returns {string}
+ * @param {...string} parts - Path segments to join (strings). Empty segments are ignored.
+ * @returns {string} Joined path string without duplicate slashes.
  */
 export function joinPaths(...parts) {
   if (!parts || parts.length === 0) return ''
@@ -301,3 +301,31 @@ export function safe(fn) {
 try {
   if (typeof globalThis !== 'undefined' && !globalThis.safe) globalThis.safe = safe
 } catch (err) { console.warn('[helpers] global attach failed', err) }
+
+/**
+ * Decode a small set of common HTML entities and numeric entities in a string.
+ * This is a lightweight fallback to avoid DOM-dependent decoding in workers.
+ * @param {string} s
+ * @returns {string}
+ */
+export function decodeHtmlEntities(s) {
+  try {
+    if (!s && s !== 0) return ''
+    const str = String(s)
+    const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
+    return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, g) => {
+      if (!g) return m
+      if (g[0] === '#') {
+        try {
+          if (g[1] === 'x' || g[1] === 'X') return String.fromCharCode(parseInt(g.slice(2), 16))
+          return String.fromCharCode(parseInt(g.slice(1), 10))
+        } catch (e) {
+          return m
+        }
+      }
+      return (named[g] !== undefined) ? named[g] : m
+    })
+  } catch (err) {
+    return String(s || '')
+  }
+}

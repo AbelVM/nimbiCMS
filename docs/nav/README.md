@@ -10,6 +10,7 @@
 
 - [NavBuildResult](type-aliases/NavBuildResult.md)
 - [NavTreeItem](type-aliases/NavTreeItem.md)
+- [ParsedPage](type-aliases/ParsedPage.md)
 - [SearchIndexEntry](type-aliases/SearchIndexEntry.md)
 
 ## Functions

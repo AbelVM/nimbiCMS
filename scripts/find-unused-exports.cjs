@@ -1,3 +1,9 @@
+/**
+ * find-unused-exports.cjs — enumerate exported symbols across `src/` for review.
+ *
+ * Usage:
+ *   node scripts/find-unused-exports.cjs > tmp/exports.json
+ */
 const fs = require('fs');
 const path = require('path');
 

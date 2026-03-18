@@ -21,7 +21,7 @@ Translation key to look up in the current locale.
 
 ### replacements?
 
-`Object` = `{}`
+`Record`\<`string`, `string`\> = `{}`
 
 Optional replacements for token interpolation.
 

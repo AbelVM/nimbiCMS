@@ -10,6 +10,12 @@ import { _rewriteAnchors } from '../htmlBuilder.js'
  * On error the worker posts `{ id, error: string }`.
  */
 
+/**
+ * Worker `onmessage` handler for anchor rewrite messages.
+ * @param {MessageEvent} ev - Message event whose `data` should contain the worker request
+ * (e.g. `{ type: 'rewriteAnchors', id, html, contentBase?, pagePath? }`).
+ * @returns {Promise<void>} Posts a `{id, result}` or `{id, error}` message.
+ */
 onmessage = async (ev) => {
   const msg = ev.data || {}
   try {
@@ -32,6 +38,11 @@ onmessage = async (ev) => {
   }
 }
 
+/**
+ * Helper to process an anchor-worker style message outside of a Worker.
+ * @param {Object} msg - Message object (expects `type === 'rewriteAnchors'` and fields `id`, `html`, `contentBase`, `pagePath`).
+ * @returns {Promise<Object>} Response shaped like the worker postMessage (contains `id` and `result` or `error`).
+ */
 export async function handleAnchorWorkerMessage(msg) {
   try {
     if (msg && msg.type === 'rewriteAnchors') {

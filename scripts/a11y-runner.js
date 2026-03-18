@@ -1,3 +1,13 @@
+/**
+ * a11y-runner.js — run accessibility checks using Puppeteer + axe-core.
+ *
+ * Usage:
+ *   node scripts/a11y-runner.js [options]
+ *
+ * Notes:
+ *   - Expects a local dev server to be running or will serve the project locally.
+ *   - Set `CHROME_PATH` or `BROWSER_PATH` env var to point to a Chrome binary if needed.
+ */
 import fs from 'fs'
 import path from 'path'
 import http from 'http'

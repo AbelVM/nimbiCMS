@@ -17,9 +17,9 @@ mistakes are surfaced early (e.g. passing a number for `contentPath`).
 
 ### options?
 
-`Object` = `{}`
+`Record`\<`string`, `unknown`\> = `{}`
 
-options parameter
+Initialization options provided by the caller.
 
 ## Returns
 

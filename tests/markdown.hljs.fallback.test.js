@@ -1,3 +1,17 @@
+import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('highlight.js/lib/core', () => ({ default: { getLanguage: (n) => true, highlight: () => { throw new Error('boom') }, highlightElement: (el) => { el.innerHTML = 'EL' } } }))
+
+describe('parseMarkdownToHtml hljs fallback', () => {
+  it('falls back to highlightElement when highlight throws', async () => {
+    vi.resetModules()
+    const md = await import('../src/markdown.js')
+    const input = '```js\nconsole.log(2)\n```\n'
+    const res = await md.parseMarkdownToHtml(input)
+    expect(res).toBeTruthy()
+    expect(res.html.includes('EL') || res.html.includes('console.log')).toBe(true)
+  })
+})
 import { it, expect } from 'vitest'
 import { parseMarkdownToHtml } from '../src/markdown.js'
 import hljs from 'highlight.js/lib/core'

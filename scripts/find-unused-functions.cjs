@@ -1,3 +1,9 @@
+/**
+ * find-unused-functions.cjs — heuristically detect unused local functions.
+ *
+ * Usage:
+ *   node scripts/find-unused-functions.cjs > tmp/unused-fns.json
+ */
 const fs = require('fs')
 const path = require('path')
 

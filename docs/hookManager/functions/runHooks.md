@@ -21,7 +21,7 @@ Hook name to invoke (e.g. 'onPageLoad').
 
 ### ctx
 
-`object`
+`Record`\<`string`, `unknown`\>
 
 Context object passed to each callback.
 

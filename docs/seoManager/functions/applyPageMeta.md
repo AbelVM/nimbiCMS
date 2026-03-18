@@ -26,7 +26,7 @@ Fallback title when none present.
 
 ### parsed
 
-`Object`
+`Record`\<`string`, `unknown`\>
 
 Parsed page object with `meta` and other fields.
 
@@ -81,5 +81,3 @@ Full page data, including raw markdown for reading time.
 ## Returns
 
 `void`
-
-- No return value.

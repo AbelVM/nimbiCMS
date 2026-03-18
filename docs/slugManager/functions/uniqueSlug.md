@@ -8,7 +8,8 @@
 
 > **uniqueSlug**(`base`, `existing`): `string`
 
-Generate a unique slug by appending a numeric suffix if needed.
+Ensure a candidate slug is unique against an existing set.
+If `base` collides, a numeric suffix is appended ("-2", "-3", ...).
 
 ## Parameters
 
@@ -16,10 +17,16 @@ Generate a unique slug by appending a numeric suffix if needed.
 
 `string`
 
+Candidate slug.
+
 ### existing
 
 `Set`\<`string`\>
 
+Set of already-used slugs.
+
 ## Returns
 
 `string`
+
+- A slug that does not appear in `existing`.

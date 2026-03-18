@@ -1,6 +1,12 @@
 #!/usr/bin/env node
+/**
+ * strip-css-comments.cjs — strip non-license CSS block comments from stylesheets.
+ *
+ * Usage:
+ *   node scripts/strip-css-comments.cjs
+ */
 /* Strip CSS block comments except those starting with /*! (often licenses)
-   Usage: node scripts/strip-css-comments.cjs
+  Usage: node scripts/strip-css-comments.cjs
 */
 const fs = require('fs');
 const path = require('path');

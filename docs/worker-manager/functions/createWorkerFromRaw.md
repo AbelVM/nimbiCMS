@@ -8,8 +8,9 @@
 
 > **createWorkerFromRaw**(`code`): `Worker` \| `null`
 
-Build a Blob URL from raw worker source and return a Worker (module).
-Returns null if the environment cannot create a Blob-based Worker.
+Convenience helper that builds a `Blob` URL from a raw worker source string
+and returns a newly constructed `Worker`. If the environment does not
+support `Blob`/`URL.createObjectURL` this returns `null`.
 
 ## Parameters
 
@@ -17,10 +18,10 @@ Returns null if the environment cannot create a Blob-based Worker.
 
 `string`
 
-JavaScript source for the worker
+JavaScript source code for the worker as a string.
 
 ## Returns
 
 `Worker` \| `null`
 
-- A Worker instance configured with `type: 'module'`, or `null` if creation failed.
+A Worker instance configured with `type: 'module'`, or `null` if creation failed.

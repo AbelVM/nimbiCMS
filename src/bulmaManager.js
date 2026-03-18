@@ -231,11 +231,6 @@ export function setStyle(style) {
  * @param {Record<string,string>} vars - Map of CSS variable names (without `--`) to values.
  * @returns {void}
  */
-/**
- * Apply CSS custom properties to the document root (keys without `--`).
- * @param {Record<string,string>} vars - Map of CSS variable names (without `--`) to values.
- * @returns {void} - No return value.
- */
 export function setThemeVars(vars) {
   const root = document.documentElement
   for (const [k, v] of Object.entries(vars || {})) {

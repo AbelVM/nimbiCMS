@@ -1,3 +1,9 @@
+/**
+ * fix-jsdoc.cjs — lightweight fixer for JSDoc param/returns descriptions.
+ *
+ * Usage:
+ *   node scripts/fix-jsdoc.cjs
+ */
 const fs = require('fs');
 const path = require('path');
 

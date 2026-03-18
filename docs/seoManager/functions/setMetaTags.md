@@ -45,5 +45,3 @@ Fallback site/document title.
 ## Returns
 
 `void`
-
-- No return value.

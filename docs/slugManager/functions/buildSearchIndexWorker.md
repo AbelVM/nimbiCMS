@@ -30,4 +30,4 @@ Base URL where markdown content is hosted
 
 `Promise`\<`object`[]\>
 
-- resolved search index entries
+- Resolved search index entries.

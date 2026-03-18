@@ -8,8 +8,9 @@
 
 > **addSlugResolver**(`fn`): `void`
 
-Register a custom slug resolver function. The function should accept a
-slug (string) and return a markdown path (or promise thereof) or `null`.
+Register a custom resolver function. The function should accept a slug
+string and return a markdown path (or promise thereof) or `null` if not
+resolved.
 
 ## Parameters
 
@@ -17,7 +18,7 @@ slug (string) and return a markdown path (or promise thereof) or `null`.
 
 (`slug`, `contentBase?`) => `string` \| `Promise`\<`string` \| `null`\> \| `null`
 
-fn parameter
+Resolver function to add.
 
 ## Returns
 

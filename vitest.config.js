@@ -7,5 +7,8 @@ export default defineConfig({
     testTimeout: 5000,
     include: ['tests/**/*.test.{js,ts}'],
     setupFiles: ['tests/setup.js'],
+    coverage: {
+      provider: 'v8'
+    },
   },
 })

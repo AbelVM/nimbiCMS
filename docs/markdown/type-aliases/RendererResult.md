@@ -18,4 +18,4 @@
 
 ### meta?
 
-> `optional` **meta**: `Object`
+> `optional` **meta**: [`Meta`](Meta.md)

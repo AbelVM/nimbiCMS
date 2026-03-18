@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * gen-dts.js — generate a minimal `src/index.d.ts` from JSDoc comments.
+ *
+ * Usage:
+ *   npm run gen-dts
+ *   or: node scripts/gen-dts.js
+ */
 // simple generator: scans src/**/*.js for exported functions/constants
 // and writes a minimal index.d.ts.  Not comprehensive but enough for most
 // purposes; rerun with `npm run gen-dts` after adding new exports.

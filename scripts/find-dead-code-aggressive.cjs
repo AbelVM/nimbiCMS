@@ -1,3 +1,9 @@
+/**
+ * find-dead-code-aggressive.cjs — scan for potentially dead JS code (aggressive heuristics).
+ *
+ * Usage:
+ *   node scripts/find-dead-code-aggressive.cjs > tmp/dead-code-aggressive.json
+ */
 const fs = require('fs');
 const path = require('path');
 

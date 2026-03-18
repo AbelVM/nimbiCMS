@@ -13,5 +13,3 @@ Lazily return a worker instance used for slug-related background tasks.
 ## Returns
 
 `Worker` \| `null`
-
-- A Worker instance or null if workers are unavailable.

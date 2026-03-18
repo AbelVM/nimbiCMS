@@ -43,3 +43,4 @@ docs-typedoc.json
 tmp/
 temp/
 a11y-report.json
+vitest-coverage.txt

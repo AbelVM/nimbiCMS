@@ -8,13 +8,16 @@
 
 > **encodeURL**(`u`): `string`
 
-Encode a URL or component with a safe fallback on failure.
+Safely encode a URL or URL component using encodeURI.  Falls back to the
+original string if encoding fails.
 
 ## Parameters
 
 ### u
 
 `string`
+
+URL or component to encode safely
 
 ## Returns
 

@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+/**
+ * check-toc.js — verify README table-of-contents anchors match headings.
+ *
+ * Usage:
+ *   node scripts/check-toc.js [README.md]
+ */
 const fs = require('fs');
 const path = process.argv[2] || 'README.md';
 const md = fs.readFileSync(path, 'utf8');

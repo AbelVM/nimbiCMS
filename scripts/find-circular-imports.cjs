@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+/**
+ * find-circular-imports.cjs — detect circular relative imports in `src/`.
+ *
+ * Usage:
+ *   node scripts/find-circular-imports.cjs
+ */
 // Detect circular imports among local relative imports in the project `src/` directory.
 // Usage: node scripts/find-circular-imports.cjs
 
