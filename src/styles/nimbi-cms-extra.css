@@ -1,5 +1,57 @@
 :root{
     --nimbi-color:#fe019a;
+    --bulma-scrollbar-thumb-color: rgba(0, 0, 0, 0.25);
+    --nimbi-version-label-color: #333;
+    --nimbi-version-label-color-dark: rgba(255, 255, 255, 0.80);
+}
+
+/* Dark mode scrollbar color override */
+.nimbi-mount[data-theme="dark"],
+[data-theme="dark"] {
+    --bulma-scrollbar-thumb-color: rgba(255, 255, 255, 0.18);
+    /* slightly darker / less bright when explicitly dark */
+    --nimbi-version-label-color: rgba(255, 255, 255, 0.80);
+}
+
+/* Support system dark mode (prefers-color-scheme) so "system" defaultStyle works */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bulma-scrollbar-thumb-color: rgba(255, 255, 255, 0.18);
+        /* system-preferred dark should match the explicit dark tone */
+        --nimbi-version-label-color: rgba(255, 255, 255, 0.80);
+    }
+}
+
+/* Mobile backdrop when search results are open */
+@media (max-width: 1023px) {
+    .nimbi-search-open::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(128,128,128,0.32);
+        background: color-mix(in srgb, var(--bulma-body-color, rgb(128,128,128)) 33%, transparent);
+        z-index: 1;
+        pointer-events: auto;
+        backdrop-filter: blur(4px);
+    }
+
+    .nimbi-mount:has(.nimbi-search-results.is-open) .navbar-start{
+        display:none !important;
+    }
+
+}
+/* Support legacy/document-level `is-dark` class (docs mention it) */
+.is-dark,
+.nimbi-mount.is-dark {
+    --bulma-scrollbar-thumb-color: rgba(255, 255, 255, 0.18);
+    --nimbi-version-label-color: rgba(255, 255, 255, 0.80);
+}
+
+/* Ensure explicit light theme resets vars even when system prefers dark */
+.nimbi-mount[data-theme="light"],
+[data-theme="light"] {
+    --bulma-scrollbar-thumb-color: rgba(0, 0, 0, 0.25);
+    --nimbi-version-label-color: #333;
 }
 
 .nimbi-mount code:not(pre > code){
@@ -25,7 +77,7 @@
 .nimbi-cms {
     display: block;
     padding: 0;
-    margin: 0;
+    margin: 0 auto;
     
     
     position: relative;
@@ -194,6 +246,12 @@
     margin: 0 0.25rem;
 }
 
+/* If the reading-time is the only child of the subtitle, don't show the separator */
+.nimbi-article .nimbi-article-subtitle > .nimbi-reading-time:only-child::before {
+    content: "";
+    margin: 0;
+}
+
 /* put separator after author on larger screens so author and date are separated */
 .nimbi-article .nimbi-article-author::after {
     content: "•";
@@ -355,6 +413,55 @@
     .nimbi-article .nimbi-article-author::after {
         content: "";
         margin: 0;
+    }
+}
+
+/* Mobile: make the navbar menu open as an overlay instead of pushing content down */
+@media (max-width: 1024px) {
+    .nimbi-site-navbar {
+        /* ensure positioned ancestor for absolute menu */
+        position: sticky;
+        top: 0;
+        z-index: 50;
+    }
+
+    .nimbi-site-navbar .navbar .navbar-menu.is-active {
+        position: absolute;
+        top: var(--nimbi-site-navbar-height, 4rem);
+        left: 0;
+        right: 0;
+        z-index: 60;
+        /* keep the menu confined to viewport and scrollable */
+        max-height: calc(100vh - var(--nimbi-site-navbar-height, 4rem));
+        /* allow dropdowns (search results) to escape the scrolling container */
+        overflow: visible;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    }
+
+    /* ensure menu items layout remains vertical for mobile */
+    .nimbi-site-navbar .navbar .navbar-menu .navbar-start,
+    .nimbi-site-navbar .navbar .navbar-menu .navbar-end {
+        display: block;
+    }
+
+    .navbar-start{
+        text-align: right;
+    }
+
+    /* Ensure the search dropdown renders above the overlay and is scrollable */
+    .nimbi-site-navbar .navbar .navbar-menu .dropdown .dropdown-menu {
+        position: absolute;
+        right: 1rem;
+        left: auto;
+        top: calc(var(--nimbi-site-navbar-height, 4rem) + 0.5rem);
+        max-height: calc(50vh);
+        overflow: auto;
+        z-index: 80;
+    }
+
+    .nimbi-site-navbar .navbar .navbar-menu .nimbi-search-results {
+        max-height: calc(40vh);
+        overflow: auto;
     }
 }
 
@@ -653,20 +760,53 @@ body,
 
 [data-theme="dark"] .nimbi-version-label,
 .nimbi-mount[data-theme="dark"] .nimbi-version-label {
-    color: var(--nimbi-version-label-color-dark, #ddd);
+    /* Prefer the shared --nimbi-version-label-color so "system" (prefers-color-scheme)
+       and explicit dark mode produce the same visible color. Fall back to the
+       dark-specific variable if needed. */
+    color: var(--nimbi-version-label-color, var(--nimbi-version-label-color-dark, #ddd));
+    /* subtler (darker) in dark mode */
+    opacity: 0.82;
+}
+
+/* Slightly more subtle hover in dark mode to avoid overly bright text */
+[data-theme="dark"] .nimbi-version-label:hover,
+.nimbi-mount[data-theme="dark"] .nimbi-version-label:hover {
+    opacity: 0.88;
+}
+
+/* Make system-preferred dark use the same opacity/hover as explicit dark */
+@media (prefers-color-scheme: dark) {
+    .nimbi-version-label {
+        color: var(--nimbi-version-label-color, var(--nimbi-version-label-color-dark, #ddd));
+        opacity: 0.82;
+    }
+    .nimbi-version-label:hover {
+        opacity: 0.88;
+    }
+}
+
+/* Ensure legacy `.is-dark` matches explicit dark opacity rules */
+.is-dark .nimbi-version-label,
+.nimbi-mount.is-dark .nimbi-version-label {
+    color: var(--nimbi-version-label-color, var(--nimbi-version-label-color-dark, #ddd));
+    opacity: 0.82;
+}
+.is-dark .nimbi-version-label:hover,
+.nimbi-mount.is-dark .nimbi-version-label:hover {
+    opacity: 0.88;
 }
 
 
 a.nimbi-version-label,
 .nimbi-version-label.tag {
-    color: var(--nimbi-version-label-color, #111) !important;
+    color: var(--nimbi-version-label-color, #333);
 }
 
 [data-theme="dark"] a.nimbi-version-label,
 [data-theme="dark"] .nimbi-version-label.tag,
 .nimbi-mount[data-theme="dark"] a.nimbi-version-label,
 .nimbi-mount[data-theme="dark"] .nimbi-version-label.tag {
-    color: var(--nimbi-version-label-color-dark, #eee) !important;
+    color: var(--nimbi-version-label-color, var(--nimbi-version-label-color-dark, #eee)) !important;
 }
 
 

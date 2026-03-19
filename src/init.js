@@ -439,31 +439,68 @@ export async function initCMS(options = {}) {
   }
 
   const pagePath = location.pathname || '/'
-  const pageDir = pagePath.endsWith('/') ? pagePath : pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
+  // Normalize pageDir: if the path ends with '/' it's a directory already.
+  // If it doesn't end with '/' and doesn't look like a file (no dot in last segment),
+  // treat it as a directory (convert '/example' -> '/example/'). Otherwise
+  // treat it as a file path and take its directory portion.
+  let pageDir
+  if (pagePath.endsWith('/')) {
+    pageDir = pagePath
+  } else {
+    const lastSeg = pagePath.substring(pagePath.lastIndexOf('/') + 1)
+    if (lastSeg && !lastSeg.includes('.')) {
+      pageDir = pagePath + '/'
+    } else {
+      pageDir = pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
+    }
+  }
   try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; console.warn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
   const contentPathWasProvided = Object.prototype.hasOwnProperty.call(finalOptions, 'contentPath')
-  // '.' and './' are page-relative
-  if (cp === '.' || cp === './') {
-    cp = ''
-    var contentBase = new URL(pageDir + cp, location.origin).toString()
-  } else if (contentPathWasProvided && cp && String(cp).trim() !== '') {
-    // Host provided value: treat as page-dir relative (user expects
-    // example.com/blog/examplepath/ if page is under /blog/)
-    if (cp.startsWith('./')) cp = cp.slice(2)
-    if (cp.startsWith('/')) cp = cp.slice(1)
-    if (cp !== '' && !cp.endsWith('/')) cp = cp + '/'
-    var contentBase = new URL(pageDir + cp, location.origin).toString()
-  } else if (cp && String(cp).trim() !== '') {
-    // Not explicitly provided (using default): treat as root-relative to
-    // avoid duplicate segments when the page already lives under the
-    // default content directory.
-    if (!cp.startsWith('/')) cp = '/' + cp
-    if (!cp.endsWith('/')) cp = cp + '/'
-    try { cp = cp.replace(/\\/g, '/') } catch (_) {}
-    var contentBase = new URL(cp, location.origin).toString()
-  } else {
-    var contentBase = new URL(pageDir, location.origin).toString()
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+  // pageRoot is the site-rooted folder for this page (origin + pageDir)
+  const pageRoot = new URL(pageDir, origin).toString()
+  // '.' and './' are page-relative (same as empty)
+  if (cp === '.' || cp === './') cp = ''
+
+  // Normalize cp into a page-relative segment without leading slash,
+  // always ensuring a trailing slash when non-empty.
+  try { cp = String(cp || '').replace(/\\/g, '/') } catch (_e) { cp = String(cp || '') }
+  if (cp.startsWith('/')) cp = cp.replace(/^\/+/, '')
+  if (cp && !cp.endsWith('/')) cp = cp + '/'
+
+  // If the configured contentPath already includes the pageDir (common when
+  // authors provide a site-rooted path like '/example/content'), remove the
+  // leading pageDir segment so we don't duplicate it when building
+  // `${origin}${pageDir}${cp}` below.
+  try {
+    if (cp && pageDir && pageDir !== '/') {
+      const pd = pageDir.replace(/^\/+/, '').replace(/\/+$/, '') + '/'
+      if (pd && cp.startsWith(pd)) {
+        cp = cp.slice(pd.length)
+      }
+    }
+  } catch (_e) {
+    /* ignore normalization errors */
+  }
+
+  // Compute contentBase as origin + pageDir + cp (always preserve pageDir/site subpath).
+  // This yields: `${location.origin}${location.pathname}${contentPath}` when cp non-empty,
+  // or `${location.origin}${location.pathname}` when cp is empty.
+  try {
+    if (cp) {
+      var contentBase = new URL(cp, pageRoot.endsWith('/') ? pageRoot : (pageRoot + '/')).toString()
+    } else {
+      var contentBase = pageRoot
+    }
+  } catch (e) {
+    // Fallback: origin + '/' + cp
+    try {
+      if (cp) var contentBase = new URL('/' + cp, origin).toString()
+      else var contentBase = new URL(pageDir, origin).toString()
+    } catch (_e) {
+      var contentBase = origin
+    }
   }
   try {
     import('./slugManager.js').then(m => {
@@ -573,11 +610,11 @@ export async function initCMS(options = {}) {
                     const finishWithAnchor = (href) => {
                     const a = document.createElement('a')
                     a.className = 'nimbi-version-label tag is-small'
-                    a.textContent = `Ninbi CMS v. ${v}`
+                    a.textContent = `Nimbi CMS v. ${v}`
                     a.href = href || '#'
                     a.target = '_blank'
                     a.rel = 'noopener noreferrer nofollow'
-                    a.setAttribute('aria-label', `Ninbi CMS version ${v}`)
+                    a.setAttribute('aria-label', `Nimbi CMS version ${v}`)
                     try { registerThemedElement(a) } catch (e) { /* ignore */ }
                     try { mountEl.appendChild(a) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
                   }

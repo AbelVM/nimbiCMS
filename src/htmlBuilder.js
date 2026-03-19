@@ -280,6 +280,10 @@ async function rewriteAnchors(article, contentBase, pagePath) {
 
     for (const a of Array.from(anchors)) {
       try {
+        // Don't rewrite anchors that live inside heading elements —
+        // links in headings are often intended as part of the heading
+        // and rewriting them can break slug/title extraction and TOC mapping.
+        try { if (a.closest && a.closest('h1,h2,h3,h4,h5,h6')) continue } catch (e) {}
         const href = a.getAttribute('href') || ''
         if (!href) continue
         if (isExternalLink(href)) continue

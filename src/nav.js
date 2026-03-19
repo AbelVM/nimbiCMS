@@ -446,6 +446,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           }
           if (key === 'Escape') {
             try { dropdown.classList.remove('is-active') } catch (e) {}
+            try { document.documentElement.classList.remove('nimbi-search-open') } catch (e) {}
             try { dropdownContent.style.display = 'none' } catch (e) {}
             try { dropdownContent.classList.remove('is-open') } catch (e) {}
             try { dropdownContent.removeAttribute('tabindex') } catch (e) {}
@@ -492,7 +493,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           title.textContent = it.title
           a.appendChild(title)
           a.addEventListener('click', () => {
-            if (dropdown) dropdown.classList.remove('is-active')
+            if (dropdown) {
+              dropdown.classList.remove('is-active')
+              try { document.documentElement.classList.remove('nimbi-search-open') } catch (e) {}
+            }
             try { dropdownContent.style.display = 'none' } catch (e) {}
             try { dropdownContent.classList.remove('is-open') } catch (e) {}
             try { dropdownContent.removeAttribute('tabindex') } catch (e) {}
@@ -503,7 +507,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         })
         dropdownContent.appendChild(panel)
       } catch (e) { /* ignore render errors */ }
-      if (dropdown) dropdown.classList.add('is-active')
+      if (dropdown) {
+        dropdown.classList.add('is-active')
+        try { document.documentElement.classList.add('nimbi-search-open') } catch (e) {}
+      }
       try { dropdownContent.style.display = 'block' } catch (e) {}
       try { dropdownContent.classList.add('is-open') } catch (e) {}
       try { dropdownContent.setAttribute('tabindex', '0') } catch (e) {}
@@ -571,7 +578,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               if (!resultsContainer) return
               if (!resultsContainer.classList.contains('is-open') && (resultsContainer.style && resultsContainer.style.display !== 'block')) return
               if (tgt && (resultsContainer.contains(tgt) || (searchInput && (tgt === searchInput || (searchInput.contains && searchInput.contains(tgt)))))) return
-              if (dropdown) dropdown.classList.remove('is-active')
+              if (dropdown) {
+                dropdown.classList.remove('is-active')
+                try { document.documentElement.classList.remove('nimbi-search-open') } catch (e) {}
+              }
               try { resultsContainer.style.display = 'none' } catch (e) {}
               try { resultsContainer.classList.remove('is-open') } catch (e) {}
             } catch (e) { /* ignore */ }

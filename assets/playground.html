@@ -126,7 +126,7 @@ function hello(){
       const style = themeSel.value || 'system'
       const els = preview.querySelectorAll('pre code')
       const bulmaVal = (bulma === 'none') ? 'null' : `'${bulma}'`
-      const initCode = `// Minimal initialization example\nnimbiCMS.initCMS({\n  el: '#app',\n  style: '${style}',\n  bulma: ${bulmaVal},\n  highlightTheme: '${hl}',\n  useCdn: true\n});`
+      const initCode = `// Minimal initialization example\nnimbiCMS.initCMS({\n  el: '#app',\n  defaultStyle: '${style}',\n  bulmaCustomize: ${bulmaVal},\n  highlightTheme: '${hl}',\n  useCdn: true\n});`
       els.forEach(el => {
         try { el.textContent = initCode } catch (e) { /* ignore */ }
         try { if (window.hljs && typeof window.hljs.highlightElement === 'function') window.hljs.highlightElement(el) } catch (e) { /* ignore */ }

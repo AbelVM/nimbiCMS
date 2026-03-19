@@ -475,22 +475,29 @@ export let fetchMarkdown = async function(path, base) {
   const baseClean = base == null ? '' : trimTrailingSlash(String(base))
   let url = ''
   try {
-    if (baseClean) {
-      if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
-        url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
-      } else if (baseClean.startsWith('/')) {
-        url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
-      } else {
-        const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
-        const basePath = baseClean.startsWith('/') ? baseClean : ('/' + baseClean)
-        url = origin + basePath.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
-      }
+    const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+    // If content base is a root-relative path (e.g. '/base'), preserve
+    // the relative URL form so consumers/tests that expect a leading
+    // slash can assert on the fetch argument.
+    if (baseClean && baseClean.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
+      url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
     } else {
-      const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
-      url = origin + '/' + path.replace(/^\//, '')
+      // Resolve to an absolute URL for other base forms so Node fetch works.
+      let baseForResolve = origin + '/'
+      if (baseClean) {
+        if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
+          baseForResolve = baseClean.replace(/\/$/, '') + '/'
+        } else if (baseClean.startsWith('/')) {
+          baseForResolve = origin + baseClean.replace(/\/$/, '') + '/'
+        } else {
+          baseForResolve = origin + '/' + baseClean.replace(/\/$/, '') + '/'
+        }
+      }
+      // Use URL resolution to preserve slashes and avoid duplicate segments
+      url = new URL(path.replace(/^\//, ''), baseForResolve).toString()
     }
   } catch (err) {
-    url = '/' + path.replace(/^\//, '')
+    url = (typeof location !== 'undefined' && location.origin ? location.origin : 'http://localhost') + '/' + path.replace(/^\//, '')
   }
   if (fetchCache.has(url)) {
     return fetchCache.get(url)
@@ -886,6 +893,22 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
   const seenDirs = new Set()
   const queue = ['']
 
+  // Prepare a base URL for resolution so hrefs like '/content/...' are
+  // resolved relative to the content base origin and path.
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+  let baseForResolve = origin + '/'
+  try {
+    if (contentBase) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(String(contentBase))) {
+        baseForResolve = String(contentBase).replace(/\/$/, '') + '/'
+      } else if (String(contentBase).startsWith('/')) {
+        baseForResolve = origin + String(contentBase).replace(/\/$/, '') + '/'
+      } else {
+        baseForResolve = origin + '/' + String(contentBase).replace(/\/$/, '') + '/'
+      }
+    }
+  } catch (err) { baseForResolve = origin + '/' }
+
   while (queue.length && !found) {
     if (queue.length > maxQueue) {
       break
@@ -893,9 +916,13 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
     const relDir = queue.shift()
     if (seenDirs.has(relDir)) continue
     seenDirs.add(relDir)
-    let url = contentBase
-    if (!url.endsWith('/')) url += '/'
-    url += relDir
+    // Resolve directory URL via URL resolution to preserve slashes.
+    let url = ''
+    try {
+      url = new URL(relDir || '', baseForResolve).toString()
+    } catch (err) {
+      url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
+    }
     try {
       let res
       try {
@@ -911,18 +938,37 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
       const text = await res.text()
       const doc = _crawlParser.parseFromString(text, 'text/html')
       const links = doc.querySelectorAll(_crawlLinkSelector)
+        // Use the current directory URL as the base for resolving links found
+        // inside this directory listing so relative links resolve correctly.
+        const linkBase = url
           for (const a of links) {
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
           if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
-            const sub = relDir + href
-            if (!seenDirs.has(sub)) queue.push(sub)
+            try {
+              const resolved = new URL(href, linkBase)
+              const basePath = new URL(baseForResolve).pathname
+              const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
+              const subNorm = ensureTrailingSlash(normalizePath(sub))
+              if (!seenDirs.has(subNorm)) queue.push(subNorm)
+            } catch (err) {
+              const sub = normalizePath(relDir + href)
+              if (!seenDirs.has(sub)) queue.push(sub)
+            }
             continue
           }
           if (href.toLowerCase().endsWith('.md')) {
-            const path = normalizePath(relDir + href)
+            let path = ''
+            try {
+              const resolved = new URL(href, linkBase)
+              const basePath = new URL(baseForResolve).pathname
+              path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
+            } catch (err) {
+              path = (relDir + href).replace(/^\//, '')
+            }
+            path = normalizePath(path)
             try {
               if (mdToSlug.has(path)) {
                 continue
@@ -962,14 +1008,35 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
   const seenDirs = new Set()
   const queue = ['']
 
+  // Prepare base URL for resolution so absolute or root-anchored hrefs
+  // are resolved relative to the content base origin and path.
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+  let baseForResolve = origin + '/'
+  try {
+    if (contentBase) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(String(contentBase))) {
+        baseForResolve = String(contentBase).replace(/\/$/, '') + '/'
+      } else if (String(contentBase).startsWith('/')) {
+        baseForResolve = origin + String(contentBase).replace(/\/$/, '') + '/'
+      } else {
+        baseForResolve = origin + '/' + String(contentBase).replace(/\/$/, '') + '/'
+      }
+    }
+  } catch (err) { baseForResolve = origin + '/' }
+
   while (queue.length) {
     if (queue.length > maxQueue) break
     const relDir = queue.shift()
     if (seenDirs.has(relDir)) continue
     seenDirs.add(relDir)
-    let url = contentBase
-    if (!url.endsWith('/')) url += '/'
-    url += relDir
+    // Resolve the current directory URL via URL resolution to avoid
+    // duplicated path segments and preserve slashes.
+    let url = ''
+    try {
+      url = new URL(relDir || '', baseForResolve).toString()
+    } catch (err) {
+      url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
+    }
     try {
       let res
       try {
@@ -985,17 +1052,34 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
       const text = await res.text()
       const doc = _crawlParser.parseFromString(text, 'text/html')
       const links = doc.querySelectorAll(_crawlLinkSelector)
+      const linkBase = url
       for (const a of links) {
         try {
           let href = a.getAttribute('href') || ''
           if (!href) continue
           if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
           if (href.endsWith('/')) {
-            const sub = relDir + href
-            if (!seenDirs.has(sub)) queue.push(sub)
+            try {
+              const resolved = new URL(href, linkBase)
+              const basePath = new URL(baseForResolve).pathname
+              const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
+              const subNorm = ensureTrailingSlash(normalizePath(sub))
+              if (!seenDirs.has(subNorm)) queue.push(subNorm)
+            } catch (err) {
+              const sub = relDir + href
+              if (!seenDirs.has(sub)) queue.push(sub)
+            }
             continue
           }
-          const path = (relDir + href).replace(/^\/+/, '')
+          let path = ''
+          try {
+            const resolved = new URL(href, linkBase)
+            const basePath = new URL(baseForResolve).pathname
+            path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
+          } catch (err) {
+            path = (relDir + href).replace(/^\//, '')
+          }
+          path = normalizePath(path)
           if (/\.(md|html?)$/i.test(path)) {
             result.add(path)
           }

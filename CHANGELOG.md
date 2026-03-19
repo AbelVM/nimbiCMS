@@ -6,6 +6,12 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 - ...
 
+# v1.0.5
+
+- **[FIX]** Nasty regression with `contentPath` management
+- **[FIX]** Minor styling issues in system mode when system is dark
+- **[FIX]** Minor fixes
+
 ## v1.0.4
 
 - **[FIX]** Some weird corner case wih `contentPath` leads to wrong paths
