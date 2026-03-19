@@ -442,11 +442,29 @@ export async function initCMS(options = {}) {
   const pageDir = pagePath.endsWith('/') ? pagePath : pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
   try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; console.warn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
-  if (cp === '.' || cp === './') cp = ''
-  if (cp.startsWith('./')) cp = cp.slice(2)
-  if (cp.startsWith('/')) cp = cp.slice(1)
-  if (cp !== '' && !cp.endsWith('/')) cp = cp + '/'
-  const contentBase = new URL(pageDir + cp, location.origin).toString()
+  const contentPathWasProvided = Object.prototype.hasOwnProperty.call(finalOptions, 'contentPath')
+  // '.' and './' are page-relative
+  if (cp === '.' || cp === './') {
+    cp = ''
+    var contentBase = new URL(pageDir + cp, location.origin).toString()
+  } else if (contentPathWasProvided && cp && String(cp).trim() !== '') {
+    // Host provided value: treat as page-dir relative (user expects
+    // example.com/blog/examplepath/ if page is under /blog/)
+    if (cp.startsWith('./')) cp = cp.slice(2)
+    if (cp.startsWith('/')) cp = cp.slice(1)
+    if (cp !== '' && !cp.endsWith('/')) cp = cp + '/'
+    var contentBase = new URL(pageDir + cp, location.origin).toString()
+  } else if (cp && String(cp).trim() !== '') {
+    // Not explicitly provided (using default): treat as root-relative to
+    // avoid duplicate segments when the page already lives under the
+    // default content directory.
+    if (!cp.startsWith('/')) cp = '/' + cp
+    if (!cp.endsWith('/')) cp = cp + '/'
+    try { cp = cp.replace(/\\/g, '/') } catch (_) {}
+    var contentBase = new URL(cp, location.origin).toString()
+  } else {
+    var contentBase = new URL(pageDir, location.origin).toString()
+  }
   try {
     import('./slugManager.js').then(m => {
       try { if (m && typeof m.setHomePage === 'function') m.setHomePage(homePage) } catch (e2) { console.warn('[nimbi-cms] setHomePage failed', e2) }

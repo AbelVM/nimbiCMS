@@ -259,7 +259,8 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
           if (subtitleEl) {
             const span = document.createElement('span')
             span.className = 'nimbi-reading-time'
-            span.textContent = ' • ' + rtText
+            // text only; visual separator handled via CSS ::before so it can be toggled per-breakpoint
+            span.textContent = rtText
             subtitleEl.appendChild(span)
           } else {
             const sub = document.createElement('p')

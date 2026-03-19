@@ -862,13 +862,26 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           if (dateText) pieces.push(dateText)
           if (pieces.length) {
               const sub = document.createElement('p')
-              const authorClean = pieces[0] ? String(pieces[0]).replace(/\"/g, '').trim() : ''
+              const authorClean = pieces[0] ? String(pieces[0]).replace(/"/g, '').trim() : ''
               const rest = pieces.slice(1)
-              const textPieces = []
-              if (authorClean) textPieces.push(authorClean)
-              if (rest.length) textPieces.push(rest.join(' • '))
               sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'
-              sub.textContent = textPieces.join(' • ')
+
+              // author on its own span
+              if (authorClean) {
+                const aSpan = document.createElement('span')
+                aSpan.className = 'nimbi-article-author'
+                aSpan.textContent = authorClean
+                sub.appendChild(aSpan)
+              }
+
+              // remaining metadata (date) in its own span; reading-time will be appended by seoManager
+              if (rest.length) {
+                const metaSpan = document.createElement('span')
+                metaSpan.className = 'nimbi-article-meta'
+                metaSpan.textContent = rest.join(' • ')
+                sub.appendChild(metaSpan)
+              }
+
               try { topH1.parentElement.insertBefore(sub, topH1.nextSibling) } catch (e) { try { topH1.insertAdjacentElement('afterend', sub) } catch (e2) { /* ignore */ } }
           }
         }

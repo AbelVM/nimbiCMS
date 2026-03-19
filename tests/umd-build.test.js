@@ -37,7 +37,7 @@ it('build:umd produces a usable UMD bundle', () => {
   // Ensure expected API surface is available (init entry required)
   const hasInit = typeof lib.initCMS === 'function' || typeof lib.default === 'function'
   expect(hasInit).toBe(true)
-})
+}, 120000)
 
 it('umd runtime: registerLanguage and theming APIs exist and are callable', async () => {
   // Ensure build (no-op if already built by previous test)

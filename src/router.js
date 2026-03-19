@@ -378,91 +378,97 @@ export async function fetchPageData(raw, contentBase) {
             const looksLikeHtml = (ct && ct.indexOf && ct.indexOf('text/html') !== -1) || rawLower.indexOf('<!doctype') !== -1 || rawLower.indexOf('<html') !== -1
             if (!looksLikeHtml) console.warn('[router] absolute fetch returned non-HTML', { abs, contentType: ct, snippet: rawLower.slice(0, 200) })
             if (looksLikeHtml) {
-              try {
-                const absUrl = abs
-                const baseHref = new URL('.', absUrl).toString()
+              const rawLowerForDir = (raw || '').toLowerCase()
+              const looksLikeDirListing = /<title>\s*index of\b/i.test(raw) || /<h1>\s*index of\b/i.test(raw) || rawLowerForDir.indexOf('parent directory') !== -1 || /<title>\s*directory listing/i.test(raw) || /<h1>\s*directory listing/i.test(raw)
+              if (looksLikeDirListing) {
+                try { console.warn('[router] absolute fetch returned directory listing; treating as not found', { abs }) } catch (_e) {}
+              } else {
                 try {
-                  const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
-                  if (parser) {
-                    const doc = parser.parseFromString(raw || '', 'text/html')
-                    const rewrite = (attr, el) => {
-                      try {
-                        const val = el.getAttribute(attr) || ''
-                        if (!val) return
-                        if (/^(https?:)?\/\//i.test(val)) return
-                        if (val.startsWith('/')) return
-                        if (val.startsWith('#')) return
+                  const absUrl = abs
+                  const baseHref = new URL('.', absUrl).toString()
+                  try {
+                    const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+                    if (parser) {
+                      const doc = parser.parseFromString(raw || '', 'text/html')
+                      const rewrite = (attr, el) => {
                         try {
-                          const resolved = new URL(val, absUrl).toString()
-                          el.setAttribute(attr, resolved)
-                        } catch (err) { console.warn('[router] rewrite attribute failed', attr, err) }
-                      } catch (err) { console.warn('[router] rewrite helper failed', err) }
+                          const val = el.getAttribute(attr) || ''
+                          if (!val) return
+                          if (/^(https?:)?\/\//i.test(val)) return
+                          if (val.startsWith('/')) return
+                          if (val.startsWith('#')) return
+                          try {
+                            const resolved = new URL(val, absUrl).toString()
+                            el.setAttribute(attr, resolved)
+                          } catch (err) { console.warn('[router] rewrite attribute failed', attr, err) }
+                        } catch (err) { console.warn('[router] rewrite helper failed', err) }
+                      }
+                      const els = doc.querySelectorAll('[src],[href],[srcset],[xlink\:href],[poster]')
+                      const rewritten = []
+                      for (const el of Array.from(els || [])) {
+                        try {
+                          const tag = el.tagName ? el.tagName.toLowerCase() : ''
+                          if (tag === 'a') continue
+                          if (el.hasAttribute('src')) {
+                            const before = el.getAttribute('src')
+                            rewrite('src', el)
+                            const after = el.getAttribute('src')
+                            if (before !== after) rewritten.push({ attr: 'src', tag, before, after })
+                          }
+                          if (el.hasAttribute('href') && tag === 'link') {
+                            const before = el.getAttribute('href')
+                            rewrite('href', el)
+                            const after = el.getAttribute('href')
+                            if (before !== after) rewritten.push({ attr: 'href', tag, before, after })
+                          }
+                          if (el.hasAttribute('href') && tag !== 'link') {
+                            const before = el.getAttribute('href')
+                            rewrite('href', el)
+                            const after = el.getAttribute('href')
+                            if (before !== after) rewritten.push({ attr: 'href', tag, before, after })
+                          }
+                          if (el.hasAttribute('xlink:href')) {
+                            const before = el.getAttribute('xlink:href')
+                            rewrite('xlink:href', el)
+                            const after = el.getAttribute('xlink:href')
+                            if (before !== after) rewritten.push({ attr: 'xlink:href', tag, before, after })
+                          }
+                          if (el.hasAttribute('poster')) {
+                            const before = el.getAttribute('poster')
+                            rewrite('poster', el)
+                            const after = el.getAttribute('poster')
+                            if (before !== after) rewritten.push({ attr: 'poster', tag, before, after })
+                          }
+                          if (el.hasAttribute('srcset')) {
+                            const rawSs = el.getAttribute('srcset') || ''
+                            const parts = rawSs.split(',').map(s => s.trim()).filter(Boolean)
+                            const mapped = parts.map(p => {
+                              const [urlPart, size] = p.split(/\s+/, 2)
+                              if (!urlPart) return p
+                              if (/^(https?:)?\/\//i.test(urlPart) || urlPart.startsWith('/')) return p
+                              try { const r = new URL(urlPart, absUrl).toString(); return size ? `${r} ${size}` : r } catch (err) { return p }
+                            }).join(', ')
+                            el.setAttribute('srcset', mapped)
+                          }
+                        } catch (err) { /* ignore per-element failures */ }
+                      }
+                      const modified = doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : raw
+                      try { if (rewritten && rewritten.length) console.warn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
+                      return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
                     }
-                    const els = doc.querySelectorAll('[src],[href],[srcset],[xlink\:href],[poster]')
-                    const rewritten = []
-                    for (const el of Array.from(els || [])) {
-                      try {
-                        const tag = el.tagName ? el.tagName.toLowerCase() : ''
-                        if (tag === 'a') continue
-                        if (el.hasAttribute('src')) {
-                          const before = el.getAttribute('src')
-                          rewrite('src', el)
-                          const after = el.getAttribute('src')
-                          if (before !== after) rewritten.push({ attr: 'src', tag, before, after })
-                        }
-                        if (el.hasAttribute('href') && tag === 'link') {
-                          const before = el.getAttribute('href')
-                          rewrite('href', el)
-                          const after = el.getAttribute('href')
-                          if (before !== after) rewritten.push({ attr: 'href', tag, before, after })
-                        }
-                        if (el.hasAttribute('href') && tag !== 'link') {
-                          const before = el.getAttribute('href')
-                          rewrite('href', el)
-                          const after = el.getAttribute('href')
-                          if (before !== after) rewritten.push({ attr: 'href', tag, before, after })
-                        }
-                        if (el.hasAttribute('xlink:href')) {
-                          const before = el.getAttribute('xlink:href')
-                          rewrite('xlink:href', el)
-                          const after = el.getAttribute('xlink:href')
-                          if (before !== after) rewritten.push({ attr: 'xlink:href', tag, before, after })
-                        }
-                        if (el.hasAttribute('poster')) {
-                          const before = el.getAttribute('poster')
-                          rewrite('poster', el)
-                          const after = el.getAttribute('poster')
-                          if (before !== after) rewritten.push({ attr: 'poster', tag, before, after })
-                        }
-                        if (el.hasAttribute('srcset')) {
-                          const rawSs = el.getAttribute('srcset') || ''
-                          const parts = rawSs.split(',').map(s => s.trim()).filter(Boolean)
-                          const mapped = parts.map(p => {
-                            const [urlPart, size] = p.split(/\s+/, 2)
-                            if (!urlPart) return p
-                            if (/^(https?:)?\/\//i.test(urlPart) || urlPart.startsWith('/')) return p
-                            try { const r = new URL(urlPart, absUrl).toString(); return size ? `${r} ${size}` : r } catch (err) { return p }
-                          }).join(', ')
-                          el.setAttribute('srcset', mapped)
-                        }
-                      } catch (err) { /* ignore per-element failures */ }
+                  } catch (e) { /* parsing failed, fall back */ }
+                  let rawWithBase = raw
+                  if (!/<base\s+[^>]*>/i.test(raw)) {
+                    if (/<head[^>]*>/i.test(raw)) {
+                      rawWithBase = raw.replace(/(<head[^>]*>)/i, `$1<base href="${baseHref}">`)
+                    } else {
+                      rawWithBase = `<base href="${baseHref}">` + raw
                     }
-                    const modified = doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : raw
-                    try { if (rewritten && rewritten.length) console.warn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
-                    return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
                   }
-                } catch (e) { /* parsing failed, fall back */ }
-                let rawWithBase = raw
-                if (!/<base\s+[^>]*>/i.test(raw)) {
-                  if (/<head[^>]*>/i.test(raw)) {
-                    rawWithBase = raw.replace(/(<head[^>]*>)/i, `$1<base href="${baseHref}">`)
-                  } else {
-                    rawWithBase = `<base href="${baseHref}">` + raw
-                  }
+                  return { data: { raw: rawWithBase, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
+                } catch (e) {
+                  return { data: { raw, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
                 }
-                return { data: { raw: rawWithBase, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
-              } catch (e) {
-                return { data: { raw, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
               }
             }
           }

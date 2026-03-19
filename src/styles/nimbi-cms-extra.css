@@ -182,8 +182,23 @@
     font-size: 0.75rem;
     
     display: inline-block;
-    margin-left: 0.5rem;
+    margin-left: 0;
     color: inherit;
+}
+
+/* show separator on larger screens via pseudo-element so it can be hidden on mobile */
+.nimbi-article .nimbi-reading-time::before {
+    /* use a centered bullet without leading/trailing literal spaces; spacing via margins */
+    content: "•";
+    display: inline-block;
+    margin: 0 0.25rem;
+}
+
+/* put separator after author on larger screens so author and date are separated */
+.nimbi-article .nimbi-article-author::after {
+    content: "•";
+    display: inline-block;
+    margin: 0 0.25rem;
 }
 
 .nimbi-article.content {}
@@ -308,6 +323,39 @@
     margin-bottom: 2rem !important;
     line-height: 1.1;
     color: var(--nimbi-reading-time-color, var(--bulma-text-muted, #7a7a7a));
+}
+
+/* Mobile: stack subtitle pieces and add extra spacing below the h1 */
+@media (max-width: 768px) {
+    .nimbi-article .nimbi-article-subtitle {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-top: 0.75rem; /* push subtitle away from h1 */
+        margin-bottom: 2.25rem !important; /* give a little more breathing room */
+        line-height: 1.25;
+    }
+
+    .nimbi-article .nimbi-article-subtitle span {
+        display: block;
+    }
+
+    /* reading time should not inherit the inline left margin on mobile */
+    .nimbi-article .nimbi-reading-time {
+        margin-left: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    .nimbi-article .nimbi-reading-time::before {
+        content: "";
+        margin: 0; /* remove leftover margins so no extra leading space appears */
+    }
+
+    /* hide the author separator on mobile */
+    .nimbi-article .nimbi-article-author::after {
+        content: "";
+        margin: 0;
+    }
 }
 
 .nimbi-search-panel .nimbi-search-result {

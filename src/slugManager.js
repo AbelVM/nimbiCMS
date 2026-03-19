@@ -526,8 +526,10 @@ export let fetchMarkdown = async function(path, base) {
       throw new Error('failed to fetch md')
     }
     const raw = await res.text()
-    const trimmed = raw.trim().slice(0, 16).toLowerCase()
-    const looksLikeHtml = trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')
+    const trimmed = raw.trim().slice(0, 128).toLowerCase()
+    // Detect common HTML responses including directory listings which may
+    // start with `<title>` or `<h1>` rather than `<html>` or `<!doctype>`.
+    const looksLikeHtml = /^(?:<!doctype|<html|<title|<h1)/.test(trimmed)
     const isHtml = looksLikeHtml || String(path || '').toLowerCase().endsWith('.html')
 
     if (looksLikeHtml && String(path || '').toLowerCase().endsWith('.md')) {

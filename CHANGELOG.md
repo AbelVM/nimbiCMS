@@ -6,7 +6,13 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 - ...
 
-# v1.0.3
+## v1.0.4
+
+- **[FIX]** Some weird corner case wih `contentPath` leads to wrong paths
+- **[FIX]** If `homePage` is set to a non existent HTML file, it might produce a folder listing instead
+- **[FIX]** Subtle CSS error in responsive view
+
+## v1.0.3
 
 - **[FEAT]** Parallel indexing, highly improved search box initial availability time
 - **[FEAT]** Workers pool for parallel processing
