@@ -528,3 +528,18 @@ If you find a bug, have a feature request or a question, just [open an issue](ht
 
 ### Scripts failing / no mount element
 - Make sure the mount element exists (`<div id="app"></div>`) and `initCMS({ el: '#app' })` uses the correct selector.
+
+### I get a console error!
+
+One of the features of `nimbiCMS` is folder crawling for enhanced indexing
+performance, so it's going to try and fetch your `contentPath` folder just in
+case your server response is an HTML listing the files in the folder. If your
+server has this functionality disabled, which is quite common, it will send back a
+`404` response that will trigger an error in the dev console of your browser, but
+no worries, it's an expected one and breaks nothing. Your console might looks like
+this when this happens
+
+```shell
+nimbi-cms.js:71  GET https://example.com/contentfolder/ 404 (Not Found)
+nimbi-cms.js:71 [slugManager] crawlAllMarkdown: directory fetch non-ok {url: 'https://example.com/contentfolder/', status: 404}
+```
