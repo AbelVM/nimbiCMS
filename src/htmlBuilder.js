@@ -1,7 +1,7 @@
 import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
-import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
+import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities, encodeURL } from './utils/helpers.js'
 import { registerThemedElement } from './bulmaManager.js'
 import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
@@ -55,7 +55,27 @@ export function createNavTree(t, tree) {
   tree.forEach((item) => {
     const li = document.createElement('li')
     const a = document.createElement('a')
-    a.href = '#' + item.path
+    try {
+      const rawPath = String(item.path || '')
+      const norm = rawPath.replace(/^[\.\/]+/, '')
+      let display = null
+      try {
+        if (mdToSlug && mdToSlug.has && mdToSlug.has(norm)) display = mdToSlug.get(norm)
+        else {
+          const baseName = String(norm || '').replace(/^.*\//, '')
+          if (baseName && mdToSlug && mdToSlug.has && mdToSlug.has(baseName)) display = mdToSlug.get(baseName)
+          else {
+            try {
+              for (const [k, v] of slugToMd || []) {
+                if (v === norm || v === baseName) { display = k; break }
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+      } catch (err) { /* ignore */ }
+      if (display) a.href = '#/' + encodeURL(String(display))
+      else a.href = '#' + encodeURL(String(item.path || ''))
+    } catch (err) { a.href = '#' + encodeURL(String(item.path || '')) }
     a.textContent = item.name
     li.appendChild(a)
     if (item.children && item.children.length) {
@@ -63,7 +83,27 @@ export function createNavTree(t, tree) {
       item.children.forEach((c) => {
         const cli = document.createElement('li')
         const ca = document.createElement('a')
-        ca.href = '#' + c.path
+        try {
+          const rawPath = String(c.path || '')
+          const norm = rawPath.replace(/^[\.\/]+/, '')
+          let display = null
+          try {
+            if (mdToSlug && mdToSlug.has && mdToSlug.has(norm)) display = mdToSlug.get(norm)
+            else {
+              const baseName = String(norm || '').replace(/^.*\//, '')
+              if (baseName && mdToSlug && mdToSlug.has && mdToSlug.has(baseName)) display = mdToSlug.get(baseName)
+              else {
+                try {
+                  for (const [k, v] of slugToMd || []) {
+                    if (v === norm || v === baseName) { display = k; break }
+                  }
+                } catch (e) { /* ignore */ }
+              }
+            }
+          } catch (err) { /* ignore */ }
+          if (display) ca.href = '#/' + encodeURL(String(display))
+          else ca.href = '#' + encodeURL(String(c.path || ''))
+        } catch (err) { ca.href = '#' + encodeURL(String(c.path || '')) }
         ca.textContent = c.name
         cli.appendChild(ca)
         subul.appendChild(cli)
@@ -91,7 +131,7 @@ export function buildTocElement(t, toc, pagePath = '') {
   label.textContent = t('onThisPage')
   aside.appendChild(label)
   const ul = document.createElement('ul')
-  ul.className = 'menu-list';
+  ul.className = 'menu-list'
 
   try {
     const lastLiAtLevel = {}
@@ -106,14 +146,44 @@ export function buildTocElement(t, toc, pagePath = '') {
         const slug = item.id || slugify(text)
         a.textContent = text
         try {
-          const normPage = String(pagePath || '').replace(/^[\\.\\/]+/, '')
-          const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
-          if (display) a.href = buildPageUrl(display, slug)
-          else a.href = `#${encodeURIComponent(slug)}`
+          const normPage = String(pagePath || '').replace(/^[\.\/]+/, '')
+          let display = null
+          if (normPage) {
+            try {
+              if (mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) display = mdToSlug.get(normPage)
+              else {
+                const baseName = String(normPage).replace(/^.*\//, '')
+                if (baseName && mdToSlug && mdToSlug.has && mdToSlug.has(baseName)) display = mdToSlug.get(baseName)
+                else {
+                  try {
+                    for (const [k, v] of slugToMd || []) {
+                      if (v === normPage || v === baseName) { display = k; break }
+                    }
+                  } catch (e) { /* ignore iteration errors */ }
+                }
+              }
+            } catch (err) { console.warn('[htmlBuilder] buildTocElement mdToSlug lookup failed', err) }
+          }
+          if (display) {
+            try {
+              // prefer cosmetic visible URL for TOC links so opening in a
+              // new tab shows the pretty `#/slug#anchor` form rather than
+              // the canonical `?page=slug#anchor` query-style URL.
+              const locParams = (typeof location !== 'undefined' && location.search) ? new URLSearchParams(location.search) : null
+              if (locParams) locParams.delete('page')
+              const qs = locParams ? locParams.toString() : ''
+              const suffix = qs ? '?' + qs : ''
+              // place anchor before query-suffix inside the fragment: `#/slug#anchor?qs`
+              a.href = '#/' + encodeURL(display) + (slug ? '#' + encodeURIComponent(slug) : '') + suffix
+            } catch (err) {
+              a.href = buildPageUrl(display, slug)
+            }
+          } else a.href = `#${encodeURIComponent(slug)}`
         } catch (err) {
           console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
-          a.href = `#${encodeURIComponent(slug)}`
+          a.href = `#${encodeURL(slug)}`
         }
+
         li.appendChild(a)
 
         if (level === 2) {
@@ -464,6 +534,12 @@ function computeSlug(parsed, article, pagePath, anchor) {
   const h1Text = topH1 ? (topH1.textContent || '').trim() : ''
   let slugKey = ''
   try {
+    // If the provided pagePath looks like a bare slug (no dots or slashes),
+    // prefer it as the canonical slug key so `?page=foo` maps exactly to
+    // `#/foo` instead of being replaced by a title-derived slug.
+    if (pagePath && typeof pagePath === 'string' && pagePath.indexOf('.') === -1 && pagePath.indexOf('/') === -1) {
+      try { slugKey = normalizePath(String(pagePath)) } catch (e) { slugKey = String(pagePath) }
+    }
     let displayTitle = ''
     try {
       if (parsed && parsed.meta && parsed.meta.title) displayTitle = String(parsed.meta.title).trim()
@@ -476,14 +552,75 @@ function computeSlug(parsed, article, pagePath, anchor) {
       } catch (e) { /* ignore */ }
     }
     if (!displayTitle && pagePath) displayTitle = String(pagePath)
-    if (displayTitle) slugKey = slugify(displayTitle)
+    if (!slugKey && displayTitle) slugKey = slugify(displayTitle)
     if (!slugKey) slugKey = '_home'
+    // Defensive: in some legacy/incorrect flows `slugKey` can accidentally
+    // include a nested cosmetic fragment marker like `slug#/slug`.
+    // `encodeURI()` preserves `#`, so that would become `#/slug#/slug`.
+    // We only strip the `#/<...>` embedded marker, while preserving normal
+    // `#anchor` fragments like `#/slug#anchor`.
+    try {
+      const sk = String(slugKey || '')
+      const embeddedCosmeticIdx = sk.indexOf('#/')
+      if (embeddedCosmeticIdx !== -1) slugKey = sk.slice(0, embeddedCosmeticIdx)
+      if (!slugKey) slugKey = '_home'
+    } catch (_e) { slugKey = '_home' }
     try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { console.warn('[htmlBuilder] computeSlug set slug mapping failed', err) }
     try {
-      const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
+      // Do not expose the canonical `?page=` query to the visible URL.
+      // Remove the `page` param from the main search and place any other
+      // query params inside the fragment after the anchor. Anchor appears
+      // before the query suffix: `#/slug#anchor?qs`.
       try {
-        history.replaceState({ page: slugKey }, '', buildPageUrl(slugKey, curHash))
-      } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
+            const locParams = new URLSearchParams(location.search || '')
+            locParams.delete('page')
+            const qs = locParams.toString()
+            const suffix = qs ? '?' + qs : ''
+            const anchorPart = anchor ? '#' + encodeURIComponent(anchor) : ''
+            const statePage = slugKey + (anchor ? `::${anchor}` : '')
+            try {
+              // If the current location.hash already starts with the desired
+              // cosmetic slug form, avoid rewriting the fragment to prevent
+              // accidental duplicate fragments (e.g. `#/slug#/slug`). Only
+              // update the stored history state in that case.
+              const desiredFragment = '#/' + encodeURL(String(slugKey)) + (anchor ? '#' + encodeURIComponent(anchor) : '') + (qs ? '?' + qs : '')
+              const currentHash = typeof location !== 'undefined' ? String(location.hash || '') : ''
+              // Normalize the current hash for comparison: strip leading '#' and optional leading '/'
+              const currentHashClean = currentHash ? String(currentHash).replace(/^#\/?/, '') : ''
+              // Try to decode the existing hash (it may be percent-encoded). If
+              // decoding fails, fall back to the raw cleaned hash. This ensures we
+              // detect matches like "%2Fslug" as the same slug and avoid
+              // rewriting the fragment which could produce duplicate fragments
+              // such as '#/slug#/slug'.
+              let currentHashDecoded = currentHashClean
+              try { currentHashDecoded = decodeURIComponent(currentHashClean) } catch (e) { /* leave raw */ }
+              // Normalize decoded value by stripping leading slashes so a decoded
+              // value like '/slug' compares equal to 'slug'. This avoids false
+              // negatives when the stored/visible hash was percent-encoded.
+              try { currentHashDecoded = String(currentHashDecoded).replace(/^\/+/, '') } catch (e) { /* ignore */ }
+              const currentHashMatchesSlug = currentHash === desiredFragment || currentHashClean === String(slugKey) || currentHashDecoded === String(slugKey)
+              try {
+                // Always write the desired fragment to the URL when replacing
+                // to avoid accidentally appending an existing hash (duplicate
+                // fragment like `#/slug#/slug`). Use the computed desired
+                // fragment even when the current hash already contains the
+                // slug so ordering/qs are normalized consistently.
+                const base = (location.pathname || '') + (location.search || '')
+                if (currentHashMatchesSlug) {
+                  try { history.replaceState({ page: statePage }, '', base + desiredFragment) } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
+                } else {
+                  try { history.replaceState({ page: statePage }, '', base + desiredFragment) } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
+                }
+              } catch (err) {
+                try { history.replaceState({ page: statePage }, '', '#/' + encodeURL(String(slugKey)) + (anchor ? '#' + encodeURIComponent(anchor) : '') + (qs ? '?' + qs : '')) } catch (err2) { console.warn('[htmlBuilder] computeSlug history replace failed', err2) }
+              }
+            } catch (err) {
+              const newUrl = (location.pathname || '') + '#/' + encodeURL(String(slugKey)) + anchorPart + suffix
+              try { history.replaceState({ page: statePage }, '', newUrl) } catch (err2) { console.warn('[htmlBuilder] computeSlug history replace failed', err2) }
+            }
+      } catch (err) {
+        try { history.replaceState({ page: slugKey + (anchor ? `::${anchor}` : '') }, '', '#/' + encodeURL(String(slugKey))) } catch (err2) { console.warn('[htmlBuilder] computeSlug history replace failed', err2) }
+      }
     } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
   } catch (err) { console.warn('[htmlBuilder] computeSlug failed', err) }
   try {
@@ -1059,9 +1196,35 @@ export function attachTocClickHandler(toc) {
         if (!a) return
         const href = a.getAttribute('href') || ''
         try {
-          const url = new URL(href, location.href)
-          const pageParam = url.searchParams.get('page')
-          const hash = url.hash ? url.hash.replace(/^#/, '') : null
+          // Support several link formats:
+          // - canonical: `?page=slug[#anchor]`
+          // - cosmetic: `#/slug[#anchor][?qs]` (qs lives inside fragment)
+          // - anchor-only: `#anchor`
+          // Parse the raw href string so we can extract page and anchor
+          // even when query params are placed inside the fragment.
+          let pageParam = null
+          let hash = null
+          try {
+            if (href.startsWith('#/')) {
+              // cosmetic fragment form
+              const frag = href.replace(/^#\//, '') // e.g. 'slug#anchor?qs' or 'slug?qs' or 'slug#anchor'
+              // split frag into slug, anchor, qs (anchor before qs expected)
+              const m = String(frag).match(/^([^?#]+)(?:#([^?]+))?(?:\?(.*))?$/)
+              if (m) {
+                pageParam = m[1] || null
+                hash = m[2] || null
+                // qs (m[3]) is intentionally ignored here; we'll compute suffix below
+              }
+            } else if (href.startsWith('#')) {
+              // simple anchor within the current page
+              pageParam = null
+              hash = href.replace(/^#/, '') || null
+            } else {
+              const url = new URL(href, location.href)
+              pageParam = url.searchParams.get('page')
+              hash = url.hash ? url.hash.replace(/^#/, '') : null
+            }
+          } catch (err) { /* ignore parse errors */ console.warn('[htmlBuilder] non-URL href in attachTocClickHandler', err) }
           if (!pageParam && !hash) return
           ev.preventDefault()
           
@@ -1075,7 +1238,40 @@ export function attachTocClickHandler(toc) {
               if (!pageParam && hash) {
                 try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               } else {
-                try { history.replaceState({ page: currentPage || pageParam }, '', buildPageUrl(currentPage || pageParam, hash)) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
+                try {
+                  // include anchor in stored page state when present so renderByQuery
+                  // can extract and scroll to it even if the visible URL uses the
+                  // cosmetic `#/slug` form.
+                  const statePage = String(currentPage || pageParam) + (hash ? `::${hash}` : '')
+                  try {
+                    // compute query suffix: prefer link-specific params, else current location.search
+                    let qs = ''
+                    try {
+                      // if the original href carried a query (either canonical or cosmetic), prefer it
+                      if (href && href.includes('?')) {
+                          const idx = href.indexOf('?')
+                          qs = href.slice(idx + 1)
+                          // strip any trailing '#' content if present after qs
+                          if (qs && qs.indexOf('#') !== -1) qs = qs.split('#')[0]
+                          // ensure canonical `page` param is not leaked into cosmetic fragment
+                          try {
+                            const p = new URLSearchParams(qs)
+                            p.delete('page')
+                            qs = p.toString()
+                          } catch (e) { /* ignore malformed qs */ }
+                        }
+                    } catch (e) { qs = '' }
+                    if (!qs) {
+                      const locParams = new URLSearchParams(location.search || '')
+                      locParams.delete('page')
+                      qs = locParams.toString()
+                    }
+                    const suffix = qs ? '?' + qs : ''
+                    const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
+                    // place anchor before query-suffix inside the fragment: `#/slug#anchor?qs`
+                    history.replaceState({ page: statePage }, '', '#/' + encodeURL(String(currentPage || pageParam)) + anchorPart + suffix)
+                  } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
+                } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               }
             } catch (err) { console.warn('[htmlBuilder] update history for anchor failed', err) }
             try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (err) { console.warn('[htmlBuilder] stopPropagation failed', err) }
@@ -1084,7 +1280,40 @@ export function attachTocClickHandler(toc) {
           }
 
           
-          history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
+            try {
+              // include anchor in stored page state when pushing a new page so
+              // renderByQuery/fetchPageData can extract it later for scrolling.
+                const statePage = String(pageParam) + (hash ? `::${hash}` : '')
+              try {
+                // extract qs from the original href if present (supports cosmetic '#/slug#anchor?qs')
+                let qs = ''
+                try {
+                  if (href && href.indexOf('?') !== -1) {
+                    const idx = href.indexOf('?')
+                    qs = href.slice(idx + 1)
+                    if (qs && qs.indexOf('#') !== -1) qs = qs.split('#')[0]
+                    try {
+                      const p = new URLSearchParams(qs)
+                      p.delete('page')
+                      qs = p.toString()
+                    } catch (e) { /* ignore malformed qs */ }
+                  }
+                } catch (e) { qs = '' }
+                if (!qs) {
+                  const locParams = new URLSearchParams(location.search || '')
+                  locParams.delete('page')
+                  qs = locParams.toString()
+                }
+                const suffix = qs ? '?' + qs : ''
+                const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
+                // place anchor before query-suffix inside the fragment: `#/slug#anchor?qs`
+                history.pushState({ page: statePage }, '', '#/' + encodeURL(String(pageParam)) + anchorPart + suffix)
+              } catch (err) {
+                history.pushState({ page: statePage }, '', '#/' + encodeURL(String(pageParam)))
+              }
+            } catch (err) {
+              try { history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash)) } catch (e) { console.warn('[htmlBuilder] history.pushState failed', e) }
+            }
           try {
             if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') {
               try { window.renderByQuery() } catch (err) { console.warn('[htmlBuilder] window.renderByQuery failed', err) }

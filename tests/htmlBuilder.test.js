@@ -307,10 +307,10 @@ describe('htmlBuilder utilities', () => {
     attachTocClickHandler(toc)
     a.click()
 
-    expect(history.state && history.state.page).toBe('test')
+    expect(history.state && history.state.page).toBe('test::foo')
     expect(pushSpy).toHaveBeenCalled()
     const pushedUrl = pushSpy.mock.calls[0][2]
-    expect(pushedUrl).toContain('lang=fr')
+    expect(pushedUrl).toBe('#/test#foo?lang=fr')
 
     pushSpy.mockRestore()
   })

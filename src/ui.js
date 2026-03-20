@@ -10,7 +10,7 @@ export { addHook, onPageLoad, onNavBuild, transformHtml, runHooks, _clearHooks }
 
 import { fetchPageData } from './router.js'
 import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton, createNavTree } from './htmlBuilder.js'
-import { setEagerForAboveFoldImages } from './utils/helpers.js'
+import { setEagerForAboveFoldImages, buildPageUrl } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 import { attachImagePreview } from './imagePreview.js'
 
@@ -105,8 +105,48 @@ export function createUI(opts) {
   }
 
   async function renderByQuery() {
-    let raw = (new URLSearchParams(location.search).get('page')) || homePage
-    const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+    const params = new URLSearchParams(location.search)
+    let raw = params.get('page') || null
+
+    // Prefer history.state.page when present (we store `slug::anchor` there
+    // when pushing cosmetic fragments). This preserves any encoded anchor.
+    try {
+      if (!raw && history && history.state && history.state.page) {
+        raw = history.state.page
+      }
+    } catch (e) { /* ignore history access issues */ }
+
+    // Normalize duplicated cosmetic fragments in the hash path.
+    // Some legacy flows can leave `#/slug#/slug` and this should resolve to
+    // `#/slug` before routing logic attempts to render.
+    try {
+      if (location.hash && String(location.hash).startsWith('#/') && String(location.hash).indexOf('#/', 2) !== -1) {
+        const firstSegment = String(location.hash).slice(0, String(location.hash).indexOf('#/', 2))
+        try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + firstSegment) } catch (e) {}
+      }
+    } catch (e) {}
+
+    // Parse location.hash: cosmetic slugs use the form `#/slug` (leading '/'),
+    // while real anchors do not start with '/'. Only treat non-slash hashes
+    // as anchor fragments.
+    let hashAnchor = null
+    try {
+      const rawHash = location.hash ? String(location.hash).replace(/^#/, '') : ''
+      if (rawHash) {
+        // Prefer checking the decoded value so encoded slashes like "%2F..."
+        // are interpreted as cosmetic paths (`#/assets/brochure.md`) rather
+        // than ordinary anchors.
+        let decoded = rawHash
+        try { decoded = decodeURIComponent(rawHash) } catch (_e) { decoded = rawHash }
+        if (!raw && decoded.startsWith('/')) {
+          raw = decoded.replace(/^\//, '')
+        } else if (!decoded.startsWith('/')) {
+          hashAnchor = decoded
+        }
+      }
+    } catch (e) { console.warn('[nimbi-cms] parse location.hash failed', e) }
+
+    if (!raw) raw = homePage
     try {
       await renderPage(raw, hashAnchor)
     } catch (e) {

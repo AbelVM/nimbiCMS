@@ -78,4 +78,58 @@ describe('nav search and interaction branches', () => {
     // burger menu should be closed
     expect(burger.classList.contains('is-active')).toBe(false)
   })
+
+  it('lazy search result links use cosmetic fragment with anchor', async () => {
+    // provide a mocked buildSearchIndex that returns an entry with ::anchor
+    globalThis.buildSearchIndex = async () => [{ title: 'WithAnchor', slug: 'foo::section' }]
+
+    const navbarWrap = document.createElement('header')
+    const container = document.createElement('main')
+    document.body.appendChild(navbarWrap)
+    document.body.appendChild(container)
+
+    const res = await nav.buildNav(navbarWrap, container, '<a href="?page=home">Root</a>', '/content/', 'home', (s)=>s, () => {}, true, 'lazy')
+    const input = document.querySelector('#nimbi-search')
+    expect(input).toBeTruthy()
+
+    // trigger ensureSearchIndex via typing
+    input.value = 'with'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 150))
+    const results = document.getElementById('nimbi-search-results')
+    expect(results).toBeTruthy()
+    const link = results.querySelector('a.panel-block')
+    expect(link).toBeTruthy()
+    // lazy mode should produce cosmetic fragment with anchor (#/foo#section)
+    expect(link.getAttribute('href')).toContain('#/foo')
+    expect(link.getAttribute('href')).toContain('#section')
+
+    delete globalThis.buildSearchIndex
+  })
+
+  it('eager search result links use canonical ?page= form', async () => {
+    globalThis.buildSearchIndex = async () => [{ title: 'EagerOne', slug: 'bar::part' }]
+
+    const navbarWrap = document.createElement('header')
+    const container = document.createElement('main')
+    document.body.appendChild(navbarWrap)
+    document.body.appendChild(container)
+
+    const res = await nav.buildNav(navbarWrap, container, '<a href="?page=home">Root</a>', '/content/', 'home', (s)=>s, () => {}, true, 'eager')
+    const input = document.querySelector('#nimbi-search')
+    expect(input).toBeTruthy()
+
+    // input to trigger results
+    input.value = 'eager'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 150))
+    const results = document.getElementById('nimbi-search-results')
+    expect(results).toBeTruthy()
+    const link = results.querySelector('a.panel-block')
+    expect(link).toBeTruthy()
+    // eager mode should use canonical page query (encoded :: in param)
+    expect(link.getAttribute('href')).toContain('?page=')
+
+    delete globalThis.buildSearchIndex
+  })
 })

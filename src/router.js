@@ -264,7 +264,19 @@ export function buildPageCandidates(resolved) {
  */
 export async function fetchPageData(raw, contentBase) {
   const originalRaw = raw || ''
-  const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+  // `location.hash` can contain:
+  // - cosmetic routes: `#/slug` (starts with '/')
+  // - real anchors: `#anchor` (does NOT start with '/')
+  // Only treat non-cosmetic hashes as anchors.
+  let hashAnchor = null
+  try {
+    if (location.hash) {
+      const hashRaw = decodeURIComponent(location.hash.replace(/^#/, ''))
+      if (hashRaw && !String(hashRaw).startsWith('/')) hashAnchor = hashRaw
+    }
+  } catch (_e) {
+    // ignore hash parsing issues
+  }
   let resolved = raw || ''
   let anchor = null
 
