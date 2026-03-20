@@ -5,7 +5,6 @@ All notable changes to **nimbiCMS** will be documented in this file.
 ## Unreleased
 
 - ...
-- **[FEAT]** Cleaner, hash based URLs (`website/#/slug#anchor?params`) support on top of canonical, (`website/?page=slug#anchor&params`) without breaking SEO or indexing
 
 ## v1.0.5
 

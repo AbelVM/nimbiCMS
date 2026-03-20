@@ -181,19 +181,4 @@ describe('router module', () => {
     expect(slugMgr.fetchMarkdown).not.toHaveBeenCalledWith('bare.md', base)
   })
 
-  it('fetchPageData ignores cosmetic `#/slug` as anchor', async () => {
-    // Simulate a cosmetic hash route. `fetchPageData` must not interpret
-    // the cosmetic `/slug` portion as a scroll anchor.
-    try { history.replaceState(null, '', '/') } catch (e) {}
-    try { location.hash = '#/foo' } catch (e) {}
-
-    slugMgr.slugToMd.set('foo', 'page.md')
-    const fakeData = { raw: '# Hello', isHtml: false }
-    slugMgr.setFetchMarkdown(vi.fn().mockResolvedValue(fakeData))
-
-    const res = await router.fetchPageData('foo', '/content/')
-    expect(res.anchor).toBe(null)
-    expect(res.pagePath).toBe('page.md')
-  })
-
 })

@@ -127,21 +127,7 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
         const p = normalizePath(pagePath)
         try {
           const base = location.origin + location.pathname
-          // Prefer query params from location.search (excluding `page`).
-          const locParams = new URLSearchParams(location.search || '')
-          locParams.delete('page')
-          let qs = locParams.toString()
-          // If none present, check for query params encoded in the hash (e.g. #/slug?lang=fr)
-          if (!qs) {
-            try {
-              const rawHash = location.hash ? decodeURIComponent(String(location.hash).replace(/^#/, '')) : ''
-              if (rawHash && rawHash.indexOf('?') !== -1) {
-                const parts = rawHash.split('?')
-                qs = parts[1] || ''
-              }
-            } catch (e) { /* ignore decode failures */ }
-          }
-          canonical = base.split('?')[0] + '?page=' + encodeURIComponent(p) + (qs ? '&' + qs : '')
+          canonical = base.split('?')[0] + '?page=' + encodeURIComponent(p)
         } catch (e) {
           canonical = location.href.split('#')[0]
         }

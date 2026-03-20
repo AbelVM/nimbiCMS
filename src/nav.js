@@ -1,7 +1,7 @@
 import { createNavTree } from './htmlBuilder.js'
 import { t } from './l10nManager.js'
 import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
-import { buildPageUrl, isExternalLink, normalizePath, safe, encodeURL } from './utils/helpers.js'
+import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './slugManager.js'
 
 function safeGet(mod, name) {
@@ -171,43 +171,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               }
               const a = document.createElement('a')
               a.className = 'panel-block nimbi-search-result'
-              try {
-                // When using eager indexing the tests expect canonical `?page=` links
-                if (searchIndexMode === 'eager') {
-                  // Support slug entries that encode an anchor as `slug::anchor`.
-                  // Split and pass anchor separately to `buildPageUrl` so the
-                  // resulting canonical URL is `?page=slug#anchor` instead of
-                  // encoding the `::` sequence into the `page` parameter.
-                  let pageKey = it.slug || ''
-                  // Some upstream/indexed data may already contain URI-encoded
-                  // delimiters like `%3A%3A` instead of `::`.
-                  try { pageKey = decodeURIComponent(String(pageKey || '')) } catch (_e) { /* ignore */ }
-                  let anchor = null
-                  if (typeof pageKey === 'string' && pageKey.indexOf('::') !== -1) {
-                    const parts = pageKey.split('::', 2)
-                    pageKey = parts[0]
-                    anchor = parts[1] || null
-                  }
-                  a.href = buildPageUrl(pageKey, anchor)
-                } else {
-                  let pageKey = it.slug || ''
-                  // Support URI-encoded `::` (e.g. `slug%3A%3Aanchor`).
-                  try { pageKey = decodeURIComponent(String(pageKey || '')) } catch (_e) { /* ignore */ }
-                  let anchorPart = ''
-                  if (typeof pageKey === 'string' && pageKey.indexOf('::') !== -1) {
-                    const parts = pageKey.split('::', 2)
-                    pageKey = parts[0]
-                    anchorPart = parts[1] ? '#' + encodeURIComponent(parts[1]) : ''
-                  }
-                  const locParams = new URLSearchParams((typeof location !== 'undefined' && location.search) ? location.search : '')
-                  locParams.delete('page')
-                  const qs = locParams.toString()
-                  const suffix = qs ? '?' + qs : ''
-                  a.href = '#/' + encodeURL(pageKey || '') + anchorPart + suffix
-                }
-              } catch (e) {
-                a.href = buildPageUrl(it.slug)
-              }
+              a.href = buildPageUrl(it.slug)
               a.setAttribute('role', 'button')
               try {
                 if (it.path && typeof it.slug === 'string') {
@@ -247,92 +211,19 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     try {
       const u = new URL(rawHref, location.href)
       const p = u.searchParams.get('page')
-      let rawHash = u.hash ? String(u.hash).replace(/^#/, '') : null
-      // Prevent cosmetic route fragments (e.g., "/slug") from becoming
-      // encoded anchors like "#%2Fslug" in the brand URL.
-      if (rawHash && rawHash.startsWith('/')) rawHash = null
       if (p) {
-        // If the first link's URL is same-origin as the current location,
-        // prefer showing the cosmetic fragment (so visible URL looks like
-        // `#/slug`). If it's cross-origin or points at a different base
-        // path, expose the canonical `?page=` URL instead so crawlers see
-        // the canonical form.
-        const page = decodeURIComponent(p || '')
-        let useCosmetic = false
-        try {
-          // Only prefer the cosmetic brand when the original href was an
-          // absolute URL (contained a scheme) and its origin matches the
-          // current location. This preserves the previous behavior of
-          // showing canonical `?page=` for relative or root-relative
-          // links while allowing absolute same-origin URLs to be cosmetic.
-          const linkOrigin = u && u.origin ? u.origin : null
-          const locOrigin = (typeof location !== 'undefined' && location.origin) ? location.origin : ((typeof location !== 'undefined' && location.href) ? (new URL(location.href)).origin : null)
-          const wasAbsolute = typeof rawHref === 'string' && rawHref.indexOf('://') !== -1
-          if (wasAbsolute && linkOrigin && locOrigin && linkOrigin === locOrigin) useCosmetic = true
-        } catch (err) { /* ignore origin read errors */ }
-
-        if (useCosmetic) {
-          // Prefer showing the cosmetic slug in the brand link when possible
-          let normalized = (typeof normalizePath === 'function') ? normalizePath(page) : String(page).replace(/^\/+/, '')
-          let cosmeticKey = normalized
-          try {
-            if (mdToSlug && typeof mdToSlug.has === 'function') {
-              if (mdToSlug.has(normalized)) cosmeticKey = mdToSlug.get(normalized)
-              else {
-                const decoded = decodeURIComponent(String(page || ''))
-                const decodedNorm = (typeof normalizePath === 'function') ? normalizePath(decoded) : String(decoded).replace(/^\/+/, '')
-                if (mdToSlug.has(decodedNorm)) cosmeticKey = mdToSlug.get(decodedNorm)
-                else {
-                  const baseName = String(normalized || '').replace(/^.*\//, '')
-                  if (mdToSlug.has(baseName)) cosmeticKey = mdToSlug.get(baseName)
-                }
-              }
-            }
-          } catch (err) { /* ignore mapping errors */ }
-          // include any extra query params from current location (excluding page)
-          const locParams = new URLSearchParams((typeof location !== 'undefined' && location.search) ? location.search : '')
-          locParams.delete('page')
-          const suffix = locParams.toString() ? '?' + locParams.toString() : ''
-          // set brand href to cosmetic fragment so it's not exposing raw filepaths
-          brandItem.href = '#/' + encodeURL(String(cosmeticKey || normalized || page)) + (rawHash ? '#' + encodeURIComponent(rawHash) : '') + suffix
-          brandItem.textContent = t('home')
-        } else {
-          try {
-            brandItem.href = buildPageUrl(page, rawHash, (typeof location !== 'undefined' && location.search) ? location.search : '')
-          } catch (err) {
-            brandItem.href = rawHref
-          }
-          brandItem.textContent = t('home')
-        }
+        const page = decodeURIComponent(p)
+        brandItem.href = buildPageUrl(page)
       } else {
-        // Map the provided homePage to a cosmetic slug when possible so the
-        // brand link prefers `#/slug` over exposing raw file paths.
-        try {
-          const locParams2 = new URLSearchParams((typeof location !== 'undefined' && location.search) ? location.search : '')
-          locParams2.delete('page')
-          const suffix2 = locParams2.toString() ? '?' + locParams2.toString() : ''
-          let homeDisplay = String(homePage || '')
-          try {
-            const normHome = (typeof normalizePath === 'function') ? normalizePath(String(homePage || '')) : String(homePage || '')
-            if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(normHome)) homeDisplay = mdToSlug.get(normHome)
-            else {
-              const baseName = String(normHome || '').replace(/^.*\//, '')
-              if (baseName && mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(baseName)) homeDisplay = mdToSlug.get(baseName)
-            }
-          } catch (e) { /* ignore mapping errors */ }
-          brandItem.href = '#/' + encodeURL(String(homeDisplay || homePage || '')) + suffix2
-          brandItem.textContent = t('home')
-        } catch (e) {
-          brandItem.href = '#/' + encodeURL(String(homePage || ''))
-          brandItem.textContent = t('home')
-        }
+        brandItem.href = buildPageUrl(homePage)
+        brandItem.textContent = t('home')
       }
     } catch (e) {
-      brandItem.href = '#/' + encodeURL(String(homePage || ''))
+      brandItem.href = buildPageUrl(homePage)
       brandItem.textContent = t('home')
     }
   } else {
-    brandItem.href = '#/' + encodeURL(String(homePage || ''))
+    brandItem.href = buildPageUrl(homePage)
     brandItem.textContent = t('home')
   }
   async function resolveLogoSrc(opt) {
@@ -400,100 +291,12 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
 
   brandItem.addEventListener('click', function (ev) {
     const href = brandItem.getAttribute('href') || '';
-    if (href.startsWith('?page=') || href.startsWith('#/')) {
+    if (href.startsWith('?page=')) {
       ev.preventDefault();
-      // support both canonical `?page=` hrefs and cosmetic `#/slug` hrefs
-      let pageParam = null
-      let hash = null
-      let cosmetic = href
-      try {
-        if (href.startsWith('?page=')) {
-          const url = new URL(href, location.href)
-          pageParam = url.searchParams.get('page')
-          hash = url.hash ? url.hash.replace(/^#/, '') : null
-        } else if (href.startsWith('#/')) {
-          // parse cosmetic fragment: '#/slug#anchor?qs' -> slug and anchor
-          const raw = String(href || '').replace(/^#/, '')
-          let beforeQs = raw
-          let qsPart = ''
-          if (raw.indexOf('?') !== -1) {
-            const ix = raw.indexOf('?')
-            beforeQs = raw.slice(0, ix)
-            qsPart = raw.slice(ix)
-          }
-          // beforeQs looks like '/slug' or '/slug#anchor'
-          const parts = beforeQs.split('#')
-          let slugPart = parts[0] || ''
-          if (slugPart.startsWith('/')) slugPart = slugPart.slice(1)
-          pageParam = slugPart || null
-          hash = parts[1] || null
-          cosmetic = '#' + beforeQs + qsPart
-        }
-      } catch (e) { /* ignore parse errors */ }
-      try {
-      // Prefer mapped slug for cosmetic fragment and stored canonical state
-      // Normalize page param to strip any leading ./ or / so mappings match
-      const rawPageParam = pageParam || ''
-      const normalizedPageParam = (typeof normalizePath === 'function') ? normalizePath(rawPageParam) : rawPageParam.replace(/^\/+/, '')
-      let pageVal = normalizedPageParam + (hash ? `::${hash}` : '')
-      let cosmeticPageKey = normalizedPageParam
-        try {
-          // If the pageParam is a markdown/file path and we have a slug mapping,
-          // prefer the slug for the visible cosmetic fragment and for history.state.
-          if (mdToSlug && typeof mdToSlug.has === 'function') {
-            if (mdToSlug.has(normalizedPageParam)) {
-              cosmeticPageKey = mdToSlug.get(normalizedPageParam)
-              pageVal = cosmeticPageKey + (hash ? `::${hash}` : '')
-            } else {
-              try {
-                const decoded = decodeURIComponent(rawPageParam || '')
-                const decodedNorm = (typeof normalizePath === 'function') ? normalizePath(decoded) : String(decoded).replace(/^\/+/, '')
-                if (mdToSlug.has(decodedNorm)) {
-                  cosmeticPageKey = mdToSlug.get(decodedNorm)
-                  pageVal = cosmeticPageKey + (hash ? `::${hash}` : '')
-                } else {
-                  const baseName = String(normalizedPageParam || '').replace(/^.*\//, '')
-                  if (mdToSlug.has(baseName)) {
-                    cosmeticPageKey = mdToSlug.get(baseName)
-                    pageVal = cosmeticPageKey + (hash ? `::${hash}` : '')
-                  }
-                }
-              } catch (e) { /* ignore decode errors */ }
-            }
-          }
-        } catch (e) { /* swallow mapping errors */ }
-        // Compose cosmetic fragment (preserve extra query params except `page`)
-        try {
-          let linkParams = null
-          if (typeof url !== 'undefined' && url && url.search) {
-            linkParams = new URLSearchParams(url.search)
-          } else {
-            linkParams = new URLSearchParams((typeof location !== 'undefined' && location.search) ? location.search : '')
-          }
-          linkParams.delete('page')
-          const qs = linkParams.toString()
-          const suffix = qs ? '?' + qs : ''
-          const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-          const finalCosmetic = (cosmetic && cosmetic.indexOf('#/') === 0) ? cosmetic : '#/' + encodeURL(cosmeticPageKey || '') + anchorPart + suffix
-          history.pushState({ page: pageVal }, '', finalCosmetic)
-        } catch (e) {
-          const locParams = new URLSearchParams((typeof location !== 'undefined' && location.search) ? location.search : '')
-          locParams.delete('page')
-          const qs = locParams.toString()
-          const suffix = qs ? '?' + qs : ''
-          const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-          const finalCosmetic = '#/' + encodeURL(cosmeticPageKey || pageParam || '') + anchorPart + suffix
-          history.pushState({ page: pageVal }, '', finalCosmetic)
-        }
-      } catch (e) {
-        const locParams = new URLSearchParams((typeof location !== 'undefined' && location.search) ? location.search : '')
-        locParams.delete('page')
-        const qs = locParams.toString()
-        const suffix = qs ? '?' + qs : ''
-        const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-        const finalCosmetic = '#/' + encodeURL(cosmeticPageKey || pageParam || '') + anchorPart + suffix
-        history.pushState({ page: pageVal }, '', finalCosmetic)
-      }
+      const url = new URL(href, location.href);
+      const pageParam = url.searchParams.get('page');
+      const hash = url.hash ? url.hash.replace(/^#/, '') : null;
+      history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash));
       runRenderWithTransition()
       try { closeMobileMenu() } catch (e) {}
     }
@@ -554,33 +357,45 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchInput.type = 'search'
     searchInput.placeholder = t('searchPlaceholder') || ''
     searchInput.id = 'nimbi-search'
-    try { searchInput.setAttribute('disabled', 'disabled') } catch (e) {}
-      try {
-        const ariaLabel = (t && typeof t === 'function' ? t('searchAria') : null) || searchInput.placeholder || 'Search'
+    try {
+      const ariaLabel = (t && typeof t === 'function' ? t('searchAria') : null) || searchInput.placeholder || 'Search'
       try { searchInput.setAttribute('aria-label', ariaLabel) } catch (e) {}
       try { searchInput.setAttribute('aria-controls', 'nimbi-search-results') } catch (e) {}
       try { searchInput.setAttribute('aria-autocomplete', 'list') } catch (e) {}
       try { searchInput.setAttribute('role', 'combobox') } catch (e) {}
-      } catch (e) {}
-    try {
-      dropdown = document.createElement('div')
-      dropdown.className = 'dropdown is-right nimbi-search'
-      const dropdownMenu = document.createElement('div')
-      dropdownMenu.className = 'dropdown-menu'
-      dropdownContent = document.createElement('div')
-      dropdownContent.id = 'nimbi-search-results'
-      dropdownContent.className = 'dropdown-content nimbi-search-results'
-      resultsContainer = dropdownContent
-      dropdownMenu.appendChild(dropdownContent)
-      dropdown.appendChild(dropdownMenu)
-      try { searchItem.appendChild(searchInput) } catch (e) {}
-      try { end.appendChild(searchItem) } catch (e) {}
-      end.appendChild(dropdown)
-    } catch (e) {
-      dropdown = null
-      dropdownContent = null
-      resultsContainer = null
+    } catch (e) {}
+    if (searchIndexMode === 'eager') {
+      searchInput.disabled = true
     }
+
+    searchControl = document.createElement('div')
+    searchControl.className = 'control'
+    if (searchIndexMode === 'eager') searchControl.classList.add('is-loading')
+    searchControl.appendChild(searchInput)
+    searchItem.appendChild(searchControl)
+
+    dropdown = document.createElement('div')
+    dropdown.className = 'dropdown is-right'
+    dropdown.id = 'nimbi-search-dropdown'
+
+    const trigger = document.createElement('div')
+    trigger.className = 'dropdown-trigger'
+    trigger.appendChild(searchItem)
+
+    const dropdownMenu = document.createElement('div')
+    dropdownMenu.className = 'dropdown-menu'
+    dropdownMenu.setAttribute('role', 'menu')
+
+    dropdownContent = document.createElement('div')
+    dropdownContent.id = 'nimbi-search-results'
+    dropdownContent.className = 'dropdown-content nimbi-search-results'
+
+    resultsContainer = dropdownContent
+
+    dropdownMenu.appendChild(dropdownContent)
+    dropdown.appendChild(trigger)
+    dropdown.appendChild(dropdownMenu)
+    end.appendChild(dropdown)
 
     const showResults = (items) => {
       if (!dropdownContent) return
@@ -665,33 +480,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           }
           const a = document.createElement('a')
           a.className = 'panel-block nimbi-search-result'
-          try {
-            if (searchIndexMode === 'eager') {
-              let pageKey = it.slug || ''
-              let anchor = null
-              if (typeof pageKey === 'string' && pageKey.indexOf('::') !== -1) {
-                const parts = pageKey.split('::', 2)
-                pageKey = parts[0]
-                anchor = parts[1] || null
-              }
-              a.href = buildPageUrl(pageKey, anchor)
-            } else {
-              let pageKey = it.slug || ''
-              let anchorPart = ''
-              if (typeof pageKey === 'string' && pageKey.indexOf('::') !== -1) {
-                const parts = pageKey.split('::', 2)
-                pageKey = parts[0]
-                anchorPart = parts[1] ? '#' + encodeURIComponent(parts[1]) : ''
-              }
-              const locParams = new URLSearchParams((typeof location !== 'undefined' && location.search) ? location.search : '')
-              locParams.delete('page')
-              const qs = locParams.toString()
-              const suffix = qs ? '?' + qs : ''
-              a.href = '#/' + encodeURL(pageKey || '') + anchorPart + suffix
-            }
-          } catch (e) {
-            a.href = buildPageUrl(it.slug)
-          }
+          a.href = buildPageUrl(it.slug)
           a.setAttribute('role', 'button')
               try {
                 if (it.path && typeof it.slug === 'string') {
@@ -815,29 +604,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const parts = mdRaw.split(/::|#/, 2)
         const mdPath = parts[0]
         const frag = parts[1]
-        // Prefer cosmetic slug-based link when mapping exists
-        try {
-          let display = null
-          try {
-            if (mdToSlug && mdToSlug.has && mdToSlug.has(mdPath)) display = mdToSlug.get(mdPath)
-            else {
-              const baseName = String(mdPath || '').replace(/^.*\//, '')
-              if (baseName && mdToSlug && mdToSlug.has && mdToSlug.has(baseName)) display = mdToSlug.get(baseName)
-              else {
-                try {
-                  for (const [k, v] of slugToMd || []) {
-                    if (v === mdPath || v === baseName) { display = k; break }
-                  }
-                } catch (e2) { /* ignore iteration errors */ }
-              }
-            }
-          } catch (err) { console.warn('[nimbi-cms] nav mdToSlug lookup failed', err) }
-          if (display) {
-            item.href = '#/' + encodeURL(display) + (frag ? '#' + encodeURIComponent(frag) : '')
-          } else {
-            item.href = buildPageUrl(mdPath, frag)
-          }
-        } catch (e) { item.href = buildPageUrl(mdPath, frag) }
+        item.href = buildPageUrl(mdPath, frag)
       } else if (/\.html(?:$|[#?])/.test(href) || href.endsWith('.html')) {
         let raw = normalizePath(href)
         const parts = raw.split(/::|#/, 2)
@@ -847,55 +614,30 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         }
         const frag = parts[1]
         try {
-          // try existing mappings first (path or basename)
-          let display = null
-          try {
-            if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) display = mdToSlug.get(htmlPath)
-            else {
-              const baseName = String(htmlPath || '').replace(/^.*\//, '')
-              if (baseName && mdToSlug && mdToSlug.has && mdToSlug.has(baseName)) display = mdToSlug.get(baseName)
-              else {
-                try {
-                  for (const [k, v] of slugToMd || []) {
-                    if (v === htmlPath || v === baseName) { display = k; break }
-                  }
-                } catch (e2) { /* ignore iteration errors */ }
-              }
-            }
-          } catch (err) { console.warn('[nimbi-cms] nav mdToSlug lookup failed (html)', err) }
-          if (display) {
-            item.href = '#/' + encodeURL(display) + (frag ? '#' + encodeURIComponent(frag) : '')
-          } else {
-            // fall back to fetching the HTML to extract a title/slug
+          const res = await fetchMarkdown(htmlPath, contentBase)
+          if (res && res.raw) {
             try {
-              const res = await fetchMarkdown(htmlPath, contentBase)
-              if (res && res.raw) {
-                try {
-                  const parser2 = new DOMParser()
-                  const doc = parser2.parseFromString(res.raw, 'text/html')
-                  const titleTag = doc.querySelector('title')
-                  const h1 = doc.querySelector('h1')
-                  const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
-                  if (titleText) {
-                    const slugKey = slugify(titleText)
-                    if (slugKey) {
-                      try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
-                      item.href = '#/' + encodeURL(slugKey) + (frag ? '#' + encodeURIComponent(frag) : '')
-                    } else {
-                      item.href = buildPageUrl(htmlPath, frag)
-                    }
-                  } else {
-                    item.href = buildPageUrl(htmlPath, frag)
-                  }
-                } catch (ee) {
+              const parser2 = new DOMParser()
+              const doc = parser2.parseFromString(res.raw, 'text/html')
+              const titleTag = doc.querySelector('title')
+              const h1 = doc.querySelector('h1')
+              const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
+              if (titleText) {
+                const slugKey = slugify(titleText)
+                if (slugKey) {
+                  try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
+                  item.href = buildPageUrl(slugKey, frag)
+                } else {
                   item.href = buildPageUrl(htmlPath, frag)
                 }
               } else {
-                item.href = href
+                item.href = buildPageUrl(htmlPath, frag)
               }
             } catch (ee) {
-              item.href = href
+              item.href = buildPageUrl(htmlPath, frag)
             }
+          } else {
+            item.href = href
           }
         } catch (ee) {
           item.href = href
@@ -963,26 +705,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const hash = url.hash ? url.hash.replace(/^#/, '') : null
         if (pageParam) {
           ev.preventDefault()
-            try {
-              const pageVal = pageParam + (hash ? `::${hash}` : '')
-              try {
-                const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-                const cosmetic = '#/' + encodeURL(pageParam || '') + anchorPart
-                history.pushState({ page: pageVal }, '', cosmetic)
-              } catch (e) {
-                const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-                const cosmetic = '#/' + encodeURL(pageParam || '') + anchorPart
-                history.pushState({ page: pageVal }, '', cosmetic)
-              }
-            } catch (e) {
-              const locParams = new URLSearchParams(location.search || '')
-              locParams.delete('page')
-              const qs = locParams.toString()
-              const suffix = qs ? '?' + qs : ''
-              const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-              const cosmetic = '#/' + encodeURL(pageParam || '') + anchorPart + suffix
-              history.pushState({ page: pageParam }, '', cosmetic)
-            }
+          history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
           runRenderWithTransition()
         }
       } catch (e) { console.warn('[nimbi-cms] navbar click handler failed', e) }
@@ -1012,26 +735,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const hash = url.hash ? url.hash.replace(/^#/, '') : null
         if (pageParam) {
           ev.preventDefault()
-            try {
-              const pageVal = pageParam + (hash ? `::${hash}` : '')
-              try {
-                const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-                const cosmetic = '#/' + encodeURL(pageParam || '') + anchorPart
-                history.pushState({ page: pageVal }, '', cosmetic)
-              } catch (e) {
-                const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-                const cosmetic = '#/' + encodeURL(pageParam || '') + anchorPart
-                history.pushState({ page: pageVal }, '', cosmetic)
-              }
-          } catch (e) {
-            const locParams = new URLSearchParams(location.search || '')
-            locParams.delete('page')
-            const qs = locParams.toString()
-            const suffix = qs ? '?' + qs : ''
-            const anchorPart = hash ? '#' + encodeURIComponent(hash) : ''
-            const cosmetic = '#/' + encodeURL(pageParam || '') + anchorPart + suffix
-            history.pushState({ page: pageParam }, '', cosmetic)
-          }
+          history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
           runRenderWithTransition()
         }
       } catch (e) {
