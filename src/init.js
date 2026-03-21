@@ -597,7 +597,7 @@ export async function initCMS(options = {}) {
         const mod = await import('./runtimeSitemap.js')
         try {
           if (mod && typeof mod.handleSitemapRequest === 'function') {
-            const handled = mod.handleSitemapRequest({ includeAllMarkdown: true })
+            const handled = mod.handleSitemapRequest({ includeAllMarkdown: true, homePage, navigationPage, notFoundPage, contentBase })
             if (handled) return
           }
         } catch (e) { /* ignore runtime sitemap handler errors */ }

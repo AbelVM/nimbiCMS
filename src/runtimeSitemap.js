@@ -81,6 +81,87 @@ export function generateSitemapXml(json) {
   return s
 }
 
+function _extractLinksFromText(text) {
+  try {
+    const out = []
+    if (!text) return out
+    // markdown links: [text](href)
+    const md = /\[[^\]]+\]\(([^)]+)\)/g
+    let m
+    while ((m = md.exec(text)) !== null) {
+      if (m[1]) out.push(m[1])
+    }
+    // html anchors: <a href="..."> or <a href='...'>
+    const ah = /<a[^>]+href=["']([^"']+)["']/gi
+    while ((m = ah.exec(text)) !== null) {
+      if (m[1]) out.push(m[1])
+    }
+    return out
+  } catch (e) { return [] }
+}
+
+async function _fetchNavDerivedEntries(opts = {}) {
+  if (typeof fetch === 'undefined' || typeof location === 'undefined') return []
+  const { navigationPage, homePage, contentBase } = opts || {}
+  const candidates = []
+
+  // Prefer configured pages when provided (root and contentBase variants)
+  try {
+    if (navigationPage && typeof navigationPage === 'string') {
+      candidates.push('/' + String(navigationPage || '').replace(/^\/+/, ''))
+      if (contentBase) {
+        try { candidates.push(new URL(String(navigationPage || ''), String(contentBase)).toString()) } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  try {
+    if (homePage && typeof homePage === 'string') {
+      candidates.push('/' + String(homePage || '').replace(/^\/+/, ''))
+      if (contentBase) {
+        try { candidates.push(new URL(String(homePage || ''), String(contentBase)).toString()) } catch (_) {}
+      }
+    }
+  } catch (_) {}
+
+  // Common fallbacks (preserve legacy behavior)
+  const fallback = [
+    '/_navigation.md', '/_navigation.html', '/_home.md', '/_home.html',
+    '/content/_navigation.md', '/content/_navigation.html', '/content/_home.md', '/content/_home.html'
+  ]
+  for (const f of fallback) if (!candidates.includes(f)) candidates.push(f)
+
+  const base = _getBase().split('?')[0]
+  const seen = new Set()
+  const results = []
+  for (const c of candidates) {
+    try {
+      const u = (typeof c === 'string' && (/^https?:\/\//i.test(c))) ? c : new URL(c, location.origin).toString()
+      const res = await fetch(u, { method: 'GET' })
+      if (!res || !res.ok) continue
+      const text = await res.text()
+      const links = _extractLinksFromText(text)
+      for (let href of links) {
+        try {
+          try {
+            const parsed = new URL(href, u)
+            if (parsed.origin !== location.origin) continue
+            href = parsed.pathname.replace(/^\//, '')
+          } catch (err) {
+            // leave href as-is
+          }
+          href = normalizePath(String(href || ''))
+          if (!href) continue
+          if (seen.has(href)) continue
+          seen.add(href)
+          results.push({ loc: base + '?page=' + encodeURIComponent(href), path: href })
+        } catch (e) { /* per-link ignore */ }
+      }
+      if (results.length) return results
+    } catch (e) { /* ignore per-candidate */ }
+  }
+  return []
+}
+
 /**
  * Attach a minimal sitemap download UI to a container element.
  * This is optional and only runs when explicitly invoked.
@@ -165,23 +246,165 @@ export function attachSitemapDownloadUI(target, opts = {}) {
 export function handleSitemapRequest(opts = {}) {
   try {
     if (typeof location === 'undefined' || typeof document === 'undefined') return false
-    const pathname = (location.pathname || '/').replace(/\/+/g, '/')
-    const name = pathname.split('/').filter(Boolean).pop() || ''
-    if (!name) return false
-    const wantXml = /^(sitemap|sitemap\.xml)$/i.test(name)
-    const wantHtml = /^(sitemap|sitemap\.html)$/i.test(name)
-    if (!wantXml && !wantHtml) return false
+
+    // Allow `?sitemap` query form at site root (no other params, no anchor)
+    // Only handle when the query contains the single `sitemap` key (value may be empty).
+    let wantXml = false
+    let wantHtml = false
+    try {
+      if (typeof location.search === 'string' && location.search) {
+        const sp = new URLSearchParams(location.search)
+        if (sp.has('sitemap')) {
+          let onlySitemap = true
+          for (const k of sp.keys()) {
+            if (k !== 'sitemap') {
+              onlySitemap = false
+              break
+            }
+          }
+          if (onlySitemap) {
+            // Do not handle if there's a fragment anchor present
+            if (location.hash && String(location.hash || '').trim()) {
+              return false
+            }
+            wantXml = true
+          } else {
+            return false
+          }
+        }
+      }
+    } catch (e) { /* ignore search parsing issues */ }
+
+    // Also accept hash-based `#/?sitemap` (cosmetic URL form)
+    try {
+      if (!wantXml && typeof location.hash === 'string' && location.hash && location.hash.startsWith('#/?')) {
+        const qs = location.hash.slice(2) // remove leading '#'
+        const sp = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
+        if (sp.has('sitemap')) {
+          let onlySitemap = true
+          for (const k of sp.keys()) {
+            if (k !== 'sitemap') { onlySitemap = false; break }
+          }
+          if (onlySitemap) {
+            wantXml = true
+          }
+        }
+      }
+    } catch (e) { /* ignore hash parsing issues */ }
+
+    // Honor host preference to render HTML for `?sitemap` when explicitly requested
+    try {
+      if (typeof window !== 'undefined' && window && window.__nimbiPreferHtmlSitemap === true && wantXml) {
+        wantXml = false
+        wantHtml = true
+      }
+    } catch (e) { /* ignore preference check errors */ }
+
+    // Fallback: handle path-based /sitemap and /sitemap.xml routes
+    if (!wantXml && !wantHtml) {
+      const pathname = (location.pathname || '/').replace(/\/\/+/g, '/')
+      const name = pathname.split('/').filter(Boolean).pop() || ''
+      if (!name) return false
+      wantXml = /^(sitemap|sitemap\.xml)$/i.test(name)
+      wantHtml = /^(sitemap|sitemap\.html)$/i.test(name)
+      if (!wantXml && !wantHtml) return false
+    }
 
     const json = generateSitemapJson(opts)
 
-    if (wantXml) {
-      const xml = generateSitemapXml(json)
+    // If we don't have entries, attempt an async fallback that tries to
+    // fetch a likely navigation or home markdown file (e.g. `/_navigation.md`, `/_home.md`)
+    // and extract links to populate the sitemap. We return `true` immediately
+    // (we will write the sitemap later when the fetch completes) so the
+    // SPA init can short-circuit; the actual document replacement happens
+    // asynchronously when results arrive.
+    async function _fetchFallbackAndWrite() {
       try {
-        document.open()
-        document.write(xml)
-        document.close()
+        const entries = await _fetchNavDerivedEntries(opts)
+        if (entries && entries.length) {
+          const xml2 = generateSitemapXml({ generatedAt: new Date().toISOString(), entries })
+          try {
+            try {
+              document.open('application/xml', 'replace')
+            } catch (_) {
+              try { document.open() } catch (_) {}
+            }
+            document.write(xml2)
+            document.close()
+
+            // Best-effort: navigate to a Blob URL containing the XML so the
+            // browser treats the resource as standalone XML and avoids
+            // injection from extensions that may alter the written DOM.
+            try {
+              if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+                const blob = new Blob([xml2], { type: 'application/xml' })
+                const blobUrl = URL.createObjectURL(blob)
+                try { location.href = blobUrl } catch (_) {
+                  try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {}
+                }
+                setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
+              }
+            } catch (_) {}
+
+            return
+          } catch (e) {
+            // Try a data: URL navigation as a best-effort to let the browser
+            // treat the content as XML. If that fails, fall back to HTML-escaped
+            // presentation inside a <pre>.
+            try {
+              if (typeof location !== 'undefined' && location) {
+                const dataUrl = 'data:application/xml;charset=utf-8,' + encodeURIComponent(xml2)
+                try { location.href = dataUrl; return } catch (_) {}
+                try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') { window.open(dataUrl, '_self'); return } } catch (_) {}
+              }
+            } catch (_) {}
+            try { document.body.innerHTML = '<pre>' + _escapeXml(xml2) + '</pre>' } catch (e2) {}
+            return
+          }
+        }
       } catch (e) {
-        try { document.body.innerHTML = '<pre>' + _escapeXml(xml) + '</pre>' } catch (e2) {}
+        console.warn('[runtimeSitemap] fallback fetch failed', e)
+      }
+    }
+
+    if (wantXml) {
+      if (json && Array.isArray(json.entries) && json.entries.length) {
+        const xml = generateSitemapXml(json)
+        try {
+          try {
+            document.open('application/xml', 'replace')
+          } catch (_) {
+            try { document.open() } catch (_) {}
+          }
+          document.write(xml)
+          document.close()
+
+          // Best-effort: navigate to a Blob URL containing the XML so the
+          // browser treats the resource as standalone XML and avoids
+          // injection from extensions that may alter the written DOM.
+          try {
+            if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+              const blob = new Blob([xml], { type: 'application/xml' })
+              const blobUrl = URL.createObjectURL(blob)
+              try { location.href = blobUrl } catch (_) {
+                try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {}
+              }
+              setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
+            }
+          } catch (_) {}
+
+        } catch (e) {
+          try {
+            if (typeof location !== 'undefined' && location) {
+              const dataUrl = 'data:application/xml;charset=utf-8,' + encodeURIComponent(xml)
+              try { location.href = dataUrl } catch (_) {}
+            }
+          } catch (_) {}
+          try { document.body.innerHTML = '<pre>' + _escapeXml(xml) + '</pre>' } catch (e2) {}
+        }
+      } else {
+        // start async fallback but still return true synchronously
+        _fetchFallbackAndWrite()
       }
       return true
     }

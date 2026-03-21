@@ -311,6 +311,35 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     }
   });
 
+  // Helper: try to find an existing slug for a given markdown/html path.
+  // Returns the slug string or null when no mapping exists.
+  function findSlugForPath(p) {
+    try {
+      if (!p) return null
+      const norm = normalizePath(String(p || ''))
+      try { if (mdToSlug && mdToSlug.has(norm)) return mdToSlug.get(norm) } catch (e) {}
+      // Try basename lookup
+      const base = norm.replace(/^.*\//, '')
+      try { if (mdToSlug && mdToSlug.has(base)) return mdToSlug.get(base) } catch (e) {}
+      // Scan slugToMd map for a matching value (handles localized entries)
+      try {
+        for (const [slug, entry] of slugToMd.entries()) {
+          if (!entry) continue
+          if (typeof entry === 'string') {
+            if (normalizePath(entry) === norm) return slug
+          } else if (entry && typeof entry === 'object') {
+            if (entry.default && normalizePath(entry.default) === norm) return slug
+            const langs = entry.langs || {}
+            for (const k in langs) {
+              if (langs[k] && normalizePath(langs[k]) === norm) return slug
+            }
+          }
+        }
+      } catch (e) {}
+      return null
+    } catch (e) { return null }
+  }
+
 
   
   const burger = document.createElement('a')
@@ -615,7 +644,12 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const parts = mdRaw.split(/::|#/, 2)
         const mdPath = parts[0]
         const frag = parts[1]
-        item.href = buildPageUrl(mdPath, frag)
+        const slug = findSlugForPath(mdPath)
+        if (slug) {
+          item.href = buildPageUrl(slug, frag)
+        } else {
+          item.href = buildPageUrl(mdPath, frag)
+        }
       } else if (/\.html(?:$|[#?])/.test(href) || href.endsWith('.html')) {
         let raw = normalizePath(href)
         const parts = raw.split(/::|#/, 2)
@@ -624,34 +658,39 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           htmlPath = htmlPath + '.html'
         }
         const frag = parts[1]
-        try {
-          const res = await fetchMarkdown(htmlPath, contentBase)
-          if (res && res.raw) {
-            try {
-              const parser2 = new DOMParser()
-              const doc = parser2.parseFromString(res.raw, 'text/html')
-              const titleTag = doc.querySelector('title')
-              const h1 = doc.querySelector('h1')
-              const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
-              if (titleText) {
-                const slugKey = slugify(titleText)
-                if (slugKey) {
-                  try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
-                  item.href = buildPageUrl(slugKey, frag)
+        const slug = findSlugForPath(htmlPath)
+        if (slug) {
+          item.href = buildPageUrl(slug, frag)
+        } else {
+          try {
+            const res = await fetchMarkdown(htmlPath, contentBase)
+            if (res && res.raw) {
+              try {
+                const parser2 = new DOMParser()
+                const doc = parser2.parseFromString(res.raw, 'text/html')
+                const titleTag = doc.querySelector('title')
+                const h1 = doc.querySelector('h1')
+                const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
+                if (titleText) {
+                  const slugKey = slugify(titleText)
+                  if (slugKey) {
+                    try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
+                    item.href = buildPageUrl(slugKey, frag)
+                  } else {
+                    item.href = buildPageUrl(htmlPath, frag)
+                  }
                 } else {
                   item.href = buildPageUrl(htmlPath, frag)
                 }
-              } else {
+              } catch (ee) {
                 item.href = buildPageUrl(htmlPath, frag)
               }
-            } catch (ee) {
-              item.href = buildPageUrl(htmlPath, frag)
+            } else {
+              item.href = href
             }
-          } else {
+          } catch (ee) {
             item.href = href
           }
-        } catch (ee) {
-          item.href = href
         }
       } else {
         item.href = href
