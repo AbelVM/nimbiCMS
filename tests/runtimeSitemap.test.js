@@ -60,9 +60,13 @@ describe('runtimeSitemap', () => {
     expect(xml).toContain('?page=' + encodeURIComponent('hello.md'))
   })
 
-  it('handleSitemapRequest serves sitemap.xml when pathname ends with sitemap.xml', () => {
+  it('handleSitemapRequest serves sitemap.xml when pathname ends with sitemap.xml', async () => {
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/sitemap.xml' }, configurable: true })
     slugManager.slugToMd.set('one', 'one.md')
+
+    // Provide a pre-built searchIndex so the handler's index build is fast in tests
+    slugManager.searchIndex.length = 0
+    slugManager.searchIndex.push({ slug: 'one', title: 'One Title', path: 'one.md' })
 
     // intercept document.write to capture output instead of replacing DOM
     const writes = []
@@ -73,7 +77,7 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(true)
     expect(writes.length).toBeGreaterThan(0)
     const written = writes.join('')
@@ -81,10 +85,14 @@ describe('runtimeSitemap', () => {
     expect(written).toContain('?page=' + encodeURIComponent('one.md'))
   })
 
-  it('handleSitemapRequest serves sitemap.html when pathname ends with sitemap.html', () => {
+  it('handleSitemapRequest serves sitemap.html when pathname ends with sitemap.html', async () => {
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/sitemap.html' }, configurable: true })
     slugManager.slugToMd.set('a', 'a.md')
     slugManager.slugToMd.set('b', 'b.md')
+
+    slugManager.searchIndex.length = 0
+    slugManager.searchIndex.push({ slug: 'a', title: 'A Title', path: 'a.md' })
+    slugManager.searchIndex.push({ slug: 'b', title: 'B Title', path: 'b.md' })
 
     const writes = []
     origDocOpen = document.open
@@ -94,7 +102,7 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(true)
     const out = writes.join('')
     expect(out).toContain('<h1>Sitemap</h1>')
@@ -102,16 +110,19 @@ describe('runtimeSitemap', () => {
     expect(out).toContain('?page=' + encodeURIComponent('b.md'))
   })
 
-  it('handleSitemapRequest returns false for unrelated paths', () => {
+  it('handleSitemapRequest returns false for unrelated paths', async () => {
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/other' }, configurable: true })
     slugManager.slugToMd.set('x', 'x.md')
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(false)
   })
 
-  it('handleSitemapRequest serves sitemap.xml when search contains ?sitemap and no other params', () => {
+  it('handleSitemapRequest serves sitemap.xml when search contains ?sitemap and no other params', async () => {
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', search: '?sitemap' }, configurable: true })
     slugManager.slugToMd.set('one', 'one.md')
+
+    slugManager.searchIndex.length = 0
+    slugManager.searchIndex.push({ slug: 'one', title: 'One Title', path: 'one.md' })
 
     const writes = []
     origDocOpen = document.open
@@ -121,7 +132,7 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(true)
     expect(writes.length).toBeGreaterThan(0)
     const written = writes.join('')
@@ -129,16 +140,19 @@ describe('runtimeSitemap', () => {
     expect(written).toContain('?page=' + encodeURIComponent('one.md'))
   })
 
-  it('handleSitemapRequest ignores ?sitemap when other params are present', () => {
+  it('handleSitemapRequest ignores ?sitemap when other params are present', async () => {
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', search: '?sitemap=1&page=home' }, configurable: true })
     slugManager.slugToMd.set('two', 'two.md')
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(false)
   })
 
-  it('handleSitemapRequest serves sitemap.xml when hash contains #/?sitemap', () => {
+  it('handleSitemapRequest serves sitemap.xml when hash contains #/?sitemap', async () => {
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', hash: '#/?sitemap' }, configurable: true })
     slugManager.slugToMd.set('one', 'one.md')
+
+    slugManager.searchIndex.length = 0
+    slugManager.searchIndex.push({ slug: 'one', title: 'One Title', path: 'one.md' })
 
     const writes = []
     origDocOpen = document.open
@@ -148,7 +162,7 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(true)
     expect(writes.length).toBeGreaterThan(0)
     const written = writes.join('')
@@ -158,8 +172,9 @@ describe('runtimeSitemap', () => {
 
   it('handleSitemapRequest fetches navigation file when no entries and populates sitemap', async () => {
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', search: '?sitemap' }, configurable: true })
-    // ensure no known slug entries
+    // ensure no known slug entries and empty search index
     slugManager.slugToMd.clear()
+    slugManager.searchIndex.length = 0
 
     // stub fetch to return a simple navigation markdown
     const navText = '[Home](_home.md)\n[Blog](/blog/page.md)'
@@ -173,11 +188,8 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(true)
-
-    // wait for async fallback to complete
-    await new Promise((r) => setTimeout(r, 50))
 
     expect(writes.length).toBeGreaterThan(0)
     const out = writes.join('')

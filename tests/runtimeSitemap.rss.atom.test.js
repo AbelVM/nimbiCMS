@@ -25,9 +25,11 @@ describe('runtimeSitemap RSS/Atom', () => {
     if (origDocClose !== undefined) document.close = origDocClose
   })
 
-  it('handleSitemapRequest serves RSS when search contains ?rss and no other params', () => {
+  it('handleSitemapRequest serves RSS when search contains ?rss and no other params', async () => {
     // populate a slug so generator will emit entries
     slugManager.slugToMd.set('one', 'one.md')
+    slugManager.searchIndex.length = 0
+    slugManager.searchIndex.push({ slug: 'one', title: 'One Title', path: 'one.md' })
 
     const writes = []
     origDocOpen = document.open
@@ -37,7 +39,7 @@ describe('runtimeSitemap RSS/Atom', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(true)
     expect(writes.length).toBeGreaterThan(0)
     const out = writes.join('')
@@ -45,11 +47,13 @@ describe('runtimeSitemap RSS/Atom', () => {
     expect(out).toContain('?page=' + encodeURIComponent('one.md'))
   })
 
-  it('handleSitemapRequest serves Atom when search contains ?atom and no other params', () => {
+  it('handleSitemapRequest serves Atom when search contains ?atom and no other params', async () => {
     // switch location to atom
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', search: '?atom' }, configurable: true })
     slugManager.slugToMd.clear()
     slugManager.slugToMd.set('two', 'two.md')
+    slugManager.searchIndex.length = 0
+    slugManager.searchIndex.push({ slug: 'two', title: 'Two Title', path: 'two.md' })
 
     const writes = []
     origDocOpen = document.open
@@ -59,7 +63,7 @@ describe('runtimeSitemap RSS/Atom', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
     expect(handled).toBe(true)
     expect(writes.length).toBeGreaterThan(0)
     const out = writes.join('')

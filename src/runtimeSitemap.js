@@ -1,93 +1,493 @@
 /**
- * Runtime sitemap generator and optional UI helpers.
- * Everything runs client-side at runtime; nothing happens at build time.
+ * Runtime sitemap/rss/atom generator — tidy and robust.
+ *
+ * Behavior summary:
+ * - Prefer the already-built `searchIndex` exported from `slugManager`.
+ * - If empty, rebuild via `buildSearchIndex(contentBase, indexDepth, noIndexing, seedPaths)`
+ *   where `indexDepth`/`noIndexing` are taken from the `opts` passed by `init()`.
+ * - Use `navigationPage` as an indexing seed but never list it in the sitemap.
+ * - Use `homePage` as an indexing seed and ensure it is listed in the sitemap.
+ * - Never index or list `notFoundPage`.
+ * - Sitemap/RSS/Atom links use the pattern `BASE/?page=<slug>` (do not use file paths).
+ * - For feed items use `title` from the index and `excerpt` as the description.
  */
-import { allMarkdownPaths, slugToMd } from './slugManager.js'
+import { allMarkdownPaths, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
 import { normalizePath } from './utils/helpers.js'
 
 function _getBase() {
   try {
-    const base = (typeof location !== 'undefined' && location && typeof location.pathname === 'string') ? (location.origin + location.pathname.split('?')[0]) : (typeof location !== 'undefined' && location.origin ? location.origin : 'http://localhost')
-    return String(base)
-  } catch (e) {
-    return 'http://localhost/'
-  }
-}
-
-/**
- * Generate a sitemap JSON object using available runtime markdown paths.
- * @param {Object} [opts]
- * @param {boolean} [opts.includeAllMarkdown=true]
- * @returns {{generatedAt:string,entries:Array}}
- */
-export function generateSitemapJson(opts = {}) {
-  const { includeAllMarkdown = true } = opts || {}
-  const base = _getBase()
-  const paths = []
-  try {
-    if (includeAllMarkdown && Array.isArray(allMarkdownPaths) && allMarkdownPaths.length) {
-      paths.push(...allMarkdownPaths)
-    } else {
-      for (const v of Array.from(slugToMd.values())) {
-        if (!v) continue
-        if (typeof v === 'string') paths.push(v)
-        else if (v && typeof v === 'object') {
-          if (v.default) paths.push(v.default)
-          if (v.langs) {
-            for (const lv of Object.values(v.langs || {})) if (lv) paths.push(lv)
-          }
-        }
-      }
+    if (typeof location !== 'undefined' && location && typeof location.pathname === 'string') {
+      return String(location.origin + location.pathname.split('?')[0])
     }
-  } catch (e) { console.warn('[runtimeSitemap] gather paths failed', e) }
-
-  const seen = new Set()
-  const entries = []
-  for (let p of paths) {
-    try {
-      if (!p) continue
-      p = normalizePath(String(p))
-      if (seen.has(p)) continue
-      seen.add(p)
-      const loc = base.split('?')[0] + '?page=' + encodeURIComponent(p)
-      entries.push({ loc, path: p })
-    } catch (e) { /* ignore per-path errors */ }
-  }
-  return { generatedAt: new Date().toISOString(), entries }
+  } catch {}
+  return 'http://localhost/'
 }
 
 function _escapeXml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 }
 
+function _humanizeSlug(slug) {
+  try {
+    if (!slug || typeof slug !== 'string') return ''
+    // prefer the last path segment
+    const last = slug.split('/').filter(Boolean).pop() || slug
+    const withoutExt = last.replace(/\.[a-z0-9]+$/i, '')
+    const parts = withoutExt.replace(/[-_]+/g, ' ').split(' ')
+    return parts.map(p => p ? (p.charAt(0).toUpperCase() + p.slice(1)) : '').join(' ').trim()
+  } catch { return String(slug) }
+}
+
 /**
- * Convert sitemap JSON to XML (sitemap protocol v0.9)
- * @param {Object|Array} json
- * @returns {string}
+ * Convert an index entry (or slug) to a canonical sitemap entry object.
+ * Always produce `loc` using slug form: `base + '?page=' + encodeURIComponent(slug)`.
  */
+function makeEntryFromIndexItem(baseNoQs, it) {
+  try {
+    const slug = it && it.slug ? String(it.slug) : null
+    if (!slug) return null
+    const loc = baseNoQs + '?page=' + encodeURIComponent(slug)
+    const ent = { loc, slug }
+    if (it.title) ent.title = String(it.title)
+    if (it.excerpt) ent.excerpt = String(it.excerpt)
+    if (it.path) ent.sourcePath = normalizePath(String(it.path))
+    return ent
+  } catch { return null }
+}
+
+export async function generateSitemapJson(opts = {}) {
+  const {
+    includeAllMarkdown = true,
+    index: providedIndex,
+    homePage,
+    navigationPage,
+    notFoundPage
+  } = opts || {}
+
+  const base = _getBase().split('?')[0]
+  const baseNoQs = base
+
+  // Prefer the live module `searchIndex` object used by the search UI.
+  // Fall back to any provided snapshot `providedIndex` if the module index
+  // is not yet populated. If both are present, merge but prefer module
+  // entries when slugs collide.
+  let idx = (Array.isArray(searchIndex) && searchIndex.length) ? searchIndex : (Array.isArray(providedIndex) ? providedIndex : [])
+  if (Array.isArray(providedIndex) && providedIndex.length && Array.isArray(searchIndex) && searchIndex.length) {
+    const bySlug = new Map()
+    try {
+      for (const it of providedIndex) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch {} }
+      for (const it of searchIndex) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch {} }
+    } catch {}
+    idx = Array.from(bySlug.values())
+  }
+
+  const excludedPaths = new Set()
+  try { if (typeof notFoundPage === 'string' && notFoundPage.trim()) excludedPaths.add(normalizePath(String(notFoundPage))) } catch {}
+  try { if (typeof navigationPage === 'string' && navigationPage.trim()) excludedPaths.add(normalizePath(String(navigationPage))) } catch {}
+
+  // Also compute excluded slugs for notFoundPage so we never include a
+  // page derived from the site's 404 content (title 'Not Found' etc.). We
+  // attempt to resolve a slug for the configured notFoundPage via the
+  // `mdToSlug` mapping or by fetching the notFoundPage and slugifying its
+  // H1. This prevents accidental inclusion when servers return fallback
+  // HTML for missing pages.
+  const excludedSlugs = new Set()
+  try {
+    if (typeof notFoundPage === 'string' && notFoundPage.trim()) {
+      const nfPath = normalizePath(String(notFoundPage))
+      try {
+        if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(nfPath)) {
+          try { excludedSlugs.add(mdToSlug.get(nfPath)) } catch {}
+        } else {
+          try {
+            const nfRes = await fetchMarkdown(nfPath, opts && opts.contentBase ? opts.contentBase : undefined)
+            if (nfRes && nfRes.raw) {
+              try {
+                let h = null
+                if (nfRes.isHtml) {
+                  try {
+                    const parser = new DOMParser()
+                    const doc = parser.parseFromString(nfRes.raw, 'text/html')
+                    const h1 = doc.querySelector('h1') || doc.querySelector('title')
+                    if (h1 && h1.textContent) h = h1.textContent.trim()
+                  } catch {}
+                } else {
+                  const m = (nfRes.raw || '').match(/^#\s+(.+)$/m)
+                  if (m && m[1]) h = m[1].trim()
+                }
+                if (h) excludedSlugs.add(slugify(h))
+              } catch {}
+            }
+          } catch {
+            /* ignore fetch failures for notFoundPage */
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+
+  const seenSlugs = new Set()
+  const entries = []
+
+  // Build a title/excerpt map from the index so we can enrich slugs
+  const titleMap = new Map()
+  const pathMap = new Map()
+  // Helper: determine whether a normalized markdown path is known to the
+  // runtime (manifest, slug maps, or index-derived pathMap). This avoids
+  // unnecessary fetches for files the server doesn't expose and reduces
+  // noisy 404s when crawling links.
+  const _isKnownPath = (p) => {
+    try {
+      if (!p || typeof p !== 'string') return false
+      const np = normalizePath(String(p))
+      try { if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length && allMarkdownPaths.includes(np)) return true } catch {}
+      try { if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(np)) return true } catch {}
+      try { if (pathMap && pathMap.has(np)) return true } catch {}
+      try {
+        for (const v of slugToMd.values()) {
+          try {
+            if (!v) continue
+            if (typeof v === 'string') {
+              if (normalizePath(String(v)) === np) return true
+            } else if (v && typeof v === 'object') {
+              if (v.default && normalizePath(String(v.default)) === np) return true
+              const langs = v.langs || {}
+              for (const lk of Object.keys(langs || {})) {
+                try { if (langs[lk] && normalizePath(String(langs[lk])) === np) return true } catch {}
+              }
+            }
+          } catch {}
+        }
+      } catch {}
+    } catch {}
+    return false
+  }
+  if (Array.isArray(idx) && idx.length) {
+    for (const it of idx) {
+      try {
+        if (!it || !it.slug) continue
+        const slugKey = String(it.slug)
+        const slugBaseKey = String(slugKey).split('::')[0]
+        if (excludedSlugs.has(slugBaseKey)) continue
+        const p = it.path ? normalizePath(String(it.path)) : null
+        if (p && excludedPaths.has(p)) continue
+        // Prefer the entry's own title (this is often the H1/H2 used in search results)
+        const entryTitle = it.title ? String(it.title) : (it.parentTitle ? String(it.parentTitle) : undefined)
+        titleMap.set(slugKey, { title: entryTitle || undefined, excerpt: it.excerpt ? String(it.excerpt) : undefined, path: p, source: 'index' })
+        if (p) pathMap.set(p, { title: entryTitle || undefined, excerpt: it.excerpt ? String(it.excerpt) : undefined, slug: slugKey })
+        const ent = makeEntryFromIndexItem(baseNoQs, it)
+        if (!ent || !ent.slug) continue
+        if (seenSlugs.has(ent.slug)) continue
+        seenSlugs.add(ent.slug)
+        if (titleMap.has(ent.slug)) {
+          const t = titleMap.get(ent.slug)
+          if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
+          if (t && t.excerpt) ent.excerpt = t.excerpt
+        }
+        entries.push(ent)
+      } catch { continue }
+    }
+  }
+
+  // Optionally add all slugs discoverable from slugToMd / allMarkdownPaths
+  if (includeAllMarkdown) {
+    try {
+      for (const [slug, mdVal] of slugToMd.entries()) {
+        try {
+          if (!slug) continue
+          const slugBase = String(slug).split('::')[0]
+          if (seenSlugs.has(slug)) continue
+          if (excludedSlugs.has(slugBase)) continue
+          // determine path for exclusion checks
+          let mappedPath = null
+          if (typeof mdVal === 'string') mappedPath = normalizePath(String(mdVal))
+          else if (mdVal && typeof mdVal === 'object') mappedPath = normalizePath(String(mdVal.default || ''))
+          if (mappedPath && excludedPaths.has(mappedPath)) continue
+          const loc = baseNoQs + '?page=' + encodeURIComponent(slug)
+          const ent = { loc, slug }
+          if (titleMap.has(slug)) {
+            const t = titleMap.get(slug)
+            if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
+            if (t && t.excerpt) ent.excerpt = t.excerpt
+          } else if (mappedPath) {
+            // try path->title fallback
+            const pm = pathMap.get(mappedPath)
+            if (pm && pm.title) {
+              ent.title = pm.title
+              ent._titleSource = 'path'
+              if (!ent.excerpt && pm.excerpt) ent.excerpt = pm.excerpt
+            }
+          }
+          seenSlugs.add(slug)
+          if (typeof slug === 'string') {
+            const looksLikePath = slug.indexOf('/') !== -1 || /\.(md|html?)$/i.test(slug)
+            const titleLooksLikePath = ent.title && typeof ent.title === 'string' && (ent.title.indexOf('/') !== -1 || /\.(md|html?)$/i.test(ent.title))
+            if (!ent.title || titleLooksLikePath || looksLikePath) {
+              ent.title = _humanizeSlug(slug)
+              ent._titleSource = 'humanize'
+            }
+          }
+          entries.push(ent)
+        } catch { /* per-slug ignore */ }
+      }
+
+      // Ensure homePage is present (use mdToSlug lookup)
+      try {
+        if (homePage && typeof homePage === 'string') {
+          const hp = normalizePath(String(homePage))
+          let hpSlug = null
+          try { if (mdToSlug && mdToSlug.has(hp)) hpSlug = mdToSlug.get(hp) } catch {}
+          if (!hpSlug) hpSlug = hp
+          const hpBase = String(hpSlug).split('::')[0]
+          if (!seenSlugs.has(hpSlug) && !excludedPaths.has(hp) && !excludedSlugs.has(hpBase)) {
+            const ent = { loc: baseNoQs + '?page=' + encodeURIComponent(hpSlug), slug: hpSlug }
+            if (titleMap.has(hpSlug)) {
+              const t = titleMap.get(hpSlug)
+              if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
+              if (t && t.excerpt) ent.excerpt = t.excerpt
+            }
+            seenSlugs.add(hpSlug)
+            entries.push(ent)
+          }
+        }
+      } catch {}
+    } catch {}
+  }
+
+  // Expand sitemap by crawling linked pages found in indexed/source markdown
+  try {
+    const seenAdd = new Set()
+    const existingSlugs = new Set(entries.map(e => String(e && e.slug ? e.slug : '')))
+    const sourcePaths = new Set()
+    for (const it of entries) {
+      try { if (it && it.sourcePath) sourcePaths.add(String(it.sourcePath)) } catch {}
+    }
+    // Limit to a reasonable number to avoid blowing up runtime
+    const MAX_SOURCE_FETCH = 30
+    let fetched = 0
+    for (const sp of sourcePaths) {
+      if (fetched >= MAX_SOURCE_FETCH) break
+      try {
+        if (!sp || typeof sp !== 'string') continue
+        // Avoid fetching unknown files: check manifest, slug maps, and
+        // index-derived paths before issuing a network request.
+        if (!_isKnownPath(sp)) continue
+        fetched += 1
+        const mdRes = await fetchMarkdown(sp, opts && opts.contentBase ? opts.contentBase : undefined)
+        // Skip if empty or if server returned a 404 fallback page — we don't
+        // want to parse the site's 404 HTML as real content.
+        if (!mdRes || !mdRes.raw) continue
+        if (mdRes && typeof mdRes.status === 'number' && mdRes.status === 404) continue
+        const raw = mdRes.raw
+        const clean = (function(r) {
+          try { return String(r || '') } catch { return '' }
+        })(raw)
+        const hrefs = []
+        const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
+        let m
+        while ((m = mdLinkRe.exec(clean))) { try { if (m && m[1]) hrefs.push(m[1]) } catch {} }
+        const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
+        while ((m = htmlLinkRe.exec(clean))) { try { if (m && m[1]) hrefs.push(m[1]) } catch {} }
+
+        for (const href of hrefs) {
+          try {
+            if (!href) continue
+            // page query param -> slug
+            if (href.indexOf('?') !== -1 || href.indexOf('=') !== -1) {
+              try {
+                const u = new URL(href, baseNoQs)
+                const p = u.searchParams.get('page')
+                if (p) {
+                  const slug = String(p)
+                  if (!existingSlugs.has(slug) && !seenAdd.has(slug)) {
+                    seenAdd.add(slug)
+                    entries.push({ loc: baseNoQs + '?page=' + encodeURIComponent(slug), slug })
+                  }
+                  continue
+                }
+              } catch {}
+            }
+            // md/html path -> try normalize and map via mdToSlug
+            let candidate = String(href).split(/[?#]/)[0]
+            // strip leading ./ or /\
+            candidate = candidate.replace(/^\.\//, '').replace(/^\//, '')
+            if (!candidate) continue
+            if (!/\.(md|html?)$/i.test(candidate)) continue
+            try {
+              const norm = normalizePath(candidate)
+              if (mdToSlug && mdToSlug.has(norm)) {
+                const s = mdToSlug.get(norm)
+                const sBase = String(s).split('::')[0]
+                if (s && !existingSlugs.has(s) && !seenAdd.has(s) && !excludedSlugs.has(sBase) && !excludedPaths.has(norm)) {
+                  seenAdd.add(s)
+                  entries.push({ loc: baseNoQs + '?page=' + encodeURIComponent(s), slug: s, sourcePath: norm })
+                }
+                continue
+              }
+              // Try fetching the target to derive a slug from its H1
+              try {
+                // Check whether the target path is known before attempting fetch.
+                if (!_isKnownPath(norm)) continue
+                const target = await fetchMarkdown(norm, opts && opts.contentBase ? opts.contentBase : undefined)
+                // Skip fallback 404 responses
+                if (target && typeof target.status === 'number' && target.status === 404) continue
+                if (target && target.raw) {
+                  const hh = (target.raw || '').match(/^#\s+(.+)$/m)
+                  const title = hh && hh[1] ? hh[1].trim() : ''
+                  const s2 = title ? slugify(title) : slugify(norm)
+                  const s2Base = String(s2).split('::')[0]
+                  if (s2 && !existingSlugs.has(s2) && !seenAdd.has(s2) && !excludedSlugs.has(s2Base)) {
+                    seenAdd.add(s2)
+                    entries.push({ loc: baseNoQs + '?page=' + encodeURIComponent(s2), slug: s2, sourcePath: norm, title: title || undefined })
+                  }
+                }
+              } catch {}
+            } catch (_) {}
+          } catch (_) {}
+        }
+      } catch (_) { /* ignore per-source failures */ }
+    }
+  } catch (_) { /* ignore expansion errors */ }
+
+  // Ensure each base slug (strip any '::' anchor) has a page-level entry.
+  try {
+    const entriesBySlug = new Map()
+    for (const e of entries) {
+      try {
+        if (!e || !e.slug) continue
+        entriesBySlug.set(String(e.slug), e)
+      } catch (_) {}
+    }
+
+    // Collect bases that appear only as anchors and ensure a page-level entry exists
+    const basesNeeded = new Set()
+    for (const e of entries) {
+      try {
+        if (!e || !e.slug) continue
+        const slugStr = String(e.slug)
+        const base = slugStr.split('::')[0]
+        if (!base) continue
+        if (slugStr !== base && !entriesBySlug.has(base)) basesNeeded.add(base)
+      } catch (_) {}
+    }
+
+    for (const base of basesNeeded) {
+      try {
+        let ent = null
+        if (titleMap.has(base)) {
+          const t = titleMap.get(base)
+          ent = { loc: baseNoQs + '?page=' + encodeURIComponent(base), slug: base }
+          if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
+          if (t && t.excerpt) ent.excerpt = t.excerpt
+          if (t && t.path) ent.sourcePath = t.path
+        } else if (pathMap && slugToMd && slugToMd.has(base)) {
+          const mdVal = slugToMd.get(base)
+          let mappedPath = null
+          if (typeof mdVal === 'string') mappedPath = normalizePath(String(mdVal))
+          else if (mdVal && typeof mdVal === 'object') mappedPath = normalizePath(String(mdVal.default || ''))
+          ent = { loc: baseNoQs + '?page=' + encodeURIComponent(base), slug: base }
+          if (mappedPath && pathMap.has(mappedPath)) {
+            const pm = pathMap.get(mappedPath)
+            if (pm && pm.title) { ent.title = pm.title; ent._titleSource = 'path' }
+            if (pm && pm.excerpt) ent.excerpt = pm.excerpt
+            ent.sourcePath = mappedPath
+          }
+        }
+        if (!ent) {
+          ent = { loc: baseNoQs + '?page=' + encodeURIComponent(base), slug: base, title: _humanizeSlug(base) }
+          ent._titleSource = 'humanize'
+        }
+        if (!entriesBySlug.has(base)) {
+          entries.push(ent)
+          entriesBySlug.set(base, ent)
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  // Filter out anchor-level entries (keep only page-level slugs without '::')
+  const final = []
+  try {
+    const seenFinal = new Set()
+    for (const e of entries) {
+      try {
+        if (!e || !e.slug) continue
+        const s = String(e.slug)
+        const base = String(s).split('::')[0]
+        if (excludedSlugs.has(base)) continue
+        if (s.indexOf('::') !== -1) continue
+        if (seenFinal.has(s)) continue
+        seenFinal.add(s)
+        final.push(e)
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  try {
+    try { console.log('[runtimeSitemap] generateSitemapJson finalEntries.titleSource:', JSON.stringify(final.map(e => ({ slug: e.slug, title: e.title, titleSource: e._titleSource || null })), null, 2)) } catch (e) {}
+  } catch (_) {}
+
+  // Attempt to fetch H1 titles for entries that did not come from the live index.
+  try {
+    for (const e of final) {
+      try {
+        if (!e || !e.slug) continue
+        const eBase = String(e.slug).split('::')[0]
+        if (excludedSlugs.has(eBase)) continue
+        if (e._titleSource === 'index') continue
+        // Resolve a candidate path for this slug
+        let candidatePath = null
+        try {
+          if (slugToMd && slugToMd.has(e.slug)) {
+            const mv = slugToMd.get(e.slug)
+            if (typeof mv === 'string') candidatePath = normalizePath(String(mv))
+            else if (mv && typeof mv === 'object') candidatePath = normalizePath(String(mv.default || ''))
+          }
+          if (!candidatePath && e.sourcePath) candidatePath = e.sourcePath
+        } catch (_) {}
+        if (!candidatePath) continue
+        if (excludedPaths.has(candidatePath)) continue
+        // Avoid fetching candidate paths not known to runtime to reduce
+        // noisy 404s when the server doesn't expose those files.
+        if (!_isKnownPath(candidatePath)) continue
+        try {
+          const md = await fetchMarkdown(candidatePath, opts && opts.contentBase ? opts.contentBase : undefined)
+          if (!md || !md.raw) continue
+          if (md && typeof md.status === 'number' && md.status === 404) continue
+          if (md && md.raw) {
+            const hh = (md.raw || '').match(/^#\s+(.+)$/m)
+            const title = hh && hh[1] ? hh[1].trim() : ''
+            if (title) {
+              e.title = title
+              e._titleSource = 'fetched'
+            }
+          }
+        } catch (_) {}
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  return { generatedAt: new Date().toISOString(), entries: final }
+}
+
 export function generateSitemapXml(json) {
-  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : (json && json.entries ? json.entries : []))
+  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
+
   let s = '<?xml version="1.0" encoding="UTF-8"?>\n'
   s += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
   for (const e of entries) {
     try {
       s += '  <url>\n'
-      s += `    <loc>${_escapeXml(String(e.loc || e.path || ''))}</loc>\n`
-      if (e.lastmod) s += `    <lastmod>${_escapeXml(String(e.lastmod))}</lastmod>\n`
+      s += `    <loc>${_escapeXml(String(e.loc || ''))}</loc>\n`
       s += '  </url>\n'
-    } catch (err) { /* ignore per-entry errors */ }
+    } catch (_) {}
   }
   s += '</urlset>\n'
   return s
 }
 
-/**
- * Generate RSS 2.0 feed from sitemap JSON
- * @param {Object|Array} json
- * @returns {string}
- */
 export function generateRssXml(json) {
-  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : (json && json.entries ? json.entries : []))
+  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
   const base = _getBase().split('?')[0]
   let s = '<?xml version="1.0" encoding="UTF-8"?>\n'
   s += '<rss version="2.0">\n'
@@ -95,36 +495,25 @@ export function generateRssXml(json) {
   s += `<title>${_escapeXml('Sitemap RSS')}</title>\n`
   s += `<link>${_escapeXml(base)}</link>\n`
   s += `<description>${_escapeXml('RSS feed generated from site index')}</description>\n`
-  const lastBuild = (json && json.generatedAt) ? new Date(json.generatedAt).toUTCString() : new Date().toUTCString()
-  s += `<lastBuildDate>${_escapeXml(lastBuild)}</lastBuildDate>\n`
+  s += `<lastBuildDate>${_escapeXml((json && json.generatedAt) ? new Date(json.generatedAt).toUTCString() : new Date().toUTCString())}</lastBuildDate>\n`
   for (const e of entries) {
     try {
-      const loc = String(e.loc || e.path || '')
+      const loc = String(e.loc || '')
       s += '<item>\n'
-      s += `<title>${_escapeXml(String(e.path || e.loc || ''))}</title>\n`
+      s += `<title>${_escapeXml(String(e.title || e.slug || e.loc || ''))}</title>\n`
+      if (e.excerpt) s += `<description>${_escapeXml(String(e.excerpt))}</description>\n`
       s += `<link>${_escapeXml(loc)}</link>\n`
       s += `<guid>${_escapeXml(loc)}</guid>\n`
-      if (e && e.lastmod) {
-        try {
-          const dt = new Date(e.lastmod)
-          if (!isNaN(dt)) s += `<pubDate>${_escapeXml(dt.toUTCString())}</pubDate>\n`
-        } catch (_) {}
-      }
       s += '</item>\n'
-    } catch (err) { /* per-item ignore */ }
+    } catch (_) {}
   }
   s += '</channel>\n'
   s += '</rss>\n'
   return s
 }
 
-/**
- * Generate Atom 1.0 feed from sitemap JSON
- * @param {Object|Array} json
- * @returns {string}
- */
 export function generateAtomXml(json) {
-  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : (json && json.entries ? json.entries : []))
+  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
   const base = _getBase().split('?')[0]
   const updated = (json && json.generatedAt) ? new Date(json.generatedAt).toISOString() : new Date().toISOString()
   let s = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -135,456 +524,441 @@ export function generateAtomXml(json) {
   s += `<id>${_escapeXml(base)}</id>\n`
   for (const e of entries) {
     try {
-      const loc = String(e.loc || e.path || '')
+      const loc = String(e.loc || '')
       const entryUpdated = (e && e.lastmod) ? (new Date(e.lastmod).toISOString()) : updated
       s += '<entry>\n'
-      s += `<title>${_escapeXml(String(e.path || e.loc || ''))}</title>\n`
+      s += `<title>${_escapeXml(String(e.title || e.slug || e.loc || ''))}</title>\n`
+      if (e.excerpt) s += `<summary>${_escapeXml(String(e.excerpt))}</summary>\n`
       s += `<link href="${_escapeXml(loc)}" />\n`
       s += `<id>${_escapeXml(loc)}</id>\n`
       s += `<updated>${_escapeXml(entryUpdated)}</updated>\n`
       s += '</entry>\n'
-    } catch (err) { /* per-entry ignore */ }
+    } catch (_) {}
   }
   s += '</feed>\n'
   return s
 }
 
-function _extractLinksFromText(text) {
+function _writeXmlToDocument(xml, mimeType = 'application/xml') {
   try {
-    const out = []
-    if (!text) return out
-    // markdown links: [text](href)
-    const md = /\[[^\]]+\]\(([^)]+)\)/g
-    let m
-    while ((m = md.exec(text)) !== null) {
-      if (m[1]) out.push(m[1])
-    }
-    // html anchors: <a href="..."> or <a href='...'>
-    const ah = /<a[^>]+href=["']([^"']+)["']/gi
-    while ((m = ah.exec(text)) !== null) {
-      if (m[1]) out.push(m[1])
-    }
-    return out
-  } catch (e) { return [] }
-}
-
-async function _fetchNavDerivedEntries(opts = {}) {
-  if (typeof fetch === 'undefined' || typeof location === 'undefined') return []
-  const { navigationPage, homePage, contentBase } = opts || {}
-  const candidates = []
-
-  // Prefer configured pages when provided (root and contentBase variants)
-  try {
-    if (navigationPage && typeof navigationPage === 'string') {
-      candidates.push('/' + String(navigationPage || '').replace(/^\/+/, ''))
-      if (contentBase) {
-        try { candidates.push(new URL(String(navigationPage || ''), String(contentBase)).toString()) } catch (_) {}
-      }
-    }
-  } catch (_) {}
-  try {
-    if (homePage && typeof homePage === 'string') {
-      candidates.push('/' + String(homePage || '').replace(/^\/+/, ''))
-      if (contentBase) {
-        try { candidates.push(new URL(String(homePage || ''), String(contentBase)).toString()) } catch (_) {}
-      }
-    }
-  } catch (_) {}
-
-  // Common fallbacks (preserve legacy behavior)
-  const fallback = [
-    '/_navigation.md', '/_navigation.html', '/_home.md', '/_home.html',
-    '/content/_navigation.md', '/content/_navigation.html', '/content/_home.md', '/content/_home.html'
-  ]
-  for (const f of fallback) if (!candidates.includes(f)) candidates.push(f)
-
-  const base = _getBase().split('?')[0]
-  const seen = new Set()
-  const results = []
-  for (const c of candidates) {
+    try { document.open(mimeType, 'replace') } catch (_) { try { document.open() } catch (_) {} }
+    document.write(xml)
+    document.close()
     try {
-      const u = (typeof c === 'string' && (/^https?:\/\//i.test(c))) ? c : new URL(c, location.origin).toString()
-      const res = await fetch(u, { method: 'GET' })
-      if (!res || !res.ok) continue
-      const text = await res.text()
-      const links = _extractLinksFromText(text)
-      for (let href of links) {
-        try {
-          try {
-            const parsed = new URL(href, u)
-            if (parsed.origin !== location.origin) continue
-            href = parsed.pathname.replace(/^\//, '')
-          } catch (err) {
-            // leave href as-is
-          }
-          href = normalizePath(String(href || ''))
-          if (!href) continue
-          if (seen.has(href)) continue
-          seen.add(href)
-          results.push({ loc: base + '?page=' + encodeURIComponent(href), path: href })
-        } catch (e) { /* per-link ignore */ }
+      if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+        const blob = new Blob([xml], { type: mimeType })
+        const blobUrl = URL.createObjectURL(blob)
+        try { location.href = blobUrl } catch (_) { try { window.open(blobUrl, '_self') } catch (_) {} }
+        setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
       }
-      if (results.length) return results
-    } catch (e) { /* ignore per-candidate */ }
+    } catch (_) {}
+  } catch (e) {
+    try { document.body.innerHTML = '<pre>' + _escapeXml(xml) + '</pre>' } catch (_) {}
   }
-  return []
 }
 
-/**
- * Attach a minimal sitemap download UI to a container element.
- * This is optional and only runs when explicitly invoked.
- * @param {Element|string} target - container element or selector
- * @param {Object} [opts] - options passed to generator and UI
- * @returns {Element|null}
- */
-export function attachSitemapDownloadUI(target, opts = {}) {
+// Schedule a sitemap write so multiple concurrent calls don't race and
+// overwrite a larger sitemap with a smaller one. The scheduler keeps the
+// largest pending `finalJson` and performs a single write shortly after
+// the burst of calls completes.
+function _scheduleSitemapWrite(finalJson, mimeType = 'application/xml') {
   try {
-    if (typeof document === 'undefined') return null
-    const container = (typeof target === 'string') ? document.querySelector(target) : target
-    if (!container || !container.appendChild) return null
-    const wrapper = document.createElement('div')
-    wrapper.className = 'nimbi-sitemap-ui'
-    wrapper.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:9999;padding:6px;background:rgba(0,0,0,0.6);border-radius:6px;'
-
-    const makeBtn = (label) => {
-      const b = document.createElement('button')
-      b.textContent = label
-      b.style.cssText = 'color:#fff;background:transparent;border:1px solid rgba(255,255,255,0.2);padding:6px 8px;margin:2px;border-radius:4px;cursor:pointer'
-      return b
+    if (typeof window === 'undefined') {
+      // fallback: immediate write
+      try {
+        let out = null
+        if (mimeType === 'application/rss+xml') out = generateRssXml(finalJson)
+        else if (mimeType === 'application/atom+xml') out = generateAtomXml(finalJson)
+        else if (mimeType === 'text/html') {
+          let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
+          html += '<h1>Sitemap</h1><ul>'
+          for (const e of (finalJson && finalJson.entries) || []) html += `<li><a href="${_escapeXml(String(e.loc || ''))}">${_escapeXml(String(e.title || e.slug || e.loc || ''))}</a></li>`
+          html += '</ul></body></html>'
+          out = html
+        } else out = generateSitemapXml(finalJson)
+        _writeXmlToDocument(out, mimeType)
+        try { if (typeof window !== 'undefined') { window.__nimbiSitemapRenderedAt = Date.now(); window.__nimbiSitemapJson = finalJson; window.__nimbiSitemapFinal = finalJson.entries || [] } } catch {}
+      } catch (_) {}
+      return
     }
 
-    const btnJson = makeBtn('sitemap.json')
-    btnJson.title = 'Download sitemap.json'
-    btnJson.addEventListener('click', () => {
-      try {
-        const json = generateSitemapJson(opts)
-        const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = opts.filename || 'sitemap.json'
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 5000)
-      } catch (e) { console.warn('[runtimeSitemap] download json failed', e) }
-    })
+    const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+    try {
+      const pending = window.__nimbiSitemapPendingWrite || null
+      if (!pending || (typeof pending.len === 'number' && pending.len < newLen)) {
+        window.__nimbiSitemapPendingWrite = { finalJson, mimeType, len: newLen }
+      }
+      if (window.__nimbiSitemapWriteTimer) return
+      window.__nimbiSitemapWriteTimer = setTimeout(() => {
+        try {
+          const p = window.__nimbiSitemapPendingWrite
+          if (!p) return
+          let out = null
+          if (p.mimeType === 'application/rss+xml') out = generateRssXml(p.finalJson)
+          else if (p.mimeType === 'application/atom+xml') out = generateAtomXml(p.finalJson)
+          else if (p.mimeType === 'text/html') {
+            let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
+            html += '<h1>Sitemap</h1><ul>'
+            for (const e of (p.finalJson && p.finalJson.entries) || []) html += `<li><a href="${_escapeXml(String(e.loc || ''))}">${_escapeXml(String(e.title || e.slug || e.loc || ''))}</a></li>`
+            html += '</ul></body></html>'
+            out = html
+          } else out = generateSitemapXml(p.finalJson)
 
-    const btnXml = makeBtn('sitemap.xml')
-    btnXml.title = 'Download sitemap.xml'
-    btnXml.addEventListener('click', () => {
-      try {
-        const json = generateSitemapJson(opts)
-        const xml = generateSitemapXml(json)
-        const blob = new Blob([xml], { type: 'application/xml' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = opts.filename || 'sitemap.xml'
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 5000)
-      } catch (e) { console.warn('[runtimeSitemap] download xml failed', e) }
-    })
-
-    wrapper.appendChild(btnJson)
-    wrapper.appendChild(btnXml)
-    container.appendChild(wrapper)
-    return wrapper
-  } catch (e) { console.warn('[runtimeSitemap] attach UI failed', e); return null }
+          try { _writeXmlToDocument(out, p.mimeType) } catch (e) {}
+          try { window.__nimbiSitemapRenderedAt = Date.now(); window.__nimbiSitemapJson = p.finalJson; window.__nimbiSitemapFinal = p.finalJson.entries || [] } catch {}
+        } catch (e) {}
+        try { clearTimeout(window.__nimbiSitemapWriteTimer) } catch (_) {}
+        window.__nimbiSitemapWriteTimer = null
+        window.__nimbiSitemapPendingWrite = null
+      }, 40)
+    } catch (e) {}
+  } catch (e) {}
 }
 
 /**
- * Handle a direct request for a sitemap route at runtime.
- * Intercepts requests for `/sitemap`, `/sitemap.html`, and `/sitemap.xml`
- * when the host serves the SPA `index.html` for those paths. This allows
- * crawlers that execute JavaScript (e.g. Google) to receive a sitemap
- * generated from the runtime index data. This is opt-in and must be
- * enabled by the host via `initCMS({ exposeSitemap: true })` or
- * `window.__nimbiExposeSitemap = true`.
- *
- * Returns `true` when the request was handled and the document was
- * replaced with the sitemap contents; `false` otherwise.
- *
- * Note: because this runs client-side there is no server-side
- * `Content-Type` header control. For full crawler compatibility a
- * server-generated sitemap.xml is preferred.
+ * Handle runtime requests for /sitemap, ?sitemap, ?rss, ?atom, etc.
+ * opts should be the same options that `init()` used (we expect init to
+ * pass `indexDepth` and `noIndexing` so rebuild uses the same params).
  */
-export function handleSitemapRequest(opts = {}) {
+export async function handleSitemapRequest(opts = {}) {
   try {
-    if (typeof location === 'undefined' || typeof document === 'undefined') return false
+    if (typeof document === 'undefined' || typeof location === 'undefined') return false
 
-    // Allow `?sitemap` query form at site root (no other params, no anchor)
-    // Only handle when the query contains the single `sitemap` key (value may be empty).
-    let wantXml = false
-    let wantHtml = false
-      let wantRss = false
-      let wantAtom = false
+    // Detect requested format
+    let wantXml = false, wantRss = false, wantAtom = false, wantHtml = false
     try {
-      if (typeof location.search === 'string' && location.search) {
-        const sp = new URLSearchParams(location.search)
-        if (sp.has('sitemap')) {
-          let onlySitemap = true
-          for (const k of sp.keys()) {
-            if (k !== 'sitemap') {
-              onlySitemap = false
-              break
-            }
-          }
-          if (onlySitemap) {
-            // Do not handle if there's a fragment anchor present
-            if (location.hash && String(location.hash || '').trim()) {
-              return false
-            }
-            wantXml = true
-          } else {
-            return false
-          }
-        }
+      const sp = new URLSearchParams(location.search || '')
+      if (sp.has('sitemap')) {
+        let only = true
+        for (const k of sp.keys()) if (k !== 'sitemap') only = false
+        if (only) wantXml = true
       }
-    } catch (e) { /* ignore search parsing issues */ }
-
-    // Also accept hash-based `#/?sitemap` (cosmetic URL form)
-    try {
-      if (!wantXml && typeof location.hash === 'string' && location.hash && location.hash.startsWith('#/?')) {
-        const qs = location.hash.slice(2) // remove leading '#'
-        const sp = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
-        if (sp.has('sitemap')) {
-          let onlySitemap = true
-          for (const k of sp.keys()) {
-            if (k !== 'sitemap') { onlySitemap = false; break }
-          }
-          if (onlySitemap) {
-            wantXml = true
-          }
-        }
+      if (sp.has('rss')) {
+        let only = true
+        for (const k of sp.keys()) if (k !== 'rss') only = false
+        if (only) wantRss = true
       }
-    } catch (e) { /* ignore hash parsing issues */ }
-
-      if (typeof location.search === 'string' && location.search) {
-        const sp = new URLSearchParams(location.search)
-        if (sp.has('rss')) {
-          let onlyRss = true
-          for (const k of sp.keys()) { if (k !== 'rss') { onlyRss = false; break } }
-          if (onlyRss) {
-            if (location.hash && String(location.hash || '').trim()) return false
-            wantRss = true
-          } else return false
-        } else if (sp.has('atom')) {
-          let onlyAtom = true
-          for (const k of sp.keys()) { if (k !== 'atom') { onlyAtom = false; break } }
-          if (onlyAtom) {
-            if (location.hash && String(location.hash || '').trim()) return false
-            wantAtom = true
-          } else return false
-        }
+      if (sp.has('atom')) {
+        let only = true
+        for (const k of sp.keys()) if (k !== 'atom') only = false
+        if (only) wantAtom = true
       }
-    // Honor host preference to render HTML for `?sitemap` when explicitly requested
-    try {
-      if (typeof window !== 'undefined' && window && window.__nimbiPreferHtmlSitemap === true && wantXml) {
-        wantXml = false
-        wantHtml = true
-      }
-    } catch (e) { /* ignore preference check errors */ }
-
-    // Fallback: handle path-based /sitemap and /sitemap.xml routes
-    // Only run when no explicit query/hash requested a sitemap/rss/atom
-    if (!wantXml && !wantHtml && !wantRss && !wantAtom) {
+    } catch (_) {}
+    if (!wantXml && !wantRss && !wantAtom) {
       const pathname = (location.pathname || '/').replace(/\/\/+/g, '/')
       const name = pathname.split('/').filter(Boolean).pop() || ''
       if (!name) return false
       wantXml = /^(sitemap|sitemap\.xml)$/i.test(name)
-      wantHtml = /^(sitemap|sitemap\.html)$/i.test(name)
       wantRss = /^(rss|rss\.xml)$/i.test(name)
       wantAtom = /^(atom|atom\.xml)$/i.test(name)
-      if (!wantXml && !wantHtml && !wantRss && !wantAtom) return false
+      wantHtml = /^(sitemap|sitemap\.html)$/i.test(name)
+      if (!wantXml && !wantRss && !wantAtom && !wantHtml) return false
     }
 
-    const json = generateSitemapJson(opts)
-
-    // If we don't have entries, attempt an async fallback that tries to
-    // fetch a likely navigation or home markdown file (e.g. `/_navigation.md`, `/_home.md`)
-    // and extract links to populate the sitemap. We return `true` immediately
-    // (we will write the sitemap later when the fetch completes) so the
-    // SPA init can short-circuit; the actual document replacement happens
-    // asynchronously when results arrive.
-    async function _fetchFallbackAndWrite(format = 'sitemap') {
-      try {
-        const entries = await _fetchNavDerivedEntries(opts)
-        if (entries && entries.length) {
-          let xml2 = ''
-          if (format === 'rss') xml2 = generateRssXml({ generatedAt: new Date().toISOString(), entries })
-          else if (format === 'atom') xml2 = generateAtomXml({ generatedAt: new Date().toISOString(), entries })
-          else xml2 = generateSitemapXml({ generatedAt: new Date().toISOString(), entries })
-          try {
-            try {
-              document.open('application/xml', 'replace')
-            } catch (_) {
-              try { document.open() } catch (_) {}
-            }
-            document.write(xml2)
-            document.close()
-
-            // Best-effort: navigate to a Blob URL containing the XML so the
-            // browser treats the resource as standalone XML and avoids
-            // injection from extensions that may alter the written DOM.
-            try {
-              if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
-                const blob = new Blob([xml2], { type: 'application/xml' })
-                const blobUrl = URL.createObjectURL(blob)
-                try { location.href = blobUrl } catch (_) {
-                  try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {}
-                }
-                setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
-              }
-            } catch (_) {}
-
-            return
-          } catch (e) {
-            // Try a data: URL navigation as a best-effort to let the browser
-            // treat the content as XML. If that fails, fall back to HTML-escaped
-            // presentation inside a <pre>.
-            try {
-              if (typeof location !== 'undefined' && location) {
-                const dataUrl = 'data:application/xml;charset=utf-8,' + encodeURIComponent(xml2)
-                try { location.href = dataUrl; return } catch (_) {}
-                try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') { window.open(dataUrl, '_self'); return } } catch (_) {}
-              }
-            } catch (_) {}
-            try { document.body.innerHTML = '<pre>' + _escapeXml(xml2) + '</pre>' } catch (e2) {}
-            return
-          }
-        }
-      } catch (e) {
-        console.warn('[runtimeSitemap] fallback fetch failed', e)
-      }
-    }
-
-    if (wantXml) {
-      if (json && Array.isArray(json.entries) && json.entries.length) {
-        const xml = generateSitemapXml(json)
+    // Prefer the authoritative live `searchIndex`: always await readiness
+    // (and start a build when necessary) so sitemap generation uses the
+    // same fully-built array the search UI relies on. Fall back to any
+    // provided snapshot in `opts.index` when waiting times out or is
+    // unavailable.
+    let idx = []
+    const waitMs = (typeof opts.waitForIndexMs === 'number') ? opts.waitForIndexMs : Infinity
+    try {
+      if (typeof whenSearchIndexReady === 'function') {
         try {
-          try {
-            document.open('application/xml', 'replace')
-          } catch (_) {
-            try { document.open() } catch (_) {}
+          const live = await whenSearchIndexReady({ timeoutMs: waitMs, contentBase: opts && opts.contentBase, indexDepth: opts && opts.indexDepth, noIndexing: opts && opts.noIndexing, startBuild: true })
+          if (Array.isArray(live) && live.length) {
+            // Merge provided snapshot with live index, preferring live entries
+            if (Array.isArray(opts.index) && opts.index.length) {
+              const bySlug = new Map()
+              try {
+                for (const it of opts.index) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+                for (const it of live) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+              } catch (_) {}
+              idx = Array.from(bySlug.values())
+            } else {
+              idx = live
+            }
+          } else {
+            idx = (Array.isArray(opts.index) && opts.index.length) ? opts.index : ((Array.isArray(searchIndex) && searchIndex.length) ? searchIndex : [])
           }
-          document.write(xml)
-          document.close()
-
-          // Best-effort: navigate to a Blob URL containing the XML so the
-          // browser treats the resource as standalone XML and avoids
-          // injection from extensions that may alter the written DOM.
-          try {
-            if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
-              const blob = new Blob([xml], { type: 'application/xml' })
-              const blobUrl = URL.createObjectURL(blob)
-              try { location.href = blobUrl } catch (_) {
-                try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {}
-              }
-              setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
-            }
-          } catch (_) {}
-
         } catch (e) {
-          try {
-            if (typeof location !== 'undefined' && location) {
-              const dataUrl = 'data:application/xml;charset=utf-8,' + encodeURIComponent(xml)
-              try { location.href = dataUrl } catch (_) {}
-            }
-          } catch (_) {}
-          try { document.body.innerHTML = '<pre>' + _escapeXml(xml) + '</pre>' } catch (e2) {}
+          idx = (Array.isArray(opts.index) && opts.index.length) ? opts.index : ((Array.isArray(searchIndex) && searchIndex.length) ? searchIndex : [])
         }
       } else {
-        // start async fallback but still return true synchronously
-        _fetchFallbackAndWrite()
+        idx = (Array.isArray(searchIndex) && searchIndex.length) ? searchIndex : (Array.isArray(opts.index) && opts.index.length ? opts.index : [])
       }
-      return true
+    } catch (e) {
+      idx = (Array.isArray(opts.index) && opts.index.length) ? opts.index : ((Array.isArray(searchIndex) && searchIndex.length) ? searchIndex : [])
     }
+
+    // Debug: if a provided index was passed, log the full array deduped
+    // by the base slug (strip anchor parts after '::') so consumers can
+    // verify what will be used. Keep this wrapped to avoid throwing.
+    try {
+      if (Array.isArray(opts.index) && opts.index.length) {
+        try {
+          const map = new Map()
+          for (const it of opts.index) {
+            try {
+              if (!it || !it.slug) continue
+              const base = String(it.slug).split('::')[0]
+              if (!map.has(base)) map.set(base, it)
+              else {
+                const prev = map.get(base)
+                if (prev && String(prev.slug || '').indexOf('::') !== -1 && String(it.slug || '').indexOf('::') === -1) {
+                  map.set(base, it)
+                }
+              }
+            } catch (_e) {}
+          }
+          try { console.log('[runtimeSitemap] providedIndex.dedupedByBase:', JSON.stringify(Array.from(map.values()), null, 2)) } catch (e) { console.log('[runtimeSitemap] providedIndex.dedupedByBase (count):', map.size) }
+        } catch (e) { console.warn('[runtimeSitemap] logging provided index failed', e) }
+      }
+    } catch (e) {}
+
+    // NOTE: polling removed. We rely on `whenSearchIndexReady({... startBuild: true })`
+    // which will start/await an index build when necessary and return the
+    // authoritative `searchIndex` array. This avoids race conditions and
+    // removes arbitrary timeouts/polling loops.
+
+    if ((!Array.isArray(idx) || !idx.length) && typeof buildSearchIndex === 'function') {
+      try {
+        const waitMs2 = (typeof opts.waitForIndexMs === 'number') ? opts.waitForIndexMs : Infinity
+        let maybe = null
+        try {
+          if (typeof whenSearchIndexReady === 'function') {
+            maybe = await whenSearchIndexReady({ timeoutMs: waitMs2, contentBase: opts && opts.contentBase, indexDepth: opts && opts.indexDepth, noIndexing: opts && opts.noIndexing, startBuild: true })
+          }
+        } catch (_) { maybe = null }
+        if (Array.isArray(maybe) && maybe.length) {
+          idx = maybe
+        } else {
+          const indexDepth = (typeof opts.indexDepth === 'number') ? opts.indexDepth : 3
+          const noIndexing = Array.isArray(opts.noIndexing) ? opts.noIndexing : undefined
+          const seeds = []
+          if (opts && opts.homePage) seeds.push(opts.homePage)
+          if (opts && opts.navigationPage) seeds.push(opts.navigationPage)
+          idx = await buildSearchIndex(opts && opts.contentBase ? opts.contentBase : undefined, indexDepth, noIndexing, seeds.length ? seeds : undefined)
+        }
+      } catch (e) {
+        console.warn('[runtimeSitemap] rebuild index failed', e)
+        idx = Array.isArray(searchIndex) && searchIndex.length ? searchIndex : []
+      }
+    }
+
+    // Debug: log the full index used to build the sitemap so we can verify
+    // which pages/anchors are available at runtime.
+    try {
+      const len = Array.isArray(idx) ? idx.length : 0
+      try { console.log('[runtimeSitemap] usedIndex.full.length (before rebuild):', len) } catch (e) {}
+      try { console.log('[runtimeSitemap] usedIndex.full (before rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+    } catch (e) {}
+
+    // Rebuild the search index on-demand to ensure we include all pages
+    // discoverable by the indexer (this follows the rule: when serving
+    // sitemap/rss/atom, prefer a fresh authoritative index). Try worker
+    // build first (if available) then fall back to `buildSearchIndex`.
+    try {
+      const rebuildSeeds = []
+      if (opts && opts.homePage) rebuildSeeds.push(opts.homePage)
+      if (opts && opts.navigationPage) rebuildSeeds.push(opts.navigationPage)
+      const rebuildDepth = (typeof opts.indexDepth === 'number') ? opts.indexDepth : 3
+      const rebuildNoIndexing = Array.isArray(opts.noIndexing) ? opts.noIndexing : undefined
+      let rebuilt = null
+      try {
+        const workerFn = (typeof globalThis !== 'undefined' && typeof globalThis.buildSearchIndexWorker === 'function') ? globalThis.buildSearchIndexWorker : undefined
+        if (typeof workerFn === 'function') {
+          try { rebuilt = await workerFn(opts && opts.contentBase ? opts.contentBase : undefined, rebuildDepth, rebuildNoIndexing) } catch (e) { rebuilt = null }
+        }
+      } catch (e) { rebuilt = null }
+
+      if ((!rebuilt || !rebuilt.length) && typeof buildSearchIndex === 'function') {
+        try { rebuilt = await buildSearchIndex(opts && opts.contentBase ? opts.contentBase : undefined, rebuildDepth, rebuildNoIndexing, rebuildSeeds.length ? rebuildSeeds : undefined) } catch (e) { rebuilt = null }
+      }
+
+      if (Array.isArray(rebuilt) && rebuilt.length) {
+        // Merge rebuilt entries with any existing idx, preferring rebuilt
+        const bySlug = new Map()
+        try {
+          for (const it of idx) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+          for (const it of rebuilt) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+        } catch (_) {}
+        idx = Array.from(bySlug.values())
+      }
+    } catch (e) {
+      try { console.warn('[runtimeSitemap] rebuild index call failed', e) } catch (_) {}
+    }
+
+    // Debug: log the full index after optional rebuild
+    try {
+      const len2 = Array.isArray(idx) ? idx.length : 0
+      try { console.log('[runtimeSitemap] usedIndex.full.length (after rebuild):', len2) } catch (e) {}
+      try { console.log('[runtimeSitemap] usedIndex.full (after rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+    } catch (e) {}
+
+    // Generate JSON using the gathered index
+    const json = await generateSitemapJson(Object.assign({}, opts, { index: idx }))
+
+    // Debug: log the final entries deduped by base slug (strip anchors)
+    let deduped = []
+    try {
+      const seen = new Set()
+      const entriesArr = Array.isArray(json && json.entries) ? json.entries : []
+      for (const e of entriesArr) {
+        try {
+          let slug = null
+          if (e && e.slug) slug = String(e.slug)
+          else if (e && e.loc) {
+            try { const u = new URL(String(e.loc)); slug = u.searchParams.get('page') } catch {}
+          }
+          if (!slug) continue
+          const base = String(slug).split('::')[0]
+          if (!seen.has(base)) {
+            seen.add(base)
+            const copy = Object.assign({}, e)
+            copy.baseSlug = base
+            deduped.push(copy)
+          }
+        } catch {}
+      }
+      try { console.log('[runtimeSitemap] finalEntries.dedupedByBase:', JSON.stringify(deduped, null, 2)) } catch (e) { console.log('[runtimeSitemap] finalEntries.dedupedByBase (count):', deduped.length) }
+    } catch (e) {
+      try { deduped = Array.isArray(json && json.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
+    }
+
+    // Construct a final JSON object that uses the deduped page-level
+    // entries for all generators so ?sitemap, ?rss and ?atom are
+    // consistent and use the same data set.
+    const finalJson = Object.assign({}, json || {}, { entries: Array.isArray(deduped) ? deduped : (Array.isArray(json && json.entries) ? json.entries : []) })
+
+    try {
+      if (typeof window !== 'undefined') {
+        try {
+          window.__nimbiSitemapJson = finalJson
+          window.__nimbiSitemapFinal = deduped
+        } catch {}
+      }
+    } catch {}
 
     if (wantRss) {
-      if (json && Array.isArray(json.entries) && json.entries.length) {
-        const rss = generateRssXml(json)
-        try {
-          try { document.open('application/rss+xml', 'replace') } catch (_) { try { document.open() } catch (_) {} }
-          document.write(rss)
-          document.close()
-          try {
-            if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
-              const blob = new Blob([rss], { type: 'application/rss+xml' })
-              const blobUrl = URL.createObjectURL(blob)
-              try { location.href = blobUrl } catch (_) { try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {} }
-              setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
-            }
-          } catch (_) {}
-        } catch (e) {
-          try {
-            if (typeof location !== 'undefined' && location) {
-              const dataUrl = 'data:application/rss+xml;charset=utf-8,' + encodeURIComponent(rss)
-              try { location.href = dataUrl } catch (_) {}
-            }
-          } catch (_) {}
-          try { document.body.innerHTML = '<pre>' + _escapeXml(rss) + '</pre>' } catch (e2) {}
-        }
-      } else {
-        _fetchFallbackAndWrite('rss')
+      const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+      let existingRenderedLen = -1
+      try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
+      if (existingRenderedLen > newLen) {
+        try { console.log('[runtimeSitemap] skip RSS write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        return true
       }
+      _scheduleSitemapWrite(finalJson, 'application/rss+xml')
       return true
     }
-
     if (wantAtom) {
-      if (json && Array.isArray(json.entries) && json.entries.length) {
-        const atom = generateAtomXml(json)
-        try {
-          try { document.open('application/atom+xml', 'replace') } catch (_) { try { document.open() } catch (_) {} }
-          document.write(atom)
-          document.close()
-          try {
-            if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
-              const blob = new Blob([atom], { type: 'application/atom+xml' })
-              const blobUrl = URL.createObjectURL(blob)
-              try { location.href = blobUrl } catch (_) { try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {} }
-              setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
-            }
-          } catch (_) {}
-        } catch (e) {
-          try {
-            if (typeof location !== 'undefined' && location) {
-              const dataUrl = 'data:application/atom+xml;charset=utf-8,' + encodeURIComponent(atom)
-              try { location.href = dataUrl } catch (_) {}
-            }
-          } catch (_) {}
-          try { document.body.innerHTML = '<pre>' + _escapeXml(atom) + '</pre>' } catch (e2) {}
-        }
-      } else {
-        _fetchFallbackAndWrite('atom')
+      const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+      let existingRenderedLen = -1
+      try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
+      if (existingRenderedLen > newLen) {
+        try { console.log('[runtimeSitemap] skip Atom write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        return true
       }
+      _scheduleSitemapWrite(finalJson, 'application/atom+xml')
+      return true
+    }
+    if (wantXml) {
+      const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+      let existingRenderedLen = -1
+      try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
+      if (existingRenderedLen > newLen) {
+        try { console.log('[runtimeSitemap] skip XML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        return true
+      }
+      _scheduleSitemapWrite(finalJson, 'application/xml')
       return true
     }
 
-    // sitemap.html
-    try {
-      let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
-      html += '<h1>Sitemap</h1><ul>'
-      for (const e of (json && json.entries) || []) {
-        try {
-          const loc = String(e.loc || '')
-          html += `<li><a href="${loc}">${loc}</a></li>`
-        } catch (err) { /* ignore per-entry */ }
-      }
-      html += '</ul></body></html>'
+    if (wantHtml) {
       try {
-        document.open()
-        document.write(html)
-        document.close()
-      } catch (e) {
-        try { document.body.innerHTML = html } catch (e2) {}
-      }
-      return true
-    } catch (e) {
-      console.warn('[runtimeSitemap] handleSitemapRequest failed to render', e)
-      return false
+        const entriesForHtml = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries : []
+        const newLen = entriesForHtml.length
+        let existingRenderedLen = -1
+        try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
+        if (existingRenderedLen > newLen) {
+          try { console.log('[runtimeSitemap] skip HTML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+          return true
+        }
+        _scheduleSitemapWrite(finalJson, 'text/html')
+        return true
+      } catch (e) { console.warn('[runtimeSitemap] render HTML failed', e); return false }
     }
-  } catch (e) { console.warn('[runtimeSitemap] handleSitemapRequest failed', e); return false }
+
+    return false
+  } catch (e) {
+    console.warn('[runtimeSitemap] handleSitemapRequest failed', e)
+    return false
+  }
+}
+
+/**
+ * Build sitemap JSON and expose it on `window` for debugging/consumers.
+ * This runs the same generator used by `handleSitemapRequest` but
+ * deliberately does not attempt to write XML to the document.
+ */
+export async function exposeSitemapGlobals(opts = {}) {
+  try {
+    const waitMs = (typeof opts.waitForIndexMs === 'number') ? opts.waitForIndexMs : Infinity
+    let idx = []
+    try {
+      if (typeof whenSearchIndexReady === 'function') {
+        try {
+          const live = await whenSearchIndexReady({ timeoutMs: waitMs, contentBase: opts && opts.contentBase, indexDepth: opts && opts.indexDepth, noIndexing: opts && opts.noIndexing, startBuild: true })
+          if (Array.isArray(live) && live.length) idx = live
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    } catch (_) {}
+    if ((!Array.isArray(idx) || !idx.length) && Array.isArray(searchIndex) && searchIndex.length) idx = searchIndex
+    if ((!Array.isArray(idx) || !idx.length) && Array.isArray(opts.index) && opts.index.length) idx = opts.index
+
+    const json = await generateSitemapJson(Object.assign({}, opts, { index: idx }))
+
+    // dedupe entries by base slug
+    let deduped = []
+    try {
+      const seen = new Set()
+      const entriesArr = Array.isArray(json && json.entries) ? json.entries : []
+      for (const e of entriesArr) {
+        try {
+          let slug = null
+          if (e && e.slug) slug = String(e.slug)
+          else if (e && e.loc) {
+            try { const u = new URL(String(e.loc)); slug = u.searchParams.get('page') } catch (_) { slug = null }
+          }
+          if (!slug) continue
+          const base = String(slug).split('::')[0]
+          if (!seen.has(base)) {
+            seen.add(base)
+            const copy = Object.assign({}, e)
+            copy.baseSlug = base
+            deduped.push(copy)
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      try { deduped = Array.isArray(json && json.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
+    }
+
+    // Ensure the exposed JSON matches the deduped page-level entries
+    const finalJson = Object.assign({}, json || {}, { entries: Array.isArray(deduped) ? deduped : (Array.isArray(json && json.entries) ? json.entries : []) })
+    try {
+      if (typeof window !== 'undefined') {
+        try {
+          window.__nimbiSitemapJson = finalJson
+          window.__nimbiSitemapFinal = deduped
+        } catch {}
+      }
+    } catch {}
+
+    return { json: finalJson, deduped }
+  } catch (e) {
+    return null
+  }
 }

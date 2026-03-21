@@ -193,6 +193,35 @@ export function _setAllMd(mdMap) {
   _allMd = mdMap || {}
 }
 
+/**
+ * Replace the runtime `searchIndex` from an external caller.
+ * Useful when a worker returns a prebuilt index and we want the
+ * module export to reflect that value for diagnostics and consumers.
+ * @param {Array} arr - Array of search index entries
+ */
+export function _setSearchIndex(arr) {
+  try {
+    if (!Array.isArray(searchIndex)) {
+      // ensure export exists as array
+      searchIndex = []
+    }
+    if (!Array.isArray(arr)) return
+      try {
+        if (!Array.isArray(searchIndex)) searchIndex = []
+        searchIndex.length = 0
+        for (const it of arr) searchIndex.push(it)
+        try {
+          if (typeof window !== 'undefined') {
+            try { window.__nimbiLiveSearchIndex = searchIndex } catch (_) { /* swallow */ }
+          }
+        } catch (_) {}
+      } catch (e) {
+        console.warn('[slugManager] replacing searchIndex by assignment fallback', e)
+        try { searchIndex = Array.from(arr) } catch (_) { /* swallow */ }
+      }
+  } catch (e) {}
+}
+
 /** @type {Map<string,string>} */
 export const listSlugCache = new Map()
 /** @type {Set<string>} */
@@ -607,8 +636,47 @@ function _stripCodeAndComments(raw) {
 /** @type {Array<{slug:string,title:string,excerpt:string,path:string}>} */
 export let searchIndex = []
 
+/**
+ * Return the live `searchIndex` array (not a copy).
+ * Consumers should avoid mutating the returned array directly.
+ * @returns {Array}
+ */
+export function getSearchIndex() { return searchIndex }
+
+// Expose a stable global getter so external tools (tests/headless scripts)
+// can observe the same live array instance used by the runtime.
+try {
+  if (typeof window !== 'undefined') {
+    try {
+      Object.defineProperty(window, '__nimbiSearchIndex', {
+        get() { return searchIndex },
+        enumerable: true,
+        configurable: true
+      })
+    } catch (e) {
+      try { window.__nimbiSearchIndex = searchIndex } catch (_) {}
+    }
+  }
+} catch (_) {}
+
+// Expose a callable helper on `window` so external test harnesses can await
+// the completion of the runtime index build.
+try {
+  if (typeof window !== 'undefined') {
+    try {
+      Object.defineProperty(window, '__nimbiIndexReady', {
+        get() { return awaitSearchIndex },
+        enumerable: true,
+        configurable: true
+      })
+    } catch (e) {
+      try { window.__nimbiIndexReady = awaitSearchIndex } catch (_) {}
+    }
+  }
+} catch (_) {}
+
 let _indexPromise = null
-export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing = undefined) {
+export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing = undefined, seedPaths = undefined) {
   const earlyExcludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : []
   try {
     const nf = normalizePath(String(notFoundPage || ''))
@@ -641,6 +709,17 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
     }
 
     let paths = []
+    // Prefer any explicit seed paths provided by callers (e.g. home/navigation)
+    try {
+      if (Array.isArray(seedPaths) && seedPaths.length) {
+        for (const p of seedPaths) {
+          try {
+            const n = normalizePath(String(p || ''))
+            if (n) paths.push(n)
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
     if (allMarkdownPaths && allMarkdownPaths.length) {
       paths = Array.from(allMarkdownPaths)
     }
@@ -863,10 +942,54 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       const finalIdx = idx.filter(entry => {
         try { return !isExcluded(String(entry.path || '')) } catch (_) { return true }
       })
-      searchIndex = finalIdx
+      try {
+        if (!Array.isArray(searchIndex)) searchIndex = []
+        searchIndex.length = 0
+        for (const it of finalIdx) searchIndex.push(it)
+      } catch (e) {
+        try { searchIndex = Array.from(finalIdx) } catch (_) { searchIndex = finalIdx }
+      }
+      try {
+        if (typeof window !== 'undefined') {
+          try { window.__nimbiResolvedIndex = searchIndex } catch (e) {}
+          try {
+            // Expose a minimal sitemap view derived directly from the
+            // authoritative search index so consumers that don't request
+            // `?rss` can still inspect the runtime sitemap shape.
+            const dedup = []
+            const seenBase = new Set()
+            for (const it of searchIndex) {
+              try {
+                if (!it || !it.slug) continue
+                const base = String(it.slug).split('::')[0]
+                if (seenBase.has(base)) continue
+                seenBase.add(base)
+                const entry = { slug: base }
+                if (it.title) entry.title = String(it.title)
+                else if (it.parentTitle) entry.title = String(it.parentTitle)
+                if (it.path) entry.path = String(it.path)
+                dedup.push(entry)
+              } catch (_) {}
+            }
+            try { window.__nimbiSitemapJson = { generatedAt: new Date().toISOString(), entries: dedup } } catch (_) {}
+            try { window.__nimbiSitemapFinal = dedup } catch (_) {}
+          } catch (_) {}
+        }
+      } catch (e) {}
     } catch (err) {
       console.warn('[slugManager] filtering index by excludes failed', err)
-      searchIndex = idx
+      try {
+        if (!Array.isArray(searchIndex)) searchIndex = []
+        searchIndex.length = 0
+        for (const it of idx) searchIndex.push(it)
+      } catch (e) {
+        try { searchIndex = Array.from(idx) } catch (_) { searchIndex = idx }
+      }
+      try {
+        if (typeof window !== 'undefined') {
+          try { window.__nimbiResolvedIndex = searchIndex } catch (e) {}
+        }
+      } catch (e) {}
     }
     return searchIndex
   })()
@@ -874,6 +997,95 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
   _indexPromise = null
   return searchIndex
 }
+
+/**
+ * Wait for the runtime `searchIndex` to be populated. If an index build is
+ * already in progress this will await it; otherwise it will optionally kick
+ * off a build (worker-first) and await completion. Returns the live
+ * `searchIndex` array (possibly empty on timeout).
+ *
+ * @param {{timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:Array<string>,seedPaths?:Array<string>,startBuild?:boolean}} opts
+ * @returns {Promise<Array>} resolves to the live `searchIndex` array
+ */
+export async function whenSearchIndexReady(opts = {}) {
+  try {
+    const timeoutMs = (typeof opts.timeoutMs === 'number') ? opts.timeoutMs : 8000
+    const contentBase = opts.contentBase
+    const indexDepth = (typeof opts.indexDepth === 'number') ? opts.indexDepth : 1
+    const noIndexing = Array.isArray(opts.noIndexing) ? opts.noIndexing : undefined
+    const seedPaths = Array.isArray(opts.seedPaths) ? opts.seedPaths : undefined
+    const startBuild = (typeof opts.startBuild === 'boolean') ? opts.startBuild : true
+
+    // If an index build is currently in progress, prefer awaiting that
+    // build so callers receive the authoritative, stable array. Only
+    // return early if the array is populated and no build promise is
+    // active _and_ the caller did not request a fresh build. When
+    // `startBuild` is true we must avoid short-circuiting on a partial
+    // in-memory `searchIndex` so a fresh authoritative build will be
+    // initiated instead.
+    if (Array.isArray(searchIndex) && searchIndex.length && !_indexPromise && !startBuild) return searchIndex
+
+    if (_indexPromise) {
+      try { await _indexPromise } catch (_) {}
+      return searchIndex
+    }
+
+    if (startBuild) {
+      // Prefer worker-based builder when available
+      try {
+        if (typeof buildSearchIndexWorker === 'function') {
+          try {
+            const res = await buildSearchIndexWorker(contentBase, indexDepth, noIndexing, seedPaths)
+            if (Array.isArray(res) && res.length) {
+              try { _setSearchIndex(res) } catch (_) {}
+              return searchIndex
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+      // Fallback to main-thread builder (this will set _indexPromise)
+      try {
+        await buildSearchIndex(contentBase, indexDepth, noIndexing, seedPaths)
+        return searchIndex
+      } catch (_) {}
+    }
+
+    // Last resort: poll for a populated array until timeout
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      if (Array.isArray(searchIndex) && searchIndex.length) return searchIndex
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise(r => setTimeout(r, 150))
+    }
+    return searchIndex
+  } catch (e) {
+    return searchIndex
+  }
+}
+
+  /**
+   * Await the runtime `searchIndex` without a timeout. This wrapper ensures
+   * the canonical index is built (worker-first) and will wait indefinitely
+   * until the index is available or a build completes. Callers that must
+   * not use timeouts should use this API instead of `whenSearchIndexReady`.
+   *
+   * @param {{contentBase?:string,indexDepth?:number,noIndexing?:Array<string>,seedPaths?:Array<string>,startBuild?:boolean,timeoutMs?:number}} opts
+   * @returns {Promise<Array>} resolves to the live `searchIndex` array
+   */
+  export async function awaitSearchIndex(opts = {}) {
+    try {
+      const o = Object.assign({}, opts)
+      if (typeof o.startBuild !== 'boolean') o.startBuild = true
+      if (typeof o.timeoutMs !== 'number') o.timeoutMs = Infinity
+      try {
+        return await whenSearchIndexReady(o)
+      } catch (_) {
+        return searchIndex
+      }
+    } catch (e) {
+      return searchIndex
+    }
+  }
 
 export const CRAWL_MAX_QUEUE = 1000
 export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE

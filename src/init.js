@@ -589,21 +589,6 @@ export async function initCMS(options = {}) {
   try { setContentBase(contentBase) } catch (err) { console.warn('[nimbi-cms] setContentBase failed', err) }
   try { setNotFoundPage(notFoundPage) } catch (err) { console.warn('[nimbi-cms] setNotFoundPage failed', err) }
   try {
-    // Optional: expose sitemap endpoints for crawlers when enabled (opt-in).
-    // Hosts can enable by passing `exposeSitemap: true` to `initCMS()` or
-    // by setting `window.__nimbiExposeSitemap = true` before init.
-    if (exposeSitemap === true || (typeof window !== 'undefined' && window.__nimbiExposeSitemap)) {
-      try {
-        const mod = await import('./runtimeSitemap.js')
-        try {
-          if (mod && typeof mod.handleSitemapRequest === 'function') {
-            const handled = mod.handleSitemapRequest({ includeAllMarkdown: true, homePage, navigationPage, notFoundPage, contentBase })
-            if (handled) return
-          }
-        } catch (e) { /* ignore runtime sitemap handler errors */ }
-      } catch (e) { /* ignore dynamic import errors */ }
-    }
-
     // Optional: attach a small sitemap download UI when a host enables it
     if (typeof window !== 'undefined' && window.__nimbiAutoAttachSitemapUI) {
       import('./runtimeSitemap.js').then(mod => {
@@ -632,6 +617,68 @@ export async function initCMS(options = {}) {
     const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing, navbarLogo)
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { console.warn('[nimbi-cms] onNavBuild hooks failed', e) }
     
+      try {
+        // If the current URL is requesting a sitemap/rss/atom, run the
+        // sitemap handler regardless of `exposeSitemap`. This ensures
+        // requests like `/?rss` or `/sitemap.xml` are handled by the
+        // runtime generator even when the host hasn't explicitly enabled
+        // the `exposeSitemap` flag.
+        let shouldTrySitemap = false
+        try {
+          const sp = new URLSearchParams(location.search || '')
+          if (sp.has('sitemap') || sp.has('rss') || sp.has('atom')) shouldTrySitemap = true
+        } catch (_) {}
+        try {
+          const pathname = (location.pathname || '/').replace(/\/\/+/g, '/')
+          const name = pathname.split('/').filter(Boolean).pop() || ''
+          if (name && /^(sitemap|sitemap\.xml|rss|rss\.xml|atom|atom\.xml)$/i.test(name)) shouldTrySitemap = true
+        } catch (_) {}
+
+        if (shouldTrySitemap || exposeSitemap === true || (typeof window !== 'undefined' && window.__nimbiExposeSitemap)) {
+          try {
+            // Ensure the authoritative index is built before handling
+            // sitemap/rss/atom requests. This will deterministically wait
+            // for the runtime index (worker-first) and avoid race
+            // conditions where consumers observe a partial array.
+            try {
+              const sm = await import('./slugManager.js')
+              if (sm && typeof sm.awaitSearchIndex === 'function') {
+                const seeds = []
+                if (homePage) seeds.push(homePage)
+                if (navigationPage) seeds.push(navigationPage)
+                try {
+                  await sm.awaitSearchIndex({ contentBase, indexDepth: Math.max(indexDepth || 1, 3), noIndexing, seedPaths: seeds.length ? seeds : undefined, startBuild: true, timeoutMs: Infinity })
+                } catch (_) { /* don't fail init if index build errors */ }
+              }
+            } catch (_) {}
+
+            const mod = await import('./runtimeSitemap.js')
+            try {
+              if (mod && typeof mod.handleSitemapRequest === 'function') {
+                const handled = await mod.handleSitemapRequest({ includeAllMarkdown: true, homePage, navigationPage, notFoundPage, contentBase, indexDepth, noIndexing })
+                if (handled) return
+              }
+            } catch (e) { /* ignore runtime sitemap handler errors */ }
+          } catch (e) { /* ignore dynamic import errors */ }
+        }
+
+        // Kick off a background sitemap build to expose runtime globals so
+        // developers and diagnostic tools can inspect the final sitemap
+        // even when the page wasn't explicitly requested as `?rss`.
+        try {
+          import('./runtimeSitemap.js').then(mod => {
+            try {
+              if (mod && typeof mod.exposeSitemapGlobals === 'function') {
+                // fire-and-forget; allow an indefinite wait so the
+                // background population has ample time to complete in
+                // environments where crawling/indexing may be slow.
+                try { mod.exposeSitemapGlobals({ includeAllMarkdown: true, homePage, navigationPage, notFoundPage, contentBase, indexDepth, noIndexing, waitForIndexMs: Infinity }).catch(() => {}) } catch (_) {}
+              }
+            } catch (_) {}
+          }).catch(() => {})
+        } catch (_) {}
+      } catch (e) {}
+
     try {
       const computeAndSet = () => {
         const navHeight = (navbarWrap && navbarWrap.getBoundingClientRect && Math.round(navbarWrap.getBoundingClientRect().height)) || (navbarWrap && navbarWrap.offsetHeight) || 0

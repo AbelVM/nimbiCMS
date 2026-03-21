@@ -49,6 +49,17 @@ The code lives at [https://github.com/AbelVM/nimbiCMS](https://github.com/AbelVM
 - Fully typed and [documented](docs/README.md)
 - [MIT licensed](LICENSE.md)
 
+### Runtime sitemap & feeds
+
+nimbiCMS exposes client-side endpoints that generate sitemaps and feeds at runtime:
+
+- Endpoints: `/?sitemap` (also cosmetic `#/?sitemap` and path forms like `/sitemap` or `/sitemap.xml`) — returns an XML sitemap that uses canonical `?page=` URLs.
+- `/?rss` and `/?atom` (also `#/?rss`, `#/?atom`, and path forms `/rss`, `/rss.xml`, `/atom`, `/atom.xml`) — return RSS 2.0 and Atom 1.0 feeds respectively.
+
+Limitations & crawler advice
+- These endpoints are generated client-side; servers cannot set the HTTP `Content-Type` header for the generated XML. The implementation uses Blob/data URL fallbacks to present XML in browsers, but this is not guaranteed to satisfy all crawlers.
+- For reliable crawler indexing prefer a server-generated `sitemap.xml` (build-time) and list it in `robots.txt`. Use the runtime endpoints for development convenience or for crawlers that execute JavaScript.
+
 ## Installation
 
 ### From npm

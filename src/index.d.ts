@@ -198,12 +198,16 @@ export const skipRootReadme: boolean
 export function getLanguages(): string[]
 export function _storeSlugMapping(slug: string, rel: string): void
 export function setHomePage(p: string): any
+export function _setSearchIndex(arr: any): any
 export function uniqueSlug(base: string, existing: Set<string>): string
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
 export function unescapeMarkdown(s: string): string
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): any
-
+export function getSearchIndex(): any
+export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean}): Promise<Array>
+export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean,timeoutMs?:number}): Promise<Array>
+export const CRAWL_MAX_QUEUE: any
 
 
 
@@ -248,12 +252,12 @@ export function markNotFound(opts: any): any
 
 
 // --- from src/runtimeSitemap.js
-export function generateSitemapJson(opts: object): {generatedAt:string,entries:Array}
-export function generateSitemapXml(json: object|any[]): string
-export function generateRssXml(json: object|any[]): string
-export function generateAtomXml(json: object|any[]): string
-export function attachSitemapDownloadUI(opts: object): Element|null
+export function generateSitemapJson(opts: any): any
 export function handleSitemapRequest(opts: any): any
+export function exposeSitemapGlobals(opts: any): any
+
+
+
 
 // --- from src/router.js
 export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any

@@ -3,7 +3,7 @@ import { t } from './l10nManager.js'
 import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
-import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths } from './slugManager.js'
+import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths, searchIndex } from './slugManager.js'
 
 function safeGet(mod, name) {
   try {
@@ -86,6 +86,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   let resultsContainer = null
   let searchOutsideHandler = null
   let indexedCountLog = false
+  // one-time guard so we only trigger sitemap build once when spinner removal fires
+  let sitemapTriggered = false
+  let resolvedIndexForSitemap = null
 
   function closeMobileMenu() {
     try {
@@ -135,15 +138,25 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const buildFn = (typeof globalBuild === 'function') ? globalBuild : (moduleBuild || undefined)
         const workerFn = (typeof globalWorker === 'function') ? globalWorker : (moduleWorker || undefined)
         try { console.log('[nimbi-cms test] ensureSearchIndex: buildFn=' + (typeof buildFn) + ' workerFn=' + (typeof workerFn) + ' (global preferred)') } catch (e) {}
+        const seeds = []
+        try { if (homePage) seeds.push(homePage) } catch (_) {}
+        try { if (navigationPage) seeds.push(navigationPage) } catch (_) {}
         if (searchIndexMode === 'lazy' && typeof workerFn === 'function') {
           try {
-            const r = await workerFn(contentBase, indexDepth, noIndexing)
-            if (r && r.length) return r
+            const r = await workerFn(contentBase, indexDepth, noIndexing, seeds.length ? seeds : undefined)
+            if (r && r.length) {
+              try {
+                if (fm && typeof fm._setSearchIndex === 'function') {
+                  try { fm._setSearchIndex(r) } catch (e) {}
+                }
+              } catch (e) {}
+              return r
+            }
           } catch (e) { console.warn && console.warn('[nimbi-cms] worker builder threw', e) }
         }
         if (typeof buildFn === 'function') {
           try { console.log('[nimbi-cms test] calling buildFn') } catch (e) {}
-          return await buildFn(contentBase, indexDepth, noIndexing)
+          return await buildFn(contentBase, indexDepth, noIndexing, seeds.length ? seeds : undefined)
         }
         return []
       } catch (err) {
@@ -159,6 +172,33 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
 
     searchIndexPromise.then((idx) => {
       try {
+        // capture resolved index for sitemap trigger
+        try { resolvedIndexForSitemap = Array.isArray(idx) ? idx : null } catch (_) { resolvedIndexForSitemap = null }
+        try {
+          if (typeof window !== 'undefined') {
+            try {
+              ;(async () => {
+                try {
+                  const fmMod = await import('./slugManager.js')
+                  try {
+                    Object.defineProperty(window, '__nimbiResolvedIndex', {
+                      get() { return (fmMod && Array.isArray(fmMod.searchIndex)) ? fmMod.searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : []) },
+                      enumerable: true,
+                      configurable: true
+                    })
+                    } catch (e2) {
+                    try { window.__nimbiResolvedIndex = (fmMod && Array.isArray(fmMod.searchIndex)) ? fmMod.searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : []) } catch (e3) {}
+                  }
+                } catch (e) {
+                  try { window.__nimbiResolvedIndex = (Array.isArray(searchIndex) ? searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : [])) } catch (e4) {}
+                }
+              })()
+            } catch (e) {}
+            try { window.__nimbi_contentBase = contentBase } catch (e) {}
+            try { window.__nimbi_indexDepth = indexDepth } catch (e) {}
+            try { window.__nimbi_noIndexing = noIndexing } catch (e) {}
+          }
+        } catch (e) {}
         const qnow = String(searchInput && searchInput.value || '').trim().toLowerCase()
         if (!qnow) return
         if (!Array.isArray(idx) || !idx.length) return
@@ -200,7 +240,25 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           try { resultsEl.style.display = 'block' } catch (e) {}
         } catch (e) { /* ignore panel render failures */ }
       } catch (e) { /* ignore */ }
-    }).catch(()=>{})
+    }).catch(()=>{}).finally(() => {
+      ;(async () => {
+        try {
+          if (sitemapTriggered) return
+          sitemapTriggered = true
+          const rs = await import('./runtimeSitemap.js')
+          try {
+            // Do not pass a snapshot index here — let the sitemap module
+            // import / reference the live `searchIndex` directly so it
+            // always operates on the same object used by the search UI.
+            await rs.handleSitemapRequest({ homePage, contentBase, indexDepth, noIndexing, includeAllMarkdown: true })
+          } catch (err) {
+            console.warn && console.warn('[nimbi-cms] sitemap trigger failed', err)
+          }
+        } catch (err) {
+          try { console.warn && console.warn('[nimbi-cms] sitemap dynamic import failed', err) } catch (_) {}
+        }
+      })()
+    })
 
     return searchIndexPromise
   }
@@ -608,6 +666,21 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             try { domInput.removeAttribute('disabled') } catch (e) {}
             try { searchControl && searchControl.classList.remove('is-loading') } catch (e) {}
           }
+          ;(async () => {
+            try {
+              if (sitemapTriggered) return
+              sitemapTriggered = true
+              const idx = await searchIndexPromise.catch(() => [])
+              const rs = await import('./runtimeSitemap.js')
+              try {
+                await rs.handleSitemapRequest({ index: Array.isArray(idx) ? idx : undefined, homePage, contentBase, indexDepth, noIndexing, includeAllMarkdown: true })
+              } catch (err) {
+                console.warn && console.warn('[nimbi-cms] sitemap trigger failed', err)
+              }
+            } catch (err) {
+              try { console.warn && console.warn('[nimbi-cms] sitemap dynamic import failed', err) } catch (_) {}
+            }
+          })()
         })
     }
     
