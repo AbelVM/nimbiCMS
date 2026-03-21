@@ -174,7 +174,21 @@ initCMS({ el: '#app', homePage: 'index.html' })
 initCMS({ el: '#app', notFoundPage: '_404.md' })
 ```
 
-Links are converted to hash‑based navigation (`?page=…`), preserving anchors and URL passed parameters
+### URL schemes — cosmetic vs canonical
+
+nimbiCMS supports two coexisting URL schemas so that user-facing navigation can be friendly while SEO remains stable:
+
+- Cosmetic (user-facing): `/#/slug[#anchor][?params]` — preferred for visible navigation, TOC links, and search results. Example: `https://example.com/#/blog/my-post#comments?lang=fr`
+- Canonical (SEO / internal): `/?page=slug[#anchor][&params]` — used for canonical `<link>` tags, internal fetches, and sitemaps so indexing stays consistent. Example: `https://example.com/?page=blog/my-post#comments&lang=fr`
+
+Behavior notes:
+
+- The UI prefers the cosmetic `/#/slug` form for links, but the library emits canonical URLs using the `?page=` form (for example in `<link rel="canonical">`) to keep SEO and indexing stable.
+- Anchors and query parameters are preserved and placed in the correct order: the anchor follows the slug, and parameters are appended after the anchor.
+- Internal fetches (including worker-based requests) use canonical `?page=` URLs so paths remain predictable on static hosts.
+- Because the cosmetic form relies on client-side routing, crawlers that do not execute JavaScript may require a server-side `sitemap.xml` or server-side routing for full indexing coverage.
+
+This behavior is covered by the test-suite (see the canonical-link and URL handling tests).
 
 ## Options
 
@@ -205,6 +219,7 @@ Links are converted to hash‑based navigation (`?page=…`), preserving anchors
 | `homePage` | `string` | `'_home.md'` | Path for the site home page (`.md` or `.html`). |
 | `notFoundPage` | `string` | `'_404.md'` | Path for the not-found page (`.md` or `.html`). |
 | `navigationPage` | `string` | `'_navigation.md'` | Path for the navigation markdown used to build the navbar (`.md` or `.html`). |
+| `exposeSitemap` | `boolean` | `true` | When `true` the client exposes a runtime sitemap at `/sitemap.xml` and `/sitemap.html`. The sitemap is generated at runtime (no build-time generation) and emits canonical `?page=` URLs (for example `/?page=blog/my-post`) while the UI preserves cosmetic `/#/slug` navigation. Requires SPA fallback (the server must serve `index.html` for `/sitemap*` requests). Disable with `initCMS({ exposeSitemap: false })`. For broad crawler coverage prefer generating a server-side `sitemap.xml` and listing it in `robots.txt`. |
 
 > Note: All these files must be within `contentPath`
 
@@ -478,6 +493,26 @@ initCMS({ el: '#app', allowUrlPathOverrides: true })
 ```
 
 > Note: enabling `allowUrlPathOverrides` still runs client-side validation; if an unsafe value is supplied the call to `initCMS()` will throw a `TypeError`. Prefer passing `contentPath`, `homePage`, and `notFoundPage` directly in the `options` object from secure script code rather than relying on URL query parameters.
+
+### Runtime sitemap (dynamic)
+
+When enabled (default `true`) nimbiCMS can expose a runtime-generated sitemap intended for crawlers and bots that execute JavaScript. The runtime sitemap is available at:
+
+- `/sitemap.xml` — XML sitemap using canonical `?page=` URLs
+- `/sitemap.html` — optional simple HTML listing (not a full UI)
+
+Key notes:
+
+- Runtime-only: the sitemap is built in the browser from discovered content paths; nothing is generated at build time.
+- Canonical URLs: the sitemap emits `?page=...` canonical URLs (for SEO and indexing) while the SPA UI keeps cosmetic `/#/slug` links for user navigation.
+- SPA fallback required: your static host must serve `index.html` for requests to `/sitemap.xml` or `/sitemap.html` so the client-side handler can render the sitemap.
+- Disabled when needed: opt out by passing `exposeSitemap: false` to `initCMS()`:
+
+```js
+initCMS({ el: '#app', exposeSitemap: false })
+```
+
+For widest crawler compatibility (search engines that don't execute JavaScript reliably) prefer generating and serving a server-side `sitemap.xml` and listing it in `robots.txt`. The runtime sitemap is a convenience for JS-aware crawlers and for environments where generating a sitemap at build time is not possible.
 
 ## Available Bulmaswatch themes
 
