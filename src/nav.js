@@ -2,7 +2,8 @@ import { createNavTree } from './htmlBuilder.js'
 import { t } from './l10nManager.js'
 import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
-import { slugify, slugToMd, mdToSlug, fetchMarkdown } from './slugManager.js'
+import { parseHrefToRoute } from './utils/urlHelper.js'
+import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths } from './slugManager.js'
 
 function safeGet(mod, name) {
   try {
@@ -127,15 +128,23 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     searchIndexPromise = (async () => {
       try {
         const fm = await import('./slugManager.js')
-        const buildFn = safeGet(fm, 'buildSearchIndex') || (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndex : undefined)
-        const workerFn = safeGet(fm, 'buildSearchIndexWorker') || (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndexWorker : undefined)
+        const globalBuild = (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndex : undefined)
+        const globalWorker = (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndexWorker : undefined)
+        const moduleBuild = safeGet(fm, 'buildSearchIndex')
+        const moduleWorker = safeGet(fm, 'buildSearchIndexWorker')
+        const buildFn = (typeof globalBuild === 'function') ? globalBuild : (moduleBuild || undefined)
+        const workerFn = (typeof globalWorker === 'function') ? globalWorker : (moduleWorker || undefined)
+        try { console.log('[nimbi-cms test] ensureSearchIndex: buildFn=' + (typeof buildFn) + ' workerFn=' + (typeof workerFn) + ' (global preferred)') } catch (e) {}
         if (searchIndexMode === 'lazy' && typeof workerFn === 'function') {
           try {
             const r = await workerFn(contentBase, indexDepth, noIndexing)
             if (r && r.length) return r
           } catch (e) { console.warn && console.warn('[nimbi-cms] worker builder threw', e) }
         }
-        if (typeof buildFn === 'function') return await buildFn(contentBase, indexDepth, noIndexing)
+        if (typeof buildFn === 'function') {
+          try { console.log('[nimbi-cms test] calling buildFn') } catch (e) {}
+          return await buildFn(contentBase, indexDepth, noIndexing)
+        }
         return []
       } catch (err) {
         console.warn('[nimbi-cms] buildSearchIndex failed', err)
@@ -535,7 +544,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           await ensureSearchIndex()
 
           const idx = await searchIndexPromise
+          try { console.log('[nimbi-cms test] search handleInput q="' + q + '" idxlen=' + (Array.isArray(idx) ? idx.length : 'nil')) } catch (e) {}
           const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
+          try { console.log('[nimbi-cms test] filtered len=' + (Array.isArray(filtered) ? filtered.length : 'nil')) } catch (e) {}
           showResults(filtered.slice(0, 10))
         } catch (err) { console.warn('[nimbi-cms] search input handler failed', err); showResults([]) }
       }, 50)
@@ -652,16 +663,37 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         try {
           const slugKey = slugify(displayName)
           if (slugKey) {
-            const parsedHref = (item.getAttribute && item.getAttribute('href')) ? item.getAttribute('href') : ''
-            try {
-              const url = new URL(parsedHref, location.href)
-              const p = url.searchParams.get('page')
-              if (p) {
-                const decoded = decodeURIComponent(p)
-                try { slugToMd.set(slugKey, decoded); mdToSlug.set(decoded, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
+                const hrefVal = item.getAttribute('href') || ''
+                let mappingTarget = null
+                // Prefer explicit md/html paths for mappings (relative or canonical)
+                if (/^[^#?]*\.(?:md|html?)(?:$|[?#])/i.test(hrefVal)) {
+                  mappingTarget = normalizePath(String(hrefVal || '').split(/[?#]/)[0])
+                } else {
+                  // If it's a canonical ?page=... form, use the page value
+                  try {
+                    const p = parseHrefToRoute(hrefVal)
+                    if (p && p.type === 'canonical' && p.page) mappingTarget = normalizePath(p.page)
+                  } catch (_e) {}
+                }
+                if (mappingTarget) {
+                  let persistMapping = false
+                  try {
+                    if (/\.(?:md|html?)(?:$|[?#])/i.test(String(mappingTarget || ''))) {
+                      persistMapping = true
+                    } else {
+                      const norm = String(mappingTarget || '').replace(/^\.\//, '')
+                      const baseName = norm.replace(/^.*\//, '')
+                      if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length) {
+                        if (allMarkdownPaths.includes(norm) || allMarkdownPaths.includes(baseName)) persistMapping = true
+                      }
+                    }
+                  } catch (err) { persistMapping = false }
+                  if (persistMapping) {
+                    try { slugToMd.set(slugKey, mappingTarget) } catch (ee) {}
+                    try { mdToSlug.set(mappingTarget, slugKey) } catch (ee) {}
+                  }
+                }
               }
-            } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }
-          }
         } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }
       }
     } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }

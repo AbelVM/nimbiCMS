@@ -17,7 +17,8 @@ describe('nav edge cases', () => {
     const res = await nav.buildNav(wrap, container, navHtml, 'http://base/', 'home', (k) => k, renderByQuery, false)
     const brand = wrap.querySelector('.navbar-brand .navbar-item')
     expect(brand).toBeTruthy()
-    expect(brand.getAttribute('href')).toContain('?page=')
+    const brandHref = brand.getAttribute('href') || ''
+    expect(brandHref.includes('?page=') || brandHref.includes('#/')).toBe(true)
   })
 
   it('md links with fragment produce encoded page param', async () => {
@@ -32,7 +33,8 @@ describe('nav edge cases', () => {
     // second item corresponds to the link (first skipped for brand)
     const item = items[0]
     expect(item).toBeTruthy()
-    expect(item.getAttribute('href')).toMatch(/\?page=.*page\.md/) // encoded md path or slug
+    const itemHref = item.getAttribute('href') || ''
+    expect(itemHref).toMatch(/(\?page=.*page\.md|#\/.*page\.md)/) // encoded md path or slug
   })
 
   it('html link with title sets slug mapping when fetchMarkdown returns title', async () => {
@@ -54,6 +56,7 @@ describe('nav edge cases', () => {
     const res = await mod.buildNav(wrap, container, navHtml, 'http://base/', 'home', (k) => k, renderByQuery, false)
     const items = wrap.querySelectorAll('.navbar-start .navbar-item')
     const item = items[0]
-    expect(item.getAttribute('href')).toContain(encodeURIComponent(slug))
+    const itemHref2 = item.getAttribute('href') || ''
+    expect(itemHref2.includes(encodeURIComponent(slug)) || itemHref2.includes(slug)).toBe(true)
   })
 })

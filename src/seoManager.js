@@ -162,6 +162,70 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
   } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
 }
 
+// Lightweight in-memory SEO map; can be configured at runtime via `setSeoMap`.
+let seoMap = (typeof window !== 'undefined' && window.__SEO_MAP) ? window.__SEO_MAP : {}
+
+/**
+ * Replace the internal SEO map used by `injectSeoForPage`.
+ * @param {Object} map - Mapping of page => {title, description, image, ...}
+ */
+export function setSeoMap(map) {
+  try {
+    if (!map || typeof map !== 'object') { seoMap = {}; return }
+    seoMap = Object.assign({}, map)
+  } catch (e) { console.warn('[seoManager] setSeoMap failed', e) }
+}
+
+/**
+ * Inject minimal SEO metadata (title, description, canonical, JSON-LD)
+ * for a given `page` token. Safe to call early during init to populate
+ * head tags before heavier rendering runs.
+ * @param {string} page - page token (slug or path)
+ * @param {string} [initialDocumentTitle] - optional fallback title
+ */
+export function injectSeoForPage(page, initialDocumentTitle = '') {
+  try {
+    if (!page) return
+    const meta = (seoMap && seoMap[page]) ? seoMap[page] : (typeof window !== 'undefined' && window.__SEO_MAP && window.__SEO_MAP[page] ? window.__SEO_MAP[page] : null)
+    // Ensure canonical for the page
+    try {
+      const canonical = location.origin + location.pathname + '?page=' + encodeURIComponent(String(page || ''))
+      upsertLinkRel('canonical', canonical)
+      try { upsertMeta('property', 'og:url', canonical) } catch (e) {}
+    } catch (e) {}
+    // If we don't have a map entry, still leave canonical/og:url in place
+    if (!meta) return
+    try { if (meta.title) document.title = String(meta.title) } catch (e) {}
+    try { if (meta.description) setTag('description', String(meta.description)) } catch (e) {}
+    try {
+      // Populate standard meta tags (robots, og, twitter) using setMetaTags
+      try { setMetaTags({ meta: meta }, meta.title || undefined, meta.image || undefined, meta.description || undefined, initialDocumentTitle) } catch (e) { /* continue */ }
+    } catch (e) {}
+    try { setStructuredData({ meta: meta }, page, meta.title || undefined, meta.image || undefined, meta.description || undefined, initialDocumentTitle) } catch (e) { console.warn('[seoManager] inject structured data failed', e) }
+  } catch (e) { console.warn('[seoManager] injectSeoForPage failed', e) }
+}
+
+/**
+ * Mark the current document as a not-found (404) page and apply
+ * appropriate SEO metadata (robots, description, canonical, JSON-LD).
+ * Safe to call at runtime; no-op when DOM is unavailable.
+ * @param {Object} [meta] - optional meta object containing title/description/image
+ * @param {string} [pagePath] - optional page path used for canonical URL generation
+ * @param {string} [titleOverride] - optional title override
+ * @param {string} [descOverride] - optional description override
+ */
+export function markNotFound(meta = {}, pagePath = '', titleOverride = undefined, descOverride = undefined) {
+  try {
+    const m = meta || {}
+    const title = (typeof titleOverride === 'string' && titleOverride.trim()) ? titleOverride : (m.title || 'Not Found')
+    const desc = (typeof descOverride === 'string' && descOverride.trim()) ? descOverride : (m.description || '')
+    try { setTag('robots', 'noindex,follow') } catch (e) {}
+    try { if (desc && String(desc).trim()) setTag('description', String(desc)) } catch (e) {}
+    try { setMetaTags({ meta: Object.assign({}, m, { robots: 'noindex,follow' }) }, title, m.image || undefined, desc) } catch (e) {}
+    try { setStructuredData({ meta: Object.assign({}, m, { title: title, description: desc }) }, pagePath || '', title, m.image || undefined, desc) } catch (e) {}
+  } catch (e) { console.warn('[seoManager] markNotFound failed', e) }
+}
+
 /**
  * Apply page-level SEO metadata: meta tags, structured data, and document title.
  * @param {Function} t - Localization function used for labels.

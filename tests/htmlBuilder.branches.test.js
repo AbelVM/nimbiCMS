@@ -54,8 +54,8 @@ describe('htmlBuilder branch coverage extras', () => {
         throw new Error('not found')
       })
       await rewriteAnchors(article, 'http://example.com/content/', 'some/page.md')
-      const out = a.getAttribute('href')
-      expect(out).toContain('?page=')
+      const out = a.getAttribute('href') || ''
+      expect(out.includes('?page=') || out.includes('#/')).toBe(true)
       expect(out).toContain('html-page')
     } finally {
       slugMgr.setFetchMarkdown(orig)

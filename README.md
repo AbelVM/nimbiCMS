@@ -492,7 +492,7 @@ Keep in mind that some themes do not play well with certain color schemas.
 
 ## Using with GitHub Pages and the GitHub file editor
 
-Nimbi CMS works well with GitHub Pages and the built-in GitHub web file editor. Minimal steps:
+nimbiCMS works well with GitHub Pages and the built-in GitHub web file editor. Minimal steps:
 
 - Enable GitHub Pages for the repository (Settings → Pages) and choose the branch/folder you want to publish (e.g., `gh-pages` or `main` / `/docs`).
 - If your content includes underscore-prefixed files (for example `_navigation.md` or `_home.md`), GitHub's Jekyll processor will ignore them by default. Add an empty `.nojekyll` file at the repository root to disable Jekyll so those files are served
@@ -504,7 +504,7 @@ Editing content via the GitHub web editor:
 1. Open the repository on [GitHub](https://github.com) and navigate to the `content/` folder (or your chosen `contentPath`).
 2. Click any `.md` file, then click the pencil icon to edit the file in the browser.
 3. Make changes and commit them directly to the branch. The published site will receive the updates on the next Pages build (or immediately if you host the `dist` on the same branch).
-4. Refresh the site to see the updated content. Nimbi CMS loads content at runtime, so browser refresh shows the latest files.
+4. Refresh the site to see the updated content. nimbiCMS loads content at runtime, so browser refresh shows the latest files.
 
 Tips:
 - Add or update `content/_navigation.md` to control the navigation bar; the nav is re-built when pages are crawled.

@@ -45,7 +45,9 @@ describe('slugManager module', () => {
     global.fetch.mockResolvedValue(dummy)
 
     await slugMgr.fetchMarkdown('foo.md', '/base/')
-    // should rewrite to canonical path before fetching
-    expect(global.fetch).toHaveBeenCalledWith('/base/subdir/foo.md')
+    // should rewrite to canonical path before fetching; accept absolute or relative URL
+    expect(global.fetch).toHaveBeenCalled()
+    const calledArg = String(global.fetch.mock.calls[0][0] || '')
+    expect(calledArg).toContain('/base/subdir/foo.md')
   })
 })

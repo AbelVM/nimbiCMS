@@ -21,7 +21,7 @@ describe('htmlBuilder coverage', () => {
     const nav = htmlBuilder.createNavTree(t, tree)
     expect(nav.querySelector('.menu-label').textContent).toBe('Nav')
     expect(nav.querySelectorAll('a').length).toBe(2)
-    expect(nav.querySelector('a').getAttribute('href')).toBe('#a')
+    expect(nav.querySelector('a').getAttribute('href')).toBe('?page=a')
   })
 
   it('buildTocElement returns null when toc has <=1 item', () => {

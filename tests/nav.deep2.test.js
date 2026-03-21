@@ -69,7 +69,10 @@ describe('nav search and burger deeper branches', () => {
 
     // simulate click on menu link inside menu
     const menu = navbar.querySelector('.navbar-menu')
-    const link = menu.querySelector('a[href*="?page=abc"]')
+    const link = Array.from(menu.querySelectorAll('a')).find(a => {
+      const h = a.getAttribute('href') || ''
+      return h.includes('?page=abc') || h.includes('#/abc')
+    })
     expect(link).toBeTruthy()
     link.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     // burger should be closed after navigation

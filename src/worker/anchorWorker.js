@@ -26,7 +26,7 @@ onmessage = async (ev) => {
         const parser = new DOMParser()
         const doc = parser.parseFromString(html || '', 'text/html')
         const article = doc.body
-        await _rewriteAnchors(article, contentBase, pagePath)
+        await _rewriteAnchors(article, contentBase, pagePath, { canonical: true })
         postMessage({ id, result: doc.body.innerHTML })
       } catch (e) {
         postMessage({ id, error: String(e) })
@@ -51,7 +51,7 @@ export async function handleAnchorWorkerMessage(msg) {
         const parser = new DOMParser()
         const doc = parser.parseFromString(html || '', 'text/html')
         const article = doc.body
-        await _rewriteAnchors(article, contentBase, pagePath)
+        await _rewriteAnchors(article, contentBase, pagePath, { canonical: true })
         return { id, result: doc.body.innerHTML }
       } catch (e) {
         return { id, error: String(e) }

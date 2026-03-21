@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import * as router from '../src/router.js'
+import * as slugManager from '../src/slugManager.js'
+
+describe('router: bad-slug fallback for site shells with nimbi mount', () => {
+  let origFetch
+  beforeEach(() => {
+    origFetch = global.fetch
+    try { router._clearIndexCache && router._clearIndexCache() } catch (e) {}
+    try { slugManager.clearFetchCache && slugManager.clearFetchCache() } catch (e) {}
+  })
+  afterEach(() => {
+    try { if (origFetch) vi.stubGlobal('fetch', origFetch) } catch (e) {}
+    try { slugManager.setFetchMarkdown && slugManager.setFetchMarkdown(slugManager.fetchMarkdown) } catch (e) {}
+  })
+
+  it('treats same-origin index HTML containing nimbi mount as site shell and falls back to notFoundPage', async () => {
+    // Stub global fetch: simulate contentBase host returning 404 for candidate content fetches
+    vi.stubGlobal('fetch', async (url, opts) => {
+      const s = String(url || '')
+      if (s.includes('localhost:3000')) {
+        return { ok: false, status: 404, statusText: 'Not Found', text: async () => '' }
+      }
+      // Absolute fallback returns site-shell HTML that contains nimbi-specific markup
+      return { ok: true, text: async () => '<!doctype html><html><head></head><body><div class="nimbi-mount"></div><script>/* nimbi */</script></body></html>', headers: { get: (k) => (k && k.toLowerCase && k.toLowerCase() === 'content-type') ? 'text/html' : null } }
+    })
+
+    // Stub fetchMarkdown to return configured notFoundPage when probed
+    const orig = slugManager.fetchMarkdown
+    slugManager.setFetchMarkdown(async (path, base) => {
+      if (String(path || '') === String(slugManager.notFoundPage)) {
+        return { raw: '# Not Found', status: 404 }
+      }
+      throw new Error('not found')
+    })
+
+    const res = await router.fetchPageData('/missing', 'http://localhost:3000/content/')
+    expect(res.pagePath).toBe(slugManager.notFoundPage)
+    expect(res.data && String(res.data.raw || '').includes('Not Found')).toBe(true)
+  })
+})

@@ -27,7 +27,9 @@ describe('nav module', () => {
 
     const secondLink = navbar.querySelector('a[href*="bar.md"]')
     expect(secondLink).toBeTruthy()
+    try { console.log && console.log('DEBUG secondLink:', secondLink && secondLink.outerHTML) } catch (e) {}
     secondLink.click()
+    await new Promise(r => setTimeout(r, 50))
     expect(renderSpy).toHaveBeenCalled()
   })
 

@@ -51,6 +51,10 @@ describe('nav search and interaction branches', () => {
     const results = document.getElementById('nimbi-search-results')
     // showResults should have added content
     expect(results).toBeTruthy()
+    // ensure search result anchors use canonical `?page=` hrefs
+    const firstAnchor = results.querySelector('.panel-block') || results.querySelector('a')
+    expect(firstAnchor).toBeTruthy()
+    expect(firstAnchor.getAttribute('href')).toContain('?page=find')
     // cleanup
     delete globalThis.buildSearchIndex
   })

@@ -33,7 +33,8 @@ describe('nav deep branches', () => {
     const res = await buildNav(navbarWrap, container, navHtml, '/content/', 'home', (_t) => _t, renderByQuery, false)
     const brand = navbarWrap.querySelector('.navbar .navbar-brand .navbar-item')
     expect(brand).toBeTruthy()
-    expect(brand.getAttribute('href')).toContain('?page=foo')
+    const brandHref = brand.getAttribute('href') || ''
+    expect(brandHref.includes('?page=foo') || brandHref.includes('#/foo')).toBe(true)
 
     // simulate click
     const ev = new MouseEvent('click', { bubbles: true })
@@ -89,7 +90,10 @@ describe('nav deep branches', () => {
     const { navbar } = await buildNav(navbarWrap, container, navHtml, '/content/', 'home', (_t) => _t, renderByQuery, false)
     // after processing, the navbar links should include a page slug derived from title
     const items = navbar.querySelectorAll('.navbar-start .navbar-item')
-    const hasSlugLink = Array.from(items).some(a => (a.getAttribute('href') || '').includes('?page='))
+    const hasSlugLink = Array.from(items).some(a => {
+      const h = (a.getAttribute('href') || '')
+      return h.includes('?page=') || h.includes('#/')
+    })
     expect(hasSlugLink).toBe(true)
   })
 

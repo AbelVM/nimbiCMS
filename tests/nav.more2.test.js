@@ -17,8 +17,8 @@ describe('nav deeper edge branches', () => {
     const item = items[0]
     expect(item).toBeTruthy()
     const href = item.getAttribute('href')
-    expect(href).toMatch(/\?page=.*guide\.md/) // includes page param
-    expect(href).toContain('#section') // fragment present after encoded page param
+    expect(href).toMatch(/(\?page=|#\/).*guide\.md/) // includes allowed page/cosmetic form
+    expect(href).toContain('#section') // fragment present after page/cosmetic path
   })
 
   it('burger toggles is-active and menu closes on menu click', async () => {

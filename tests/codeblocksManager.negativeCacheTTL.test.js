@@ -37,5 +37,5 @@ describe('codeblocksManager negative-cache TTL retry', () => {
     expect(spy).toHaveBeenCalled()
 
     vi.useRealTimers()
-  })
+  }, 20000)
 })

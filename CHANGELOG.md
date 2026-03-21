@@ -5,6 +5,9 @@ All notable changes to **nimbiCMS** will be documented in this file.
 ## Unreleased
 
 - ...
+- **[FEAT]** Added cosmetic URLs (`website/#/slug[#anchor][?params]`) on top of canonical URLs (`website/?page=slug[#anchor][?params]`)
+- **[FEAT]** Improved SEO management
+- **[FEAT]** Added a dynamic sitemap generator
 
 ## v1.0.5
 

@@ -239,10 +239,18 @@ export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchR
 
 // --- from src/seoManager.js
 export function getSiteNameFromMeta(): string
+export function setSeoMap(map: object): any
+export function injectSeoForPage(page: string, initialDocumentTitle: string): any
+export function markNotFound(opts: any): any
 
 
 
 
+
+// --- from src/runtimeSitemap.js
+export function generateSitemapJson(opts: object): {generatedAt:string,entries:Array}
+export function generateSitemapXml(json: object|any[]): string
+export function attachSitemapDownloadUI(opts: object): Element|null
 
 // --- from src/router.js
 export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
@@ -348,6 +356,11 @@ export function handleWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/anchorWorker.js
 export function handleAnchorWorkerMessage(msg: object): Promise<object>
+
+// --- from src/utils/urlHelper.js
+export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): string
+export function parseHrefToRoute(href: string): any
+export function toCanonicalHref(href: string): string
 
 // --- from src/utils/renderer-manager.js
 

@@ -234,9 +234,9 @@ describe('htmlBuilder utilities', () => {
     expect(nav.querySelector('p.menu-label').textContent).toBe('Nav')
     const links = nav.querySelectorAll('a')
     expect(links.length).toBe(3)
-    expect(links[0].href).toContain('#a')
-    expect(links[1].href).toContain('#a1')
-    expect(links[2].href).toContain('#b')
+    expect(links[0].href).toContain('?page=a')
+    expect(links[1].href).toContain('?page=a1')
+    expect(links[2].href).toContain('?page=b')
   })
 
   it('buildTocElement returns null when only one useful entry exists', () => {
@@ -423,8 +423,8 @@ describe('htmlBuilder utilities', () => {
     const links = article.querySelectorAll('a')
     // depending on normalization logic, the link may drop the directory
     // or preserve it; accept either form.
-    expect(links[0].href).toMatch(/\?page=(?:foo|dir%2Ffoo\.md)/)
-    expect(links[1].href).toContain('?page=bar')
+    expect(links[0].href).toMatch(/(\?page=(?:foo|dir%2Ffoo\.md)|#\/(?:foo|dir(?:%2F|\/)foo\.md))/)
+    expect(links[1].href).toMatch(/(\?page=bar|#\/bar)/)
     expect(links[2].href).toContain('/external')
   })
 

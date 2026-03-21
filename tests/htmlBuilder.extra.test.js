@@ -9,7 +9,7 @@ describe('htmlBuilder extra tests', () => {
     const anchors = nav.querySelectorAll('a')
     expect(anchors.length).toBe(2)
     expect(anchors[0].textContent).toBe('Home')
-    expect(anchors[0].getAttribute('href')).toContain('#home')
+    expect(anchors[0].getAttribute('href')).toContain('?page=home')
     expect(anchors[1].textContent).toBe('About')
   })
 

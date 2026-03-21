@@ -25,7 +25,8 @@ describe('nav focused branches', () => {
     const res = await nav.buildNav(navbarWrap, container, navHtml, '/content/', 'home', (s)=>s, () => {}, false)
     const brand = res.navbar.querySelector('.navbar-brand .navbar-item')
     expect(brand).toBeTruthy()
-    expect(brand.getAttribute('href')).toContain('page=foo')
+    const brandHref = brand.getAttribute('href') || ''
+    expect(brandHref.includes('page=foo') || brandHref.includes('#/foo')).toBe(true)
   })
 
   it('burger toggles active class on menu and burger', async () => {

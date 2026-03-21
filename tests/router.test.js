@@ -166,7 +166,7 @@ describe('router module', () => {
 
   it('fetchPageData will try common extensions for a bare slug', async () => {
     const base = '/content/'
-    const fakeData = { raw: '# Yo' }
+    const fakeData = { raw: '# bare' }
     // stub fetchMarkdown: succeed on first (.html) and later (for sanity)
     slugMgr.fetchMarkdown
       .mockImplementation((path) => {

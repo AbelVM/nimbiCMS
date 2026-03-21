@@ -62,7 +62,8 @@ describe('nav search & burger', () => {
     expect(results.style.display).toBe('block')
     const link = results.querySelector('a')
     expect(link).toBeTruthy()
-    expect(link.getAttribute('href')).toContain('?page=about')
+    const linkHref = link.getAttribute('href') || ''
+    expect(linkHref.includes('?page=about') || linkHref.includes('#/about')).toBe(true)
     expect(link.textContent).toContain('About')
   })
 })

@@ -10,6 +10,8 @@ import { parseMarkdownToHtml } from './markdown.js'
 import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
 import { createUI } from './ui.js'
+import { parseHrefToRoute } from './utils/urlHelper.js'
+import { injectSeoForPage, setSeoMap } from './seoManager.js'
 import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
 import { ensureBulma, setStyle, registerThemedElement } from './bulmaManager.js'
@@ -43,10 +45,18 @@ export function parseInitOptionsFromQuery(queryString) {
     let qs = typeof queryString === 'string' ? queryString : (typeof window !== 'undefined' && window.location ? window.location.search : '')
 
   if (!qs && typeof window !== 'undefined' && window.location && window.location.hash) {
-    const hash = window.location.hash
-    const idx = hash.indexOf('?')
-    if (idx !== -1) {
-      qs = hash.slice(idx)
+    try {
+      const parsed = parseHrefToRoute(window.location.href)
+      if (parsed && parsed.params) qs = parsed.params.startsWith('?') ? parsed.params : ('?' + parsed.params)
+      else {
+        const hash = window.location.hash
+        const idx = hash.indexOf('?')
+        if (idx !== -1) qs = hash.slice(idx)
+      }
+    } catch (e) {
+      const hash = window.location.hash
+      const idx = hash.indexOf('?')
+      if (idx !== -1) qs = hash.slice(idx)
     }
   }
 
@@ -382,7 +392,37 @@ export async function initCMS(options = {}) {
   } catch (e) { console.warn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
 
   try {
-     
+    
+    // Configure SEO map and inject minimal SEO metadata early (library-level injection)
+    try {
+      if (finalOptions && finalOptions.seoMap && typeof finalOptions.seoMap === 'object') setSeoMap(finalOptions.seoMap)
+    } catch (e) {}
+    // Attach a lightweight runtime error/rejection logger for debugging render issues.
+    try {
+      if (typeof window !== 'undefined') {
+        if (!window.__nimbiRenderingErrors__) window.__nimbiRenderingErrors__ = []
+        window.addEventListener('error', function(ev) {
+          try {
+            const rec = { type: 'error', message: ev && ev.message ? String(ev.message) : '', filename: ev && ev.filename ? String(ev.filename) : '', lineno: ev && ev.lineno ? ev.lineno : null, colno: ev && ev.colno ? ev.colno : null, stack: ev && ev.error && ev.error.stack ? ev.error.stack : null, time: Date.now() }
+            try { console.warn('[nimbi-cms] runtime error', rec.message) } catch (_) {}
+            window.__nimbiRenderingErrors__.push(rec)
+          } catch (_) {}
+        })
+        window.addEventListener('unhandledrejection', function(ev) {
+          try {
+            const rec = { type: 'unhandledrejection', reason: ev && ev.reason ? String(ev.reason) : '', time: Date.now() }
+            try { console.warn('[nimbi-cms] unhandledrejection', rec.reason) } catch (_) {}
+            window.__nimbiRenderingErrors__.push(rec)
+          } catch (_) {}
+        })
+      }
+    } catch (e) {}
+    try {
+      const parsedForSeo = parseHrefToRoute(typeof window !== 'undefined' ? window.location.href : '')
+      const pageForSeo = (parsedForSeo && parsedForSeo.page) ? parsedForSeo.page : (homePage || '_home.md')
+      try { injectSeoForPage(pageForSeo, initialDocumentTitle || '') } catch (e) {}
+    } catch (e) {}
+
     await (async () => {
 
   try {
@@ -547,6 +587,14 @@ export async function initCMS(options = {}) {
   try { setNotFoundPage(notFoundPage) } catch (err) { console.warn('[nimbi-cms] setNotFoundPage failed', err) }
   try { setContentBase(contentBase) } catch (err) { console.warn('[nimbi-cms] setContentBase failed', err) }
   try { setNotFoundPage(notFoundPage) } catch (err) { console.warn('[nimbi-cms] setNotFoundPage failed', err) }
+  try {
+    // Optional: attach a small sitemap download UI when a host enables it
+    if (typeof window !== 'undefined' && window.__nimbiAutoAttachSitemapUI) {
+      import('./runtimeSitemap.js').then(mod => {
+        try { if (mod && typeof mod.attachSitemapDownloadUI === 'function') mod.attachSitemapDownloadUI(document.body, { filename: 'sitemap.json' }) } catch (e) { /* ignore */ }
+      }).catch(() => {})
+    }
+  } catch (e) {}
     try {
       await fetchMarkdown(homePage, contentBase)
     } catch (e) {
@@ -610,11 +658,11 @@ export async function initCMS(options = {}) {
                     const finishWithAnchor = (href) => {
                     const a = document.createElement('a')
                     a.className = 'nimbi-version-label tag is-small'
-                    a.textContent = `Nimbi CMS v. ${v}`
+                    a.textContent = `nimbiCMS v. ${v}`
                     a.href = href || '#'
                     a.target = '_blank'
                     a.rel = 'noopener noreferrer nofollow'
-                    a.setAttribute('aria-label', `Nimbi CMS version ${v}`)
+                    a.setAttribute('aria-label', `nimbiCMS version ${v}`)
                     try { registerThemedElement(a) } catch (e) { /* ignore */ }
                     try { mountEl.appendChild(a) } catch (err) { console.warn('[nimbi-cms] append version label failed', err) }
                   }

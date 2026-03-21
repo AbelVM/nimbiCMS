@@ -112,24 +112,24 @@ describe('utils helpers', () => {
 
   it('buildPageUrl falls back when URLSearchParams is unavailable', () => {
     const orig = global.URLSearchParams
-    // eslint-disable-next-line no-global-assign
+     
     global.URLSearchParams = class { constructor () { throw new Error('boom') } }
     try {
       expect(buildPageUrl('test', 'h')).toBe('?page=test#h')
     } finally {
-      // eslint-disable-next-line no-global-assign
+       
       global.URLSearchParams = orig
     }
   })
 
   it('encodeURL falls back when encodeURI throws', () => {
     const orig = global.encodeURI
-    // eslint-disable-next-line no-global-assign
+     
     global.encodeURI = () => { throw new Error('boom') }
     try {
       expect(encodeURL('foo')).toBe('foo')
     } finally {
-      // eslint-disable-next-line no-global-assign
+       
       global.encodeURI = orig
     }
   })

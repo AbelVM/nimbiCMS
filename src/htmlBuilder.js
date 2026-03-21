@@ -1,7 +1,19 @@
-import { slugify, mdToSlug, slugToMd, fetchMarkdown } from './slugManager.js'
+import { slugify, mdToSlug, slugToMd, fetchMarkdown, notFoundPage } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
+import { buildCosmeticUrl, parseHrefToRoute } from './utils/urlHelper.js'
+import { setTag, setStructuredData, setMetaTags, markNotFound } from './seoManager.js'
+// Prefix the current pathname to cosmetic URLs so we replace any existing
+// `?page=` query instead of appending a hash to it.
+function fullCosmetic(page, anchor = null) {
+  try {
+    const base = (typeof location !== 'undefined' && location && typeof location.pathname === 'string') ? (location.pathname || '/') : '/'
+    return String(base) + buildCosmeticUrl(page, anchor)
+  } catch (e) {
+    return buildCosmeticUrl(page, anchor)
+  }
+}
 import { registerThemedElement } from './bulmaManager.js'
 import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
@@ -55,7 +67,15 @@ export function createNavTree(t, tree) {
   tree.forEach((item) => {
     const li = document.createElement('li')
     const a = document.createElement('a')
-    a.href = '#' + item.path
+    try {
+      const p = String(item.path || '')
+      try {
+        a.setAttribute('href', buildPageUrl(p))
+      } catch (e) {
+        if (p && p.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p))
+        else a.setAttribute('href', fullCosmetic(p))
+      }
+    } catch (e) { a.setAttribute('href', '#' + item.path) }
     a.textContent = item.name
     li.appendChild(a)
     if (item.children && item.children.length) {
@@ -63,7 +83,15 @@ export function createNavTree(t, tree) {
       item.children.forEach((c) => {
         const cli = document.createElement('li')
         const ca = document.createElement('a')
-        ca.href = '#' + c.path
+        try {
+          const cp = String(c.path || '')
+          try {
+            ca.setAttribute('href', buildPageUrl(cp))
+          } catch (e) {
+            if (cp && cp.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp))
+            else ca.setAttribute('href', fullCosmetic(cp))
+          }
+        } catch (e) { ca.setAttribute('href', '#' + c.path) }
         ca.textContent = c.name
         cli.appendChild(ca)
         subul.appendChild(cli)
@@ -252,8 +280,11 @@ let _lastContentBasePath = ''
  * @param {string} [pagePath] - Optional page path used for relative link resolution.
  * @returns {Promise<void>} - Resolves when anchor rewriting and any async title fetches complete.
  */
-async function rewriteAnchors(article, contentBase, pagePath) {
+async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
   try {
+    // default to canonical hrefs unless explicitly overridden
+    opts = opts || {}
+    if (typeof opts.canonical === 'undefined') opts.canonical = true
     const anchors = article.querySelectorAll('a')
     if (!anchors || !anchors.length) return
 
@@ -290,17 +321,18 @@ async function rewriteAnchors(article, contentBase, pagePath) {
         try {
           if (href.startsWith('?') || href.indexOf('?') !== -1) {
             try {
-              const tmpUrl = new URL(href, contentBase || location.href)
-              const pageParam = tmpUrl.searchParams.get('page')
-              if (pageParam && pageParam.indexOf('/') === -1 && pagePath) {
-                const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
-                if (dir) {
-                  const newRel = normalizePath(dir + pageParam)
-                  a.setAttribute('href', buildPageUrl(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null))
-                  continue
-                }
-              }
-            } catch (err) { /* ignore URL parse errors */ }
+                  const tmpUrl = new URL(href, contentBase || location.href)
+                  const pageParam = tmpUrl.searchParams.get('page')
+                  if (pageParam && pageParam.indexOf('/') === -1 && pagePath) {
+                    const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+                    if (dir) {
+                      const newRel = normalizePath(dir + pageParam)
+                      const urlVal = opts && opts.canonical ? buildPageUrl(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null) : fullCosmetic(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null)
+                      a.setAttribute('href', urlVal)
+                      continue
+                    }
+                  }
+                } catch (err) { /* ignore URL parse errors */ }
           }
         } catch (err) { /* ignore pre-check errors */ }
         if (href.startsWith('/') && !href.endsWith('.md')) continue
@@ -359,10 +391,23 @@ async function rewriteAnchors(article, contentBase, pagePath) {
                 } catch (err) { /* ignore iteration errors */ }
               }
               if (slugKey) {
-                a.setAttribute('href', buildPageUrl(slugKey))
+                const urlVal = opts && opts.canonical ? buildPageUrl(slugKey, null) : fullCosmetic(slugKey)
+                a.setAttribute('href', urlVal)
               } else {
-                htmlPending.add(rel)
-                htmlAnchorInfo.push({ node: a, rel })
+                // If the resolved target has no file extension, try the
+                // .html candidate when probing for titles. This avoids
+                // issuing fetches for bare slug paths (e.g. `nimbicms`) which
+                // would request `/nimbicms` from the origin and produce
+                // confusing 404s on many static hosts. Store the HTML
+                // candidate in the pending list and record it on the
+                // anchor info so later mapping logic uses the canonical
+                // path form.
+                let htmlRel = rel
+                try {
+                  if (!/\.[^\/]+$/.test(String(rel || ''))) htmlRel = String(rel || '') + '.html'
+                } catch (err) { htmlRel = rel }
+                htmlPending.add(htmlRel)
+                htmlAnchorInfo.push({ node: a, rel: htmlRel })
               }
             }
           }
@@ -431,9 +476,11 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       let slug = null
       try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { console.warn('[htmlBuilder] mdToSlug access failed', err) }
       if (slug) {
-        a.setAttribute('href', buildPageUrl(slug, frag))
+        const urlVal = opts && opts.canonical ? buildPageUrl(slug, frag) : fullCosmetic(slug, frag)
+        a.setAttribute('href', urlVal)
       } else {
-        a.setAttribute('href', buildPageUrl(rel, frag))
+        const urlVal = opts && opts.canonical ? buildPageUrl(rel, frag) : fullCosmetic(rel, frag)
+        a.setAttribute('href', urlVal)
       }
     }
     for (const info of htmlAnchorInfo) {
@@ -443,8 +490,13 @@ async function rewriteAnchors(article, contentBase, pagePath) {
       if (!slug) {
         try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { console.warn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
       }
-      if (slug) a.setAttribute('href', buildPageUrl(slug))
-      else a.setAttribute('href', buildPageUrl(rel))
+      if (slug) {
+        const urlVal = opts && opts.canonical ? buildPageUrl(slug, null) : fullCosmetic(slug)
+        a.setAttribute('href', urlVal)
+      } else {
+        const urlVal = opts && opts.canonical ? buildPageUrl(rel, null) : fullCosmetic(rel)
+        a.setAttribute('href', urlVal)
+      }
     }
   } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
 }
@@ -479,12 +531,27 @@ function computeSlug(parsed, article, pagePath, anchor) {
     if (displayTitle) slugKey = slugify(displayTitle)
     if (!slugKey) slugKey = '_home'
     try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { console.warn('[htmlBuilder] computeSlug set slug mapping failed', err) }
-    try {
-      const curHash = anchor || (location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : '')
-      try {
-        history.replaceState({ page: slugKey }, '', buildPageUrl(slugKey, curHash))
-      } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
-    } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
+        try {
+        // Prefer a normalized anchor extracted via `parseHrefToRoute`, but
+        // avoid persisting an anchor from a different page when rendering a new page.
+        let curHash = anchor || ''
+        if (!curHash) {
+          try {
+            const parsedCurrent = parseHrefToRoute(typeof location !== 'undefined' ? location.href : '')
+            // Only reuse the current anchor if it belongs to the same page slug.
+            if (parsedCurrent && parsedCurrent.anchor && parsedCurrent.page && String(parsedCurrent.page) === String(slugKey)) {
+              curHash = parsedCurrent.anchor
+            } else {
+              curHash = ''
+            }
+          } catch (err) {
+            curHash = ''
+          }
+        }
+        try {
+          history.replaceState({ page: slugKey }, '', fullCosmetic(slugKey, curHash))
+        } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
+      } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
   } catch (err) { console.warn('[htmlBuilder] computeSlug failed', err) }
   try {
     if (parsed && parsed.meta && parsed.meta.title && topH1) {
@@ -988,6 +1055,24 @@ export function renderNotFound(contentWrap, t, e) {
     notFound.appendChild(h)
     notFound.appendChild(p)
     if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(notFound)
+  try {
+    try { markNotFound({ title: t ? (t('notFound') || 'Not Found') : 'Not Found', description: t ? (t('notFoundDescription') || '') : '' }, notFoundPage, t ? (t('notFound') || 'Not Found') : 'Not Found', t ? (t('notFoundDescription') || '') : '') } catch (err) {}
+  } catch (err) {}
+    try {
+      // Optional client-side redirect to a known 404 path. Hosts can set
+      // `window.__nimbiNotFoundRedirect = '/404.html'` (or similar) to enable.
+      try {
+        const redirectPath = (typeof window !== 'undefined' && window.__nimbiNotFoundRedirect) ? String(window.__nimbiNotFoundRedirect).trim() : null
+        if (redirectPath) {
+          try {
+            const target = new URL(redirectPath, location.origin).toString()
+            if ((location.href || '').split('#')[0] !== target) {
+              try { location.replace(target) } catch (e) { location.href = target }
+            }
+          } catch (e) { /* invalid URL, ignore */ }
+        }
+      } catch (e) {}
+    } catch (err) {}
   }
 
  
@@ -1059,23 +1144,24 @@ export function attachTocClickHandler(toc) {
         if (!a) return
         const href = a.getAttribute('href') || ''
         try {
-          const url = new URL(href, location.href)
-          const pageParam = url.searchParams.get('page')
-          const hash = url.hash ? url.hash.replace(/^#/, '') : null
+          // Use the central href parser so we correctly handle both canonical
+          // and cosmetic forms (e.g. "?page=foo" and "#/foo#anchor?x=1").
+          const parsedHref = parseHrefToRoute(href)
+          const pageParam = parsedHref && parsedHref.page ? parsedHref.page : null
+          const hash = parsedHref && parsedHref.anchor ? parsedHref.anchor : null
           if (!pageParam && !hash) return
           ev.preventDefault()
-          
+
           let currentPage = null
           try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (err) { currentPage = null; console.warn('[htmlBuilder] access history.state failed', err) }
           try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (err) { console.warn('[htmlBuilder] parse current location failed', err) }
 
           if ((!pageParam && hash) || (pageParam && currentPage && String(pageParam) === String(currentPage))) {
             try {
-              
               if (!pageParam && hash) {
                 try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               } else {
-                try { history.replaceState({ page: currentPage || pageParam }, '', buildPageUrl(currentPage || pageParam, hash)) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
+                try { history.replaceState({ page: currentPage || pageParam }, '', fullCosmetic(currentPage || pageParam, hash)) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
               }
             } catch (err) { console.warn('[htmlBuilder] update history for anchor failed', err) }
             try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (err) { console.warn('[htmlBuilder] stopPropagation failed', err) }
@@ -1083,8 +1169,7 @@ export function attachTocClickHandler(toc) {
             return
           }
 
-          
-          history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
+          history.pushState({ page: pageParam }, '', fullCosmetic(pageParam, hash))
           try {
             if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') {
               try { window.renderByQuery() } catch (err) { console.warn('[htmlBuilder] window.renderByQuery failed', err) }
@@ -1216,23 +1301,29 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
       onScroll()
     } else {
       if (!btn._nimbiObserver) {
-        const obs = new IntersectionObserver((entries) => {
-          for (const entry of entries) {
-            if (entry.target instanceof Element) {
-              if (entry.isIntersecting) {
-                btn.classList.remove('show')
-                if (tocLabel) tocLabel.classList.remove('show')
-              } else {
-                btn.classList.add('show')
-                if (tocLabel) tocLabel.classList.add('show')
+        if (typeof globalThis !== 'undefined' && typeof globalThis.IntersectionObserver !== 'undefined') {
+          const ObsCtor = globalThis.IntersectionObserver
+          const obs = new ObsCtor((entries) => {
+            for (const entry of entries) {
+              if (entry.target instanceof Element) {
+                if (entry.isIntersecting) {
+                  btn.classList.remove('show')
+                  if (tocLabel) tocLabel.classList.remove('show')
+                } else {
+                  btn.classList.add('show')
+                  if (tocLabel) tocLabel.classList.add('show')
+                }
               }
             }
-          }
-        }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
-        btn._nimbiObserver = obs
+          }, { root: (container instanceof Element) ? container : ((mountEl instanceof Element) ? mountEl : null), threshold: 0 })
+          btn._nimbiObserver = obs
+        } else {
+          // No IntersectionObserver available in this environment; mark observer as null
+          btn._nimbiObserver = null
+        }
       }
-      try { btn._nimbiObserver.disconnect() } catch (err) { console.warn('[htmlBuilder] observer disconnect failed', err) }
-      try { btn._nimbiObserver.observe(topH1) } catch (err) { console.warn('[htmlBuilder] observer observe failed', err) }
+      try { if (btn._nimbiObserver && typeof btn._nimbiObserver.disconnect === 'function') btn._nimbiObserver.disconnect() } catch (err) { console.warn('[htmlBuilder] observer disconnect failed', err) }
+      try { if (btn._nimbiObserver && typeof btn._nimbiObserver.observe === 'function') btn._nimbiObserver.observe(topH1) } catch (err) { console.warn('[htmlBuilder] observer observe failed', err) }
       try {
         const checkIntersect = () => {
           try {
@@ -1249,7 +1340,7 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
           } catch (err) { console.warn('[htmlBuilder] checkIntersect failed', err) }
         }
         checkIntersect()
-        if (!('IntersectionObserver' in window)) {
+        if (!(typeof globalThis !== 'undefined' && typeof globalThis.IntersectionObserver !== 'undefined')) {
           setTimeout(checkIntersect, 100)
         }
       } catch (err) { console.warn('[htmlBuilder] checkIntersect outer failed', err) }

@@ -9,6 +9,7 @@
 export { addHook, onPageLoad, onNavBuild, transformHtml, runHooks, _clearHooks } from './nimbi-cms.js'
 
 import { fetchPageData } from './router.js'
+import { parseHrefToRoute } from './utils/urlHelper.js'
 import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton, createNavTree } from './htmlBuilder.js'
 import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
@@ -105,12 +106,31 @@ export function createUI(opts) {
   }
 
   async function renderByQuery() {
-    let raw = (new URLSearchParams(location.search).get('page')) || homePage
-    const hashAnchor = location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
     try {
+      if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
+        try {
+          window.__nimbiCMSDebug = window.__nimbiCMSDebug || {}
+          window.__nimbiCMSDebug.renderByQuery = (window.__nimbiCMSDebug.renderByQuery || 0) + 1
+        } catch (_) {}
+      }
+      let parsed = parseHrefToRoute(location.href)
+      // If a path-style URL was used (e.g. /slug) convert it to the
+      // canonical `?page=slug[...]` form so the rest of the pipeline only
+      // sees the approved patterns. Use replaceState so we don't reload.
+      if (parsed && parsed.type === 'path' && parsed.page) {
+        try {
+          let out = '?page=' + encodeURIComponent(parsed.page || '')
+          if (parsed.params) out += (out.includes('?') ? '&' : '?') + parsed.params
+          if (parsed.anchor) out += '#' + encodeURIComponent(parsed.anchor)
+          try { history.replaceState(history.state, '', out) } catch (e) { try { history.replaceState({}, '', out) } catch (_e) {} }
+          parsed = parseHrefToRoute(location.href)
+        } catch (e) { /* ignore replace failures */ }
+      }
+      const raw = (parsed && parsed.page) ? parsed.page : homePage
+      const hashAnchor = parsed && parsed.anchor ? parsed.anchor : null
       await renderPage(raw, hashAnchor)
     } catch (e) {
-      console.warn('[nimbi-cms] renderByQuery failed for', raw, e)
+      console.warn('[nimbi-cms] renderByQuery failed', e)
       renderNotFound(contentWrap, t, e)
     }
   }

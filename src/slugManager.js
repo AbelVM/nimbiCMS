@@ -59,6 +59,7 @@ export function setLanguages(list) {
 export function getLanguages() { return availableLanguages }
 
 import * as l10n from './l10nManager.js'
+import { parseHrefToRoute } from './utils/urlHelper.js'
 
 let _slugWorker = null
 import slugWorkerCode from './worker/slugWorker.js?raw'
@@ -463,6 +464,15 @@ export function clearFetchCache() { fetchCache.clear() }
  */
 export let fetchMarkdown = async function(path, base) {
   if (!path) throw new Error('path required')
+  // Accept cosmetic or canonical hrefs and extract page token for internal fetches
+  try {
+    if (typeof path === 'string' && (path.indexOf('?page=') !== -1 || path.startsWith('?') || path.startsWith('#/') || path.indexOf('#/') !== -1)) {
+      try {
+        const parsed = parseHrefToRoute(path)
+        if (parsed && parsed.page) path = parsed.page
+      } catch (e) {}
+    }
+  } catch (e) {}
   try {
     const o = (String(path || '').match(/([^\/]+)\.md(?:$|[?#])/) || [])[1]
     if (o && slugToMd.has(o)) {
@@ -480,7 +490,12 @@ export let fetchMarkdown = async function(path, base) {
     // the relative URL form so consumers/tests that expect a leading
     // slash can assert on the fetch argument.
     if (baseClean && baseClean.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
-      url = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+      // Resolve root-relative content bases to an absolute URL so Node's fetch
+      // (undici) receives a valid absolute URL. In browser environments this
+      // will match location.origin; in tests we fall back to http://localhost.
+      const rel = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+      const origin = (typeof location !== 'undefined' && location && location.origin) ? location.origin : 'http://localhost'
+      url = origin.replace(/\/$/, '') + rel
     } else {
       // Resolve to an absolute URL for other base forms so Node fetch works.
       let baseForResolve = origin + '/'
