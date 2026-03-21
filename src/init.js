@@ -257,7 +257,8 @@ export async function initCMS(options = {}) {
     availableLanguages,
     homePage = '_home.md',
     notFoundPage = '_404.md',
-    navigationPage = '_navigation.md'
+    navigationPage = '_navigation.md',
+    exposeSitemap = true
   } = finalOptions
 
   try {
@@ -588,6 +589,21 @@ export async function initCMS(options = {}) {
   try { setContentBase(contentBase) } catch (err) { console.warn('[nimbi-cms] setContentBase failed', err) }
   try { setNotFoundPage(notFoundPage) } catch (err) { console.warn('[nimbi-cms] setNotFoundPage failed', err) }
   try {
+    // Optional: expose sitemap endpoints for crawlers when enabled (opt-in).
+    // Hosts can enable by passing `exposeSitemap: true` to `initCMS()` or
+    // by setting `window.__nimbiExposeSitemap = true` before init.
+    if (exposeSitemap === true || (typeof window !== 'undefined' && window.__nimbiExposeSitemap)) {
+      try {
+        const mod = await import('./runtimeSitemap.js')
+        try {
+          if (mod && typeof mod.handleSitemapRequest === 'function') {
+            const handled = mod.handleSitemapRequest({ includeAllMarkdown: true })
+            if (handled) return
+          }
+        } catch (e) { /* ignore runtime sitemap handler errors */ }
+      } catch (e) { /* ignore dynamic import errors */ }
+    }
+
     // Optional: attach a small sitemap download UI when a host enables it
     if (typeof window !== 'undefined' && window.__nimbiAutoAttachSitemapUI) {
       import('./runtimeSitemap.js').then(mod => {

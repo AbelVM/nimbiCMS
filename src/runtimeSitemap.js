@@ -145,3 +145,69 @@ export function attachSitemapDownloadUI(target, opts = {}) {
     return wrapper
   } catch (e) { console.warn('[runtimeSitemap] attach UI failed', e); return null }
 }
+
+/**
+ * Handle a direct request for a sitemap route at runtime.
+ * Intercepts requests for `/sitemap`, `/sitemap.html`, and `/sitemap.xml`
+ * when the host serves the SPA `index.html` for those paths. This allows
+ * crawlers that execute JavaScript (e.g. Google) to receive a sitemap
+ * generated from the runtime index data. This is opt-in and must be
+ * enabled by the host via `initCMS({ exposeSitemap: true })` or
+ * `window.__nimbiExposeSitemap = true`.
+ *
+ * Returns `true` when the request was handled and the document was
+ * replaced with the sitemap contents; `false` otherwise.
+ *
+ * Note: because this runs client-side there is no server-side
+ * `Content-Type` header control. For full crawler compatibility a
+ * server-generated sitemap.xml is preferred.
+ */
+export function handleSitemapRequest(opts = {}) {
+  try {
+    if (typeof location === 'undefined' || typeof document === 'undefined') return false
+    const pathname = (location.pathname || '/').replace(/\/+/g, '/')
+    const name = pathname.split('/').filter(Boolean).pop() || ''
+    if (!name) return false
+    const wantXml = /^(sitemap|sitemap\.xml)$/i.test(name)
+    const wantHtml = /^(sitemap|sitemap\.html)$/i.test(name)
+    if (!wantXml && !wantHtml) return false
+
+    const json = generateSitemapJson(opts)
+
+    if (wantXml) {
+      const xml = generateSitemapXml(json)
+      try {
+        document.open()
+        document.write(xml)
+        document.close()
+      } catch (e) {
+        try { document.body.innerHTML = '<pre>' + _escapeXml(xml) + '</pre>' } catch (e2) {}
+      }
+      return true
+    }
+
+    // sitemap.html
+    try {
+      let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
+      html += '<h1>Sitemap</h1><ul>'
+      for (const e of (json && json.entries) || []) {
+        try {
+          const loc = String(e.loc || '')
+          html += `<li><a href="${loc}">${loc}</a></li>`
+        } catch (err) { /* ignore per-entry */ }
+      }
+      html += '</ul></body></html>'
+      try {
+        document.open()
+        document.write(html)
+        document.close()
+      } catch (e) {
+        try { document.body.innerHTML = html } catch (e2) {}
+      }
+      return true
+    } catch (e) {
+      console.warn('[runtimeSitemap] handleSitemapRequest failed to render', e)
+      return false
+    }
+  } catch (e) { console.warn('[runtimeSitemap] handleSitemapRequest failed', e); return false }
+}
