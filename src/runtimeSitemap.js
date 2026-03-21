@@ -81,6 +81,74 @@ export function generateSitemapXml(json) {
   return s
 }
 
+/**
+ * Generate RSS 2.0 feed from sitemap JSON
+ * @param {Object|Array} json
+ * @returns {string}
+ */
+export function generateRssXml(json) {
+  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : (json && json.entries ? json.entries : []))
+  const base = _getBase().split('?')[0]
+  let s = '<?xml version="1.0" encoding="UTF-8"?>\n'
+  s += '<rss version="2.0">\n'
+  s += '<channel>\n'
+  s += `<title>${_escapeXml('Sitemap RSS')}</title>\n`
+  s += `<link>${_escapeXml(base)}</link>\n`
+  s += `<description>${_escapeXml('RSS feed generated from site index')}</description>\n`
+  const lastBuild = (json && json.generatedAt) ? new Date(json.generatedAt).toUTCString() : new Date().toUTCString()
+  s += `<lastBuildDate>${_escapeXml(lastBuild)}</lastBuildDate>\n`
+  for (const e of entries) {
+    try {
+      const loc = String(e.loc || e.path || '')
+      s += '<item>\n'
+      s += `<title>${_escapeXml(String(e.path || e.loc || ''))}</title>\n`
+      s += `<link>${_escapeXml(loc)}</link>\n`
+      s += `<guid>${_escapeXml(loc)}</guid>\n`
+      if (e && e.lastmod) {
+        try {
+          const dt = new Date(e.lastmod)
+          if (!isNaN(dt)) s += `<pubDate>${_escapeXml(dt.toUTCString())}</pubDate>\n`
+        } catch (_) {}
+      }
+      s += '</item>\n'
+    } catch (err) { /* per-item ignore */ }
+  }
+  s += '</channel>\n'
+  s += '</rss>\n'
+  return s
+}
+
+/**
+ * Generate Atom 1.0 feed from sitemap JSON
+ * @param {Object|Array} json
+ * @returns {string}
+ */
+export function generateAtomXml(json) {
+  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : (json && json.entries ? json.entries : []))
+  const base = _getBase().split('?')[0]
+  const updated = (json && json.generatedAt) ? new Date(json.generatedAt).toISOString() : new Date().toISOString()
+  let s = '<?xml version="1.0" encoding="utf-8"?>\n'
+  s += '<feed xmlns="http://www.w3.org/2005/Atom">\n'
+  s += `<title>${_escapeXml('Sitemap Atom')}</title>\n`
+  s += `<link href="${_escapeXml(base)}" />\n`
+  s += `<updated>${_escapeXml(updated)}</updated>\n`
+  s += `<id>${_escapeXml(base)}</id>\n`
+  for (const e of entries) {
+    try {
+      const loc = String(e.loc || e.path || '')
+      const entryUpdated = (e && e.lastmod) ? (new Date(e.lastmod).toISOString()) : updated
+      s += '<entry>\n'
+      s += `<title>${_escapeXml(String(e.path || e.loc || ''))}</title>\n`
+      s += `<link href="${_escapeXml(loc)}" />\n`
+      s += `<id>${_escapeXml(loc)}</id>\n`
+      s += `<updated>${_escapeXml(entryUpdated)}</updated>\n`
+      s += '</entry>\n'
+    } catch (err) { /* per-entry ignore */ }
+  }
+  s += '</feed>\n'
+  return s
+}
+
 function _extractLinksFromText(text) {
   try {
     const out = []
@@ -251,6 +319,8 @@ export function handleSitemapRequest(opts = {}) {
     // Only handle when the query contains the single `sitemap` key (value may be empty).
     let wantXml = false
     let wantHtml = false
+      let wantRss = false
+      let wantAtom = false
     try {
       if (typeof location.search === 'string' && location.search) {
         const sp = new URLSearchParams(location.search)
@@ -292,6 +362,24 @@ export function handleSitemapRequest(opts = {}) {
       }
     } catch (e) { /* ignore hash parsing issues */ }
 
+      if (typeof location.search === 'string' && location.search) {
+        const sp = new URLSearchParams(location.search)
+        if (sp.has('rss')) {
+          let onlyRss = true
+          for (const k of sp.keys()) { if (k !== 'rss') { onlyRss = false; break } }
+          if (onlyRss) {
+            if (location.hash && String(location.hash || '').trim()) return false
+            wantRss = true
+          } else return false
+        } else if (sp.has('atom')) {
+          let onlyAtom = true
+          for (const k of sp.keys()) { if (k !== 'atom') { onlyAtom = false; break } }
+          if (onlyAtom) {
+            if (location.hash && String(location.hash || '').trim()) return false
+            wantAtom = true
+          } else return false
+        }
+      }
     // Honor host preference to render HTML for `?sitemap` when explicitly requested
     try {
       if (typeof window !== 'undefined' && window && window.__nimbiPreferHtmlSitemap === true && wantXml) {
@@ -307,7 +395,9 @@ export function handleSitemapRequest(opts = {}) {
       if (!name) return false
       wantXml = /^(sitemap|sitemap\.xml)$/i.test(name)
       wantHtml = /^(sitemap|sitemap\.html)$/i.test(name)
-      if (!wantXml && !wantHtml) return false
+      wantRss = /^(rss|rss\.xml)$/i.test(name)
+      wantAtom = /^(atom|atom\.xml)$/i.test(name)
+      if (!wantXml && !wantHtml && !wantRss && !wantAtom) return false
     }
 
     const json = generateSitemapJson(opts)
@@ -318,11 +408,14 @@ export function handleSitemapRequest(opts = {}) {
     // (we will write the sitemap later when the fetch completes) so the
     // SPA init can short-circuit; the actual document replacement happens
     // asynchronously when results arrive.
-    async function _fetchFallbackAndWrite() {
+    async function _fetchFallbackAndWrite(format = 'sitemap') {
       try {
         const entries = await _fetchNavDerivedEntries(opts)
         if (entries && entries.length) {
-          const xml2 = generateSitemapXml({ generatedAt: new Date().toISOString(), entries })
+          let xml2 = ''
+          if (format === 'rss') xml2 = generateRssXml({ generatedAt: new Date().toISOString(), entries })
+          else if (format === 'atom') xml2 = generateAtomXml({ generatedAt: new Date().toISOString(), entries })
+          else xml2 = generateSitemapXml({ generatedAt: new Date().toISOString(), entries })
           try {
             try {
               document.open('application/xml', 'replace')
@@ -405,6 +498,66 @@ export function handleSitemapRequest(opts = {}) {
       } else {
         // start async fallback but still return true synchronously
         _fetchFallbackAndWrite()
+      }
+      return true
+    }
+
+    if (wantRss) {
+      if (json && Array.isArray(json.entries) && json.entries.length) {
+        const rss = generateRssXml(json)
+        try {
+          try { document.open('application/rss+xml', 'replace') } catch (_) { try { document.open() } catch (_) {} }
+          document.write(rss)
+          document.close()
+          try {
+            if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+              const blob = new Blob([rss], { type: 'application/rss+xml' })
+              const blobUrl = URL.createObjectURL(blob)
+              try { location.href = blobUrl } catch (_) { try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {} }
+              setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
+            }
+          } catch (_) {}
+        } catch (e) {
+          try {
+            if (typeof location !== 'undefined' && location) {
+              const dataUrl = 'data:application/rss+xml;charset=utf-8,' + encodeURIComponent(rss)
+              try { location.href = dataUrl } catch (_) {}
+            }
+          } catch (_) {}
+          try { document.body.innerHTML = '<pre>' + _escapeXml(rss) + '</pre>' } catch (e2) {}
+        }
+      } else {
+        _fetchFallbackAndWrite('rss')
+      }
+      return true
+    }
+
+    if (wantAtom) {
+      if (json && Array.isArray(json.entries) && json.entries.length) {
+        const atom = generateAtomXml(json)
+        try {
+          try { document.open('application/atom+xml', 'replace') } catch (_) { try { document.open() } catch (_) {} }
+          document.write(atom)
+          document.close()
+          try {
+            if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+              const blob = new Blob([atom], { type: 'application/atom+xml' })
+              const blobUrl = URL.createObjectURL(blob)
+              try { location.href = blobUrl } catch (_) { try { if (typeof window !== 'undefined' && window && typeof window.open === 'function') window.open(blobUrl, '_self') } catch (_) {} }
+              setTimeout(() => { try { URL.revokeObjectURL(blobUrl) } catch (_) {} }, 5000)
+            }
+          } catch (_) {}
+        } catch (e) {
+          try {
+            if (typeof location !== 'undefined' && location) {
+              const dataUrl = 'data:application/atom+xml;charset=utf-8,' + encodeURIComponent(atom)
+              try { location.href = dataUrl } catch (_) {}
+            }
+          } catch (_) {}
+          try { document.body.innerHTML = '<pre>' + _escapeXml(atom) + '</pre>' } catch (e2) {}
+        }
+      } else {
+        _fetchFallbackAndWrite('atom')
       }
       return true
     }

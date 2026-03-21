@@ -250,6 +250,8 @@ export function markNotFound(opts: any): any
 // --- from src/runtimeSitemap.js
 export function generateSitemapJson(opts: object): {generatedAt:string,entries:Array}
 export function generateSitemapXml(json: object|any[]): string
+export function generateRssXml(json: object|any[]): string
+export function generateAtomXml(json: object|any[]): string
 export function attachSitemapDownloadUI(opts: object): Element|null
 export function handleSitemapRequest(opts: any): any
 

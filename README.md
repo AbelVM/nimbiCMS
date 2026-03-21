@@ -220,7 +220,7 @@ This behavior is covered by the test-suite (see the canonical-link and URL handl
 | `homePage` | `string` | `'_home.md'` | Path for the site home page (`.md` or `.html`). |
 | `notFoundPage` | `string` | `'_404.md'` | Path for the not-found page (`.md` or `.html`). |
 | `navigationPage` | `string` | `'_navigation.md'` | Path for the navigation markdown used to build the navbar (`.md` or `.html`). |
-| `exposeSitemap` | `boolean` | `true` | When `true` the client exposes a runtime sitemap at `/sitemap.xml` and `/sitemap.html`. The sitemap is generated at runtime (no build-time generation) and emits canonical `?page=` URLs (for example `/?page=blog/my-post`) while the UI preserves cosmetic `/#/slug` navigation. Requires SPA fallback (the server must serve `index.html` for `/sitemap*` requests). Disable with `initCMS({ exposeSitemap: false })`. For broad crawler coverage prefer generating a server-side `sitemap.xml` and listing it in `robots.txt`. |
+| `exposeSitemap` | `boolean` | `true` | When `true` the client exposes a runtime sitemap at `/sitemap.xml` and `/sitemap.html`. The sitemap is generated at runtime (no build-time generation) and emits canonical `?page=` URLs (for example `/?page=blog/my-post`) while the UI preserves cosmetic `/#/slug` navigation. Requires SPA fallback (the server must serve `index.html` for `/sitemap*` requests). Disable with `initCMS({ exposeSitemap: false })`. For broad crawler coverage prefer generating a server-side `sitemap.xml` and listing it in `robots.txt`. You can also get an XML sitemap at `/?sitemap` endpoint. |
 
 > Note: All these files must be within `contentPath`
 
