@@ -10242,7 +10242,7 @@ function Xo(e = {}) {
       typeof window < "u" && window && window.__nimbiPreferHtmlSitemap === !0 && t && (t = !1, n = !0);
     } catch {
     }
-    if (!t && !n) {
+    if (!t && !n && !i && !r) {
       const o = (location.pathname || "/").replace(/\/\/+/g, "/").split("/").filter(Boolean).pop() || "";
       if (!o || (t = /^(sitemap|sitemap\.xml)$/i.test(o), n = /^(sitemap|sitemap\.html)$/i.test(o), i = /^(rss|rss\.xml)$/i.test(o), r = /^(atom|atom\.xml)$/i.test(o), !t && !n && !i && !r)) return !1;
     }

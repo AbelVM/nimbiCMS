@@ -389,7 +389,8 @@ export function handleSitemapRequest(opts = {}) {
     } catch (e) { /* ignore preference check errors */ }
 
     // Fallback: handle path-based /sitemap and /sitemap.xml routes
-    if (!wantXml && !wantHtml) {
+    // Only run when no explicit query/hash requested a sitemap/rss/atom
+    if (!wantXml && !wantHtml && !wantRss && !wantAtom) {
       const pathname = (location.pathname || '/').replace(/\/\/+/g, '/')
       const name = pathname.split('/').filter(Boolean).pop() || ''
       if (!name) return false

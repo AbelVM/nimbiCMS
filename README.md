@@ -38,7 +38,8 @@ The code lives at [https://github.com/AbelVM/nimbiCMS](https://github.com/AbelVM
 - Image preview modal with zoom controls, wheel zoom, drag pan, double-click to zoom, and touch pinch support.
 - Syntax highlighting using [highlight.js](https://highlightjs.org/) — languages are auto-registered when detected.
 - Simple theming (light/dark), Bulma and hightlight.js customization options.
-- [RSS 2.0](https://www.rssboard.org/rss-specification) and [ATOM 1.0](https://www.rfc-editor.org/rfc/rfc4287) support
+- Feeding support: [RSS 2.0](https://www.rssboard.org/rss-specification) at `/?rss` and [ATOM 1.0](https://www.rfc-editor.org/rfc/rfc4287) at  `/?atom`
+- Dynamic sitemap at `/?sitemap`
 - Simplified deliverables: regardless all the dynamic imports, the bundle is kept in one JS file and one CSS file
 - Bundle is compact size
   - JS file: 243.74 kB, gzipped 70.62 kB (for UMD bundle)
