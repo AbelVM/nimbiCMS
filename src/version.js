@@ -1,4 +1,12 @@
 /**
+ * Version utilities.
+ *
+ * Retrieve the build-injected package version string.
+ *
+ * @module version
+ */
+
+/**
  * Return the package version string.
  *
  * This value is injected at build time via Vite's `define` configuration.

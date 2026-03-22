@@ -1,3 +1,11 @@
+/**
+ * Routing and page resolution helpers.
+ *
+ * Utilities for resolving page slugs, caching resolution results, and
+ * supporting SPA-style navigation within the runtime.
+ *
+ * @module router
+ */
 import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath, notFoundPage, homePage } from './slugManager.js'
 import * as l10n from './l10nManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'

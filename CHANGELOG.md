@@ -6,6 +6,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 - ...
 - **[FEAT]** Added cosmetic URLs (`website/#/slug[#anchor][?params]`) on top of canonical URLs (`website/?page=slug[#anchor][?params]`)
+- **[FEAT]** Improved parallel indexing, 6x
 - **[FEAT]** Improved SEO management
 - **[FEAT]** Added a dynamic sitemap
 - **[FEAT]** Added dynamic RSS 2.0 and ATOM 1.0 endpoints
@@ -49,7 +50,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 ## v1.0.1
 
-- **[FIX]** Disabled image preview for for images wrapped in links.
+- **[FIX]** Disabled image preview for images wrapped in links.
 - **[DOCS]** Document `.nojekyll` to serve underscore-markdown files in gh-pages.
 - **[FIX]** Use repo-relative contentPath to avoid root fetches.
 - **[FIX]** Fixed gh-pages path.

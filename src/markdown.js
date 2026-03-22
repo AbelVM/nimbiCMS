@@ -1,3 +1,11 @@
+/**
+ * Markdown parsing and renderer helpers.
+ *
+ * Provides utilities for converting Markdown to HTML, managing renderer
+ * workers, and extracting table-of-contents data.
+ *
+ * @module markdown
+ */
 import { marked } from 'marked'
 import RendererWorker from './worker/renderer.js?worker&inline'
 import * as RendererModule from './worker/renderer.js'

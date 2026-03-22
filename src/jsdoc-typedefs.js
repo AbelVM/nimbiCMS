@@ -1,7 +1,9 @@
 /**
- * Shared JSDoc typedefs to improve emitted declaration generation.
- * This file does not execute code; it only provides typedef annotations
- * that TypeDoc/gen-dts can pick up.
+ * Shared JSDoc typedefs for type generation.
+ *
+ * Centralized typedefs used by declaration generation and tooling.
+ *
+ * @module jsdoc-typedefs
  */
 
 /**

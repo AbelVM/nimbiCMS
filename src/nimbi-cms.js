@@ -1,3 +1,11 @@
+/**
+ * Nimbi CMS public entrypoint.
+ *
+ * Re-exports primary runtime APIs and default `initCMS`.
+ *
+ * @module nimbi-cms
+ */
+
 import './styles/initial.css'
 import 'bulma/css/bulma.min.css'
 import 'highlight.js/styles/monokai.css'

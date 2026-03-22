@@ -1,7 +1,9 @@
-/* Initialization logic extracted from nimbi-cms.js to keep the top-level
- * entrypoint small.  This module exports the `initCMS` function which is
- * responsible for validating options, constructing the DOM scaffolding, and
- * delegating navigation and UI behaviour to helper modules.
+/**
+ * Initialization API.
+ *
+ * Exports `initCMS` and helpers to initialize the CMS runtime.
+ *
+ * @module init
  */
 
 import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, notFoundPage } from './slugManager.js'

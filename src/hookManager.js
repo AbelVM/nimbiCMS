@@ -1,5 +1,14 @@
 
 
+/**
+ * Hook registration and runner utilities.
+ *
+ * Exposes APIs to register and invoke lifecycle hooks used by the UI
+ * and initialization code. Callers can register callbacks for
+ * `onPageLoad`, `onNavBuild`, and `transformHtml`.
+ *
+ * @module hookManager
+ */
 import { debugWarn } from './utils/debug.js'
 
 const hooks = {

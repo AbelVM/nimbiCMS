@@ -1,3 +1,11 @@
+/**
+ * Navigation builder and DOM wiring utilities.
+ *
+ * Build navigation DOM, pre-scan links for slug mapping, and wire SPA
+ * navigation callbacks into the site header.
+ *
+ * @module nav
+ */
 import { createNavTree, preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
 import { t } from './l10nManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'

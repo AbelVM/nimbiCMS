@@ -1,10 +1,9 @@
 /**
- * UI / hooks exports shim.
+ * UI exports and rendering helpers.
  *
- * Re-exports hook registration and runner utilities so UI-related code can
- * import them from a focused module path (`./ui.js`). This keeps the
- * top-level `nimbi-cms.js` file compatible with existing imports while
- * providing a clearer separation for future refactors.
+ * Re-exports hook utilities and provides the `createUI` entrypoint.
+ *
+ * @module ui
  */
 export { addHook, onPageLoad, onNavBuild, transformHtml, runHooks, _clearHooks } from './nimbi-cms.js'
 

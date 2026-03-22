@@ -187,7 +187,7 @@ export function makeWorkerPool(createWorker: any, name: any, size: any): any
 
 
 // --- from src/version.js
-
+export function getVersion(): Promise<string>
 
 // --- from src/ui.js
 
@@ -306,7 +306,7 @@ export const initialDocumentTitle: string
 
 
 // --- from src/indexManager.js
-
+export const indexSet: any
 
 
 // --- from src/imagePreview.js

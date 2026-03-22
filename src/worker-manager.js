@@ -1,12 +1,9 @@
 /**
- * Generic worker manager to centralize Worker lifecycle and messaging.
+ * Worker manager utilities.
+ *
+ * Manage lifecycle and messaging with the internal `Worker` instance.
  *
  * @module worker-manager
- */
-
-/**
- * @typedef {Object} WorkerManager
- * @property {() => (Worker|null)} get - Return the Worker instance or null.
  * @property {(msg: any, timeout?: number) => Promise<unknown>} send - Send a message to the worker and await a response.
  * @property {() => void} terminate - Terminate the worker and clear internal state.
  */

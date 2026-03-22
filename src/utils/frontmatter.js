@@ -1,10 +1,7 @@
 /**
- * Parse a simple YAML-like frontmatter block from a markdown string.
- *
- * @param {string} md - Markdown source that may start with `---` frontmatter.
- * @returns {{content:string, data: Record<string,string>}} The remaining
- *   markdown content and a flat map of frontmatter key→value strings.
+ * @module utils/frontmatter
  */
+
 /**
  * Parse a YAML-like frontmatter block from a markdown string.
  * @param {string} md - Markdown source possibly starting with `---`

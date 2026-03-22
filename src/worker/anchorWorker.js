@@ -1,3 +1,6 @@
+/**
+ * @module worker/anchorWorker
+ */
 import { _rewriteAnchors } from '../htmlBuilder.js'
 
 /**

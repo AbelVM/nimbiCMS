@@ -1,6 +1,9 @@
 /**
- * Responsible for slug ↔ markdown mappings, slug generation,
- * and runtime discovery.
+ * Slug and markdown mapping utilities.
+ *
+ * Manage slug generation, mapping, and runtime discovery for markdown content.
+ *
+ * @module slugManager
  */
 
 /**

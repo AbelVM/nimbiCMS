@@ -1,3 +1,6 @@
+/**
+ * @module worker/slugWorker
+ */
 import { buildSearchIndex, crawlForSlug } from '../slugManager.js'
 
 /**

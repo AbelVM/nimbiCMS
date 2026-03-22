@@ -1,15 +1,9 @@
 /**
- * Runtime sitemap/rss/atom generator — tidy and robust.
+ * Runtime sitemap and feed generator.
  *
- * Behavior summary:
- * - Prefer the already-built `searchIndex` exported from `slugManager`.
- * - If empty, rebuild via `buildSearchIndex(contentBase, indexDepth, noIndexing, seedPaths)`
- *   where `indexDepth`/`noIndexing` are taken from the `opts` passed by `init()`.
- * - Use `navigationPage` as an indexing seed but never list it in the sitemap.
- * - Use `homePage` as an indexing seed and ensure it is listed in the sitemap.
- * - Never index or list `notFoundPage`.
- * - Sitemap/RSS/Atom links use the pattern `BASE/?page=<slug>` (do not use file paths).
- * - For feed items use `title` from the index and `excerpt` as the description.
+ * Generate sitemap JSON and RSS/Atom feeds from the runtime search index.
+ *
+ * @module runtimeSitemap
  */
 import { allMarkdownPaths, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
 import { normalizePath } from './utils/helpers.js'

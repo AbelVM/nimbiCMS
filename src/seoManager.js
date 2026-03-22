@@ -1,3 +1,11 @@
+/**
+ * SEO helpers: meta tags and structured data.
+ *
+ * Utilities to set standard meta tags, Open Graph/Twitter tags, and JSON-LD
+ * structured data for pages.
+ *
+ * @module seoManager
+ */
 import { normalizePath } from './utils/helpers.js'
 import readingTime from 'reading-time/lib/reading-time'
 import { debugWarn } from './utils/debug.js'

@@ -1,3 +1,6 @@
+/**
+ * @module utils/renderer-manager
+ */
 import RendererWorker from '../worker/renderer.js?worker&inline'
 import * as RendererModule from '../worker/renderer.js'
 import { makeWorkerPool } from '../worker-manager.js'

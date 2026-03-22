@@ -1,17 +1,9 @@
 /**
  * Image preview modal helper.
  *
- * This module provides a lightweight modal dialog for previewing images at
- * full size with zoom controls. It is intentionally self-contained so it can
- * be wired into `createUI()` without polluting other modules.
+ * Lightweight modal for viewing images with zoom, pan, and controls.
  *
- * Features:
- * - Zoom in/out (wheel + buttons)
- * - Fit to window / original size
- * - Drag-to-pan when the image overflows the viewport
- * - Pinch-to-zoom (touch)
- * - Double-click / double-tap to zoom
- * - Keyboard arrow panning when zoomed
+ * @module imagePreview
  */
 
 let _modal = null

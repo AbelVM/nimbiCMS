@@ -1,5 +1,10 @@
-/** helper module used by the declaration generator tests; exporting a handful of
-  contrived functions that exercise JSDoc parsing, unions, generics, records, and callbacks. */
+/**
+ * Declarations generator test helpers.
+ *
+ * Small helper functions used by the `gen-dts` tests to exercise JSDoc parsing.
+ *
+ * @module gen-dts-sample
+ */
 
 /**
  * @param {{a:number,b:string}} opts

@@ -1,3 +1,11 @@
+/**
+ * Localization loader and translator.
+ *
+ * Provides runtime localization utilities: loading locale files and
+ * translating keys with optional replacements.
+ *
+ * @module l10nManager
+ */
 import { DEFAULT_L10N } from './utils/l10n-defaults.js'
 
 const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))

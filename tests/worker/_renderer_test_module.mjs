@@ -1,3 +1,6 @@
+/**
+ * @module worker/renderer
+ */
 import * as _markedModule from 'marked'
 import { parseFrontmatter } from '../../src/utils/frontmatter.js'
 

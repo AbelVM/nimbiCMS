@@ -1,3 +1,11 @@
+/**
+ * Code block highlighting and highlight.js integration.
+ *
+ * Manages language registration, theming helpers, and observing code
+ * blocks for automatic highlighting.
+ *
+ * @module codeblocksManager
+ */
 import hljs from 'highlight.js/lib/core'
 import { debugWarn, debugError } from './utils/debug.js'
 

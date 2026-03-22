@@ -1,3 +1,11 @@
+/**
+ * HTML builder and article rendering helpers.
+ *
+ * Functions to parse markdown into article DOM, build TOC elements, and
+ * prepare content for rendering inside the UI.
+ *
+ * @module htmlBuilder
+ */
 import { slugify, mdToSlug, slugToMd, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, HOME_SLUG } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'

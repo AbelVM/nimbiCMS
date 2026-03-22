@@ -1,4 +1,13 @@
 
+/**
+ * Bulma and theming helpers.
+ *
+ * Manage Bulma and theme variants, inject theme overrides, and provide
+ * helpers for loading remote or local Bulma themes.
+ *
+ * @module bulmaManager
+ */
+
 /** @type {'light'|'dark'|'system'} */
 let currentStyle = 'light'
 
