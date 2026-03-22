@@ -39,6 +39,12 @@ import { notFoundPage } from './slugManager.js'
  * @param {UIOptions} opts - configuration options and DOM mounts for the UI
  * @returns {UIReturn} - helpers and entrypoints for rendering the site
  */
+/**
+ * Create UI helpers and entrypoints for rendering pages in a mounted CMS.
+ * Placed adjacent to the exported symbol for clarity.
+ * @param {UIOptions} opts
+ * @returns {UIReturn}
+ */
 export function createUI(opts) {
   const {
     contentWrap,

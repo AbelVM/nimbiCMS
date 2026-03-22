@@ -15,6 +15,12 @@ import { setTag, setStructuredData, setMetaTags, markNotFound } from './seoManag
 import { debugLog, debugWarn, debugError, debugInfo, isDebugLevel, incrementCounter } from './utils/debug.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
+/**
+ * Build a cosmetic URL prefixed with the current pathname.
+ * @param {string} page - slug or page token
+ * @param {string|null} [anchor] - optional anchor id
+ * @returns {string}
+ */
 function fullCosmetic(page, anchor = null) {
   try {
     const base = (typeof location !== 'undefined' && location && typeof location.pathname === 'string') ? (location.pathname || '/') : '/'
@@ -36,6 +42,13 @@ function _hbShouldProbe(contentBase) {
   try { if (allMarkdownPaths && allMarkdownPaths.length) return true } catch (e) {}
   return false
 }
+
+/**
+ * Resolve a path against a base URL and return the pathname portion.
+ * @param {string} path - candidate path (may be relative)
+ * @param {string} base - base URL or path to resolve against
+ * @returns {string}
+ */
 function resolvePathWithBase(path, base) {
   try {
     const u = new URL(path, base)
@@ -805,7 +818,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
  * rendering pipeline.
  *
  * @param {string} raw - HTML string to parse
- * @returns {{html:string,meta:Object,toc:Array<{level:number,text:string,id:string}>}}
+ * @returns {ParsedPage}
  */
 const HTML_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
 
@@ -861,6 +874,7 @@ function parseHtml(raw) {
  * `registerLanguage` as needed.  Errors are swallowed.
  *
  * @param {string} raw - markdown text to scan
+ * @returns {Promise<void>}
  */
 async function ensureLanguages(raw) {
   const langsArray = (md.detectFenceLanguagesAsync ? await md.detectFenceLanguagesAsync(raw || '', SUPPORTED_HLJS_MAP) : md.detectFenceLanguages(raw || '', SUPPORTED_HLJS_MAP))
@@ -887,7 +901,7 @@ async function ensureLanguages(raw) {
  * any required languages along the way.
  *
  * @param {string} raw - markdown source
- * @returns {Promise<{html:string,meta:Object,toc:Array}>}
+ * @returns {Promise<ParsedPage>}
  */
 async function parseMarkdown(raw) {
   await ensureLanguages(raw)
@@ -1045,7 +1059,8 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
  * Execute any script tags contained within an `article` element.
  * This should be called after the `article` is appended to the document
  * so that scripts which query the DOM find their target elements.
- * @param {HTMLElement} article - Article element containing script tags
+ * @param {HTMLElement} article - Article element containing script tags.
+ * @returns {void}
  */
 export function executeEmbeddedScripts(article) {
   if (!article || !article.querySelectorAll) return
@@ -1111,9 +1126,10 @@ export function executeEmbeddedScripts(article) {
 /**
  * Render a simple "not found" message into the provided container.
  * Placed immediately above export for TypeDoc.
- * @param {HTMLElement|null} contentWrap - contentWrap parameter
- * @param {Function|null} t - t parameter
- * @param {Error|null} e - e parameter
+ * @param {HTMLElement|null} contentWrap - Container where the message will be rendered; may be null.
+ * @param {Function|null} t - Translation function that accepts a key and returns a localized string.
+ * @param {Error|null} e - Optional error whose message may be displayed to the user.
+ * @returns {void}
  */
 export function renderNotFound(contentWrap, t, e) {
     if (contentWrap) contentWrap.innerHTML = ''
@@ -1217,7 +1233,72 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
 }
 
  
-export { parseHtml as _parseHtml, parseMarkdown as _parseMarkdown, ensureLanguages as _ensureLanguages, rewriteAnchors, rewriteAnchors as _rewriteAnchors, computeSlug as _computeSlug, rewriteAnchorsWorker as _rewriteAnchorsWorker }
+/**
+ * Exported helper aliases (intended for tests and advanced usage).
+ *
+ * `_parseHtml(raw)` -> Parse raw HTML into a `ParsedPage`.
+ * `_parseMarkdown(raw)` -> Parse markdown source into a `ParsedPage` (async).
+ * `_ensureLanguages(raw)` -> Register highlight.js languages referenced in markdown (async).
+ * `_computeSlug(parsed, article, pagePath, anchor)` -> Compute article slug and update slug mappings.
+ *
+ * Note: these are thin aliases to the internal implementations above.
+ *
+ * @exports _parseHtml
+ * @exports _parseMarkdown
+ * @exports _ensureLanguages
+ * @exports _computeSlug
+ */
+/**
+ * Parse raw HTML and return the normalized parsed page object.
+ * @param {string} raw
+ * @returns {ParsedPage}
+ */
+export { parseHtml as _parseHtml }
+
+/**
+ * Parse markdown source into a parsed page used by the renderer.
+ * @param {string} raw
+ * @returns {Promise<ParsedPage>}
+ */
+export { parseMarkdown as _parseMarkdown }
+
+/**
+ * Ensure highlight.js languages referenced in the parsed content are registered.
+ * @param {ParsedPage} parsed
+ * @returns {Promise<void>}
+ */
+export { ensureLanguages as _ensureLanguages }
+
+/**
+ * Rewrite anchors in an article element to SPA links.
+ * @param {HTMLElement} article
+ * @param {string} contentBase
+ * @param {string} [pagePath]
+ * @returns {Promise<void>}
+ */
+export { rewriteAnchors }
+
+/**
+ * Alias of `rewriteAnchors` for test/advanced usage.
+ * @returns {Promise<void>}
+ */
+export { rewriteAnchors as _rewriteAnchors }
+
+/**
+ * Compute an article slug and update slug mappings as needed.
+ * @param {ParsedPage} parsed
+ * @param {HTMLElement} article
+ * @param {string} pagePath
+ * @param {string|null} anchor
+ * @returns {string}
+ */
+export { computeSlug as _computeSlug }
+
+/**
+ * Worker-based anchor rewrite helper export.
+ * @returns {Worker|null}
+ */
+export { rewriteAnchorsWorker as _rewriteAnchorsWorker }
 
 
 

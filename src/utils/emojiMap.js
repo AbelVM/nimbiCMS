@@ -1573,4 +1573,8 @@ const emojimap = {
     "united_nations": "🇺🇳",
     "pirate_flag": "🏴‍☠️"
 };
+/**
+ * Emoji map: shortcodes to emoji glyphs. Exported as the module default.
+ * @type {Record<string,string>}
+ */
 export default emojimap;

@@ -42,6 +42,12 @@ import { setDebugLevel, debugWarn, debugInfo, debugLog, incrementCounter, hasLeg
  * @param {string} [queryString] optional query string (for tests); defaults to window.location.search
  * @returns {Object} - Parsed options object containing any recognized and parsed query parameters.
  */
+/**
+ * Parse URL query string into a normalized `initCMS` options object.
+ * Conservative, descriptive helper used by `initCMS` and tests.
+ * @param {string} [queryString]
+ * @returns {Object}
+ */
 export function parseInitOptionsFromQuery(queryString) {
   try {
     let qs = typeof queryString === 'string' ? queryString : (typeof window !== 'undefined' && window.location ? window.location.search : '')
@@ -130,6 +136,8 @@ export function parseInitOptionsFromQuery(queryString) {
  *  - must not contain ".." segments
  *  - must not be an absolute URL (protocol://) or start with //
  *  - must not start with a leading slash (we normalize to relative)
+ * @param {string} p - candidate content path segment
+ * @returns {boolean} true when the path is considered safe
  */
 function isSafeContentPath(p) {
   if (typeof p !== 'string') return false
@@ -150,6 +158,8 @@ function isSafeContentPath(p) {
  *  - must not start with a leading slash (we normalize to relative)
  *  - path segments may include A-Za-z0-9._- and may contain single-level
  *    subpaths (e.g. "assets/brochure.md").
+ * @param {string} name - candidate page path
+ * @returns {boolean} true when `name` matches allowed page path rules
  */
 function isSafePagePath(name) {
   if (typeof name !== 'string') return false
@@ -204,6 +214,12 @@ export let initialDocumentTitle = ''
  * @param {string|null} [options.notFoundPage] - Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, the runtime will render an inline "Not Found" message linking to the configured `homePage` instead of attempting to load `'_404.md'`.
  * @param {boolean} [options.skipRootReadme=false] - when true, the indexer will skip link discovery inside a repository-root `README.md`; set to `false` to treat the root README like other content pages.
  * @returns {Promise<void>} resolves once the initial page has rendered
+ */
+/**
+ * Initialize the Nimbi CMS runtime on the host page.
+ * Conservative wrapper used by consumers to mount UI and start routing.
+ * @param {Record<string,unknown>} [options]
+ * @returns {Promise<void>}
  */
 export async function initCMS(options = {}) {
 

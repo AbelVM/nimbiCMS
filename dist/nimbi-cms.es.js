@@ -8488,7 +8488,7 @@ function jo() {
     }
   };
 }
-const ma = qi(() => jo(), "markdown", Do), _i = typeof DOMParser < "u" ? new DOMParser() : null, Mt = () => ma.get(), $r = (e) => ma.send(e, 3e3), ht = [];
+const ma = qi(() => jo(), "markdown", Do), _i = typeof DOMParser < "u" ? new DOMParser() : null, Mt = () => ma.get(), $r = (e, t = 3e3) => ma.send(e, t), ht = [];
 function fr(e) {
   if (e && (typeof e == "object" || typeof e == "function")) {
     ht.push(e);

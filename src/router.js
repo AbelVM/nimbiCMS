@@ -45,6 +45,7 @@ export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000 // five minutes
  * expiration.  This is the recommended API for external code rather than
  * mutating the namespace object directly (which is read‑only in ESM).
  * @param {number} ms - Time-to-live (milliseconds) for cached resolution entries.
+ * @returns {void}
  */
 export function setResolutionCacheTtl(ms) {
   RESOLUTION_CACHE_TTL = ms
@@ -53,6 +54,11 @@ export function setResolutionCacheTtl(ms) {
 /**
  * Resolution cache entry shape.
  * @typedef {{value:{resolved:string,anchor:string|null},ts:number}} ResolutionRecord
+ */
+
+/**
+ * Resolution result value shape (convenience typedef).
+ * @typedef {{resolved:string,anchor:string|null}} ResolutionValue
  */
 
 /**
@@ -69,6 +75,7 @@ export const resolutionCache = new Map()
  * Used by refreshIndexPaths and map-tracking helpers.
  *
  * @param {Array|string[]|{values:()=>Iterable}} arrOrMap - array or object providing a `values()` iterator.
+ * @returns {void}
  */
 export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
   indexSet.clear();
@@ -114,6 +121,7 @@ export function resolutionCacheGet(key) {
 /**
  * Store a resolution result in the runtime resolution cache and evict the
  * oldest entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
+ * @exports resolutionCacheSet
  * @param {string} key - Cache key string.
  * @param {{resolved:string,anchor:string|null}} value - Resolution record to store.
  * @returns {void}
@@ -133,6 +141,11 @@ export function resolutionCacheSet(key, value) {
 
  
 
+/**
+ * Remove expired entries from the `resolutionCache` according to `RESOLUTION_CACHE_TTL`.
+ * This is a no-op when TTL is not configured or set to a non-positive value.
+ * @returns {void}
+ */
 export function _purgeExpiredEntries() {
   if (!RESOLUTION_CACHE_TTL || RESOLUTION_CACHE_TTL <= 0) return
   const now = Date.now()

@@ -22,6 +22,10 @@ import { debugWarn } from './utils/debug.js'
  * @typedef {{id?:string,result?:unknown,error?:string}} WorkerResponse
  */
 /**
+ * Worker manager API surface exported by makeWorkerManager/makeWorkerPool.
+ * @typedef {{get:()=> (Worker|null), send:(msg:WorkerRequest, timeout?:number)=>Promise<unknown>, terminate:()=>void}} WorkerManager
+ */
+/**
  * Create a worker manager that lazily instantiates a Worker and provides
  * request/response semantics with timeout and automatic cleanup on errors.
  * @param {function(): (Worker|null)} createWorker - Function that returns a new Worker instance when called.

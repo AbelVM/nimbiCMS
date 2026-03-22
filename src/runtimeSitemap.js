@@ -13,6 +13,25 @@ import { debugLog, debugWarn } from './utils/debug.js'
 const _debugLog = debugLog
 const _debugWarn = debugWarn
 
+/**
+ * Sitemap entry object.
+ * @typedef {{
+ *   loc: string,
+ *   slug: string,
+ *   title?: string,
+ *   excerpt?: string,
+ *   sourcePath?: string,
+ *   lastmod?: string,
+ *   _titleSource?: string,
+ *   baseSlug?: string
+ * }} SitemapEntry
+ */
+
+/**
+ * Sitemap JSON structure returned by generators.
+ * @typedef {{generatedAt:string, entries:Array<SitemapEntry>}} SitemapJson
+ */
+
 function _getBase() {
   try {
     if (typeof location !== 'undefined' && location && typeof location.pathname === 'string') {
@@ -40,6 +59,9 @@ function _humanizeSlug(slug) {
 /**
  * Convert an index entry (or slug) to a canonical sitemap entry object.
  * Always produce `loc` using slug form: `base + '?page=' + encodeURIComponent(slug)`.
+ * @param {string} baseNoQs - Base URL without a querystring (used as prefix for `loc`).
+ * @param {Object} it - Index item object (should contain `slug`, optional `title`, `excerpt`, `path`).
+ * @returns {SitemapEntry|null} sitemap entry or null when conversion fails.
  */
 function makeEntryFromIndexItem(baseNoQs, it) {
   try {
@@ -62,7 +84,7 @@ function makeEntryFromIndexItem(baseNoQs, it) {
  * @param {string} [opts.homePage]
  * @param {string} [opts.navigationPage]
  * @param {string} [opts.notFoundPage]
- * @returns {{generatedAt:string,entries:Array}} sitemap JSON object
+ * @returns {SitemapJson} sitemap JSON object
  */
 export async function generateSitemapJson(opts = {}) {
   const {

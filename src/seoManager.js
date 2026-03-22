@@ -21,6 +21,7 @@ import { debugWarn } from './utils/debug.js'
  * Set or update a single meta tag in the document head.
  * @param {string} name - Meta tag name (e.g. 'description').
  * @param {string} content - Meta tag content value.
+ * @returns {void}
  */
 export function setTag(name, content) {
   let tag = document.querySelector(`meta[name="${name}"]`)

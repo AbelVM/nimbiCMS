@@ -17,6 +17,23 @@ const hooks = {
   transformHtml: []
 };
 
+/**
+ * Hook callback signature.
+ * @typedef {(ctx:Record<string,unknown>) => void|Promise<void>} HookCallback
+ */
+
+/**
+ * Internal hooks registry typed for documentation.
+ * @type {{onPageLoad:HookCallback[], onNavBuild:HookCallback[], transformHtml:HookCallback[]}}
+ */
+/* (the `hooks` object above holds arrays of HookCallback) */
+
+/**
+ * Register a hook callback for the given hook name.
+ * @param {string} name - Hook name to register (e.g. 'onPageLoad').
+ * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback function to register.
+ * @returns {void}
+ */
 export function addHook(name, fn) {
   if (!Object.prototype.hasOwnProperty.call(hooks, name)) {
     throw new Error('Unknown hook "' + name + '"');
@@ -68,6 +85,11 @@ export async function runHooks(name, ctx) {
   }
 }
 
+/**
+ * Clear all registered hooks for every hook type.
+ * Useful in tests to reset hook state.
+ * @returns {void}
+ */
 export function _clearHooks() {
   Object.keys(hooks).forEach(k => { hooks[k].length = 0 });
 }

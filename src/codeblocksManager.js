@@ -9,6 +9,12 @@
 import hljs from 'highlight.js/lib/core'
 import { debugWarn, debugError } from './utils/debug.js'
 
+/**
+ * Expose the internal `hljs` (highlight.js core) instance for tests
+ * and advanced usage (language registration, theming helpers).
+ * This is a runtime reference to the imported highlight.js core.
+ * @exports hljs
+ */
 export { hljs }
 
 const HIGHLIGHT_JS_VERSION = typeof __HIGHLIGHT_JS_VERSION__ !== 'undefined'
@@ -176,7 +182,10 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
   return loadSupportedLanguagesPromise
 }
 
-/** @type {Set<string>} */
+/**
+ * Set of highlight.js languages that have been registered with `hljs`.
+ * @type {Set<string>}
+ */
 const registeredLangs = new Set()
 
 /**
@@ -349,17 +358,11 @@ export async function registerLanguage(name, modulePath) {
  
 /** @type {IntersectionObserver|null} */
 let __hlObserver = null
-/**
- * Lazy-highlight `<pre><code>` blocks using IntersectionObserver.  The
- * observer will register necessary languages as elements become visible.
- *
- * @param {ParentNode} [root=document] - Root node in which to observe `<pre><code>` blocks.
- * @returns {void} - No return value.
- */
+
 /**
  * Observe and lazy-highlight `<pre><code>` blocks, registering languages as needed.
  * @param {ParentNode} [root=document] - Root node in which to observe code blocks.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function observeCodeBlocks(root = document) {
   
@@ -448,19 +451,11 @@ export function observeCodeBlocks(root = document) {
   blocks.forEach(b => { try { obs.observe(b) } catch (err) { debugWarn('[codeblocksManager] observe failed', err) } })
 }
 /**
- * Change the highlight.js CSS theme by injecting a <link>.  If `theme` is
- * `'monokai'` nothing happens (it's the default bundle).  When `useCdn` is
- * true the stylesheet is fetched from jsdelivr.
- *
- * @param {string} theme - Name of the highlight.js CSS theme to apply.
- * @param {{useCdn?:boolean}} [opts] - Options object; set `useCdn` to true to load theme from CDN.
- * @returns {void} - No return value.
- */
-/**
  * Switch highlight.js CSS theme, optionally loading from CDN.
+ * If `theme` is `'monokai'` (the default) the existing theme is removed.
  * @param {string} theme - Name of the highlight.js theme to apply.
  * @param {{useCdn?:boolean}} [opts] - Options object; `useCdn` controls CDN loading.
- * @returns {void} - No return value.
+ * @returns {void}
  */
 export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = document.querySelector('link[data-hl-theme]')

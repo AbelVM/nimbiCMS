@@ -35,5 +35,16 @@ function _createRendererInstance() {
 
 const _rendererManager = makeWorkerPool(() => _createRendererInstance(), 'markdown', poolSize)
 
+/**
+ * Return the underlying renderer worker instance, creating the pool lazily.
+ * @returns {(Worker|null)} Worker instance or null when unavailable.
+ */
 export function initRendererWorker() { return _rendererManager.get() }
+
+/**
+ * Send a message to the renderer worker and await a response.
+ * @param {Object} msg - Message payload to send to the renderer.
+ * @param {number} [timeout] - Timeout in milliseconds (default: 3000).
+ * @returns {Promise<unknown>} Promise resolving with the worker's result.
+ */
 export function _sendToRenderer(msg) { return _rendererManager.send(msg, 3000) }

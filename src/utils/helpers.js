@@ -1,4 +1,9 @@
 /**
+ * Utility helper functions used by the runtime.
+ * @module utils/helpers
+ */
+
+/**
  * Return true if the href points to an external or special link.  This
  * matches absolute URLs and mailto/tel schemes.
  *
@@ -49,6 +54,7 @@ export function ensureTrailingSlash(u) {
  * Apply the lazy-loading attribute to an <img> element if not already set.
  *
  * @param {HTMLImageElement} img - image element to mark for lazy loading
+ * @returns {void}
  */
 export function setLazyload(img) {
   try {
@@ -65,6 +71,7 @@ export function setLazyload(img) {
  * determined to be above-the-fold (eager) by `setEagerForAboveFoldImages`.
  *
  * @param {string} url - Absolute or relative URL to preload.
+ * @returns {void}
  */
 function preloadImage(url) {
   try {
@@ -95,6 +102,7 @@ function preloadImage(url) {
  * @param {HTMLElement} container - Root element containing the images.
  * @param {number} [marginPx=0] - Extra pixels past the visible bottom that should still be considered above-the-fold.
  * @param {boolean} [debug=false] - If true, logs debug info for each image.
+ * @returns {void}
  */
 export function setEagerForAboveFoldImages(container, marginPx = 0, debug = false) {
   try {

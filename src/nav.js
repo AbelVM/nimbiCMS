@@ -65,6 +65,11 @@ export function createSiteNav(homePage) {
  * @param {1|2|3} indexDepth - include H2 headings in the search index when 2; include H3 when 3
  * @returns {Promise<NavBuildResult>} resolves with an object containing `navbar` and `linkEls`
  */
+/**
+ * Build the site navigation DOM and wire SPA navigation handlers.
+ * Minimal descriptive JSDoc placed adjacent to the exported symbol.
+ * @returns {Promise<NavBuildResult>}
+ */
 export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager', indexDepth = 1, noIndexing = undefined, logoOption = 'favicon') {
   if (!navbarWrap || !(navbarWrap instanceof HTMLElement)) {
     throw new TypeError('navbarWrap must be an HTMLElement')
@@ -98,6 +103,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   let sitemapTriggered = false
   let resolvedIndexForSitemap = null
 
+  /**
+   * Close the mobile hamburger menu and update ARIA attributes.
+   * @returns {void}
+   */
   function closeMobileMenu() {
     try {
       const burgerEl = document.querySelector('.navbar-burger')
@@ -111,11 +120,14 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     } catch (err) { debugWarn('[nimbi-cms] closeMobileMenu failed', err) }
   }
 
-  /* Helper: run the provided `renderByQuery` with a small visual transition.
-     Adds `.is-inactive` to the main content then calls the renderer; when
-     the renderer completes (or throws) the class is removed on the next
-     animation frame so layout has a chance to settle. */
-  async function runRenderWithTransition() {
+    /**
+    * Run the provided `renderByQuery` with a small visual transition.
+    * Adds `.is-inactive` to the main content then calls the renderer; when
+    * the renderer completes (or throws) the class is removed on the next
+    * animation frame so layout has a chance to settle.
+    * @returns {Promise<void>}
+    */
+    async function runRenderWithTransition() {
     const contentEl = (typeof document !== 'undefined') ? document.querySelector('.nimbi-content') : null
     try { if (contentEl) contentEl.classList.add('is-inactive') } catch (e) {}
     try {
@@ -389,8 +401,11 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     }
   });
 
-  // Helper: try to find an existing slug for a given markdown/html path.
-  // Returns the slug string or null when no mapping exists.
+  /**
+   * Try to find an existing slug for a given markdown/html path.
+   * @param {string} p - Markdown or HTML path to resolve (e.g. 'foo.md').
+   * @returns {string|null} Slug string when found, otherwise `null`.
+   */
   function findSlugForPath(p) {
     try {
       if (!p) return null

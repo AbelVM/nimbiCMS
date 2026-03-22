@@ -167,4 +167,8 @@ export function toCanonicalHref(href) {
   return String(href || '')
 }
 
+/**
+ * Re-export the canonical page URL builder from `./helpers.js` so callers
+ * of this module can import it via `utils/urlHelper`.
+ */
 export { buildCanonicalPageUrl }

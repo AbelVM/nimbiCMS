@@ -63,18 +63,38 @@ export function isDebugLevel(level = 1) {
  */
 export function isDebug() { return isDebugLevel(1) }
 
+/**
+ * Log an error-level message when debug level is >= 1.
+ * @param {...any} args - Arguments forwarded to console.error
+ * @returns {void}
+ */
 export function debugError(...args) {
   try { if (isDebugLevel(1) && console && typeof console.error === 'function') console.error(...args) } catch (e) {}
 }
 
+/**
+ * Log a warning-level message when debug level is >= 2.
+ * @param {...any} args - Arguments forwarded to console.warn
+ * @returns {void}
+ */
 export function debugWarn(...args) {
   try { if (isDebugLevel(2) && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {}
 }
 
+/**
+ * Log an info-level message when debug level is >= 3.
+ * @param {...any} args - Arguments forwarded to console.info
+ * @returns {void}
+ */
 export function debugInfo(...args) {
   try { if (isDebugLevel(3) && console && typeof console.info === 'function') console.info(...args) } catch (e) {}
 }
 
+/**
+ * Log a verbose message when debug level is >= 3.
+ * @param {...any} args - Arguments forwarded to console.log
+ * @returns {void}
+ */
 export function debugLog(...args) {
   try { if (isDebugLevel(3) && console && typeof console.log === 'function') console.log(...args) } catch (e) {}
 }

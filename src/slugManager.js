@@ -213,6 +213,7 @@ export const HOME_SLUG = '_home'
  * Set the not-found page path used when `fetchMarkdown` encounters a
  * missing markdown file or an HTML response for a `.md` request.
  * @param {string} p - path to use as the not-found page (relative to content base)
+ * @returns {void} - No return value.
  */
 export function setNotFoundPage(p) {
   if (p == null) {
@@ -229,6 +230,7 @@ export function setNotFoundPage(p) {
  * Set the home page path used when trying home-page fallbacks during
  * slug resolution. If unset, `_home.md` is used.
  * @param {string} p - path to use as the home page (relative to content base)
+ * @returns {void} - No return value.
  */
 export function setHomePage(p) {
   // Allow callers to explicitly clear the configured home page by
@@ -414,6 +416,8 @@ export function slugify(s) {
 /**
  * Ensure a candidate slug is unique against an existing set.
  * If `base` collides, a numeric suffix is appended ("-2", "-3", ...).
+ *
+ * @exports uniqueSlug
  *
  * @param {string} base - Candidate slug.
  * @param {Set<string>} existing - Set of already-used slugs.
@@ -691,6 +695,7 @@ export let fetchMarkdown = async function(path, base, opts) {
  * Override the internal fetchMarkdown implementation. Useful for tests
  * or when consumers want to provide a bespoke fetch strategy.
  * @param {(path:string, base?:string)=>Promise<FetchResult>} fn - Custom fetch function used to load markdown. Receives `(path, base)` and must return a `FetchResult` promise.
+ * @returns {void} - No return value.
  */
 export function setFetchMarkdown(fn) {
   if (typeof fn === 'function') {

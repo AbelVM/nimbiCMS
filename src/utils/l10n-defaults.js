@@ -91,5 +91,10 @@ export const DEFAULT_L10N = {
   }
 }
 
+/**
+ * Default localization entries keyed by locale (e.g. 'en', 'es').
+ * Exported as the module default for convenience.
+ * @type {Record<string, L10nEntry>}
+ */
 export default DEFAULT_L10N
 

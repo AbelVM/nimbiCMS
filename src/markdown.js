@@ -15,6 +15,12 @@ import { debugWarn } from './utils/debug.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
+/**
+ * Create a renderer worker instance or an inline shim when Workers are
+ * unavailable. The returned value implements a minimal Worker-like API
+ * (`postMessage`, `addEventListener`, `removeEventListener`, `terminate`).
+ * @returns {Worker|Object|null}
+ */
 function _createRendererInstance() {
   if (typeof Worker !== 'undefined') {
     try { return new RendererWorker() } catch (e) { /* fallthrough to inline */ }
@@ -86,9 +92,14 @@ const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : n
  */
 export const initRendererWorker = () => _rendererManager.get()
 
-export const _sendToRenderer = (msg) => {
-  /** @returns {Promise<RendererResult>} */
-  return _rendererManager.send(msg, 3000)
+/**
+ * Send a message to the renderer worker and await a response.
+ * @param {Object} msg - Message payload to send to the renderer.
+ * @param {number} [timeout=3000] - Timeout in milliseconds.
+ * @returns {Promise<RendererResult>} Promise resolving with the renderer result.
+ */
+export const _sendToRenderer = (msg, timeout = 3000) => {
+  return _rendererManager.send(msg, timeout)
 }
 
 /** Registered marked plugins. */

@@ -9,17 +9,15 @@
  */
 import { slugToMd, mdToSlug, allMarkdownPaths } from './slugManager.js';
 
-export const indexSet = new Set();
-
 /**
- * Refresh the internal index set from `allMarkdownPaths` and current slug maps.
- * Useful when the content base or path list changes at runtime (tests/plugins).
- *
- * @param {string} contentBase - The base path for content (used for API symmetry).
- * @returns {void}
+ * Runtime set of known markdown paths collected from the index and slug maps.
+ * Other modules read this set to enumerate available pages.
+ * @type {Set<string>}
  */
+export const indexSet = new Set();
 /**
  * Refresh the internal index set from available markdown paths and slug maps.
+ * Useful when the content base or path list changes at runtime (tests/plugins).
  * @param {string} contentBase - Base path for content used by the indexer.
  * @returns {void}
  */

@@ -207,6 +207,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
  * When no `.nimbi-mount` elements are present the same attribute is
  * applied to `document.documentElement` to support global/UMD usage.
  *
+ * @exports setStyle
  * @param {'light'|'dark'|'system'} style - chosen theme mode.
  * @returns {void}
  */

@@ -201,13 +201,13 @@ export const slugResolvers: Set<Function>
 export const allMarkdownPaths: string[]
 export const homePage: string
 export const HOME_SLUG: string
-export function setHomePage(p: string): any
+export function setHomePage(p: string): void
 export function _setSearchIndex(arr: any): any
 export function uniqueSlug(base: string, existing: Set<string>): string
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
 export function unescapeMarkdown(s: string): string
-export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): any
+export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): void
 export function getSearchIndex(): any
 export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean}): Promise<Array>
 export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean,timeoutMs?:number}): Promise<Array>
@@ -253,7 +253,7 @@ export function markNotFound(opts: any): any
 
 
 // --- from src/runtimeSitemap.js
-export function generateSitemapJson(opts: object): {generatedAt:string,entries:Array}
+export function generateSitemapJson(opts: object): any
 export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
@@ -281,8 +281,8 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
 
 
 // --- from src/markdown.js
+export const _sendToRenderer: any
 export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<string,string>): Promise<Set<string>>
-
 
 
 
@@ -315,8 +315,8 @@ export function attachImagePreview(opts: any): any
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
 export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
-export function executeEmbeddedScripts(article: any): any
-export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): any
+export function executeEmbeddedScripts(article: any): void
+export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): void
 
 
 
@@ -345,7 +345,7 @@ export function callIt(cb: (...args:any[])=>any): void
 export const HLJS_ALIAS_MAP: Record<string,string>
 export function loadSupportedLanguages(url: string): Promise<void>
 export function registerLanguage(name: string, modulePath: string): Promise<boolean>
-export function observeCodeBlocks(root: any): void
+export function observeCodeBlocks(root: any): any
 export function setHighlightTheme(opts: {useCdn?:boolean}): void
 
 
@@ -381,7 +381,7 @@ export const DEFAULT_L10N: Record<string, L10nEntry>
 export function normalizePath(p: string): string
 export function trimTrailingSlash(u: string): string
 export function ensureTrailingSlash(u: string): string
-export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): any
+export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): void
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
 export function encodeURL(u: string): string
 export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
@@ -400,14 +400,14 @@ export function setDebugLevel(level: any): any
 export function getDebugLevel(): number
 export function isDebugLevel(level: number): any
 export function isDebug(): any
+export function debugError(...args: any): void
+export function debugWarn(...args: any): void
+export function debugInfo(...args: any): void
+export function debugLog(...args: any): void
 export function incrementCounter(name: string): any
 export function syncLegacyCounter(name: string): any
 export function hasLegacyDebug(): boolean
 export function getDebugCounters(): Record<string,number>
 export function resetDebugCounters(): any
-
-
-
-
 
 // --- from src/lib/index.js
