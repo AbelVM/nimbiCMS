@@ -39,6 +39,7 @@
 
   <script src="./dist/nimbi-cms.js" defer></script>
   <script defer>
+    window.__nimbiCMSDebug = false
     window.addEventListener('DOMContentLoaded', function () {
       if (!window.nimbiCMS) {
         console.warn('nimbiCMS UMD bundle not found at /dist/nimbi-cms.js');
@@ -47,13 +48,11 @@
       try {
         nimbiCMS.initCMS({
           el: '#app',
-          // Use repo-relative content path so gh-pages serves files from the
-          // repository subpath (avoids requests to root `/`)
           contentPath: './',
           indexDepth: 3,
           bulmaCustomize: 'materia',
-          homePage: 'assets/brochure.md',
-          notFoundPage: 'assets/404.md',
+          homePage: 'assets/brochure.md',/* 
+          notFoundPage: 'assets/404.md', */
           navigationPage: 'assets/navigation.md',
         });
       } catch (e) {

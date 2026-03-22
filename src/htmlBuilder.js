@@ -1,4 +1,4 @@
-import { slugify, mdToSlug, slugToMd, fetchMarkdown, notFoundPage } from './slugManager.js'
+import { slugify, mdToSlug, slugToMd, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, HOME_SLUG } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
@@ -21,6 +21,13 @@ import * as AnchorModule from './worker/anchorWorker.js'
 
 const _hbShouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
 function _hbWarn(...args) { try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {} }
+function _hbShouldProbe(contentBase) {
+  try { if (_hbShouldDebug) return true } catch (e) {}
+  try { if (typeof notFoundPage === 'string' && notFoundPage) return true } catch (e) {}
+  try { if (slugToMd && slugToMd.size) return true } catch (e) {}
+  try { if (allMarkdownPaths && allMarkdownPaths.length) return true } catch (e) {}
+  return false
+}
 function resolvePathWithBase(path, base) {
   try {
     const u = new URL(path, base)
@@ -369,7 +376,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p
             rel = normalizePath(rel)
             rel = trimTrailingSlash(rel)
-            if (!rel) rel = '_home'
+            if (!rel) rel = HOME_SLUG
             if (!rel.endsWith('.md')) {
               let slugKey = null
               try {
@@ -416,7 +423,23 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
     }
 
     if (pending.size) {
-      await Promise.all(Array.from(pending).map(async rel => {
+      if (!_hbShouldProbe(contentBase)) {
+        try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping md title probes (probing disabled)') } catch (e) {}
+        // Create conservative slug mappings from filenames when probing is disabled
+        for (const rel of Array.from(pending)) {
+          try {
+            const m = String(rel).match(/([^\/]+)\.md$/)
+            const basename = m && m[1]
+            if (basename) {
+              const candidate = slugify(basename)
+              if (candidate) {
+                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] setting fallback slug mapping failed', err) }
+              }
+            }
+          } catch (err) { /* ignore per-path fallback errors */ }
+        }
+      } else {
+        await Promise.all(Array.from(pending).map(async rel => {
         try {
           try {
             const m = String(rel).match(/([^\/]+)\.md$/)
@@ -443,11 +466,28 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             }
           }
           } catch (err) { console.warn('[htmlBuilder] fetchMarkdown during rewriteAnchors failed', err) }
-      }))
+        }))
+      }
     }
 
     if (htmlPending.size) {
-      await Promise.all(Array.from(htmlPending).map(async rel => {
+      if (!_hbShouldProbe(contentBase)) {
+        try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping html title probes (probing disabled)') } catch (e) {}
+        // Create conservative slug mappings from html filenames when probing disabled
+        for (const rel of Array.from(htmlPending)) {
+          try {
+            const m = String(rel).match(/([^\/]+)\.html$/)
+            const basename = m && m[1]
+            if (basename) {
+              const candidate = slugify(basename)
+              if (candidate) {
+                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] setting fallback html slug mapping failed', err) }
+              }
+            }
+          } catch (err) { /* ignore per-path fallback errors */ }
+        }
+      } else {
+        await Promise.all(Array.from(htmlPending).map(async rel => {
         try {
           const res = await fetchMarkdown(rel, contentBase)
           if (res && res.raw) {
@@ -468,7 +508,8 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             } catch (err) { console.warn('[htmlBuilder] parse fetched HTML failed', err) }
           }
         } catch (err) { console.warn('[htmlBuilder] fetchMarkdown for htmlPending failed', err) }
-      }))
+        }))
+      }
     }
 
     for (const info of anchorInfo) {
@@ -529,7 +570,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
     }
     if (!displayTitle && pagePath) displayTitle = String(pagePath)
     if (displayTitle) slugKey = slugify(displayTitle)
-    if (!slugKey) slugKey = '_home'
+    if (!slugKey) slugKey = HOME_SLUG
     try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { console.warn('[htmlBuilder] computeSlug set slug mapping failed', err) }
         try {
         // Prefer a normalized anchor extracted via `parseHrefToRoute`, but
@@ -622,6 +663,24 @@ export async function preScanHtmlSlugs(linkEls, base) {
 
   if (!htmlPaths.size) return
 
+  if (!_hbShouldProbe(base)) {
+    try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping preScanHtmlSlugs (probing disabled)') } catch (e) {}
+    // Create conservative mappings from html filenames when probing disabled
+    for (const htmlPath of Array.from(htmlPaths)) {
+      try {
+        const m = String(htmlPath).match(/([^\/]+)\.html$/)
+        const basename = m && m[1]
+        if (basename) {
+          const candidate = slugify(basename)
+          if (candidate) {
+            try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, htmlPath); if (!mdToSlug.has(htmlPath)) mdToSlug.set(htmlPath, candidate) } catch (err) { console.warn('[htmlBuilder] setting fallback preScanHtmlSlugs mapping failed', err) }
+          }
+        }
+      } catch (err) { /* ignore per-path errors */ }
+    }
+    return
+  }
+
   const fetchAndExtract = async (htmlPath) => {
     try {
       const res = await fetchMarkdown(htmlPath, base)
@@ -699,7 +758,10 @@ export async function preMapMdSlugs(linkEls, contentBase) {
   }
 
   if (pending.size) {
-    await Promise.all(Array.from(pending).map(async rel => {
+    if (!_hbShouldProbe(contentBase)) {
+      try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping preMapMdSlugs probes (probing disabled)') } catch (e) {}
+    } else {
+      await Promise.all(Array.from(pending).map(async rel => {
       try {
         const m = String(rel).match(/([^\/]+)\.md$/)
         const basename = m && m[1]
@@ -724,7 +786,8 @@ export async function preMapMdSlugs(linkEls, contentBase) {
           }
         }
       } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs fetch failed', err) }
-    }))
+      }))
+    }
   }
 }
 
@@ -1055,6 +1118,24 @@ export function renderNotFound(contentWrap, t, e) {
     notFound.appendChild(h)
     notFound.appendChild(p)
     if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(notFound)
+    // If hosts choose to disable the configured `notFoundPage` (set to
+    // `null`), render a small inline helper linking back to the site's
+    // home page so users can recover from a missing route without a
+    // separate `_404.md` file.
+    try {
+      if (!notFoundPage) {
+        try {
+          const linkP = document.createElement('p')
+          const label = t ? (t('goHome') || 'Go back to') : 'Go back to'
+          linkP.textContent = label + ' '
+          const a = document.createElement('a')
+          try { a.href = buildPageUrl(homePage) } catch (err) { a.href = buildPageUrl(homePage || '') }
+          a.textContent = t ? (t('home') || 'Home') : 'Home'
+          linkP.appendChild(a)
+          if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(linkP)
+        } catch (_) {}
+      }
+    } catch (_) {}
   try {
     try { markNotFound({ title: t ? (t('notFound') || 'Not Found') : 'Not Found', description: t ? (t('notFoundDescription') || '') : '' }, notFoundPage, t ? (t('notFound') || 'Not Found') : 'Not Found', t ? (t('notFoundDescription') || '') : '') } catch (err) {}
   } catch (err) {}

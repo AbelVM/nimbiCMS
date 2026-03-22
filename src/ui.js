@@ -15,6 +15,7 @@ import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 import { attachImagePreview } from './imagePreview.js'
 import { debugWarn } from './debug.js'
+import { notFoundPage } from './slugManager.js'
 
 
 
@@ -63,7 +64,24 @@ export function createUI(opts) {
     try {
       ({ data, pagePath, anchor } = await fetchPageData(raw, contentBase))
     } catch (e) {
-      console.error('[nimbi-cms] fetchPageData failed', e)
+      // Treat expected 'no page data' failures as warnings when the
+      // consumer has elected to use the inline not-found fallback
+      // (i.e. `notFoundPage` is unset). Preserve error-level logs for
+      // unexpected failures.
+      const msg = e && e.message ? String(e.message) : ''
+      const expectedMissing = (!notFoundPage || typeof notFoundPage !== 'string' || !notFoundPage) && /no page data/i.test(msg)
+      try {
+        if (expectedMissing) {
+          try { if (console && typeof console.warn === 'function') console.warn('[nimbi-cms] fetchPageData (expected missing)', e) } catch (err) {}
+        } else {
+          console.error('[nimbi-cms] fetchPageData failed', e)
+        }
+      } catch (_e) {}
+      // When hosts choose to disable a configured `notFoundPage` (set to
+      // `null`) we render a small inline 404 helper. In that case the
+      // sidebar/nav TOC should be hidden so the page doesn't show stale
+      // navigation for a missing route.
+      try { if (!notFoundPage && navWrap && navWrap.innerHTML !== undefined) navWrap.innerHTML = '' } catch (err) {}
       renderNotFound(contentWrap, t, e)
       return
     }
@@ -132,7 +150,8 @@ export function createUI(opts) {
       await renderPage(raw, hashAnchor)
     } catch (e) {
       debugWarn('[nimbi-cms] renderByQuery failed', e)
-      renderNotFound(contentWrap, t, e)
+        try { if (!notFoundPage && navWrap && navWrap.innerHTML !== undefined) navWrap.innerHTML = '' } catch (err) {}
+        renderNotFound(contentWrap, t, e)
     }
   }
 

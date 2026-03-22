@@ -167,18 +167,18 @@ Drop `.md` and/or `.html` files into your content directory. No build step is ne
 
 **Required files**
 
-- `_home.md` — required by default. You can override this with the `homePage` option to use a different `.md` or `.html` file as the home page.
-
-```javascript
-initCMS({ el: '#app', homePage: 'index.html' })
-```
-
 - `_navigation.md` — renders into the navbar; use Markdown links. Example nav markup:
 
 ```markdown
-[Home](_home.md)
+[Home](home.md)
 [Blog](blog.md)
 [About](about.md)
+```
+
+-- `home page` — by default the library will use the first link found in `_navigation.md` when present. If no suitable link is found, the runtime will not automatically probe or fall back to `_home.md`; set the `homePage` option to explicitly select a page (for example `index.html`).
+
+```javascript
+initCMS({ el: '#app', homePage: 'index.html' })
 ```
 
 - `_404.md` — optional fallback for 404 responses. When the server responds to a requested `.md` path with an HTML document (e.g., an SPA fallback serving `index.html`), the CMS treats that as a missing markdown page and will attempt to load `/_404.md` from the configured content base so a proper 404 page can be rendered instead of the site's index HTML.
@@ -229,9 +229,9 @@ This behavior is covered by the test-suite (see the canonical-link and URL handl
 
 | Option | Type | Default | Description |
 |---|---:|:---:|---|
-| `homePage` | `string` | `'_home.md'` | Path for the site home page (`.md` or `.html`). |
-| `notFoundPage` | `string` | `'_404.md'` | Path for the not-found page (`.md` or `.html`). |
 | `navigationPage` | `string` | `'_navigation.md'` | Path for the navigation markdown used to build the navbar (`.md` or `.html`). |
+| `homePage` | `string` | `first link of navigationPage` | Path for the site home page (`.md` or `.html`). |
+| `notFoundPage` | `string\|null` | `null` | Path for the not-found page (`.md` or `.html`). When unset (`null`) the runtime renders a small inline "Not Found" message linking to the configured `homePage` instead of attempting to fetch `'_404.md'`. |
 | `exposeSitemap` | `boolean` | `true` | When `true` the client exposes a runtime sitemap at `/sitemap.xml` and `/sitemap.html`. The sitemap is generated at runtime (no build-time generation) and emits canonical `?page=` URLs (for example `/?page=blog/my-post`) while the UI preserves cosmetic `/#/slug` navigation. Requires SPA fallback (the server must serve `index.html` for `/sitemap*` requests). Disable with `initCMS({ exposeSitemap: false })`. For broad crawler coverage prefer generating a server-side `sitemap.xml` and listing it in `robots.txt`. You can also get an XML sitemap at `/?sitemap` endpoint. |
 
 > Note: All these files must be within `contentPath`
@@ -567,7 +567,6 @@ If you find a bug, have a feature request or a question, just [open an issue](ht
 ### Content not loading / 404 pages
 - Verify `contentPath` is correct and matches the directory containing your `.md` files.
 - Ensure your static server is serving those files (a 404 is often because the content folder isn’t published or the path is wrong).
-- If you’re using `homePage`/`notFoundPage`, confirm those files exist and are reachable (the default is `_home.md` and `_404.md`).
 
 ### Styles not appearing / Bulma missing
 - Ensure `dist/nimbi-cms.css` is loaded alongside `dist/nimbi-cms.js`.

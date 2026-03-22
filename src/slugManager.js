@@ -82,6 +82,16 @@ function _debugLog(...args) {
   } catch (_) {}
 }
 
+// Decide whether the slug manager should emit non-debug errors to console.
+function _slugShouldLog() {
+  try {
+    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) return true
+  } catch (_e) {}
+  try {
+    return (typeof notFoundPage === 'string' && notFoundPage) ? true : false
+  } catch (_e) { return false }
+}
+
 /**
  * Lazily return a worker instance used for slug-related background tasks.
  * @returns {Worker|null}
@@ -195,7 +205,15 @@ export let notFoundPage = '_404.md'
  * Used as a fallback during slug resolution when appropriate.
  * @type {string}
  */
-export let homePage = '_home.md'
+export let homePage = null
+
+/**
+ * Sentinel slug used internally to represent the site root when a slug
+ * cannot be derived from a page title. Centralized here so callers avoid
+ * hard-coding the literal `'_home'`.
+ * @type {string}
+ */
+export const HOME_SLUG = '_home'
 
 /**
  * Set the not-found page path used when `fetchMarkdown` encounters a
@@ -203,7 +221,13 @@ export let homePage = '_home.md'
  * @param {string} p - path to use as the not-found page (relative to content base)
  */
 export function setNotFoundPage(p) {
-  if (p == null) return
+  if (p == null) {
+    // Allow callers to explicitly clear the configured not-found page
+    // so the runtime can render an inline fallback instead of
+    // attempting to load a `_404.md` file.
+    notFoundPage = null
+    return
+  }
   notFoundPage = String(p || '')
 }
 
@@ -213,7 +237,13 @@ export function setNotFoundPage(p) {
  * @param {string} p - path to use as the home page (relative to content base)
  */
 export function setHomePage(p) {
-  if (p == null) return
+  // Allow callers to explicitly clear the configured home page by
+  // passing `null`/`undefined`. When cleared, `homePage` will be
+  // `null` and the runtime will not fall back to `_home.md`.
+  if (p == null) {
+    homePage = null
+    return
+  }
   homePage = String(p || '')
 }
 
@@ -531,7 +561,7 @@ export function clearFetchCache() { fetchCache.clear() }
 /**
  * @type {(path: string, base?: string) => Promise<FetchResult>
  */
-export let fetchMarkdown = async function(path, base) {
+export let fetchMarkdown = async function(path, base, opts) {
   if (!path) throw new Error('path required')
   // Accept cosmetic or canonical hrefs and extract page token for internal fetches
   try {
@@ -551,6 +581,14 @@ export let fetchMarkdown = async function(path, base) {
       }
     }
   } catch (err) { _debugLog('[slugManager] slug mapping normalization failed', err) }
+  // If a notFoundPage is not configured and we have no index/mappings,
+  // avoid issuing network probes for guessed candidates. This prevents
+  // spurious requests like `/bad_slug`, `/bad_slug.md`, or `_home.md`
+  // when the runtime intends to render an inline 404 fallback.
+  const allowFetch = (opts && opts.force === true) || (typeof notFoundPage === 'string' && notFoundPage) || (slugToMd && slugToMd.size) || (allMarkdownPaths && allMarkdownPaths.length) || (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug)
+  if (!allowFetch) {
+    throw new Error('failed to fetch md')
+  }
   const baseClean = base == null ? '' : trimTrailingSlash(String(base))
   let url = ''
   try {
@@ -591,15 +629,17 @@ export let fetchMarkdown = async function(path, base) {
     const res = await fetch(url)
     if (!res || typeof res.ok !== 'boolean' || !res.ok) {
       if (res && res.status === 404) {
-        try {
-          const p404 = `${baseClean}/${notFoundPage}`
-          const r404 = await globalThis.fetch(p404)
-          if (r404 && typeof r404.ok === 'boolean' && r404.ok) {
-            const raw404 = await r404.text()
-            return { raw: raw404, status: 404 }
+          if (typeof notFoundPage === 'string' && notFoundPage) {
+            try {
+              const p404 = `${baseClean}/${notFoundPage}`
+              const r404 = await globalThis.fetch(p404)
+              if (r404 && typeof r404.ok === 'boolean' && r404.ok) {
+                const raw404 = await r404.text()
+                return { raw: raw404, status: 404 }
+              }
+            } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
           }
-        } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
-      }
+        }
       let body = ''
       try {
         if (res && typeof res.clone === 'function') {
@@ -613,7 +653,15 @@ export let fetchMarkdown = async function(path, base) {
         body = ''
         _debugLog('[slugManager] reading error body failed', err)
       }
-      console.error('fetchMarkdown failed:', { url, status: res ? res.status : undefined, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) })
+      try {
+        const status = res ? res.status : undefined
+        if (status === 404) {
+          try { if (console && typeof console.warn === 'function') console.warn('fetchMarkdown failed (404):', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
+        } else {
+          try { if (console && typeof console.error === 'function') console.error('fetchMarkdown failed:', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
+        }
+      } catch (e) {}
+      throw new Error('failed to fetch md')
       throw new Error('failed to fetch md')
     }
     const raw = await res.text()
@@ -625,14 +673,16 @@ export let fetchMarkdown = async function(path, base) {
 
     if (looksLikeHtml && String(path || '').toLowerCase().endsWith('.md')) {
       try {
-        const p404 = `${baseClean}/${notFoundPage}`
-        const r404 = await globalThis.fetch(p404)
-        if (r404.ok) {
-          const raw404 = await r404.text()
-          return { raw: raw404, status: 404 }
+        if (typeof notFoundPage === 'string' && notFoundPage) {
+          const p404 = `${baseClean}/${notFoundPage}`
+          const r404 = await globalThis.fetch(p404)
+          if (r404.ok) {
+            const raw404 = await r404.text()
+            return { raw: raw404, status: 404 }
+          }
         }
       } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
-      console.error('fetchMarkdown: server returned HTML for .md request', url)
+      if (_slugShouldLog()) console.error('fetchMarkdown: server returned HTML for .md request', url)
       throw new Error('failed to fetch md')
     }
 
@@ -1435,6 +1485,16 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     return resolveSlugPath(decoded) || slugToMd.get(decoded)
   }
 
+  // Short-circuit aggressive candidate probing when the host did not
+  // configure a `notFoundPage` and we don't have any index/mapping data
+  // available. This avoids unnecessary network requests for guessed
+  // candidates like `slug.html`/`slug.md` when the runtime will render
+  // an inline 404 instead.
+  try {
+    const allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(decoded) || (allMarkdownPaths && allMarkdownPaths.length) || refreshIndexPaths._refreshed || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))
+    if (!allowCandidateProbing) return null
+  } catch (_e) {}
+
   for (const resolver of slugResolvers) {
     try {
       const res = await resolver(decoded, contentBase)
@@ -1519,24 +1579,25 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   }
 
   try {
-    const homeCandidates = []
-    if (homePage && typeof homePage === 'string' && homePage.trim()) homeCandidates.push(homePage)
-    if (!homeCandidates.includes('_home.md')) homeCandidates.push('_home.md')
-    for (const hp of homeCandidates) {
+    // Only consider an explicitly configured `homePage`. Do NOT fall
+    // back to a hard-coded `_home.md` file — the runtime should not
+    // guess or probe for `_home.md` automatically.
+    if (homePage && typeof homePage === 'string' && homePage.trim()) {
       try {
-        const home = await fetchMarkdown(hp, contentBase)
+        const home = await fetchMarkdown(homePage, contentBase)
         if (home && home.raw) {
           const mhome = (home.raw || '').match(/^#\s+(.+)$/m)
           if (mhome && mhome[1]) {
             const homeSlug = slugify(mhome[1].trim())
             if (homeSlug === decoded) {
-              _storeSlugMapping(decoded, hp)
-              mdToSlug.set(hp, decoded)
-              return hp
+              _storeSlugMapping(decoded, homePage)
+              mdToSlug.set(homePage, decoded)
+              return homePage
             }
           }
         }
       } catch (e) {
+        _debugLog('[slugManager] home page fetch failed', e)
       }
     }
   } catch (e) {

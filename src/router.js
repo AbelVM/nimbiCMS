@@ -14,6 +14,18 @@ export let RESOLUTION_CACHE_MAX = 100
 export function setResolutionCacheMax(n) {
   RESOLUTION_CACHE_MAX = n
 }
+
+// Gate router logs and optional probe behavior.
+function _routerShouldLog() {
+  try {
+    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) return true
+  } catch (_e) {}
+  try {
+    return (typeof notFoundPage === 'string' && notFoundPage) ? true : false
+  } catch (_e) {
+    return false
+  }
+}
 /**
  * Time‑to‑live (TTL) for cache entries, in milliseconds.  After this duration
  * a stored resolution will be treated as if it does not exist, triggering a
@@ -352,10 +364,21 @@ export async function fetchPageData(raw, contentBase) {
     resolutionCacheSet(cacheKey, { resolved, anchor })
   }
 
+  // Compute whether we should attempt network probing for candidates.
+  // Do this early so we can avoid absolute fetches/site-shell probes
+  // when the runtime intends to render an inline not-found fallback.
+  let allowCandidateProbing = true
+  try {
+    const explicitResolved = String(resolved || '').includes('.md') || String(resolved || '').includes('.html') || (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')))
+    allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(resolved) || (indexSet && indexSet.size) || refreshIndexPaths._refreshed || originalWasExplicitEarly || explicitResolved
+  } catch (_e) {
+    allowCandidateProbing = true
+  }
+
   if (!anchor && hashAnchor) anchor = hashAnchor
 
   try {
-    if (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/'))) {
+    if (allowCandidateProbing && resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/'))) {
       const abs = resolved.startsWith('/') ? new URL(resolved, location.origin).toString() : resolved
       try {
         const res = await fetch(abs)
@@ -381,13 +404,15 @@ export async function fetchPageData(raw, contentBase) {
                     return { data: mdData, pagePath: alt, anchor }
                   }
                 } catch (_e) { /* ignore md probe failure */ }
-                try {
-                  const nf = await fetchMarkdown(notFoundPage, contentBase)
-                  if (nf && nf.raw) {
-                    try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
-                    return { data: nf, pagePath: notFoundPage, anchor }
-                  }
-                } catch (_e) { /* ignore notFoundPage probe */ }
+                if (typeof notFoundPage === 'string' && notFoundPage) {
+                  try {
+                    const nf = await fetchMarkdown(notFoundPage, contentBase)
+                    if (nf && nf.raw) {
+                      try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
+                      return { data: nf, pagePath: notFoundPage, anchor }
+                    }
+                  } catch (_e) { /* ignore notFoundPage probe */ }
+                }
 
                 try { fetchError = new Error('site shell detected (absolute fetch)') } catch (_e) {}
                 // fall through — don't return the absolute HTML; allow
@@ -418,13 +443,15 @@ export async function fetchPageData(raw, contentBase) {
                 } catch (_e) {
                   // ignore md probe failure
                 }
-                try {
-                  const nf = await fetchMarkdown(notFoundPage, contentBase)
-                  if (nf && nf.raw) {
-                    try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
-                    return { data: nf, pagePath: notFoundPage, anchor }
-                  }
-                } catch (_e) { /* ignore notFoundPage probe */ }
+                if (typeof notFoundPage === 'string' && notFoundPage) {
+                  try {
+                    const nf = await fetchMarkdown(notFoundPage, contentBase)
+                    if (nf && nf.raw) {
+                      try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
+                      return { data: nf, pagePath: notFoundPage, anchor }
+                    }
+                  } catch (_e) { /* ignore notFoundPage probe */ }
+                }
 
                 try { fetchError = new Error('site shell detected (absolute fetch)') } catch (_e) {}
                 // fall through — don't return the absolute HTML; allow
@@ -439,7 +466,9 @@ export async function fetchPageData(raw, contentBase) {
 
   const pageCandidates = buildPageCandidates(resolved)
   try {
-    try { console.warn('[router-debug] fetchPageData candidates', { originalRaw, resolved, pageCandidates }) } catch (_e) {}
+    if (_routerShouldLog()) {
+      try { console.warn('[router-debug] fetchPageData candidates', { originalRaw, resolved, pageCandidates }) } catch (_e) {}
+    }
   } catch (_e) {}
 
   const originalWasExplicit = String(originalRaw || '').includes('.md') || String(originalRaw || '').includes('.html')
@@ -480,53 +509,72 @@ export async function fetchPageData(raw, contentBase) {
   let pagePath = null
 
 
-  let fetchError = null;
-  for (const candidate of pageCandidates) {
-    if (!candidate) continue;
-    try {
-      const norm = normalizePath(candidate);
-      data = await fetchMarkdown(norm, contentBase);
-      pagePath = norm;
+  let fetchError = null
+  // When no explicit `notFoundPage` is configured and we don't have
+  // an index mapping or slug mapping available, avoid issuing a flood
+  // of network probes for guessed candidates (e.g. `bad_slug.html`,
+  // `bad_slug.md`) — render the inline 404 instead. This keeps the
+  // console and network quieter for the common case where hosts want
+  // the client to show an inline fallback without exhausting probes.
+  try {
+    // Re-evaluate the probe gate in case resolution changed; do not
+    // enable probing simply because `contentBase` is absolute.
+    const explicitResolvedLater = String(resolved || '').includes('.md') || String(resolved || '').includes('.html') || (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')))
+    allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(resolved) || (indexSet && indexSet.size) || refreshIndexPaths._refreshed || originalWasExplicit || explicitResolvedLater
+  } catch (_e) {
+    allowCandidateProbing = true
+  }
 
-      // Defensive check: if the user requested a bare slug (e.g. "potato")
-      // and there is no explicit `slugToMd` mapping for that slug, ensure
-      // the fetched page's H1/title actually slugifies to the requested
-      // value. This prevents accidental resolution of unrelated pages
-      // (commonly the site's home page) for mistyped slugs.
-      if (requestedSlug && !slugToMd.has(requestedSlug)) {
-        try {
-          let title = ''
-          if (data && data.isHtml) {
-            try {
-              const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
-              if (parser) {
-                const doc = parser.parseFromString(data.raw || '', 'text/html')
-                const h1 = doc.querySelector('h1') || doc.querySelector('title')
-                if (h1 && h1.textContent) title = h1.textContent.trim()
-              }
-            } catch (_e) { /* ignore parse errors */ }
-          } else {
-            const m = (data && data.raw || '').match(/^#\s+(.+)$/m)
-            if (m && m[1]) title = m[1].trim()
-          }
-              if (title) {
-                const titleSlug = slugify(title)
-                if (titleSlug !== requestedSlug) {
-                  // If this was an HTML candidate and a sibling `.md` candidate
-                  // exists, attempt to probe the `.md` sibling before rejecting
-                  // the candidate. This helps accept the real markdown page when
-                  // the HTML looked like an index or unrelated shell.
-                  try {
-                    if (/\.html$/i.test(norm)) {
-                      const alt = norm.replace(/\.html$/i, '.md')
-                      if (pageCandidates.includes(alt)) {
-                        try {
-                          const mdData = await fetchMarkdown(alt, contentBase)
-                          if (mdData && mdData.raw) {
-                            data = mdData
-                            pagePath = alt
-                            // accepted the sibling .md; skip rejection
-                          } else {
+  if (!allowCandidateProbing) {
+    // Short-circuit: do not attempt candidate fetches for unknown slugs.
+    fetchError = new Error('no page data')
+  } else {
+    for (const candidate of pageCandidates) {
+      if (!candidate) continue
+      try {
+        const norm = normalizePath(candidate)
+        data = await fetchMarkdown(norm, contentBase)
+        pagePath = norm
+
+        // Defensive check: if the user requested a bare slug (e.g. "potato")
+        // and there is no explicit `slugToMd` mapping for that slug, ensure
+        // the fetched page's H1/title actually slugifies to the requested
+        // value. This prevents accidental resolution of unrelated pages
+        // (commonly the site's home page) for mistyped slugs.
+        if (requestedSlug && !slugToMd.has(requestedSlug)) {
+          try {
+            let title = ''
+            if (data && data.isHtml) {
+              try {
+                const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+                if (parser) {
+                  const doc = parser.parseFromString(data.raw || '', 'text/html')
+                  const h1 = doc.querySelector('h1') || doc.querySelector('title')
+                  if (h1 && h1.textContent) title = h1.textContent.trim()
+                }
+              } catch (_e) { /* ignore parse errors */ }
+            } else {
+              const m = (data && data.raw || '').match(/^#\s+(.+)$/m)
+              if (m && m[1]) title = m[1].trim()
+            }
+            if (title) {
+              const titleSlug = slugify(title)
+              if (titleSlug !== requestedSlug) {
+                // If this was an HTML candidate and a sibling `.md` candidate
+                // exists, attempt to probe the `.md` sibling before rejecting
+                // the candidate. This helps accept the real markdown page when
+                // the HTML looked like an index or unrelated shell.
+                try {
+                  if (/\.html$/i.test(norm)) {
+                    const alt = norm.replace(/\.html$/i, '.md')
+                    if (pageCandidates.includes(alt)) {
+                      try {
+                        const mdData = await fetchMarkdown(alt, contentBase)
+                        if (mdData && mdData.raw) {
+                          data = mdData
+                          pagePath = alt
+                        } else {
+                          if (typeof notFoundPage === 'string' && notFoundPage) {
                             try {
                               const nf = await fetchMarkdown(notFoundPage, contentBase)
                               if (nf && nf.raw) {
@@ -544,31 +592,31 @@ export async function fetchPageData(raw, contentBase) {
                               fetchError = new Error('slug mismatch for candidate')
                               continue
                             }
-                          }
-                        } catch (_e) {
-                          try {
-                            const nf = await fetchMarkdown(notFoundPage, contentBase)
-                            if (nf && nf.raw) {
-                              data = nf
-                              pagePath = notFoundPage
-                            } else {
-                              data = null
-                              pagePath = null
-                              fetchError = new Error('slug mismatch for candidate')
-                              continue
-                            }
-                          } catch (_e2) {
+                          } else {
                             data = null
                             pagePath = null
                             fetchError = new Error('slug mismatch for candidate')
                             continue
                           }
                         }
-                      } else {
-                        data = null
-                        pagePath = null
-                        fetchError = new Error('slug mismatch for candidate')
-                        continue
+                      } catch (_e) {
+                        try {
+                          const nf = await fetchMarkdown(notFoundPage, contentBase)
+                          if (nf && nf.raw) {
+                            data = nf
+                            pagePath = notFoundPage
+                          } else {
+                            data = null
+                            pagePath = null
+                            fetchError = new Error('slug mismatch for candidate')
+                            continue
+                          }
+                        } catch (_e2) {
+                          data = null
+                          pagePath = null
+                          fetchError = new Error('slug mismatch for candidate')
+                          continue
+                        }
                       }
                     } else {
                       data = null
@@ -576,47 +624,61 @@ export async function fetchPageData(raw, contentBase) {
                       fetchError = new Error('slug mismatch for candidate')
                       continue
                     }
-                  } catch (_e) {
+                  } else {
                     data = null
                     pagePath = null
                     fetchError = new Error('slug mismatch for candidate')
                     continue
                   }
+                } catch (_e) {
+                  data = null
+                  pagePath = null
+                  fetchError = new Error('slug mismatch for candidate')
+                  continue
                 }
               }
-        } catch (_e) { /* ignore validation errors */ }
-      }
+            }
+          } catch (_e) { /* ignore validation errors */ }
+        }
 
-      // If we just fetched an HTML candidate that was generated for a
-      // bare slug (i.e. the original request did not explicitly ask for
-      // an HTML file) and a sibling `.md` candidate exists, probe the
-      // `.md` candidate and prefer it if available. This avoids cases
-      // where servers return the site `index.html` for unknown paths
-      // which would otherwise render the homepage instead of the
-      // site's not-found page.
-      try {
-        if (!originalWasExplicit && /\.html$/i.test(norm)) {
-          const alt = norm.replace(/\.html$/i, '.md')
-          if (pageCandidates.includes(alt)) {
-            try {
-              // Only probe the `.md` sibling when the HTML result actually
-              // looks like HTML (server index fallback) — do not probe when
-              // the returned data appears to be markdown/plain text.
-              const rawSnippetFull = String((data && data.raw) || '').trim()
-              const rawSnippet = rawSnippetFull.slice(0, 128).toLowerCase()
-              const looksLikeHtml = (data && data.isHtml) || /^(?:<!doctype|<html|<title|<h1)/i.test(rawSnippet) || rawSnippet.indexOf('<div id="app"') !== -1 || rawSnippet.indexOf('nimbi-') !== -1 || rawSnippet.indexOf('nimbi') !== -1 || rawSnippet.indexOf('initcms(') !== -1
-              if (looksLikeHtml) {
-                let accepted = false
-                try {
-                  const mdData = await fetchMarkdown(alt, contentBase)
-                  if (mdData && mdData.raw) {
-                    data = mdData
-                    pagePath = alt
-                    accepted = true
-                  } else {
-                    // If the `.md` sibling is not present, prefer the configured
-                    // not-found page so we don't render the site shell as if it
-                    // were actual content for a missing slug.
+        // If we just fetched an HTML candidate that was generated for a
+        // bare slug (i.e. the original request did not explicitly ask for
+        // an HTML file) and a sibling `.md` candidate exists, probe the
+        // `.md` candidate and prefer it if available. This avoids cases
+        // where servers return the site `index.html` for unknown paths
+        // which would otherwise render the homepage instead of the
+        // site's not-found page.
+        try {
+          if (!originalWasExplicit && /\.html$/i.test(norm)) {
+            const alt = norm.replace(/\.html$/i, '.md')
+            if (pageCandidates.includes(alt)) {
+              try {
+                const rawSnippetFull = String((data && data.raw) || '').trim()
+                const rawSnippet = rawSnippetFull.slice(0, 128).toLowerCase()
+                const looksLikeHtml = (data && data.isHtml) || /^(?:<!doctype|<html|<title|<h1)/i.test(rawSnippet) || rawSnippet.indexOf('<div id="app"') !== -1 || rawSnippet.indexOf('nimbi-') !== -1 || rawSnippet.indexOf('nimbi') !== -1 || rawSnippet.indexOf('initcms(') !== -1
+                if (looksLikeHtml) {
+                  let accepted = false
+                  try {
+                    const mdData = await fetchMarkdown(alt, contentBase)
+                    if (mdData && mdData.raw) {
+                      data = mdData
+                      pagePath = alt
+                      accepted = true
+                    } else {
+                      if (typeof notFoundPage === 'string' && notFoundPage) {
+                        try {
+                          const nf = await fetchMarkdown(notFoundPage, contentBase)
+                          if (nf && nf.raw) {
+                            data = nf
+                            pagePath = notFoundPage
+                            accepted = true
+                          }
+                        } catch (_e) {
+                          /* ignore notFoundPage probe failure */
+                        }
+                      }
+                    }
+                  } catch (_e) {
                     try {
                       const nf = await fetchMarkdown(notFoundPage, contentBase)
                       if (nf && nf.raw) {
@@ -624,81 +686,72 @@ export async function fetchPageData(raw, contentBase) {
                         pagePath = notFoundPage
                         accepted = true
                       }
-                    } catch (_e) {
-                      /* ignore notFoundPage probe failure */
-                    }
+                    } catch (_e2) { /* ignore */ }
                   }
-                } catch (_e) {
-                  // md probe threw; try notFoundPage as a conservative fallback
-                  try {
-                    const nf = await fetchMarkdown(notFoundPage, contentBase)
-                    if (nf && nf.raw) {
-                      data = nf
-                      pagePath = notFoundPage
-                      accepted = true
-                    }
-                  } catch (_e2) { /* ignore */ }
-                }
 
-                if (!accepted) {
-                  // No sibling `.md` or configured `notFoundPage` was
-                  // available. The returned HTML looks like a site shell, so
-                  // reject this candidate rather than treating the shell as
-                  // actual page content. This avoids rendering the homepage
-                  // for mistyped/missing slugs.
-                  data = null
-                  pagePath = null
-                  fetchError = new Error('site shell detected (candidate HTML rejected)')
-                  continue
+                  if (!accepted) {
+                    data = null
+                    pagePath = null
+                    fetchError = new Error('site shell detected (candidate HTML rejected)')
+                    continue
+                  }
                 }
-              }
-            } catch (_e) { /* ignore probe errors */ }
+              } catch (_e) { /* ignore probe errors */ }
+            }
           }
-        }
-      } catch (_e) { /* ignore probe errors */ }
+        } catch (_e) { /* ignore probe errors */ }
 
-      // If we reached this point, accept the fetched data and stop trying
-      // other candidates.
-      try {
-        try { console.warn('[router-debug] fetchPageData accepted candidate', { candidate: norm, pagePath, isHtml: data && data.isHtml, snippet: (data && data.raw ? String(data.raw).slice(0,160) : null) }) } catch (_e) {}
-      } catch (_e) {}
-      break;
-    } catch (e) {
-      fetchError = e;
-      try { console.warn('[router] candidate fetch failed', { candidate, contentBase, err: (e && e.message) || e }) } catch (_e) {}
+        try {
+          if (_routerShouldLog()) {
+            try { console.warn('[router-debug] fetchPageData accepted candidate', { candidate: norm, pagePath, isHtml: data && data.isHtml, snippet: (data && data.raw ? String(data.raw).slice(0,160) : null) }) } catch (_e) {}
+          }
+        } catch (_e) {}
+        break
+      } catch (e) {
+        fetchError = e
+        try { if (_routerShouldLog()) console.warn('[router] candidate fetch failed', { candidate, contentBase, err: (e && e.message) || e }) } catch (_e) {}
+      }
     }
   }
 
   if (!data) {
-    try { console.warn('[router-debug] fetchPageData no data', { originalRaw, resolved, pageCandidates, fetchError: (fetchError && (fetchError.message || String(fetchError))) || null }) } catch (_e) {}
-    try { console.error('[router] fetchPageData: no page data for', { originalRaw, resolved, pageCandidates, contentBase, fetchError: (fetchError && (fetchError.message || String(fetchError))) || null }) } catch (_e) {}
+    const fetchErrMsg = (fetchError && (fetchError.message || String(fetchError))) || null
+    const isExpectedMissing = fetchErrMsg && /failed to fetch md|site shell detected/i.test(fetchErrMsg)
+    try { if (_routerShouldLog()) { try { console.warn('[router-debug] fetchPageData no data', { originalRaw, resolved, pageCandidates, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
+    if (isExpectedMissing) {
+      try { if (_routerShouldLog()) { try { console.warn('[router] fetchPageData: no page data (expected)', { originalRaw, resolved, pageCandidates, contentBase, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
+    } else {
+      try { if (_routerShouldLog()) { try { console.error('[router] fetchPageData: no page data for', { originalRaw, resolved, pageCandidates, contentBase, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
+    }
     // Conservative fallback: if no candidate produced content, prefer the
     // configured notFoundPage when available so we don't render the site
     // shell (homepage) for missing slugs.
-    try {
-      const nf = await fetchMarkdown(notFoundPage, contentBase)
-      if (nf && nf.raw) {
-        try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
-        return { data: nf, pagePath: notFoundPage, anchor }
-      }
-    } catch (_e) { /* ignore notFoundPage probe errors */ }
+                    if (typeof notFoundPage === 'string' && notFoundPage) {
+                      try {
+                        const nf = await fetchMarkdown(notFoundPage, contentBase)
+                        if (nf && nf.raw) {
+                          try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
+                          return { data: nf, pagePath: notFoundPage, anchor }
+                        }
+                      } catch (_e) { /* ignore notFoundPage probe errors */ }
+                    }
     try {
       if (originalWasExplicit && String(originalRaw || '').toLowerCase().includes('.html')) {
-        try {
+          try {
           const abs = new URL(String(originalRaw || ''), location.href).toString()
-          console.warn('[router] attempting absolute HTML fetch fallback', abs)
+          if (_routerShouldLog()) console.warn('[router] attempting absolute HTML fetch fallback', abs)
           const res = await fetch(abs)
           if (res && res.ok) {
             const raw = await res.text()
             const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
             const rawLower = (raw || '').toLowerCase()
             const looksLikeHtml = (ct && ct.indexOf && ct.indexOf('text/html') !== -1) || rawLower.indexOf('<!doctype') !== -1 || rawLower.indexOf('<html') !== -1
-            if (!looksLikeHtml) console.warn('[router] absolute fetch returned non-HTML', { abs, contentType: ct, snippet: rawLower.slice(0, 200) })
+            if (!looksLikeHtml && _routerShouldLog()) console.warn('[router] absolute fetch returned non-HTML', { abs, contentType: ct, snippet: rawLower.slice(0, 200) })
             if (looksLikeHtml) {
               const rawLowerForDir = (raw || '').toLowerCase()
               const looksLikeDirListing = /<title>\s*index of\b/i.test(raw) || /<h1>\s*index of\b/i.test(raw) || rawLowerForDir.indexOf('parent directory') !== -1 || /<title>\s*directory listing/i.test(raw) || /<h1>\s*directory listing/i.test(raw)
               if (looksLikeDirListing) {
-                try { console.warn('[router] absolute fetch returned directory listing; treating as not found', { abs }) } catch (_e) {}
+                try { if (_routerShouldLog()) console.warn('[router] absolute fetch returned directory listing; treating as not found', { abs }) } catch (_e) {}
               } else {
                 try {
                   const absUrl = abs
@@ -770,7 +823,7 @@ export async function fetchPageData(raw, contentBase) {
                         } catch (err) { /* ignore per-element failures */ }
                       }
                       const modified = doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : raw
-                      try { if (rewritten && rewritten.length) console.warn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
+                      try { if (_routerShouldLog() && rewritten && rewritten.length) console.warn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
                       return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
                     }
                   } catch (e) { /* parsing failed, fall back */ }
@@ -789,8 +842,8 @@ export async function fetchPageData(raw, contentBase) {
               }
             }
           }
-        } catch (err) {
-          console.warn('[router] absolute HTML fetch fallback failed', err)
+                } catch (err) {
+          if (_routerShouldLog()) console.warn('[router] absolute HTML fetch fallback failed', err)
         }
       }
     } catch (_) { /* ignore fallback errors */ }
@@ -798,23 +851,30 @@ export async function fetchPageData(raw, contentBase) {
     try {
       const dec = decodeURIComponent(String(resolved || ''))
       if (dec && !/\.(md|html?)$/i.test(dec)) {
-        const candidates = [
-          `/assets/${dec}.html`,
-          `/assets/${dec}/index.html`
-        ]
-        for (const abs of candidates) {
-          try {
-            const res = await fetch(abs, { method: 'GET' })
-            if (res && res.ok) {
-              const raw = await res.text()
-              return { data: { raw, isHtml: true }, pagePath: abs.replace(/^\//, ''), anchor }
+        // Only probe the `/assets/...` fallbacks when a configured
+        // `notFoundPage` exists (or debugging explicitly enabled). This
+        // prevents extra 404 asset requests when using the inline
+        // not-found fallback.
+        const shouldProbeAssets = (typeof notFoundPage === 'string' && notFoundPage)
+        if (shouldProbeAssets && _routerShouldLog()) {
+          const candidates = [
+            `/assets/${dec}.html`,
+            `/assets/${dec}/index.html`
+          ]
+          for (const abs of candidates) {
+            try {
+              const res = await fetch(abs, { method: 'GET' })
+              if (res && res.ok) {
+                const raw = await res.text()
+                return { data: { raw, isHtml: true }, pagePath: abs.replace(/^\//, ''), anchor }
+              }
+            } catch (e) {
+              /* ignore single-candidate failures */
             }
-          } catch (e) {
-            /* ignore single-candidate failures */
           }
         }
       }
-    } catch (e) { console.warn('[router] assets fallback failed', e) }
+    } catch (e) { if (_routerShouldLog()) console.warn('[router] assets fallback failed', e) }
 
     throw new Error('no page data');
   }

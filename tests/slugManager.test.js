@@ -131,8 +131,11 @@ describe('slugManager module', () => {
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('') })
     })
     const result = await slugMgr.ensureSlug(slug, base)
-    expect(result).toBe('_home.md')
-    expect(slugMgr.slugToMd.get(slug)).toBe('_home.md')
+    // No automatic fallback to `_home.md` — when no explicit homePage is
+    // configured, ensureSlug should not probe `_home.md` and should return
+    // null for unknown slugs.
+    expect(result).toBeNull()
+    expect(slugMgr.slugToMd.get(slug)).toBeUndefined()
   })
 
   it('crawlForSlug traverses directory listings to locate slug', async () => {

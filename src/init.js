@@ -4,7 +4,7 @@
  * delegating navigation and UI behaviour to helper modules.
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages } from './slugManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, notFoundPage } from './slugManager.js'
 import * as router from './router.js'
 import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
@@ -102,7 +102,10 @@ export function parseInitOptionsFromQuery(queryString) {
     }
     if (params.has('homePage')) out.homePage = params.get('homePage')
     if (params.has('navigationPage')) out.navigationPage = params.get('navigationPage')
-    if (params.has('notFoundPage')) out.notFoundPage = params.get('notFoundPage')
+    if (params.has('notFoundPage')) {
+      const v = params.get('notFoundPage')
+      out.notFoundPage = (v === 'null') ? null : v
+    }
     if (params.has('availableLanguages')) {
       out.availableLanguages = params.get('availableLanguages').split(',').map(s => s.trim()).filter(Boolean)
     }
@@ -200,8 +203,8 @@ export let initialDocumentTitle = ''
  * @param {number} [options.cacheTtlMinutes=5] - resolution cache time‑to‑live in minutes
  * @param {number} [options.cacheMaxEntries] - maximum number of resolution cache entries (defaults to module constant)
  * @param {Array<Record<string,unknown>>} [options.markdownExtensions] - list of marked extensions to register on init
- * @param {string} [options.homePage] - Sets the site’s home page. Can be a `.md` or `.html` file. If not set, falls back to `'_home.md'`.
- * @param {string} [options.notFoundPage] - Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, defaults to `'_404.md'`.
+ * @param {string} [options.homePage] - Sets the site’s home page. Can be a `.md` or `.html` file. If not set, the initializer will attempt to derive the home page from the first link in `navigationPage`. The runtime will not automatically fall back to `'_home.md'`.
+ * @param {string|null} [options.notFoundPage] - Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, the runtime will render an inline "Not Found" message linking to the configured `homePage` instead of attempting to load `'_404.md'`.
  * @param {boolean} [options.skipRootReadme=false] - when true, the indexer will skip link discovery inside a repository-root `README.md`; set to `false` to treat the root README like other content pages.
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
@@ -256,8 +259,8 @@ export async function initCMS(options = {}) {
     cacheMaxEntries,
     markdownExtensions,
     availableLanguages,
-    homePage = '_home.md',
-    notFoundPage = '_404.md',
+    homePage = null,
+    notFoundPage = null,
     navigationPage = '_navigation.md',
     exposeSitemap = true
   } = finalOptions
@@ -421,8 +424,8 @@ export async function initCMS(options = {}) {
     } catch (e) {}
     try {
       const parsedForSeo = parseHrefToRoute(typeof window !== 'undefined' ? window.location.href : '')
-      const pageForSeo = (parsedForSeo && parsedForSeo.page) ? parsedForSeo.page : (homePage || '_home.md')
-      try { injectSeoForPage(pageForSeo, initialDocumentTitle || '') } catch (e) {}
+      const pageForSeo = (parsedForSeo && parsedForSeo.page) ? parsedForSeo.page : (homePage || undefined)
+      try { if (pageForSeo) injectSeoForPage(pageForSeo, initialDocumentTitle || '') } catch (e) {}
     } catch (e) {}
 
     await (async () => {
@@ -544,18 +547,17 @@ export async function initCMS(options = {}) {
       var contentBase = origin
     }
   }
-  try {
-    import('./slugManager.js').then(m => {
-      try { if (m && typeof m.setHomePage === 'function') m.setHomePage(homePage) } catch (e2) { dbgWarn('[nimbi-cms] setHomePage failed', e2) }
-    }).catch(e => { /* ignore dynamic import errors for tests */ })
-  } catch (e) { dbgWarn('[nimbi-cms] setHomePage dynamic import failed', e) }
+  // Defer setting the slugManager home page until after we attempt to
+  // derive a sensible default from the navigation page when the caller
+  // did not explicitly provide `homePage` in options. This avoids
+  // forcing `_home.md` when the site's nav points elsewhere.
   if (l10nFile) await loadL10nFile(l10nFile, pageDir)
   if (availableLanguages && Array.isArray(availableLanguages)) {
     setLanguages(availableLanguages)
   }
   if (lang) setLang(lang)
 
-  const ui = createUI({ contentWrap, navWrap, container, mountOverlay, t, contentBase, homePage, initialDocumentTitle, runHooks })
+  
 
   if (typeof cacheTtlMinutes === 'number' && cacheTtlMinutes >= 0) {
     if (typeof router.setResolutionCacheTtl === 'function') {
@@ -595,24 +597,132 @@ export async function initCMS(options = {}) {
       }).catch(() => {})
     }
   } catch (e) {}
+    // Attempt to derive `homePage` from the first link in the navigation
+    // page when the user did not explicitly provide `homePage`.
+    let _earlyParsedNav = null
+    let _earlyNavMd = null
     try {
-      await fetchMarkdown(homePage, contentBase)
-    } catch (e) {
-      if (homePage === '_home.md') {
-        throw new Error('Required _home.md not found')
+      const homeWasProvided = Object.prototype.hasOwnProperty.call(finalOptions, 'homePage')
+      if (!homeWasProvided && navigationPage) {
+        // Try to fetch the configured navigation page. If it fails, attempt
+        // a few common alternate locations (no leading underscore, plain
+        // "navigation.md", or under `assets/`) so sites that moved/renamed
+        // their nav file still derive a sensible home page.
+        try {
+          const tried = []
+          const candidates = []
+          try {
+            if (navigationPage) candidates.push(String(navigationPage))
+          } catch (_) {}
+          try {
+            const stripped = String(navigationPage || '').replace(/^_/, '')
+            if (stripped && stripped !== String(navigationPage)) candidates.push(stripped)
+          } catch (_) {}
+          try { candidates.push('navigation.md') } catch (_) {}
+          try { candidates.push('assets/navigation.md') } catch (_) {}
+          // Deduplicate while preserving order
+          const uniq = []
+          for (const c of candidates) {
+            try {
+              if (!c) continue
+              const s = String(c)
+              if (!uniq.includes(s)) uniq.push(s)
+            } catch (_) {}
+          }
+
+          for (const np of uniq) {
+            tried.push(np)
+            try {
+              _earlyNavMd = await fetchMarkdown(np, contentBase, { force: true })
+              if (_earlyNavMd && _earlyNavMd.raw) {          // Use repo-relative content path so gh-pages serves files from the
+          // repository subpath (avoids requests to root `/`)
+                // Remember which navigation file actually worked so we
+                // reuse it later when building the nav (avoid a second
+                // failing round-trip to the original configured path).
+                try { navigationPage = np } catch (_) {}
+                try { dbgWarn('[nimbi-cms] fetched navigation candidate', np, 'contentBase=', contentBase) } catch (_) {}
+                _earlyParsedNav = await markdown.parseMarkdownToHtml(_earlyNavMd.raw || '')
+                try {
+                  const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+                  if (parser && _earlyParsedNav && _earlyParsedNav.html) {
+                    const doc = parser.parseFromString(_earlyParsedNav.html, 'text/html')
+                    const a = doc.querySelector('a')
+                    if (a) {
+                      try {
+                        const href = a.getAttribute('href') || ''
+                        const r = parseHrefToRoute(href)
+                        try { dbgWarn('[nimbi-cms] parsed nav first-link href', href, '->', r) } catch (_) {}
+                        if (r && r.page) {
+                          // Only accept candidate home pages that look like a path
+                          // (contain an extension or a directory). Slugs (cosmetic)
+                          // are not used here because `homePage` is expected to be
+                          // a fetchable path relative to `contentBase`.
+                          if (r.type === 'path' || (r.type === 'canonical' && (r.page.includes('.') || r.page.includes('/')))) {
+                            homePage = r.page
+                            try { dbgWarn('[nimbi-cms] derived homePage from navigation', homePage) } catch (_) {}
+                            break
+                          }
+                        }
+                      } catch (e) { /* swallow parsing errors for this candidate */ }
+                    }
+                  }
+                } catch (e) { /* swallow parse errors for this candidate */ }
+              }
+            } catch (_) {
+              // try next candidate
+            }
+          }
+        } catch (e) {
+          // ignore navigation fetch/parse failures — we'll fall back below
+        }
       }
-      throw new Error(`Required ${homePage} not found at ${contentBase}${homePage}: ${e.message}`)
+
+      try { dbgWarn('[nimbi-cms] final homePage before slugManager setHomePage', homePage) } catch (_) {}
+      // Inform slugManager of the (possibly updated) homePage value.
+      try {
+        setHomePage(homePage)
+      } catch (e) { dbgWarn('[nimbi-cms] setHomePage failed', e) }
+
+      // Only fetch the configured `homePage` when it is necessary. When the
+      // runtime is starting from a cosmetic hash route (e.g. "#/slug") and
+      // the host has intentionally left `notFoundPage` unset (inline 404),
+      // avoid probing the home page to reduce noisy network requests.
+      let _shouldFetchHome = true
+      try {
+        const parsedCurrent = parseHrefToRoute(typeof location !== 'undefined' ? location.href : '')
+        if (parsedCurrent && parsedCurrent.type === 'cosmetic' && (typeof notFoundPage === 'undefined' || notFoundPage == null)) {
+          _shouldFetchHome = false
+        }
+      } catch (_e) {}
+
+      if (_shouldFetchHome && homePage) {
+        try {
+          await fetchMarkdown(homePage, contentBase, { force: true })
+        } catch (e) {
+          throw new Error(`Required ${homePage} not found at ${contentBase}${homePage}: ${e && e.message ? e.message : String(e)}`)
+        }
+      }
+    } catch (e) {
+      // rethrow the error so init fails as before
+      throw e
     }
 
   setStyle(defaultStyle)
   await ensureBulma(bulmaCustomize, pageDir)
+  const ui = createUI({ contentWrap, navWrap, container, mountOverlay, t, contentBase, homePage, initialDocumentTitle, runHooks })
 
   try {
     const navbarWrap = document.createElement('header')
     navbarWrap.className = 'nimbi-site-navbar'
     mountEl.insertBefore(navbarWrap, sectionEl)
-    const navMd = await fetchMarkdown(navigationPage, contentBase)
-    const parsedNav = await markdown.parseMarkdownToHtml(navMd.raw || '')
+    // Reuse the navigation page parsed earlier when available to avoid a
+    // second network round-trip; otherwise load it now.
+    let navMd = _earlyNavMd
+    let parsedNav = _earlyParsedNav
+    if (!parsedNav) {
+      navMd = await fetchMarkdown(navigationPage, contentBase, { force: true })
+      parsedNav = await markdown.parseMarkdownToHtml(navMd.raw || '')
+    }
     const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing, navbarLogo)
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { dbgWarn('[nimbi-cms] onNavBuild hooks failed', e) }
     

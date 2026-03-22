@@ -9,10 +9,11 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[FEAT]** Improved SEO management
 - **[FEAT]** Added a dynamic sitemap
 - **[FEAT]** Added dynamic RSS 2.0 and ATOM 1.0 endpoints
+- **[FEAT]** More flexible defaults for `homePage` and `notFoundPage`
 
 ## v1.0.5
 
-- **[FIX]** Nasty regression with `contentPath` management
+- **[FIX]** Nasty regression at `contentPath` management
 - **[FIX]** Minor styling issues in system mode when system is dark
 - **[FIX]** Minor fixes
 

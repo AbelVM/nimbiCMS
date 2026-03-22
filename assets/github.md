@@ -75,6 +75,12 @@ But you're definitely lost.
 
 ```
 
+### The Jekyll override
+
+[Jekyll](https://github.com/jekyll/jekyll) is a simple, blog-aware, static site generator perfect and is the default engine behind GitHub Pages. Problem is that, if you want to use **nimbiCMS** in GitHub pages and any of your files start wih an underscore (for example `_navigation.md` or `_home.md`), GitHub's Jekyll processor will ignore them by default.
+
+Add an empty `.nojekyll` file at the repository root to disable Jekyll in your repository so those files are served.
+
 ## Set up the web page
 
 In the root folder of your repository, create a file called exactly `index.html` and paste this code:

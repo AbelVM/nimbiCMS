@@ -85,7 +85,9 @@ describe('initCMS option handling', () => {
   it('fails when required _home.md fetch returns 404', async () => {
     document.body.innerHTML = '<div id="app"></div>'
     global.fetch = vi.fn(async (url) => ({ ok: false, status: 404, text: () => Promise.resolve('') }))
-    await expect(initCMS({ el: '#app' })).rejects.toThrow(/Required _home\.md not found/)
+    // With no implicit `_home.md` fallback the initializer should not
+    // reject simply because a non-configured `_home.md` is missing.
+    await expect(initCMS({ el: '#app' })).resolves.toBeUndefined()
   })
 
   it('honors crawlMaxQueue option', async () => {

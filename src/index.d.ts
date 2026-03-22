@@ -200,6 +200,7 @@ export function _storeSlugMapping(slug: string, rel: string): void
 export const slugResolvers: Set<Function>
 export const allMarkdownPaths: string[]
 export const homePage: string
+export const HOME_SLUG: string
 export function setHomePage(p: string): any
 export function _setSearchIndex(arr: any): any
 export function uniqueSlug(base: string, existing: Set<string>): string
