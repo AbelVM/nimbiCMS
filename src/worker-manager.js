@@ -11,6 +11,8 @@
  * @property {() => void} terminate - Terminate the worker and clear internal state.
  */
 
+import { debugWarn } from './utils/debug.js'
+
 /**
  * Shape of a request sent to the worker manager. `type` is the worker action
  * name and `id` is injected by the manager when sending.
@@ -31,11 +33,7 @@
  */
 export function makeWorkerManager(createWorker, name = 'worker') {
   let _w = null
-
-  const _shouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
-  function _warn(...args) {
-    try { if (_shouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {}
-  }
+  function _warn(...args) { try { debugWarn(...args) } catch (e) {} }
 
   /**
    * Return the underlying Worker instance, creating it lazily.
@@ -148,8 +146,7 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
   const _ws = new Array(size).fill(null)
   let _idx = 0
 
-  const _poolShouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
-  function _poolWarn(...args) { try { if (_poolShouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {} }
+  function _poolWarn(...args) { try { debugWarn(...args) } catch (e) {} }
 
   function _create(i) {
     if (!_ws[i]) {
@@ -276,11 +273,11 @@ export function createWorkerFromRaw(code) {
         }
         return new Worker(workerUrl, { type: 'module' })
       } catch (err) {
-        try { if (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug && console && typeof console.warn === 'function') console.warn('[worker-manager] createWorkerFromRaw failed', err) } catch (e) {}
+        try { debugWarn('[worker-manager] createWorkerFromRaw failed', err) } catch (e) {}
       }
     }
   } catch (err) {
-    try { if (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug && console && typeof console.warn === 'function') console.warn('[worker-manager] createWorkerFromRaw failed', err) } catch (e) {}
+    try { debugWarn('[worker-manager] createWorkerFromRaw failed', err) } catch (e) {}
   }
   return null
 }

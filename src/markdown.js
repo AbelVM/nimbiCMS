@@ -3,6 +3,7 @@ import RendererWorker from './worker/renderer.js?worker&inline'
 import * as RendererModule from './worker/renderer.js'
 import { makeWorkerPool } from './worker-manager.js'
 import emojimap from './utils/emojiMap.js'
+import { debugWarn } from './utils/debug.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
@@ -94,7 +95,7 @@ export const markdownPlugins = []
 export function addMarkdownExtension(plugin) {
   if (plugin && (typeof plugin === 'object' || typeof plugin === 'function')) {
     markdownPlugins.push(plugin)
-    try { marked.use(plugin) } catch (e) { console.warn('[markdown] failed to apply plugin', e) }
+    try { marked.use(plugin) } catch (e) { debugWarn('[markdown] failed to apply plugin', e) }
   }
 }
 
@@ -109,7 +110,7 @@ export function setMarkdownExtensions(plugins) {
   }
   try {
     markdownPlugins.forEach(p => marked.use(p))
-  } catch (e) { console.warn('[markdown] failed to apply markdown extensions', e) }
+  } catch (e) { debugWarn('[markdown] failed to apply markdown extensions', e) }
 }
 import { parseFrontmatter } from './utils/frontmatter.js'
 import hljs from 'highlight.js/lib/core'
@@ -127,7 +128,7 @@ export async function parseMarkdownToHtml(md) {
     let { content, data } = parseFrontmatter(md || '')
     try { content = String(content || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
     marked.setOptions({ gfm: true, mangle: false, headerIds: false, headerPrefix: '' })
-    try { markdownPlugins.forEach(p => marked.use(p)) } catch (e) { console.warn('[markdown] apply plugins failed', e) }
+    try { markdownPlugins.forEach(p => marked.use(p)) } catch (e) { debugWarn('[markdown] apply plugins failed', e) }
     const html = marked.parse(content)
     try {
       const parser = SHARED_DOM_PARSER || (typeof DOMParser !== 'undefined' ? new DOMParser() : null)
@@ -432,7 +433,7 @@ export async function detectFenceLanguagesAsync(mdText, supportedMap) {
       const res = await _sendToRenderer({ type: 'detect', md: String(mdText || ''), supported: arr })
       if (Array.isArray(res)) return new Set(res)
     } catch (e) {
-      console.warn('[markdown] detectFenceLanguagesAsync worker failed', e)
+      debugWarn('[markdown] detectFenceLanguagesAsync worker failed', e)
     }
   }
   return detectFenceLanguages(mdText || '', supportedMap)

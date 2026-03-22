@@ -1,5 +1,7 @@
 
 
+import { debugWarn } from './utils/debug.js'
+
 const hooks = {
   onPageLoad: [],
   onNavBuild: [],
@@ -52,7 +54,7 @@ export async function runHooks(name, ctx) {
     try {
       await fn(ctx);
     } catch (e) {
-      console.warn('[nimbi-cms] runHooks callback failed', e);
+      try { debugWarn('[nimbi-cms] runHooks callback failed', e) } catch (err) {}
     }
   }
 }

@@ -14,7 +14,7 @@ import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickH
 import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 import { attachImagePreview } from './imagePreview.js'
-import { debugWarn } from './debug.js'
+import { debugWarn, debugError, incrementCounter, syncLegacyCounter } from './utils/debug.js'
 import { notFoundPage } from './slugManager.js'
 
 
@@ -72,9 +72,9 @@ export function createUI(opts) {
       const expectedMissing = (!notFoundPage || typeof notFoundPage !== 'string' || !notFoundPage) && /no page data/i.test(msg)
       try {
         if (expectedMissing) {
-          try { if (console && typeof console.warn === 'function') console.warn('[nimbi-cms] fetchPageData (expected missing)', e) } catch (err) {}
+          try { debugWarn('[nimbi-cms] fetchPageData (expected missing)', e) } catch (err) {}
         } else {
-          console.error('[nimbi-cms] fetchPageData failed', e)
+          try { debugError('[nimbi-cms] fetchPageData failed', e) } catch (err) {}
         }
       } catch (_e) {}
       // When hosts choose to disable a configured `notFoundPage` (set to
@@ -126,12 +126,8 @@ export function createUI(opts) {
 
   async function renderByQuery() {
     try {
-      if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
-        try {
-          window.__nimbiCMSDebug = window.__nimbiCMSDebug || {}
-          window.__nimbiCMSDebug.renderByQuery = (window.__nimbiCMSDebug.renderByQuery || 0) + 1
-        } catch (_) {}
-      }
+      try { incrementCounter('renderByQuery') } catch (_) {}
+      try { syncLegacyCounter('renderByQuery') } catch (_) {}
       let parsed = parseHrefToRoute(location.href)
       // If a path-style URL was used (e.g. /slug) convert it to the
       // canonical `?page=slug[...]` form so the rest of the pipeline only

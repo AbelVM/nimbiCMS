@@ -4,6 +4,7 @@ import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from '.
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
 import { buildCosmeticUrl, parseHrefToRoute } from './utils/urlHelper.js'
 import { setTag, setStructuredData, setMetaTags, markNotFound } from './seoManager.js'
+import { debugLog, debugWarn, debugError, debugInfo, isDebugLevel, incrementCounter } from './utils/debug.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
 function fullCosmetic(page, anchor = null) {
@@ -19,10 +20,9 @@ import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
 import * as AnchorModule from './worker/anchorWorker.js'
 
-const _hbShouldDebug = (typeof globalThis !== 'undefined' && typeof globalThis.__nimbiCMSDebug !== 'undefined') ? Boolean(globalThis.__nimbiCMSDebug) : false
-function _hbWarn(...args) { try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {} }
+function _hbWarn(...args) { try { debugWarn(...args) } catch (e) {} }
 function _hbShouldProbe(contentBase) {
-  try { if (_hbShouldDebug) return true } catch (e) {}
+  try { if (isDebugLevel(3)) return true } catch (e) {}
   try { if (typeof notFoundPage === 'string' && notFoundPage) return true } catch (e) {}
   try { if (slugToMd && slugToMd.size) return true } catch (e) {}
   try { if (allMarkdownPaths && allMarkdownPaths.length) return true } catch (e) {}
@@ -143,10 +143,10 @@ export function buildTocElement(t, toc, pagePath = '') {
         try {
           const normPage = String(pagePath || '').replace(/^[\\.\\/]+/, '')
           const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
-          if (display) a.href = buildPageUrl(display, slug)
-          else a.href = `#${encodeURIComponent(slug)}`
+            if (display) a.href = buildPageUrl(display, slug)
+            else a.href = `#${encodeURIComponent(slug)}`
         } catch (err) {
-          console.warn('[htmlBuilder] buildTocElement href normalization failed', err)
+            debugWarn('[htmlBuilder] buildTocElement href normalization failed', err)
           a.href = `#${encodeURIComponent(slug)}`
         }
         li.appendChild(a)
@@ -175,9 +175,9 @@ export function buildTocElement(t, toc, pagePath = '') {
         }
         subUl.appendChild(li)
         lastLiAtLevel[level] = li
-      } catch (err) { console.warn('[htmlBuilder] buildTocElement item failed', err, item) }
+      } catch (err) { debugWarn('[htmlBuilder] buildTocElement item failed', err, item) }
     })
-  } catch (err) { console.warn('[htmlBuilder] buildTocElement failed', err) }
+  } catch (err) { debugWarn('[htmlBuilder] buildTocElement failed', err) }
 
   aside.appendChild(ul)
   const itemCount = ul.querySelectorAll('li').length
@@ -215,11 +215,11 @@ function lazyLoadImages(el, pagePath, contentBase) {
         try {
           const resolved = new URL(pageDirForImgs + src, contentBase).toString()
           img.src = resolved
-          try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (err) { console.warn('[htmlBuilder] set image loading attribute failed', err) }
-        } catch (err) { console.warn('[htmlBuilder] resolve image src failed', err) }
+          try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (err) { debugWarn('[htmlBuilder] set image loading attribute failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] resolve image src failed', err) }
       })
     }
-  } catch (err) { console.warn('[htmlBuilder] lazyLoadImages failed', err) }
+  } catch (err) { debugWarn('[htmlBuilder] lazyLoadImages failed', err) }
 }
 
 /**
@@ -250,8 +250,8 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
             if (!val) return
             if (/^(https?:)?\/\//i.test(val) || val.startsWith('/')) return
             if (val.startsWith('#')) return
-            try { node.setAttribute(attr, new URL(val, baseForPage).toString()) } catch (err) { console.warn('[htmlBuilder] rewrite asset attribute failed', attr, val, err) }
-          } catch (err) { console.warn('[htmlBuilder] rewriteAttr failed', err) }
+            try { node.setAttribute(attr, new URL(val, baseForPage).toString()) } catch (err) { debugWarn('[htmlBuilder] rewrite asset attribute failed', attr, val, err) }
+          } catch (err) { debugWarn('[htmlBuilder] rewriteAttr failed', err) }
         }
         if (node.hasAttribute && node.hasAttribute('src')) rewriteAttr('src')
         if (node.hasAttribute && node.hasAttribute('href')) {
@@ -270,9 +270,9 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
           }).join(', ')
           node.setAttribute('srcset', mapped)
         }
-      } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets node processing failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets node processing failed', err) }
     }
-  } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed', err) }
+  } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets failed', err) }
 }
 
 let _lastContentBase = ''
@@ -357,7 +357,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             rel = normalizePath(rel)
             anchorInfo.push({ node: a, mdPathRaw, frag, rel })
             if (!mdToSlug.has(rel)) pending.add(rel)
-          } catch (err) { console.warn('[htmlBuilder] resolve mdPath failed', err) }
+          } catch (err) { debugWarn('[htmlBuilder] resolve mdPath failed', err) }
           continue
         }
         try {
@@ -386,9 +386,9 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
                     try {
                       const baseName = String(rel || '').replace(/^.*\//, '')
                       if (baseName && mdToSlug.has && mdToSlug.has(baseName)) slugKey = mdToSlug.get(baseName)
-                    } catch (e) { console.warn('[htmlBuilder] mdToSlug baseName check failed', e) }
+                    } catch (e) { debugWarn('[htmlBuilder] mdToSlug baseName check failed', e) }
                   }
-                } catch (err) { console.warn('[htmlBuilder] mdToSlug access check failed', err) }
+                } catch (err) { debugWarn('[htmlBuilder] mdToSlug access check failed', err) }
               if (!slugKey) {
                 try {
                   const baseName = String(rel || '').replace(/^.*\//, '')
@@ -418,13 +418,13 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
               }
             }
           }
-        } catch (err) { console.warn('[htmlBuilder] resolving href to URL failed', err) }
-      } catch (err) { console.warn('[htmlBuilder] processing anchor failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] resolving href to URL failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] processing anchor failed', err) }
     }
 
     if (pending.size) {
       if (!_hbShouldProbe(contentBase)) {
-        try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping md title probes (probing disabled)') } catch (e) {}
+        try { debugWarn('[htmlBuilder] skipping md title probes (probing disabled)') } catch (e) {}
         // Create conservative slug mappings from filenames when probing is disabled
         for (const rel of Array.from(pending)) {
           try {
@@ -433,7 +433,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             if (basename) {
               const candidate = slugify(basename)
               if (candidate) {
-                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] setting fallback slug mapping failed', err) }
+                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] setting fallback slug mapping failed', err) }
               }
             }
           } catch (err) { /* ignore per-path fallback errors */ }
@@ -448,12 +448,12 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
               try {
                 const mapped = slugToMd.get(basename)
                 if (mapped) {
-                  try { mdToSlug.set(mapped, basename) } catch (err) { console.warn('[htmlBuilder] mdToSlug.set failed', err) }
+                  try { mdToSlug.set(mapped, basename) } catch (err) { debugWarn('[htmlBuilder] mdToSlug.set failed', err) }
                 }
-              } catch (err) { console.warn('[htmlBuilder] reading slugToMd failed', err) }
+              } catch (err) { debugWarn('[htmlBuilder] reading slugToMd failed', err) }
               return
             }
-          } catch (err) { console.warn('[htmlBuilder] basename slug lookup failed', err) }
+          } catch (err) { debugWarn('[htmlBuilder] basename slug lookup failed', err) }
 
           const mdData = await fetchMarkdown(rel, contentBase)
             if (mdData && mdData.raw) {
@@ -461,18 +461,18 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             if (m2 && m2[1]) {
               const candidate = slugify(m2[1].trim())
               if (candidate) {
-                try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] setting slug mapping failed', err) }
+                try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] setting slug mapping failed', err) }
               }
             }
           }
-          } catch (err) { console.warn('[htmlBuilder] fetchMarkdown during rewriteAnchors failed', err) }
+          } catch (err) { debugWarn('[htmlBuilder] fetchMarkdown during rewriteAnchors failed', err) }
         }))
       }
     }
 
     if (htmlPending.size) {
       if (!_hbShouldProbe(contentBase)) {
-        try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping html title probes (probing disabled)') } catch (e) {}
+        try { debugWarn('[htmlBuilder] skipping html title probes (probing disabled)') } catch (e) {}
         // Create conservative slug mappings from html filenames when probing disabled
         for (const rel of Array.from(htmlPending)) {
           try {
@@ -481,7 +481,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             if (basename) {
               const candidate = slugify(basename)
               if (candidate) {
-                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] setting fallback html slug mapping failed', err) }
+                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] setting fallback html slug mapping failed', err) }
               }
             }
           } catch (err) { /* ignore per-path fallback errors */ }
@@ -502,12 +502,12 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
               if (titleText) {
                 const slugKey = slugify(titleText)
                 if (slugKey) {
-                  try { slugToMd.set(slugKey, rel); mdToSlug.set(rel, slugKey) } catch (err) { console.warn('[htmlBuilder] setting html slug mapping failed', err) }
+                  try { slugToMd.set(slugKey, rel); mdToSlug.set(rel, slugKey) } catch (err) { debugWarn('[htmlBuilder] setting html slug mapping failed', err) }
                 }
               }
-            } catch (err) { console.warn('[htmlBuilder] parse fetched HTML failed', err) }
+            } catch (err) { debugWarn('[htmlBuilder] parse fetched HTML failed', err) }
           }
-        } catch (err) { console.warn('[htmlBuilder] fetchMarkdown for htmlPending failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] fetchMarkdown for htmlPending failed', err) }
         }))
       }
     }
@@ -515,7 +515,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
     for (const info of anchorInfo) {
       const { node: a, frag, rel } = info
       let slug = null
-      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { console.warn('[htmlBuilder] mdToSlug access failed', err) }
+      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { debugWarn('[htmlBuilder] mdToSlug access failed', err) }
       if (slug) {
         const urlVal = opts && opts.canonical ? buildPageUrl(slug, frag) : fullCosmetic(slug, frag)
         a.setAttribute('href', urlVal)
@@ -527,9 +527,9 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
     for (const info of htmlAnchorInfo) {
       const { node: a, rel } = info
       let slug = null
-      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { console.warn('[htmlBuilder] mdToSlug access failed for htmlAnchorInfo', err) }
+      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { debugWarn('[htmlBuilder] mdToSlug access failed for htmlAnchorInfo', err) }
       if (!slug) {
-        try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { console.warn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
+        try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { debugWarn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
       }
       if (slug) {
         const urlVal = opts && opts.canonical ? buildPageUrl(slug, null) : fullCosmetic(slug)
@@ -539,7 +539,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
         a.setAttribute('href', urlVal)
       }
     }
-  } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
+  } catch (err) { debugWarn('[htmlBuilder] rewriteAnchors failed', err) }
 }
 
 /**
@@ -571,7 +571,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
     if (!displayTitle && pagePath) displayTitle = String(pagePath)
     if (displayTitle) slugKey = slugify(displayTitle)
     if (!slugKey) slugKey = HOME_SLUG
-    try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { console.warn('[htmlBuilder] computeSlug set slug mapping failed', err) }
+    try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
         try {
         // Prefer a normalized anchor extracted via `parseHrefToRoute`, but
         // avoid persisting an anchor from a different page when rendering a new page.
@@ -591,9 +591,9 @@ function computeSlug(parsed, article, pagePath, anchor) {
         }
         try {
           history.replaceState({ page: slugKey }, '', fullCosmetic(slugKey, curHash))
-        } catch (err) { console.warn('[htmlBuilder] computeSlug history replace failed', err) }
-      } catch (err) { console.warn('[htmlBuilder] computeSlug inner failed', err) }
-  } catch (err) { console.warn('[htmlBuilder] computeSlug failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] computeSlug history replace failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] computeSlug inner failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] computeSlug failed', err) }
   try {
     if (parsed && parsed.meta && parsed.meta.title && topH1) {
       const metaTitle = String(parsed.meta.title).trim()
@@ -649,22 +649,22 @@ export async function preScanHtmlSlugs(linkEls, base) {
         const htmlPath = path
         try {
           if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
-        } catch (err) { console.warn('[htmlBuilder] mdToSlug check failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] mdToSlug check failed', err) }
         try {
           let already = false
           for (const v of slugToMd.values()) {
             if (v === htmlPath) { already = true; break }
           }
           if (already) continue
-        } catch (err) { console.warn('[htmlBuilder] slugToMd iteration failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] slugToMd iteration failed', err) }
         htmlPaths.add(htmlPath)
-      } catch (err) { console.warn('[htmlBuilder] preScanHtmlSlugs anchor iteration failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] preScanHtmlSlugs anchor iteration failed', err) }
   }
 
   if (!htmlPaths.size) return
 
   if (!_hbShouldProbe(base)) {
-    try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping preScanHtmlSlugs (probing disabled)') } catch (e) {}
+    try { debugWarn('[htmlBuilder] skipping preScanHtmlSlugs (probing disabled)') } catch (e) {}
     // Create conservative mappings from html filenames when probing disabled
     for (const htmlPath of Array.from(htmlPaths)) {
       try {
@@ -673,7 +673,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
         if (basename) {
           const candidate = slugify(basename)
           if (candidate) {
-            try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, htmlPath); if (!mdToSlug.has(htmlPath)) mdToSlug.set(htmlPath, candidate) } catch (err) { console.warn('[htmlBuilder] setting fallback preScanHtmlSlugs mapping failed', err) }
+            try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, htmlPath); if (!mdToSlug.has(htmlPath)) mdToSlug.set(htmlPath, candidate) } catch (err) { debugWarn('[htmlBuilder] setting fallback preScanHtmlSlugs mapping failed', err) }
           }
         }
       } catch (err) { /* ignore per-path errors */ }
@@ -696,12 +696,12 @@ export async function preScanHtmlSlugs(linkEls, base) {
             if (titleText) {
               const slugKey = slugify(titleText)
               if (slugKey) {
-                try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (err) { console.warn('[htmlBuilder] set slugToMd/mdToSlug failed', err) }
+                try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (err) { debugWarn('[htmlBuilder] set slugToMd/mdToSlug failed', err) }
               }
             }
-          } catch (err) { console.warn('[htmlBuilder] parse HTML title failed', err) }
+          } catch (err) { debugWarn('[htmlBuilder] parse HTML title failed', err) }
       }
-    } catch (err) { console.warn('[htmlBuilder] fetchAndExtract failed', err) }
+    } catch (err) { debugWarn('[htmlBuilder] fetchAndExtract failed', err) }
   }
 
   const CONCURRENCY = 5
@@ -731,7 +731,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
   try {
     const contentBaseUrl = new URL(contentBase, typeof location !== 'undefined' ? location.href : 'http://localhost/')
     contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
-  } catch (err) { contentBasePath = ''; console.warn('[htmlBuilder] preMapMdSlugs parse base failed', err) }
+  } catch (err) { contentBasePath = ''; debugWarn('[htmlBuilder] preMapMdSlugs parse base failed', err) }
 
   for (const a of Array.from(linkEls || [])) {
     try {
@@ -746,20 +746,20 @@ export async function preMapMdSlugs(linkEls, contentBase) {
               resolved = resolvePathWithBase(mdPathRaw, contentBase)
             } catch (err) {
               resolved = mdPathRaw
-              console.warn('[htmlBuilder] resolve mdPath URL failed', err)
+              debugWarn('[htmlBuilder] resolve mdPath URL failed', err)
             }
           const rel = (resolved && contentBasePath && resolved.startsWith(contentBasePath)) ? resolved.slice(contentBasePath.length) : String(resolved || '').replace(/^\//, '')
           anchorInfo.push({ rel })
           if (!mdToSlug.has(rel)) pending.add(rel)
-        } catch (err) { console.warn('[htmlBuilder] rewriteAnchors failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] rewriteAnchors failed', err) }
         continue
       }
-    } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs anchor iteration failed', err) }
+    } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs anchor iteration failed', err) }
   }
 
   if (pending.size) {
     if (!_hbShouldProbe(contentBase)) {
-      try { if (_hbShouldDebug && console && typeof console.warn === 'function') console.warn('[htmlBuilder] skipping preMapMdSlugs probes (probing disabled)') } catch (e) {}
+      try { debugWarn('[htmlBuilder] skipping preMapMdSlugs probes (probing disabled)') } catch (e) {}
     } else {
       await Promise.all(Array.from(pending).map(async rel => {
       try {
@@ -769,10 +769,10 @@ export async function preMapMdSlugs(linkEls, contentBase) {
           try {
               const mapped = slugToMd.get(basename)
               if (mapped) mdToSlug.set(mapped, basename)
-            } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs slug map access failed', err) }
+              } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs slug map access failed', err) }
           return
         }
-        } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs basename check failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs basename check failed', err) }
 
       try {
         const mdData = await fetchMarkdown(rel, contentBase)
@@ -781,11 +781,11 @@ export async function preMapMdSlugs(linkEls, contentBase) {
           if (m2 && m2[1]) {
             const candidate = slugify(m2[1].trim())
             if (candidate) {
-              try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs setting slug mapping failed', err) }
+              try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs setting slug mapping failed', err) }
             }
           }
         }
-      } catch (err) { console.warn('[htmlBuilder] preMapMdSlugs fetch failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs fetch failed', err) }
       }))
     }
   }
@@ -808,8 +808,8 @@ function parseHtml(raw) {
     addHeadingIds(doc)
     try {
       const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (err) { console.warn('[htmlBuilder] parseHtml set image loading attribute failed', err) } })
-    } catch (err) { console.warn('[htmlBuilder] parseHtml query images failed', err) }
+      imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('data-want-lazy', '1') } catch (err) { debugWarn('[htmlBuilder] parseHtml set image loading attribute failed', err) } })
+    } catch (err) { debugWarn('[htmlBuilder] parseHtml query images failed', err) }
     const codes = doc.querySelectorAll('pre code, code[class]')
     codes.forEach(codeEl => {
       try {
@@ -820,18 +820,18 @@ function parseHtml(raw) {
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
           try {
             ;(async () => {
-              try { await registerLanguage(canonical) } catch (err) { console.warn('[htmlBuilder] registerLanguage failed', err) }
+              try { await registerLanguage(canonical) } catch (err) { debugWarn('[htmlBuilder] registerLanguage failed', err) }
             })()
-          } catch (err) { console.warn('[htmlBuilder] schedule registerLanguage failed', err) }
+          } catch (err) { debugWarn('[htmlBuilder] schedule registerLanguage failed', err) }
         } else {
           try {
             if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
               const out = hljs.highlight ? hljs.highlight(codeEl.textContent || '', { language: 'plaintext' }) : null
               if (out && out.value) codeEl.innerHTML = out.value
             }
-          } catch (err) { console.warn('[htmlBuilder] plaintext highlight fallback failed', err) }
+          } catch (err) { debugWarn('[htmlBuilder] plaintext highlight fallback failed', err) }
         }
-      } catch (err) { console.warn('[htmlBuilder] code element processing failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] code element processing failed', err) }
     })
     const tocEntries = []
     const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
@@ -844,7 +844,7 @@ function parseHtml(raw) {
       if (titleTag && titleTag.textContent && String(titleTag.textContent).trim()) metaObj.title = String(titleTag.textContent).trim()
     } catch (e) { /* ignore title extraction failures */ }
     return { html: doc.body.innerHTML, meta: metaObj, toc: tocEntries }
-  } catch (err) { console.warn('[htmlBuilder] parseHtml failed', err); return { html: raw || '', meta: {}, toc: [] } }
+  } catch (err) { debugWarn('[htmlBuilder] parseHtml failed', err); return { html: raw || '', meta: {}, toc: [] } }
 }
 
 /**
@@ -863,15 +863,15 @@ async function ensureLanguages(raw) {
       const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(l) || SUPPORTED_HLJS_MAP.get(String(l).toLowerCase()))) || l
       try {
         promises.push(registerLanguage(canonical))
-      } catch (err) { console.warn('[htmlBuilder] ensureLanguages push canonical failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] ensureLanguages push canonical failed', err) }
       if (String(l) !== String(canonical)) {
         try {
           promises.push(registerLanguage(l))
-        } catch (err) { console.warn('[htmlBuilder] ensureLanguages push alias failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] ensureLanguages push alias failed', err) }
       }
-    } catch (err) { console.warn('[htmlBuilder] ensureLanguages inner failed', err) }
+    } catch (err) { debugWarn('[htmlBuilder] ensureLanguages inner failed', err) }
   }
-  try { await Promise.all(promises) } catch (err) { console.warn('[htmlBuilder] ensureLanguages failed', err) }
+  try { await Promise.all(promises) } catch (err) { debugWarn('[htmlBuilder] ensureLanguages failed', err) }
 }
 
 /**
@@ -911,7 +911,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
         const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
         if (parser) {
           const doc = parser.parseFromString(data.raw || '', 'text/html')
-          try { rewriteRelativeAssets(doc.body, pagePath, contentBase) } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle (inner)', err) }
+          try { rewriteRelativeAssets(doc.body, pagePath, contentBase) } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle (inner)', err) }
           parsed = parseHtml(doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : data.raw || '')
         } else {
           parsed = parseHtml(data.raw || '')
@@ -926,8 +926,8 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const article = document.createElement('article')
     article.className = 'nimbi-article content'
     article.innerHTML = parsed.html
-    try { rewriteRelativeAssets(article, pagePath, contentBase) } catch (err) { console.warn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle', err) }
-    try { addHeadingIds(article) } catch (err) { console.warn('[htmlBuilder] addHeadingIds failed', err) }
+    try { rewriteRelativeAssets(article, pagePath, contentBase) } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle', err) }
+    try { addHeadingIds(article) } catch (err) { debugWarn('[htmlBuilder] addHeadingIds failed', err) }
     try {
       const codeEls = article.querySelectorAll('pre code, code[class]')
       codeEls.forEach(el => {
@@ -935,14 +935,14 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
           const cleaned = String(raw || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
           if (cleaned) {
-            try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned; console.warn('[htmlBuilder] set element class failed', err) }
+            try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned; debugWarn('[htmlBuilder] set element class failed', err) }
           } else {
-            try { el.removeAttribute && el.removeAttribute('class') } catch (err) { el.className = ''; console.warn('[htmlBuilder] remove element class failed', err) }
+            try { el.removeAttribute && el.removeAttribute('class') } catch (err) { el.className = ''; debugWarn('[htmlBuilder] remove element class failed', err) }
           }
-        } catch (err) { console.warn('[htmlBuilder] code element cleanup failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] code element cleanup failed', err) }
       })
-    } catch (err) { console.warn('[htmlBuilder] processing code elements failed', err) }
-    try { observeCodeBlocks(article) } catch (err) { console.warn('[htmlBuilder] observeCodeBlocks failed', err) }
+    } catch (err) { debugWarn('[htmlBuilder] processing code elements failed', err) }
+    try { observeCodeBlocks(article) } catch (err) { debugWarn('[htmlBuilder] observeCodeBlocks failed', err) }
 
     lazyLoadImages(article, pagePath, contentBase)
 
@@ -959,7 +959,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           figure.appendChild(img)
         } catch (e) { /* ignore per-image failures */ }
       })
-    } catch (err) { console.warn('[htmlBuilder] wrap images in Bulma image helper failed', err) }
+    } catch (err) { debugWarn('[htmlBuilder] wrap images in Bulma image helper failed', err) }
 
     try {
       const tables = article.querySelectorAll && article.querySelectorAll('table') || []
@@ -975,7 +975,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           }
         } catch (e) { /* ignore per-table failures */ }
       })
-    } catch (err) { console.warn('[htmlBuilder] add Bulma table class failed', err) }
+    } catch (err) { debugWarn('[htmlBuilder] add Bulma table class failed', err) }
 
     const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
 
@@ -1061,7 +1061,7 @@ export function executeEmbeddedScripts(article) {
           }
           if (executed) {
             s.parentNode && s.parentNode.removeChild(s)
-            try { console.info('[htmlBuilder] executed inline script via Function') } catch (e) {}
+            try { debugInfo('[htmlBuilder] executed inline script via Function') } catch (e) {}
             continue
           }
           try { newScript.type = 'module' } catch (e) {}
@@ -1078,10 +1078,10 @@ export function executeEmbeddedScripts(article) {
         }
         const srcLabel = s.src || '<inline>'
         newScript.addEventListener('error', (ev) => {
-          try { console.warn('[htmlBuilder] injected script error', { src: srcLabel, ev }) } catch (e) {}
+          try { debugWarn('[htmlBuilder] injected script error', { src: srcLabel, ev }) } catch (e) {}
         })
         newScript.addEventListener('load', () => {
-          try { console.info('[htmlBuilder] injected script loaded', { src: srcLabel, hasNimbi: !!(window && window.nimbiCMS) }) } catch (e) {}
+          try { debugInfo('[htmlBuilder] injected script loaded', { src: srcLabel, hasNimbi: !!(window && window.nimbiCMS) }) } catch (e) {}
         })
         try {
           ;(document.head || document.body || document.documentElement).appendChild(newScript)
@@ -1090,12 +1090,12 @@ export function executeEmbeddedScripts(article) {
             try { newScript.type = 'text/javascript' } catch (e) {}
             ;(document.head || document.body || document.documentElement).appendChild(newScript)
           } catch (appendErr2) {
-            try { console.warn('[htmlBuilder] injected script append failed, skipping', { src: srcLabel, err: appendErr2 }) } catch (e) {}
+            try { debugWarn('[htmlBuilder] injected script append failed, skipping', { src: srcLabel, err: appendErr2 }) } catch (e) {}
           }
         }
         s.parentNode && s.parentNode.removeChild(s)
-        try { console.info('[htmlBuilder] executed injected script', srcLabel) } catch (e) {}
-      } catch (e) { console.warn('[htmlBuilder] execute injected script failed', e) }
+        try { debugInfo('[htmlBuilder] executed injected script', srcLabel) } catch (e) {}
+      } catch (e) { debugWarn('[htmlBuilder] execute injected script failed', e) }
     }
   } catch (e) { /* ignore */ }
 }
@@ -1204,7 +1204,7 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   const html = String(article.innerHTML)
   const res = await _sendToAnchorWorker({ type: 'rewriteAnchors', html, contentBase, pagePath })
   if (res && typeof res === 'string') {
-    try { article.innerHTML = res } catch (e) { console.warn('[htmlBuilder] applying rewritten anchors failed', e) }
+    try { article.innerHTML = res } catch (e) { debugWarn('[htmlBuilder] applying rewritten anchors failed', e) }
   }
 }
 
@@ -1234,35 +1234,35 @@ export function attachTocClickHandler(toc) {
           ev.preventDefault()
 
           let currentPage = null
-          try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (err) { currentPage = null; console.warn('[htmlBuilder] access history.state failed', err) }
-          try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (err) { console.warn('[htmlBuilder] parse current location failed', err) }
+          try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (err) { currentPage = null; debugWarn('[htmlBuilder] access history.state failed', err) }
+          try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (err) { debugWarn('[htmlBuilder] parse current location failed', err) }
 
           if ((!pageParam && hash) || (pageParam && currentPage && String(pageParam) === String(currentPage))) {
             try {
               if (!pageParam && hash) {
-                try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
+                try { history.replaceState(history.state, '', (location.pathname || '') + (location.search || '') + (hash ? '#' + encodeURIComponent(hash) : '')) } catch (err) { debugWarn('[htmlBuilder] history.replaceState failed', err) }
               } else {
-                try { history.replaceState({ page: currentPage || pageParam }, '', fullCosmetic(currentPage || pageParam, hash)) } catch (err) { console.warn('[htmlBuilder] history.replaceState failed', err) }
+                try { history.replaceState({ page: currentPage || pageParam }, '', fullCosmetic(currentPage || pageParam, hash)) } catch (err) { debugWarn('[htmlBuilder] history.replaceState failed', err) }
               }
-            } catch (err) { console.warn('[htmlBuilder] update history for anchor failed', err) }
-            try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (err) { console.warn('[htmlBuilder] stopPropagation failed', err) }
-            try { scrollToAnchorOrTop(hash) } catch (err) { console.warn('[htmlBuilder] scrollToAnchorOrTop failed', err) }
+            } catch (err) { debugWarn('[htmlBuilder] update history for anchor failed', err) }
+            try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation && ev.stopPropagation() } catch (err) { debugWarn('[htmlBuilder] stopPropagation failed', err) }
+            try { scrollToAnchorOrTop(hash) } catch (err) { debugWarn('[htmlBuilder] scrollToAnchorOrTop failed', err) }
             return
           }
 
           history.pushState({ page: pageParam }, '', fullCosmetic(pageParam, hash))
           try {
             if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') {
-              try { window.renderByQuery() } catch (err) { console.warn('[htmlBuilder] window.renderByQuery failed', err) }
+              try { window.renderByQuery() } catch (err) { debugWarn('[htmlBuilder] window.renderByQuery failed', err) }
             } else if (typeof window !== 'undefined') {
-              try { window.dispatchEvent(new PopStateEvent('popstate')) } catch (err) { console.warn('[htmlBuilder] dispatch popstate failed', err) }
+              try { window.dispatchEvent(new PopStateEvent('popstate')) } catch (err) { debugWarn('[htmlBuilder] dispatch popstate failed', err) }
             } else {
-              try { renderByQuery() } catch (err) { console.warn('[htmlBuilder] renderByQuery failed', err) }
+              try { renderByQuery() } catch (err) { debugWarn('[htmlBuilder] renderByQuery failed', err) }
             }
-          } catch (err) { console.warn('[htmlBuilder] SPA navigation invocation failed', err) }
-        } catch (err) { /* ignore non-URL hrefs */ console.warn('[htmlBuilder] non-URL href in attachTocClickHandler', err) }
+          } catch (err) { debugWarn('[htmlBuilder] SPA navigation invocation failed', err) }
+        } catch (err) { /* ignore non-URL hrefs */ debugWarn('[htmlBuilder] non-URL href in attachTocClickHandler', err) }
       })
-    } catch (e) { console.warn('[htmlBuilder] attachTocClickHandler failed', e) }
+    } catch (e) { debugWarn('[htmlBuilder] attachTocClickHandler failed', e) }
   }
 
 
@@ -1293,21 +1293,21 @@ export function scrollToAnchorOrTop(anchor) {
                 if (containerEl && containerEl.scrollTo && containerEl.contains(el)) {
                   const top = el.getBoundingClientRect().top - containerEl.getBoundingClientRect().top + containerEl.scrollTop
                   containerEl.scrollTo({ top, behavior: 'smooth' })
-                } else {
-                  try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (err) { try { el.scrollIntoView() } catch (err2) { console.warn('[htmlBuilder] scrollIntoView failed', err2) } }
+                  } else {
+                  try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch (err) { try { el.scrollIntoView() } catch (err2) { debugWarn('[htmlBuilder] scrollIntoView failed', err2) } }
                 }
               } catch (err) {
-                try { el.scrollIntoView() } catch (err2) { console.warn('[htmlBuilder] final scroll fallback failed', err2) }
+                try { el.scrollIntoView() } catch (err2) { debugWarn('[htmlBuilder] final scroll fallback failed', err2) }
               }
           }
-          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (err) { console.warn('[htmlBuilder] scheduling scroll failed', err); setTimeout(doScroll, 50) }
-        } catch (err) { try { el.scrollIntoView() } catch (err2) { console.warn('[htmlBuilder] final scroll fallback failed', err2) } ; console.warn('[htmlBuilder] doScroll failed', err) }
+          try { requestAnimationFrame(() => setTimeout(doScroll, 50)) } catch (err) { debugWarn('[htmlBuilder] scheduling scroll failed', err); setTimeout(doScroll, 50) }
+        } catch (err) { try { el.scrollIntoView() } catch (err2) { debugWarn('[htmlBuilder] final scroll fallback failed', err2) } ; debugWarn('[htmlBuilder] doScroll failed', err) }
       }
     } else {
       try {
         if (containerEl && containerEl.scrollTo) containerEl.scrollTo({ top: 0, behavior: 'smooth' })
         else window.scrollTo(0, 0)
-      } catch (err) { try { window.scrollTo(0, 0) } catch (err2) { console.warn('[htmlBuilder] window.scrollTo failed', err2) } ; console.warn('[htmlBuilder] scroll to top failed', err) }
+      } catch (err) { try { window.scrollTo(0, 0) } catch (err2) { debugWarn('[htmlBuilder] window.scrollTo failed', err2) } ; debugWarn('[htmlBuilder] scroll to top failed', err) }
     }
   }
 
@@ -1342,20 +1342,20 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
         else if (mountElLocal && mountElLocal.appendChild) mountElLocal.appendChild(btn)
         else document.body.appendChild(btn)
       } catch (err) {
-        try { document.body.appendChild(btn) } catch (err2) { console.warn('[htmlBuilder] append scroll top button failed', err2) }
+        try { document.body.appendChild(btn) } catch (err2) { debugWarn('[htmlBuilder] append scroll top button failed', err2) }
       }
       try {
         try { registerThemedElement(btn) } catch (e) { /* ignore */ }
-      } catch (err) { console.warn('[htmlBuilder] set scroll-top button theme registration failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] set scroll-top button theme registration failed', err) }
       btn.addEventListener('click', () => {
         try {
           if (container && container.scrollTo) container.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
           else if (mountEl && mountEl.scrollTo) mountEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
           else window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
         } catch (err) {
-          try { if (container) container.scrollTop = 0 } catch (e2) { console.warn('[htmlBuilder] fallback container scrollTop failed', e2) }
-          try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { console.warn('[htmlBuilder] fallback mountEl scrollTop failed', e3) }
-          try { document.documentElement.scrollTop = 0 } catch (e4) { console.warn('[htmlBuilder] fallback document scrollTop failed', e4) }
+          try { if (container) container.scrollTop = 0 } catch (e2) { debugWarn('[htmlBuilder] fallback container scrollTop failed', e2) }
+          try { if (mountEl) mountEl.scrollTop = 0 } catch (e3) { debugWarn('[htmlBuilder] fallback mountEl scrollTop failed', e3) }
+          try { document.documentElement.scrollTop = 0 } catch (e4) { debugWarn('[htmlBuilder] fallback document scrollTop failed', e4) }
         }
       })
     }
@@ -1376,7 +1376,7 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
             btn.classList.remove('show')
             if (tocLabel) tocLabel.classList.remove('show')
           }
-        } catch (err) { console.warn('[htmlBuilder] onScroll handler failed', err) }
+        } catch (err) { debugWarn('[htmlBuilder] onScroll handler failed', err) }
       }
       safe(() => root.addEventListener('scroll', onScroll))
       onScroll()
@@ -1403,8 +1403,8 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
           btn._nimbiObserver = null
         }
       }
-      try { if (btn._nimbiObserver && typeof btn._nimbiObserver.disconnect === 'function') btn._nimbiObserver.disconnect() } catch (err) { console.warn('[htmlBuilder] observer disconnect failed', err) }
-      try { if (btn._nimbiObserver && typeof btn._nimbiObserver.observe === 'function') btn._nimbiObserver.observe(topH1) } catch (err) { console.warn('[htmlBuilder] observer observe failed', err) }
+      try { if (btn._nimbiObserver && typeof btn._nimbiObserver.disconnect === 'function') btn._nimbiObserver.disconnect() } catch (err) { debugWarn('[htmlBuilder] observer disconnect failed', err) }
+      try { if (btn._nimbiObserver && typeof btn._nimbiObserver.observe === 'function') btn._nimbiObserver.observe(topH1) } catch (err) { debugWarn('[htmlBuilder] observer observe failed', err) }
       try {
         const checkIntersect = () => {
           try {
@@ -1418,13 +1418,13 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
               btn.classList.add('show')
               if (tocLabel) tocLabel.classList.add('show')
             }
-          } catch (err) { console.warn('[htmlBuilder] checkIntersect failed', err) }
+          } catch (err) { debugWarn('[htmlBuilder] checkIntersect failed', err) }
         }
         checkIntersect()
         if (!(typeof globalThis !== 'undefined' && typeof globalThis.IntersectionObserver !== 'undefined')) {
           setTimeout(checkIntersect, 100)
         }
-      } catch (err) { console.warn('[htmlBuilder] checkIntersect outer failed', err) }
+      } catch (err) { debugWarn('[htmlBuilder] checkIntersect outer failed', err) }
     }
-  } catch (err) { console.warn('[htmlBuilder] ensureScrollTopButton failed', err) }
+  } catch (err) { debugWarn('[htmlBuilder] ensureScrollTopButton failed', err) }
 }

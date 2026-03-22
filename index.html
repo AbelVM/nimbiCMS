@@ -39,7 +39,6 @@
 
   <script src="./dist/nimbi-cms.js" defer></script>
   <script defer>
-    window.__nimbiCMSDebug = false
     window.addEventListener('DOMContentLoaded', function () {
       if (!window.nimbiCMS) {
         console.warn('nimbiCMS UMD bundle not found at /dist/nimbi-cms.js');
@@ -51,8 +50,8 @@
           contentPath: './',
           indexDepth: 3,
           bulmaCustomize: 'materia',
-          homePage: 'assets/brochure.md',/* 
-          notFoundPage: 'assets/404.md', */
+          homePage: 'assets/brochure.md',
+          notFoundPage: 'assets/404.md',
           navigationPage: 'assets/navigation.md',
         });
       } catch (e) {

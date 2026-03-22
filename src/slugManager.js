@@ -69,28 +69,19 @@ import { parseHrefToRoute } from './utils/urlHelper.js'
 import slugWorkerCode from './worker/slugWorker.js?raw'
 
 import { makeWorkerPool, createWorkerFromRaw } from './worker-manager.js'
+import { debugLog, debugWarn, debugError, isDebug } from './utils/debug.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 const _slugWorkerManager = makeWorkerPool(() => createWorkerFromRaw(slugWorkerCode), 'slugManager', poolSize)
 
-// Debug logging helper — logs only when `window.__nimbiCMSDebug` is truthy.
-function _debugLog(...args) {
-  try {
-    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
-      console.log(...args)
-    }
-  } catch (_) {}
-}
-
+// Use centralized debug helpers.
 // Decide whether the slug manager should emit non-debug errors to console.
 function _slugShouldLog() {
-  try {
-    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) return true
-  } catch (_e) {}
-  try {
-    return (typeof notFoundPage === 'string' && notFoundPage) ? true : false
-  } catch (_e) { return false }
+  try { if (isDebug()) return true } catch (_e) {}
+  try { return (typeof notFoundPage === 'string' && notFoundPage) ? true : false } catch (_e) { return false }
 }
+
+function _debugLog(...args) { try { debugLog(...args) } catch (_) {} }
 
 /**
  * Lazily return a worker instance used for slug-related background tasks.
@@ -585,7 +576,7 @@ export let fetchMarkdown = async function(path, base, opts) {
   // avoid issuing network probes for guessed candidates. This prevents
   // spurious requests like `/bad_slug`, `/bad_slug.md`, or `_home.md`
   // when the runtime intends to render an inline 404 fallback.
-  const allowFetch = (opts && opts.force === true) || (typeof notFoundPage === 'string' && notFoundPage) || (slugToMd && slugToMd.size) || (allMarkdownPaths && allMarkdownPaths.length) || (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug)
+  const allowFetch = (opts && opts.force === true) || (typeof notFoundPage === 'string' && notFoundPage) || (slugToMd && slugToMd.size) || (allMarkdownPaths && allMarkdownPaths.length) || isDebug()
   if (!allowFetch) {
     throw new Error('failed to fetch md')
   }
@@ -656,9 +647,9 @@ export let fetchMarkdown = async function(path, base, opts) {
       try {
         const status = res ? res.status : undefined
         if (status === 404) {
-          try { if (console && typeof console.warn === 'function') console.warn('fetchMarkdown failed (404):', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
+          try { debugWarn('fetchMarkdown failed (404):', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
         } else {
-          try { if (console && typeof console.error === 'function') console.error('fetchMarkdown failed:', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
+          try { debugError('fetchMarkdown failed:', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
         }
       } catch (e) {}
       throw new Error('failed to fetch md')
@@ -682,7 +673,7 @@ export let fetchMarkdown = async function(path, base, opts) {
           }
         }
       } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
-      if (_slugShouldLog()) console.error('fetchMarkdown: server returned HTML for .md request', url)
+      if (_slugShouldLog()) debugError('fetchMarkdown: server returned HTML for .md request', url)
       throw new Error('failed to fetch md')
     }
 

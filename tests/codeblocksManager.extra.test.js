@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SUPPORTED_HLJS_MAP, setHighlightTheme, loadSupportedLanguages, observeCodeBlocks, hljs } from '../src/codeblocksManager.js'
+import * as debug from '../src/utils/debug.js'
 
 describe('codeblocksManager extra', () => {
   let origFetch
@@ -26,7 +27,7 @@ describe('codeblocksManager extra', () => {
     setHighlightTheme('default')
     expect(document.querySelector('link[data-hl-theme]')).toBeNull()
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(debug, 'debugWarn').mockImplementation(() => {})
     setHighlightTheme('solarized', { useCdn: false })
     expect(warnSpy).toHaveBeenCalled()
     expect(document.querySelector('link[data-hl-theme]')).toBeNull()

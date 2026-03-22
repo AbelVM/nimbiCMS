@@ -10,6 +10,8 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[FEAT]** Added a dynamic sitemap
 - **[FEAT]** Added dynamic RSS 2.0 and ATOM 1.0 endpoints
 - **[FEAT]** More flexible defaults for `homePage` and `notFoundPage`
+- **[FEAT]** Centralized logging behavior
+- **[CHORE]** Improved JSDoc coverage and quality
 
 ## v1.0.5
 

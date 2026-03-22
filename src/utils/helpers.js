@@ -5,6 +5,8 @@
  * @param {string} href - URL or href string to evaluate
  * @returns {boolean}
  */
+import { debugWarn } from './debug.js'
+
 export function isExternalLink(href) {
   if (!href || typeof href !== 'string') return false
   return /^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')
@@ -53,7 +55,7 @@ export function setLazyload(img) {
     if (img && img.getAttribute && !img.getAttribute('loading')) {
       img.setAttribute('loading', 'lazy')
     }
-  } catch (err) { console.warn('[helpers] setLazyload failed', err) }
+  } catch (err) { debugWarn('[helpers] setLazyload failed', err) }
 }
 
 /**
@@ -76,7 +78,7 @@ function preloadImage(url) {
     link.href = url
     document.head.appendChild(link)
   } catch (err) {
-    console.warn('[helpers] preloadImage failed', err)
+    debugWarn('[helpers] preloadImage failed', err)
   }
 }
 
@@ -126,7 +128,7 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
       const parsed = ratio ? parseFloat(ratio) : NaN
       if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 1) maxHeightRatio = parsed
     } catch (err) {
-      console.warn('[helpers] read CSS ratio failed', err)
+      debugWarn('[helpers] read CSS ratio failed', err)
     }
 
     const maxImageHeight = Math.max(200, Math.floor(viewportHeight * maxHeightRatio))
@@ -171,7 +173,7 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
         }
 
       } catch (err) {
-        console.warn('[helpers] setEagerForAboveFoldImages per-image failed', err)
+        debugWarn('[helpers] setEagerForAboveFoldImages per-image failed', err)
       }
     })
 
@@ -187,11 +189,11 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
           img.fetchPriority = 'high'
         }
       } catch (err) {
-        console.warn('[helpers] setEagerForAboveFoldImages fallback failed', err)
+        debugWarn('[helpers] setEagerForAboveFoldImages fallback failed', err)
       }
     }
   } catch (err) {
-    console.warn('[helpers] setEagerForAboveFoldImages failed', err)
+    debugWarn('[helpers] setEagerForAboveFoldImages failed', err)
   }
 }
 
@@ -269,7 +271,7 @@ export function encodeURL(u) {
     if (s.includes('%')) return s
     return encodeURI(s)
   } catch (_) {
-    console.warn('[helpers] encodeURL failed', _)
+    debugWarn('[helpers] encodeURL failed', _)
     return String(u || '')
   }
 }
@@ -288,19 +290,19 @@ export function safe(fn) {
     const result = fn()
     if (result && typeof result.then === 'function') {
       return result.catch(e => {
-        console.warn('[helpers] safe swallowed error', e)
+        debugWarn('[helpers] safe swallowed error', e)
         return undefined
       })
     }
     return result
   } catch (_e) {
-    console.warn('[helpers] safe swallowed error', _e)
+    debugWarn('[helpers] safe swallowed error', _e)
   }
 }
 
 try {
   if (typeof globalThis !== 'undefined' && !globalThis.safe) globalThis.safe = safe
-} catch (err) { console.warn('[helpers] global attach failed', err) }
+} catch (err) { debugWarn('[helpers] global attach failed', err) }
 
 /**
  * Decode a small set of common HTML entities and numeric entities in a string.

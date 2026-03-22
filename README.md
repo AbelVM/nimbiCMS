@@ -214,6 +214,7 @@ This behavior is covered by the test-suite (see the canonical-link and URL handl
 | `el` | `string` \ `Element` | required | CSS selector or DOM element used as the mount target. |
 | `contentPath` | `string` | `/content` | URL path to the content folder serving `.md`/`.html` files; normalized to a relative path with trailing slash. |
 | `allowUrlPathOverrides` | `boolean` | `false` | Opt-in: when `true`, `contentPath`, `homePage`, `notFoundPage`, and `navigationPage` may be overridden using URL params. |
+| `debugLevel` | `0 \|1 \| 2 \| 3` | `0` | Initial logging verbosity: `0`=disabled, `1`=errors, `2`=errors+warnings, `3`=all messages. |
 
 ### Indexing and Search
 
@@ -282,6 +283,15 @@ For a complete listing of exported symbols and TypeScript types, see [the docume
 ```js
 import { getVersion } from 'nimbi-cms'
 getVersion().then(v => console.log('nimbiCMS version', v))
+```
+
+### Debugging
+
+- `setDebugLevel(level)` — adjust runtime logging verbosity programmatically. `level` is a number `0..3` where `0` disables messages, `1` enables errors, `2` enables errors and warnings, and `3` enables info/log messages. Example:
+
+```js
+import { setDebugLevel } from 'nimbi-cms'
+setDebugLevel(2)
 ```
 
 ### Hooks (extension points)

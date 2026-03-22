@@ -2,6 +2,8 @@
 /** @type {'light'|'dark'|'system'} */
 let currentStyle = 'light'
 
+import { debugLog, debugWarn, isDebug } from './utils/debug.js'
+
 /**
  * @typedef {Record<string,string>} ThemeVars
  */
@@ -110,12 +112,7 @@ function removeThemeAndOverrides() {
  * @returns {Promise<void>} - Resolves when theme loading completes.
  */
 export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
-  const debug = typeof window !== 'undefined' && window.__nimbiCMSDebug
-  if (debug) {
-    try {
-      console.debug('[bulmaManager] ensureBulma called', { bulmaCustomize, pageDir })
-    } catch (_) {}
-  }
+  try { debugLog('[bulmaManager] ensureBulma called', { bulmaCustomize, pageDir }) } catch (_) {}
 
   if (!bulmaCustomize) return
 
@@ -175,7 +172,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
           document.head.appendChild(s)
           return
         }
-      } catch (_) { console.warn('[bulmaManager] fetch local bulma candidate failed', _) }
+      } catch (_) { debugWarn('[bulmaManager] fetch local bulma candidate failed', _) }
     }
     return
   }
@@ -186,7 +183,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
     removeThemeAndOverrides()
     const href = `https://unpkg.com/bulmaswatch/${encodeURIComponent(theme)}/bulmaswatch.min.css`
     injectLink(href, { 'data-bulmaswatch-theme': theme })
-  } catch (_) { console.warn('[bulmaManager] ensureBulma failed', _) }
+  } catch (_) { debugWarn('[bulmaManager] ensureBulma failed', _) }
 }
 
 /**
@@ -234,7 +231,7 @@ export function setStyle(style) {
 export function setThemeVars(vars) {
   const root = document.documentElement
   for (const [k, v] of Object.entries(vars || {})) {
-    try { root.style.setProperty(`--${k}`, v) } catch (_) { console.warn('[bulmaManager] setThemeVars failed for', k, _ ) }
+    try { root.style.setProperty(`--${k}`, v) } catch (_) { debugWarn('[bulmaManager] setThemeVars failed for', k, _ ) }
   }
 }
 

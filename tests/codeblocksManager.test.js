@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as cb from '../src/codeblocksManager.js'
+import * as debug from '../src/utils/debug.js'
 
 // simple IntersectionObserver stub for some tests
 class DummyObserver {
@@ -78,7 +79,7 @@ describe('codeblocksManager', () => {
     expect(document.querySelectorAll('link[data-hl-theme]').length).toBe(0)
 
     // request non-monokai with useCdn=false should log warning and not add
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(debug, 'debugWarn').mockImplementation(() => {})
     cb.setHighlightTheme('dracula', { useCdn: false })
     expect(warnSpy).toHaveBeenCalled()
     expect(document.querySelector('link[data-hl-theme]')).toBeNull()

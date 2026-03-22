@@ -3,6 +3,7 @@ import * as l10n from './l10nManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
+import { isDebug, isDebugLevel, incrementCounter, debugError, debugWarn, debugInfo, debugLog, syncLegacyCounter } from './utils/debug.js'
 import { refreshIndexPaths, indexSet } from './indexManager.js'
 export let RESOLUTION_CACHE_MAX = 100
 
@@ -17,14 +18,8 @@ export function setResolutionCacheMax(n) {
 
 // Gate router logs and optional probe behavior.
 function _routerShouldLog() {
-  try {
-    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) return true
-  } catch (_e) {}
-  try {
-    return (typeof notFoundPage === 'string' && notFoundPage) ? true : false
-  } catch (_e) {
-    return false
-  }
+  try { if (isDebugLevel(2)) return true } catch (_e) {}
+  try { return false } catch (_e) { return false }
 }
 /**
  * Time‑to‑live (TTL) for cache entries, in milliseconds.  After this duration
@@ -85,7 +80,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
  */
 export function _clearIndexCache() {
   indexSet.clear();
-  try { refreshIndexPaths._refreshed = false } catch (e) { console.warn('[router] _clearIndexCache: refreshIndexPaths reset failed', e) }
+  try { refreshIndexPaths._refreshed = false } catch (e) { debugWarn('[router] _clearIndexCache: refreshIndexPaths reset failed', e) }
 }
 
  
@@ -213,8 +208,8 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
           if (rel) localCandidates.add(rel)
         }
       }
-    } catch (e) {
-      console.warn('[router] malformed URL while discovering index candidates', e)
+      } catch (e) {
+      debugWarn('[router] malformed URL while discovering index candidates', e)
     }
   }
 
@@ -230,7 +225,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
           return candidate
         }
       }
-    } catch (e) { console.warn('[router] fetchMarkdown during index discovery failed', e) }
+    } catch (e) { debugWarn('[router] fetchMarkdown during index discovery failed', e) }
   }
   return null
 }
@@ -277,7 +272,7 @@ export function buildPageCandidates(resolved) {
           pageCandidates.push(dec + '.md')
         }
       }
-    } catch (e) { console.warn('[router] buildPageCandidates failed during slug handling', e) }
+    } catch (e) { debugWarn('[router] buildPageCandidates failed during slug handling', e) }
   }
   return pageCandidates
 }
@@ -299,12 +294,8 @@ export function buildPageCandidates(resolved) {
 export async function fetchPageData(raw, contentBase) {
   const originalRaw = raw || ''
   try {
-    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
-      try {
-        window.__nimbiCMSDebug = window.__nimbiCMSDebug || {}
-        window.__nimbiCMSDebug.fetchPageData = (window.__nimbiCMSDebug.fetchPageData || 0) + 1
-      } catch (_) {}
-    }
+    try { incrementCounter('fetchPageData') } catch (_) {}
+    try { syncLegacyCounter('fetchPageData') } catch (_) {}
   } catch (_) {}
   // Extract a parsed anchor from the current location in a robust way.
   // Use `parseHrefToRoute` so cosmetic hashes like "#/slug#anchor?x=1" are
@@ -467,7 +458,7 @@ export async function fetchPageData(raw, contentBase) {
   const pageCandidates = buildPageCandidates(resolved)
   try {
     if (_routerShouldLog()) {
-      try { console.warn('[router-debug] fetchPageData candidates', { originalRaw, resolved, pageCandidates }) } catch (_e) {}
+      try { debugLog('[router-debug] fetchPageData candidates', { originalRaw, resolved, pageCandidates }) } catch (_e) {}
     }
   } catch (_e) {}
 
@@ -703,13 +694,13 @@ export async function fetchPageData(raw, contentBase) {
 
         try {
           if (_routerShouldLog()) {
-            try { console.warn('[router-debug] fetchPageData accepted candidate', { candidate: norm, pagePath, isHtml: data && data.isHtml, snippet: (data && data.raw ? String(data.raw).slice(0,160) : null) }) } catch (_e) {}
+            try { debugLog('[router-debug] fetchPageData accepted candidate', { candidate: norm, pagePath, isHtml: data && data.isHtml, snippet: (data && data.raw ? String(data.raw).slice(0,160) : null) }) } catch (_e) {}
           }
         } catch (_e) {}
         break
-      } catch (e) {
+        } catch (e) {
         fetchError = e
-        try { if (_routerShouldLog()) console.warn('[router] candidate fetch failed', { candidate, contentBase, err: (e && e.message) || e }) } catch (_e) {}
+        try { if (_routerShouldLog()) debugWarn('[router] candidate fetch failed', { candidate, contentBase, err: (e && e.message) || e }) } catch (_e) {}
       }
     }
   }
@@ -717,11 +708,11 @@ export async function fetchPageData(raw, contentBase) {
   if (!data) {
     const fetchErrMsg = (fetchError && (fetchError.message || String(fetchError))) || null
     const isExpectedMissing = fetchErrMsg && /failed to fetch md|site shell detected/i.test(fetchErrMsg)
-    try { if (_routerShouldLog()) { try { console.warn('[router-debug] fetchPageData no data', { originalRaw, resolved, pageCandidates, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
+    try { if (_routerShouldLog()) { try { debugLog('[router-debug] fetchPageData no data', { originalRaw, resolved, pageCandidates, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
     if (isExpectedMissing) {
-      try { if (_routerShouldLog()) { try { console.warn('[router] fetchPageData: no page data (expected)', { originalRaw, resolved, pageCandidates, contentBase, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
+      try { if (_routerShouldLog()) { try { debugWarn('[router] fetchPageData: no page data (expected)', { originalRaw, resolved, pageCandidates, contentBase, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
     } else {
-      try { if (_routerShouldLog()) { try { console.error('[router] fetchPageData: no page data for', { originalRaw, resolved, pageCandidates, contentBase, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
+      try { if (_routerShouldLog()) { try { debugError('[router] fetchPageData: no page data for', { originalRaw, resolved, pageCandidates, contentBase, fetchError: fetchErrMsg }) } catch (_e) {} } } catch (_e) {}
     }
     // Conservative fallback: if no candidate produced content, prefer the
     // configured notFoundPage when available so we don't render the site
@@ -739,19 +730,19 @@ export async function fetchPageData(raw, contentBase) {
       if (originalWasExplicit && String(originalRaw || '').toLowerCase().includes('.html')) {
           try {
           const abs = new URL(String(originalRaw || ''), location.href).toString()
-          if (_routerShouldLog()) console.warn('[router] attempting absolute HTML fetch fallback', abs)
+          if (_routerShouldLog()) debugWarn('[router] attempting absolute HTML fetch fallback', abs)
           const res = await fetch(abs)
           if (res && res.ok) {
             const raw = await res.text()
             const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
             const rawLower = (raw || '').toLowerCase()
             const looksLikeHtml = (ct && ct.indexOf && ct.indexOf('text/html') !== -1) || rawLower.indexOf('<!doctype') !== -1 || rawLower.indexOf('<html') !== -1
-            if (!looksLikeHtml && _routerShouldLog()) console.warn('[router] absolute fetch returned non-HTML', { abs, contentType: ct, snippet: rawLower.slice(0, 200) })
+            if (!looksLikeHtml && _routerShouldLog()) debugWarn('[router] absolute fetch returned non-HTML', { abs, contentType: ct, snippet: rawLower.slice(0, 200) })
             if (looksLikeHtml) {
               const rawLowerForDir = (raw || '').toLowerCase()
               const looksLikeDirListing = /<title>\s*index of\b/i.test(raw) || /<h1>\s*index of\b/i.test(raw) || rawLowerForDir.indexOf('parent directory') !== -1 || /<title>\s*directory listing/i.test(raw) || /<h1>\s*directory listing/i.test(raw)
               if (looksLikeDirListing) {
-                try { if (_routerShouldLog()) console.warn('[router] absolute fetch returned directory listing; treating as not found', { abs }) } catch (_e) {}
+                try { if (_routerShouldLog()) debugWarn('[router] absolute fetch returned directory listing; treating as not found', { abs }) } catch (_e) {}
               } else {
                 try {
                   const absUrl = abs
@@ -770,8 +761,8 @@ export async function fetchPageData(raw, contentBase) {
                           try {
                             const resolved = new URL(val, absUrl).toString()
                             el.setAttribute(attr, resolved)
-                          } catch (err) { console.warn('[router] rewrite attribute failed', attr, err) }
-                        } catch (err) { console.warn('[router] rewrite helper failed', err) }
+                          } catch (err) { debugWarn('[router] rewrite attribute failed', attr, err) }
+                        } catch (err) { debugWarn('[router] rewrite helper failed', err) }
                       }
                       const els = doc.querySelectorAll('[src],[href],[srcset],[xlink\:href],[poster]')
                       const rewritten = []
@@ -823,7 +814,7 @@ export async function fetchPageData(raw, contentBase) {
                         } catch (err) { /* ignore per-element failures */ }
                       }
                       const modified = doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : raw
-                      try { if (_routerShouldLog() && rewritten && rewritten.length) console.warn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
+                      try { if (_routerShouldLog() && rewritten && rewritten.length) debugWarn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
                       return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
                     }
                   } catch (e) { /* parsing failed, fall back */ }
@@ -843,7 +834,7 @@ export async function fetchPageData(raw, contentBase) {
             }
           }
                 } catch (err) {
-          if (_routerShouldLog()) console.warn('[router] absolute HTML fetch fallback failed', err)
+          if (_routerShouldLog()) debugWarn('[router] absolute HTML fetch fallback failed', err)
         }
       }
     } catch (_) { /* ignore fallback errors */ }
@@ -874,7 +865,7 @@ export async function fetchPageData(raw, contentBase) {
           }
         }
       }
-    } catch (e) { if (_routerShouldLog()) console.warn('[router] assets fallback failed', e) }
+    } catch (e) { if (_routerShouldLog()) debugWarn('[router] assets fallback failed', e) }
 
     throw new Error('no page data');
   }

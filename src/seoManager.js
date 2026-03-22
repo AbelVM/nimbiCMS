@@ -1,5 +1,6 @@
 import { normalizePath } from './utils/helpers.js'
 import readingTime from 'reading-time/lib/reading-time'
+import { debugWarn } from './utils/debug.js'
 
 /**
  * Page data shape passed around the renderer.
@@ -44,7 +45,7 @@ function upsertLinkRel(rel, href) {
       document.head.appendChild(link)
     }
     link.setAttribute('href', href)
-  } catch (e) { console.warn('[seoManager] upsertLinkRel failed', e) }
+  } catch (e) { debugWarn('[seoManager] upsertLinkRel failed', e) }
 }
 
 function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
@@ -100,7 +101,7 @@ export function getSiteNameFromMeta() {
       }
     }
   } catch (e) {
-    console.warn('[seoManager] getSiteNameFromMeta failed', e)
+    debugWarn('[seoManager] getSiteNameFromMeta failed', e)
   }
   return ''
 }
@@ -134,10 +135,10 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
       } else {
         canonical = location.href.split('#')[0]
       }
-    } catch (e) { canonical = location.href.split('#')[0]; console.warn('[seoManager] compute canonical failed', e) }
+    } catch (e) { canonical = location.href.split('#')[0]; debugWarn('[seoManager] compute canonical failed', e) }
 
     if (canonical) upsertLinkRel('canonical', canonical)
-    try { upsertMeta('property', 'og:url', canonical) } catch (e) { console.warn('[seoManager] upsertMeta og:url failed', e) }
+    try { upsertMeta('property', 'og:url', canonical) } catch (e) { debugWarn('[seoManager] upsertMeta og:url failed', e) }
 
     const json = {
       '@context': 'https://schema.org',
@@ -159,7 +160,7 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
       document.head.appendChild(el)
     }
     el.textContent = JSON.stringify(json, null, 2)
-  } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
+  } catch (e) { debugWarn('[seoManager] setStructuredData failed', e) }
 }
 
 // Lightweight in-memory SEO map; can be configured at runtime via `setSeoMap`.
@@ -173,7 +174,7 @@ export function setSeoMap(map) {
   try {
     if (!map || typeof map !== 'object') { seoMap = {}; return }
     seoMap = Object.assign({}, map)
-  } catch (e) { console.warn('[seoManager] setSeoMap failed', e) }
+  } catch (e) { debugWarn('[seoManager] setSeoMap failed', e) }
 }
 
 /**
@@ -201,8 +202,8 @@ export function injectSeoForPage(page, initialDocumentTitle = '') {
       // Populate standard meta tags (robots, og, twitter) using setMetaTags
       try { setMetaTags({ meta: meta }, meta.title || undefined, meta.image || undefined, meta.description || undefined, initialDocumentTitle) } catch (e) { /* continue */ }
     } catch (e) {}
-    try { setStructuredData({ meta: meta }, page, meta.title || undefined, meta.image || undefined, meta.description || undefined, initialDocumentTitle) } catch (e) { console.warn('[seoManager] inject structured data failed', e) }
-  } catch (e) { console.warn('[seoManager] injectSeoForPage failed', e) }
+    try { setStructuredData({ meta: meta }, page, meta.title || undefined, meta.image || undefined, meta.description || undefined, initialDocumentTitle) } catch (e) { debugWarn('[seoManager] inject structured data failed', e) }
+  } catch (e) { debugWarn('[seoManager] injectSeoForPage failed', e) }
 }
 
 /**
@@ -223,7 +224,7 @@ export function markNotFound(meta = {}, pagePath = '', titleOverride = undefined
     try { if (desc && String(desc).trim()) setTag('description', String(desc)) } catch (e) {}
     try { setMetaTags({ meta: Object.assign({}, m, { robots: 'noindex,follow' }) }, title, m.image || undefined, desc) } catch (e) {}
     try { setStructuredData({ meta: Object.assign({}, m, { title: title, description: desc }) }, pagePath || '', title, m.image || undefined, desc) } catch (e) {}
-  } catch (e) { console.warn('[seoManager] markNotFound failed', e) }
+  } catch (e) { debugWarn('[seoManager] markNotFound failed', e) }
 }
 
 /**
@@ -249,7 +250,7 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
         labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
       }
     }
-  } catch (e) { console.warn('[seoManager] update toc label failed', e) }
+  } catch (e) { debugWarn('[seoManager] update toc label failed', e) }
 
   try {
     const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
@@ -276,10 +277,10 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
           }
           if (!found && h1Text) found = String(h1Text).trim()
         }
-      } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
+          } catch (e) { debugWarn('[seoManager] compute descOverride failed', e) }
       if (found && String(found).length > 160) found = String(found).slice(0, 157).trim() + '...'
       descOverride = found
-    } catch (e) { console.warn('[seoManager] compute descOverride failed', e) }
+    } catch (e) { debugWarn('[seoManager] compute descOverride failed', e) }
 
     let displayTitle = ''
     try {
@@ -296,8 +297,8 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
     }
     if (!displayTitle) displayTitle = pagePath || ''
 
-    try { setMetaTags(parsed, displayTitle || undefined, firstImageUrl, descOverride) } catch (e) { console.warn('[seoManager] setMetaTags failed', e) }
-    try { setStructuredData(parsed, slugKey, displayTitle || undefined, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { console.warn('[seoManager] setStructuredData failed', e) }
+    try { setMetaTags(parsed, displayTitle || undefined, firstImageUrl, descOverride) } catch (e) { debugWarn('[seoManager] setMetaTags failed', e) }
+    try { setStructuredData(parsed, slugKey, displayTitle || undefined, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { debugWarn('[seoManager] setStructuredData failed', e) }
     const siteName = getSiteNameFromMeta()
     if (displayTitle) {
       if (siteName) document.title = `${siteName} - ${displayTitle}`
@@ -307,7 +308,7 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
     } else {
       document.title = initialDocumentTitle || document.title
     }
-  } catch (e) { console.warn('[seoManager] applyPageMeta failed', e) }
+  } catch (e) { debugWarn('[seoManager] applyPageMeta failed', e) }
 
   try {
     try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (_e) {}
@@ -338,5 +339,5 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
         } catch (err) { try { const sub = document.createElement('p'); sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'; const span = document.createElement('span'); span.className = 'nimbi-reading-time'; span.textContent = rtText; sub.appendChild(span); topH1Elem.insertAdjacentElement('afterend', sub) } catch (err2) { /* ignore */ } }
       }
     }
-  } catch (ee) { console.warn('[seoManager] reading time update failed', ee) }
+  } catch (ee) { debugWarn('[seoManager] reading time update failed', ee) }
 }

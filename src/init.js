@@ -14,6 +14,7 @@ import { injectSeoForPage, setSeoMap } from './seoManager.js'
 import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
 import { ensureBulma, setStyle, registerThemedElement } from './bulmaManager.js'
+import { setDebugLevel, debugWarn, debugInfo, debugLog, incrementCounter, hasLegacyDebug } from './utils/debug.js'
 
 /**
  * Parse well-known `initCMS` options from the current page URL's query
@@ -43,24 +44,18 @@ export function parseInitOptionsFromQuery(queryString) {
   try {
     let qs = typeof queryString === 'string' ? queryString : (typeof window !== 'undefined' && window.location ? window.location.search : '')
 
-  if (!qs && typeof window !== 'undefined' && window.location && window.location.hash) {
-    try {
-      const parsed = parseHrefToRoute(window.location.href)
-      if (parsed && parsed.params) qs = parsed.params.startsWith('?') ? parsed.params : ('?' + parsed.params)
-      else {
-        const hash = window.location.hash
-        const idx = hash.indexOf('?')
-        if (idx !== -1) qs = hash.slice(idx)
+    if (!qs && typeof window !== 'undefined' && window.location && window.location.hash) {
+      try {
+        const parsed = parseHrefToRoute(window.location.href)
+        if (parsed && parsed.params) qs = parsed.params.startsWith('?') ? parsed.params : ('?' + parsed.params)
+      } catch (e) {
+        qs = ''
       }
-    } catch (e) {
-      const hash = window.location.hash
-      const idx = hash.indexOf('?')
-      if (idx !== -1) qs = hash.slice(idx)
     }
-  }
 
-  if (!qs) return {}
-  const params = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
+    if (!qs) return {}
+
+    const params = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
     const out = {}
 
     const parseBool = (v) => {
@@ -209,14 +204,6 @@ export let initialDocumentTitle = ''
  * @returns {Promise<void>} resolves once the initial page has rendered
  */
 export async function initCMS(options = {}) {
-  const debug = typeof window !== 'undefined' && window.__nimbiCMSDebug
-  if (debug) {
-    try {
-      console.info('[nimbi-cms] initCMS called', { options })
-    } catch (_) {}
-  }
-
-  const dbgWarn = (...args) => { try { if (typeof window !== 'undefined' && window.__nimbiCMSDebug) { console.warn(...args) } } catch (e) {} }
 
   if (!options || typeof options !== 'object') {
     throw new TypeError('initCMS(options): options must be an object')
@@ -225,13 +212,9 @@ export async function initCMS(options = {}) {
   const queryOpts = parseInitOptionsFromQuery()
     if (queryOpts && (queryOpts.contentPath || queryOpts.homePage || queryOpts.notFoundPage || queryOpts.navigationPage)) {
     if (options && options.allowUrlPathOverrides === true) {
-      if (debug) {
-        try { dbgWarn('[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage/navigationPage') } catch (e) {}
-      }
+      try { debugWarn('[nimbi-cms] allowUrlPathOverrides enabled by host; honoring URL overrides for contentPath/homePage/notFoundPage/navigationPage') } catch (e) {}
     } else {
-      if (debug) {
-        try { dbgWarn('[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage/navigationPage') } catch (e) {}
-      }
+      try { debugWarn('[nimbi-cms] ignoring unsafe URL overrides for contentPath/homePage/notFoundPage/navigationPage') } catch (e) {}
       delete queryOpts.contentPath
       delete queryOpts.homePage
       delete queryOpts.notFoundPage
@@ -239,6 +222,22 @@ export async function initCMS(options = {}) {
     }
   }
   const finalOptions = Object.assign({}, queryOpts, options)
+  try {
+    if (Object.prototype.hasOwnProperty.call(finalOptions, 'debugLevel')) {
+      setDebugLevel(finalOptions.debugLevel)
+    } else if (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug && typeof globalThis.__nimbiCMSDebug.debugLevel !== 'undefined') {
+      // Honor an explicit legacy debugLevel if present on the old global
+      // (e.g. `window.__nimbiCMSDebug = { debugLevel: 3 }`). Presence of the
+      // legacy counters object alone should not automatically enable
+      // verbose logging; to avoid unexpectedly noisy consoles we only
+      // respect a numeric `debugLevel` property when present.
+      try {
+        const lvl = Number(globalThis.__nimbiCMSDebug.debugLevel)
+        if (Number.isFinite(lvl)) setDebugLevel(Math.max(0, Math.min(3, Math.floor(lvl))))
+      } catch (e) {}
+    }
+  } catch (e) {}
+  try { debugInfo('[nimbi-cms] initCMS called', { options: finalOptions }) } catch (e) {}
   if (queryOpts && typeof queryOpts.bulmaCustomize === 'string' && queryOpts.bulmaCustomize.trim()) {
     finalOptions.bulmaCustomize = queryOpts.bulmaCustomize
   }
@@ -392,9 +391,9 @@ export async function initCMS(options = {}) {
 
   try {
     import('./slugManager.js').then(m => {
-      try { if (m && typeof m.setSkipRootReadme === 'function') m.setSkipRootReadme(!!skipRootReadme) } catch (e2) { dbgWarn('[nimbi-cms] setSkipRootReadme failed', e2) }
+      try { if (m && typeof m.setSkipRootReadme === 'function') m.setSkipRootReadme(!!skipRootReadme) } catch (e2) { debugWarn('[nimbi-cms] setSkipRootReadme failed', e2) }
     }).catch(e => { /* ignore dynamic import errors for tests */ })
-  } catch (e) { dbgWarn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
+  } catch (e) { debugWarn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
 
   try {
     
@@ -409,14 +408,14 @@ export async function initCMS(options = {}) {
         window.addEventListener('error', function(ev) {
           try {
             const rec = { type: 'error', message: ev && ev.message ? String(ev.message) : '', filename: ev && ev.filename ? String(ev.filename) : '', lineno: ev && ev.lineno ? ev.lineno : null, colno: ev && ev.colno ? ev.colno : null, stack: ev && ev.error && ev.error.stack ? ev.error.stack : null, time: Date.now() }
-            try { dbgWarn('[nimbi-cms] runtime error', rec.message) } catch (_) {}
+            try { debugWarn('[nimbi-cms] runtime error', rec.message) } catch (_) {}
             window.__nimbiRenderingErrors__.push(rec)
           } catch (_) {}
         })
         window.addEventListener('unhandledrejection', function(ev) {
           try {
             const rec = { type: 'unhandledrejection', reason: ev && ev.reason ? String(ev.reason) : '', time: Date.now() }
-            try { dbgWarn('[nimbi-cms] unhandledrejection', rec.reason) } catch (_) {}
+            try { debugWarn('[nimbi-cms] unhandledrejection', rec.reason) } catch (_) {}
             window.__nimbiRenderingErrors__.push(rec)
           } catch (_) {}
         })
@@ -432,7 +431,7 @@ export async function initCMS(options = {}) {
 
   try {
     mountEl.classList.add('nimbi-mount')
-  } catch (e) { dbgWarn('[nimbi-cms] mount element setup failed', e) }
+  } catch (e) { debugWarn('[nimbi-cms] mount element setup failed', e) }
 
   const sectionEl = document.createElement('section')
   sectionEl.className = 'section'
@@ -440,7 +439,7 @@ export async function initCMS(options = {}) {
   const container = document.createElement('div')
   container.className = 'container nimbi-cms'
   try {
-  } catch (e) { dbgWarn('[nimbi-cms] container style setup failed', e) }
+  } catch (e) { debugWarn('[nimbi-cms] container style setup failed', e) }
 
   const cols = document.createElement('div')
   cols.className = 'columns'
@@ -452,7 +451,7 @@ export async function initCMS(options = {}) {
     const label = (typeof t === 'function') ? t('navigation') : null
     if (label) navCol.setAttribute('aria-label', label)
   } catch (e) {
-    dbgWarn('[nimbi-cms] set nav aria-label failed', e)
+    debugWarn('[nimbi-cms] set nav aria-label failed', e)
   }
   cols.appendChild(navCol)
 
@@ -480,7 +479,7 @@ export async function initCMS(options = {}) {
     }
   } catch (e) {
     mountOverlay = null
-    dbgWarn('[nimbi-cms] mount overlay setup failed', e)
+    debugWarn('[nimbi-cms] mount overlay setup failed', e)
   }
 
   const pagePath = location.pathname || '/'
@@ -499,7 +498,7 @@ export async function initCMS(options = {}) {
       pageDir = pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
     }
   }
-  try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; dbgWarn('[nimbi-cms] read initial document title failed', e) }
+  try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; debugWarn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
   const contentPathWasProvided = Object.prototype.hasOwnProperty.call(finalOptions, 'contentPath')
   const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
@@ -576,19 +575,19 @@ export async function initCMS(options = {}) {
           markdown.addMarkdownExtension(ext)
         }
       })
-    } catch (err) { dbgWarn('[nimbi-cms] applying markdownExtensions failed', err) }
+    } catch (err) { debugWarn('[nimbi-cms] applying markdownExtensions failed', err) }
   }
 
   try {
     if (typeof crawlMaxQueue === 'number') {
       import('./slugManager.js').then(({ setDefaultCrawlMaxQueue }) => {
-        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { dbgWarn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
+        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
       })
     }
-  } catch (err) { dbgWarn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
+  } catch (err) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
 
-  try { setContentBase(contentBase) } catch (err) { dbgWarn('[nimbi-cms] setContentBase failed', err) }
-  try { setNotFoundPage(notFoundPage) } catch (err) { dbgWarn('[nimbi-cms] setNotFoundPage failed', err) }
+  try { setContentBase(contentBase) } catch (err) { debugWarn('[nimbi-cms] setContentBase failed', err) }
+  try { setNotFoundPage(notFoundPage) } catch (err) { debugWarn('[nimbi-cms] setNotFoundPage failed', err) }
   try {
     // Optional: attach a small sitemap download UI when a host enables it
     if (typeof window !== 'undefined' && window.__nimbiAutoAttachSitemapUI) {
@@ -640,7 +639,7 @@ export async function initCMS(options = {}) {
                 // reuse it later when building the nav (avoid a second
                 // failing round-trip to the original configured path).
                 try { navigationPage = np } catch (_) {}
-                try { dbgWarn('[nimbi-cms] fetched navigation candidate', np, 'contentBase=', contentBase) } catch (_) {}
+                try { debugWarn('[nimbi-cms] fetched navigation candidate', np, 'contentBase=', contentBase) } catch (_) {}
                 _earlyParsedNav = await markdown.parseMarkdownToHtml(_earlyNavMd.raw || '')
                 try {
                   const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
@@ -651,7 +650,7 @@ export async function initCMS(options = {}) {
                       try {
                         const href = a.getAttribute('href') || ''
                         const r = parseHrefToRoute(href)
-                        try { dbgWarn('[nimbi-cms] parsed nav first-link href', href, '->', r) } catch (_) {}
+                        try { debugWarn('[nimbi-cms] parsed nav first-link href', href, '->', r) } catch (_) {}
                         if (r && r.page) {
                           // Only accept candidate home pages that look like a path
                           // (contain an extension or a directory). Slugs (cosmetic)
@@ -659,7 +658,7 @@ export async function initCMS(options = {}) {
                           // a fetchable path relative to `contentBase`.
                           if (r.type === 'path' || (r.type === 'canonical' && (r.page.includes('.') || r.page.includes('/')))) {
                             homePage = r.page
-                            try { dbgWarn('[nimbi-cms] derived homePage from navigation', homePage) } catch (_) {}
+                            try { debugWarn('[nimbi-cms] derived homePage from navigation', homePage) } catch (_) {}
                             break
                           }
                         }
@@ -677,11 +676,11 @@ export async function initCMS(options = {}) {
         }
       }
 
-      try { dbgWarn('[nimbi-cms] final homePage before slugManager setHomePage', homePage) } catch (_) {}
+      try { debugWarn('[nimbi-cms] final homePage before slugManager setHomePage', homePage) } catch (_) {}
       // Inform slugManager of the (possibly updated) homePage value.
       try {
         setHomePage(homePage)
-      } catch (e) { dbgWarn('[nimbi-cms] setHomePage failed', e) }
+      } catch (e) { debugWarn('[nimbi-cms] setHomePage failed', e) }
 
       // Only fetch the configured `homePage` when it is necessary. When the
       // runtime is starting from a cosmetic hash route (e.g. "#/slug") and
@@ -724,7 +723,7 @@ export async function initCMS(options = {}) {
       parsedNav = await markdown.parseMarkdownToHtml(navMd.raw || '')
     }
     const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing, navbarLogo)
-    try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { dbgWarn('[nimbi-cms] onNavBuild hooks failed', e) }
+    try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { debugWarn('[nimbi-cms] onNavBuild hooks failed', e) }
     
       try {
         // If the current URL is requesting a sitemap/rss/atom, run the
@@ -792,31 +791,31 @@ export async function initCMS(options = {}) {
       const computeAndSet = () => {
         const navHeight = (navbarWrap && navbarWrap.getBoundingClientRect && Math.round(navbarWrap.getBoundingClientRect().height)) || (navbarWrap && navbarWrap.offsetHeight) || 0
         if (navHeight > 0) {
-          try { mountEl.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { dbgWarn('[nimbi-cms] set CSS var failed', err) }
-          try { container.style.paddingTop = '' } catch (err) { dbgWarn('[nimbi-cms] set container paddingTop failed', err) }
+          try { mountEl.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { debugWarn('[nimbi-cms] set CSS var failed', err) }
+          try { container.style.paddingTop = '' } catch (err) { debugWarn('[nimbi-cms] set container paddingTop failed', err) }
           try {
             const mountH = (mountEl && mountEl.getBoundingClientRect && Math.round(mountEl.getBoundingClientRect().height)) || (mountEl && mountEl.clientHeight) || 0
             if (mountH > 0) {
               const explicit = Math.max(0, mountH - navHeight)
-              try { container.style.setProperty('--nimbi-cms-height', `${explicit}px`) } catch (err) { dbgWarn('[nimbi-cms] set --nimbi-cms-height failed', err) }
-            } else {
-              try { container.style.setProperty('--nimbi-cms-height', 'calc(100vh - var(--nimbi-site-navbar-height))') } catch (err) { dbgWarn('[nimbi-cms] set --nimbi-cms-height failed', err) }
+              try { container.style.setProperty('--nimbi-cms-height', `${explicit}px`) } catch (err) { debugWarn('[nimbi-cms] set --nimbi-cms-height failed', err) }
+              } else {
+              try { container.style.setProperty('--nimbi-cms-height', 'calc(100vh - var(--nimbi-site-navbar-height))') } catch (err) { debugWarn('[nimbi-cms] set --nimbi-cms-height failed', err) }
             }
-          } catch (err) { dbgWarn('[nimbi-cms] compute container height failed', err) }
-          try { navbarWrap.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { dbgWarn('[nimbi-cms] set navbar CSS var failed', err) }
+          } catch (err) { debugWarn('[nimbi-cms] compute container height failed', err) }
+          try { navbarWrap.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { debugWarn('[nimbi-cms] set navbar CSS var failed', err) }
         }
       }
       computeAndSet()
       try {
         if (typeof ResizeObserver !== 'undefined') {
           const ro = new ResizeObserver(() => computeAndSet())
-          try { ro.observe(navbarWrap) } catch (err) { dbgWarn('[nimbi-cms] ResizeObserver.observe failed', err) }
+          try { ro.observe(navbarWrap) } catch (err) { debugWarn('[nimbi-cms] ResizeObserver.observe failed', err) }
         }
-      } catch (err) { dbgWarn('[nimbi-cms] ResizeObserver setup failed', err) }
-    } catch (err) { dbgWarn('[nimbi-cms] compute navbar height failed', err) }
+      } catch (err) { debugWarn('[nimbi-cms] ResizeObserver setup failed', err) }
+    } catch (err) { debugWarn('[nimbi-cms] compute navbar height failed', err) }
     
   } catch (e) {
-    dbgWarn('[nimbi-cms] build navigation failed', e)
+    debugWarn('[nimbi-cms] build navigation failed', e)
   }
   await ui.renderByQuery()
   
@@ -836,7 +835,7 @@ export async function initCMS(options = {}) {
                     a.rel = 'noopener noreferrer nofollow'
                     a.setAttribute('aria-label', `nimbiCMS version ${v}`)
                     try { registerThemedElement(a) } catch (e) { /* ignore */ }
-                    try { mountEl.appendChild(a) } catch (err) { dbgWarn('[nimbi-cms] append version label failed', err) }
+                    try { mountEl.appendChild(a) } catch (err) { debugWarn('[nimbi-cms] append version label failed', err) }
                   }
 
                   const injectedHomepage = typeof __NIMBI_CMS_HOMEPAGE__ !== 'undefined' ? __NIMBI_CMS_HOMEPAGE__ : null
@@ -852,13 +851,13 @@ export async function initCMS(options = {}) {
 
                   finishWithAnchor(safeLink)
                 } catch (err) {
-                  dbgWarn('[nimbi-cms] building version label failed', err)
+                  debugWarn('[nimbi-cms] building version label failed', err)
                 }
-          } catch (err) { dbgWarn('[nimbi-cms] building version label failed', err) }
-        }).catch((e) => { dbgWarn('[nimbi-cms] getVersion() failed', e) })
+          } catch (err) { debugWarn('[nimbi-cms] building version label failed', err) }
+        }).catch((e) => { debugWarn('[nimbi-cms] getVersion() failed', e) })
       }
-    }).catch((e) => { dbgWarn('[nimbi-cms] import version module failed', e) })
-  } catch (err) { dbgWarn('[nimbi-cms] version label setup failed', err) }
+    }).catch((e) => { debugWarn('[nimbi-cms] import version module failed', e) })
+  } catch (err) { debugWarn('[nimbi-cms] version label setup failed', err) }
 
     })()
   } catch (err) {

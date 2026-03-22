@@ -13,23 +13,11 @@
  */
 import { allMarkdownPaths, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
 import { normalizePath } from './utils/helpers.js'
+import { debugLog, debugWarn } from './utils/debug.js'
 
-// Debug logging helper — logs only when `window.__nimbiCMSDebug` is truthy.
-function _debugLog(...args) {
-  try {
-    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
-      console.log(...args)
-    }
-  } catch (_) {}
-}
-
-function _debugWarn(...args) {
-  try {
-    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
-      console.warn(...args)
-    }
-  } catch (_) {}
-}
+// Backwards-compatible underscore-prefixed aliases used in older code paths
+const _debugLog = debugLog
+const _debugWarn = debugWarn
 
 function _getBase() {
   try {

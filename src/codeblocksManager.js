@@ -1,4 +1,5 @@
 import hljs from 'highlight.js/lib/core'
+import { debugWarn, debugError } from './utils/debug.js'
 
 export { hljs }
 
@@ -127,7 +128,7 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
           else SUPPORTED_HLJS_MAP.delete(a)
         }
         aliasesList = cleaned
-      } catch (err) { console.warn('[codeblocksManager] cleanup aliases failed', err) }
+      } catch (err) { debugWarn('[codeblocksManager] cleanup aliases failed', err) }
       try {
         let removed = 0
         for (const k of Array.from(SUPPORTED_HLJS_MAP.keys())) {
@@ -157,12 +158,12 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
         try {
           const sepKey = ':---------------------'
           if (SUPPORTED_HLJS_MAP.has(sepKey)) { SUPPORTED_HLJS_MAP.delete(sepKey); removed++ }
-        } catch (err) { console.warn('[codeblocksManager] remove sep key failed', err) }
+        } catch (err) { debugWarn('[codeblocksManager] remove sep key failed', err) }
         try {
           const keys = Array.from(SUPPORTED_HLJS_MAP.keys()).sort()
-        } catch (err) { console.warn('[codeblocksManager] compute supported keys failed', err) }
-      } catch (_) { console.warn('[codeblocksManager] ignored error', _) }
-    } catch (err) { console.warn('[codeblocksManager] loadSupportedLanguages failed', err) }
+        } catch (err) { debugWarn('[codeblocksManager] compute supported keys failed', err) }
+      } catch (_) { debugWarn('[codeblocksManager] ignored error', _) }
+    } catch (err) { debugWarn('[codeblocksManager] loadSupportedLanguages failed', err) }
   })()
   return loadSupportedLanguagesPromise
 }
@@ -184,7 +185,7 @@ export async function registerLanguage(name, modulePath) {
     ;(async () => {
       try {
         await loadSupportedLanguages()
-      } catch (err) { console.warn('[codeblocksManager] loadSupportedLanguages (IIFE) failed', err) }
+      } catch (err) { debugWarn('[codeblocksManager] loadSupportedLanguages (IIFE) failed', err) }
     })()
   }
   if (loadSupportedLanguagesPromise) {
@@ -356,7 +357,7 @@ export function observeCodeBlocks(root = document) {
   
   if (!loadSupportedLanguagesPromise) {
     ;(async () => {
-      try { await loadSupportedLanguages() } catch (_) { console.warn('[codeblocksManager] loadSupportedLanguages (observer) failed', _) }
+      try { await loadSupportedLanguages() } catch (_) { debugWarn('[codeblocksManager] loadSupportedLanguages (observer) failed', _) }
     })()
   }
   const aliasMapLocal = HLJS_ALIAS_MAP
@@ -367,7 +368,7 @@ export function observeCodeBlocks(root = document) {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return
         const el = entry.target
-        try { obs.unobserve(el) } catch (err) { console.warn('[codeblocksManager] observer unobserve failed', err) }
+        try { obs.unobserve(el) } catch (err) { debugWarn('[codeblocksManager] observer unobserve failed', err) }
         ;(async () => {
           try {
             const cls = (el.getAttribute && el.getAttribute('class')) || el.className || ''
@@ -378,7 +379,7 @@ export function observeCodeBlocks(root = document) {
               const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
               try {
                 await registerLanguage(canonical)
-              } catch (err) { console.warn('[codeblocksManager] registerLanguage failed', err) }
+              } catch (err) { debugWarn('[codeblocksManager] registerLanguage failed', err) }
               try {
                 try {
                   const raw = el.textContent || el.innerText || ''
@@ -386,7 +387,7 @@ export function observeCodeBlocks(root = document) {
                 } catch (e) { /* ignore */ }
                 try { if (el && el.dataset && el.dataset.highlighted) delete el.dataset.highlighted } catch (_) {}
                 hljs.highlightElement(el)
-              } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed', err) }
+              } catch (err) { debugWarn('[codeblocksManager] hljs.highlightElement failed', err) }
             } else {
               try {
                 const code = el.textContent || ''
@@ -397,11 +398,11 @@ export function observeCodeBlocks(root = document) {
                     if (out && out.value) el.innerHTML = out.value
                   }
                 } catch (err) {
-                  try { hljs.highlightElement(el) } catch (e) { console.warn('[codeblocksManager] fallback highlightElement failed', e) }
+                  try { hljs.highlightElement(el) } catch (e) { debugWarn('[codeblocksManager] fallback highlightElement failed', e) }
                 }
-              } catch (err) { console.warn('[codeblocksManager] auto-detect plaintext failed', err) }
+              } catch (err) { debugWarn('[codeblocksManager] auto-detect plaintext failed', err) }
             }
-          } catch (err) { console.warn('[codeblocksManager] observer entry processing failed', err) }
+          } catch (err) { debugWarn('[codeblocksManager] observer entry processing failed', err) }
         })()
       })
     }, { root: null, rootMargin: '300px', threshold: 0.1 })
@@ -422,7 +423,7 @@ export function observeCodeBlocks(root = document) {
           const canonical = (SUPPORTED_HLJS_MAP.size && (SUPPORTED_HLJS_MAP.get(mapped) || SUPPORTED_HLJS_MAP.get(String(mapped).toLowerCase()))) || mapped
           try {
             await registerLanguage(canonical)
-          } catch (err) { console.warn('[codeblocksManager] registerLanguage failed (no observer)', err) }
+          } catch (err) { debugWarn('[codeblocksManager] registerLanguage failed (no observer)', err) }
         }
         try {
           try {
@@ -431,12 +432,12 @@ export function observeCodeBlocks(root = document) {
           } catch (e) {}
           try { if (el && el.dataset && el.dataset.highlighted) delete el.dataset.highlighted } catch (_) {}
           hljs.highlightElement(el)
-        } catch (err) { console.warn('[codeblocksManager] hljs.highlightElement failed (no observer)', err) }
-      } catch (_) { console.warn('[codeblocksManager] loadSupportedLanguages fallback ignored error', _) }
+        } catch (err) { debugWarn('[codeblocksManager] hljs.highlightElement failed (no observer)', err) }
+      } catch (_) { debugWarn('[codeblocksManager] loadSupportedLanguages fallback ignored error', _) }
     })
     return
   }
-  blocks.forEach(b => { try { obs.observe(b) } catch (err) { console.warn('[codeblocksManager] observe failed', err) } })
+  blocks.forEach(b => { try { obs.observe(b) } catch (err) { debugWarn('[codeblocksManager] observe failed', err) } })
 }
 /**
  * Change the highlight.js CSS theme by injecting a <link>.  If `theme` is
@@ -467,7 +468,7 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
   if (existingTheme && existingTheme.toLowerCase() === requestedLower) return
 
   if (!useCdn) {
-    console.warn('Requested highlight theme not bundled; set useCdn=true to load theme from CDN')
+    try { debugWarn('Requested highlight theme not bundled; set useCdn=true to load theme from CDN') } catch (e) {}
     return
   }
 

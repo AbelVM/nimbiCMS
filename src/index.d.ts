@@ -341,11 +341,6 @@ export function recordExample(): Record<string, number[]>
 export function sum(opts: any): {sum:number}
 export function callIt(cb: (...args:any[])=>any): void
 
-// --- from src/debug.js
-
-
-
-
 // --- from src/codeblocksManager.js
 export const HLJS_ALIAS_MAP: Record<string,string>
 export function loadSupportedLanguages(url: string): Promise<void>
@@ -399,5 +394,20 @@ export function decodeHtmlEntities(s: string): string
 export function parseFrontmatter(md: string): {content:string, data: Record<string,string>}
 
 // --- from src/utils/emojiMap.js
+
+// --- from src/utils/debug.js
+export function setDebugLevel(level: any): any
+export function getDebugLevel(): number
+export function isDebugLevel(level: number): any
+export function isDebug(): any
+export function incrementCounter(name: string): any
+export function syncLegacyCounter(name: string): any
+export function hasLegacyDebug(): boolean
+export function getDebugCounters(): Record<string,number>
+export function resetDebugCounters(): any
+
+
+
+
 
 // --- from src/lib/index.js
