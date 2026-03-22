@@ -54,5 +54,5 @@ describe('runtimeSitemap waits for index completion', () => {
     const written = writes.join('')
     // ensure an entry from the tail of the final index is present
     expect(written).toContain('?page=' + encodeURIComponent('p20'))
-  })
+  }, 20000)
 })

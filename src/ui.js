@@ -14,6 +14,7 @@ import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickH
 import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 import { attachImagePreview } from './imagePreview.js'
+import { debugWarn } from './debug.js'
 
 
 
@@ -68,7 +69,7 @@ export function createUI(opts) {
     }
     if (!anchor && hashAnchor) anchor = hashAnchor
 
-    try { scrollToAnchorOrTop(null) } catch (_) { console.warn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
+    try { scrollToAnchorOrTop(null) } catch (_) { debugWarn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
     contentWrap.innerHTML = ''
 
     const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
@@ -81,26 +82,26 @@ export function createUI(opts) {
       attachTocClickHandler(toc)
     }
 
-    try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { console.warn('[nimbi-cms] transformHtml hooks failed', e) }
+    try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { debugWarn('[nimbi-cms] transformHtml hooks failed', e) }
 
     contentWrap.appendChild(article)
 
-    try { executeEmbeddedScripts(article) } catch (e) { console.warn('[nimbi-cms] executeEmbeddedScripts failed', e) }
+    try { executeEmbeddedScripts(article) } catch (e) { debugWarn('[nimbi-cms] executeEmbeddedScripts failed', e) }
 
-    try { attachImagePreview(article, { t }) } catch (e) { console.warn('[nimbi-cms] attachImagePreview failed', e) }
+    try { attachImagePreview(article, { t }) } catch (e) { debugWarn('[nimbi-cms] attachImagePreview failed', e) }
 
     try {
       setEagerForAboveFoldImages(container, 100, false)
       requestAnimationFrame(() => setEagerForAboveFoldImages(container, 100, false))
       setTimeout(() => setEagerForAboveFoldImages(container, 100, false), 250)
     } catch (e) {
-      console.warn('[nimbi-cms] setEagerForAboveFoldImages failed', e)
+      debugWarn('[nimbi-cms] setEagerForAboveFoldImages failed', e)
     }
 
     scrollToAnchorOrTop(anchor)
     ensureScrollTopButton(article, topH1, { mountOverlay, container, navWrap, t })
 
-    try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { console.warn('[nimbi-cms] onPageLoad hooks failed', e) }
+    try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { debugWarn('[nimbi-cms] onPageLoad hooks failed', e) }
 
     currentPagePath = pagePath
   }
@@ -130,7 +131,7 @@ export function createUI(opts) {
       const hashAnchor = parsed && parsed.anchor ? parsed.anchor : null
       await renderPage(raw, hashAnchor)
     } catch (e) {
-      console.warn('[nimbi-cms] renderByQuery failed', e)
+      debugWarn('[nimbi-cms] renderByQuery failed', e)
       renderNotFound(contentWrap, t, e)
     }
   }
@@ -148,7 +149,8 @@ export function createUI(opts) {
         left: containerEl.scrollLeft || 0
       }
       sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data))
-    } catch (_e) {
+    } catch (e) {
+      debugWarn('[nimbi-cms] save scroll position failed', e)
     }
   }
 
@@ -163,6 +165,7 @@ export function createUI(opts) {
         containerEl.scrollTo({ top: data.top, left: (data.left || 0), behavior: 'auto' })
       }
     } catch (_e) {
+      /* ignore restore errors */
     }
   }
 
@@ -172,7 +175,7 @@ export function createUI(opts) {
         restoreScrollPosition()
         setEagerForAboveFoldImages(container, 100, false)
       } catch (e) {
-        console.warn('[nimbi-cms] bfcache restore failed', e)
+        debugWarn('[nimbi-cms] bfcache restore failed', e)
       }
     }
   })
@@ -181,7 +184,7 @@ export function createUI(opts) {
     try {
       saveScrollPosition()
     } catch (e) {
-      console.warn('[nimbi-cms] save scroll position failed', e)
+      debugWarn('[nimbi-cms] save scroll position failed', e)
     }
   })
 

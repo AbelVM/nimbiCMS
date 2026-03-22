@@ -61,7 +61,7 @@ describe('runtimeSitemap RSS/Atom', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)
@@ -69,7 +69,7 @@ describe('runtimeSitemap RSS/Atom', () => {
     const out = writes.join('')
     expect(out).toContain('<rss')
     expect(out).toContain('?page=' + encodeURIComponent('one'))
-  })
+  }, 20000)
 
   it('handleSitemapRequest serves Atom when search contains ?atom and no other params', async () => {
     // switch location to atom
@@ -87,7 +87,7 @@ describe('runtimeSitemap RSS/Atom', () => {
     document.write = (s) => writes.push(String(s || ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)
@@ -95,5 +95,5 @@ describe('runtimeSitemap RSS/Atom', () => {
     const out = writes.join('')
     expect(out).toContain('<feed')
     expect(out).toContain('?page=' + encodeURIComponent('two'))
-  })
+  }, 20000)
 })

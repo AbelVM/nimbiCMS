@@ -1,9 +1,13 @@
-import { createNavTree } from './htmlBuilder.js'
+import { createNavTree, preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
 import { t } from './l10nManager.js'
-import { preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths, searchIndex } from './slugManager.js'
+
+// Local debug helpers: controlled by `window.__nimbiCMSDebug` at runtime
+const __nimbiDebug = (typeof window !== 'undefined' && window.__nimbiCMSDebug)
+function __nimbiDebugLog(...args) { if (!__nimbiDebug) return; try { console.log(...args) } catch (e) {} }
+function __nimbiDebugWarn(...args) { if (!__nimbiDebug) return; try { console.warn(...args) } catch (e) {} }
 
 function safeGet(mod, name) {
   try {
@@ -100,7 +104,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         burgerEl.setAttribute('aria-expanded', 'false')
         if (target) target.classList.remove('is-active')
       }
-    } catch (err) { console.warn && console.warn('[nimbi-cms] closeMobileMenu failed', err) }
+    } catch (err) { __nimbiDebugWarn('[nimbi-cms] closeMobileMenu failed', err) }
   }
 
   /* Helper: run the provided `renderByQuery` with a small visual transition.
@@ -114,7 +118,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       const r = renderByQuery && renderByQuery()
       if (r && typeof r.then === 'function') await r
     } catch (e) {
-      try { console.warn && console.warn('[nimbi-cms] renderByQuery failed', e) } catch (_) {}
+      try { __nimbiDebugWarn('[nimbi-cms] renderByQuery failed', e) } catch (_) {}
     } finally {
       try {
         if (typeof requestAnimationFrame === 'function') {
@@ -137,7 +141,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const moduleWorker = safeGet(fm, 'buildSearchIndexWorker')
         const buildFn = (typeof globalBuild === 'function') ? globalBuild : (moduleBuild || undefined)
         const workerFn = (typeof globalWorker === 'function') ? globalWorker : (moduleWorker || undefined)
-        try { console.log('[nimbi-cms test] ensureSearchIndex: buildFn=' + (typeof buildFn) + ' workerFn=' + (typeof workerFn) + ' (global preferred)') } catch (e) {}
+        __nimbiDebugLog('[nimbi-cms test] ensureSearchIndex: buildFn=' + (typeof buildFn) + ' workerFn=' + (typeof workerFn) + ' (global preferred)')
         const seeds = []
         try { if (homePage) seeds.push(homePage) } catch (_) {}
         try { if (navigationPage) seeds.push(navigationPage) } catch (_) {}
@@ -152,15 +156,15 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               } catch (e) {}
               return r
             }
-          } catch (e) { console.warn && console.warn('[nimbi-cms] worker builder threw', e) }
+          } catch (e) { __nimbiDebugWarn('[nimbi-cms] worker builder threw', e) }
         }
         if (typeof buildFn === 'function') {
-          try { console.log('[nimbi-cms test] calling buildFn') } catch (e) {}
+          __nimbiDebugLog('[nimbi-cms test] calling buildFn')
           return await buildFn(contentBase, indexDepth, noIndexing, seeds.length ? seeds : undefined)
         }
         return []
       } catch (err) {
-        console.warn('[nimbi-cms] buildSearchIndex failed', err)
+        __nimbiDebugWarn('[nimbi-cms] buildSearchIndex failed', err)
         return []
       } finally {
         if (searchInput) {
@@ -246,16 +250,16 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           if (sitemapTriggered) return
           sitemapTriggered = true
           const rs = await import('./runtimeSitemap.js')
-          try {
-            // Do not pass a snapshot index here — let the sitemap module
-            // import / reference the live `searchIndex` directly so it
-            // always operates on the same object used by the search UI.
-            await rs.handleSitemapRequest({ homePage, contentBase, indexDepth, noIndexing, includeAllMarkdown: true })
-          } catch (err) {
-            console.warn && console.warn('[nimbi-cms] sitemap trigger failed', err)
-          }
+            try {
+              // Do not pass a snapshot index here — let the sitemap module
+              // import / reference the live `searchIndex` directly so it
+              // always operates on the same object used by the search UI.
+              await rs.handleSitemapRequest({ homePage, contentBase, indexDepth, noIndexing, includeAllMarkdown: true })
+            } catch (err) {
+              __nimbiDebugWarn('[nimbi-cms] sitemap trigger failed', err)
+            }
         } catch (err) {
-          try { console.warn && console.warn('[nimbi-cms] sitemap dynamic import failed', err) } catch (_) {}
+          try { __nimbiDebugWarn('[nimbi-cms] sitemap dynamic import failed', err) } catch (_) {}
         }
       })()
     })
@@ -278,15 +282,27 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     try {
       const u = new URL(rawHref, location.href)
       const p = u.searchParams.get('page')
-      if (p) {
-        const page = decodeURIComponent(p)
-        brandItem.href = buildPageUrl(page)
-      } else {
-        brandItem.href = buildPageUrl(homePage)
-        brandItem.textContent = t('home')
-      }
+      const target = p ? decodeURIComponent(p) : homePage
+      // Prefer a slug when possible: if the target looks like a path (.md/.html
+      // or contains a directory), try to resolve a slug for that path. If the
+      // target already looks like a slug (no dot), keep it as-is.
+      let slugCandidate = null
+      try {
+        if (typeof target === 'string' && (/(?:\.md|\.html?)$/i.test(target) || target.includes('/'))) {
+          slugCandidate = findSlugForPath(target)
+        }
+      } catch (e) {}
+      if (!slugCandidate && typeof target === 'string' && !String(target).includes('.')) slugCandidate = target
+      const finalPage = slugCandidate || target
+      brandItem.href = buildPageUrl(finalPage)
+      if (!brandItem.textContent || !String(brandItem.textContent).trim()) brandItem.textContent = t('home')
     } catch (e) {
-      brandItem.href = buildPageUrl(homePage)
+      try {
+        const slugCandidate = (typeof homePage === 'string' && (/(?:\.md|\.html?)$/i.test(homePage) || homePage.includes('/'))) ? findSlugForPath(homePage) : (typeof homePage === 'string' && !homePage.includes('.') ? homePage : null)
+        brandItem.href = buildPageUrl(slugCandidate || homePage)
+      } catch (ee) {
+        brandItem.href = buildPageUrl(homePage)
+      }
       brandItem.textContent = t('home')
     }
   } else {
@@ -425,9 +441,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           burger.setAttribute('aria-expanded', 'true')
           if (target) target.classList.add('is-active')
         }
-      } catch (err) { console.warn('[nimbi-cms] navbar burger toggle failed', err) }
+      } catch (err) { __nimbiDebugWarn('[nimbi-cms] navbar burger toggle failed', err) }
     })
-  } catch (err) { console.warn('[nimbi-cms] burger event binding failed', err) }
+  } catch (err) { __nimbiDebugWarn('[nimbi-cms] burger event binding failed', err) }
 
   const menu = document.createElement('div')
   menu.className = 'navbar-menu'
@@ -631,11 +647,11 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           await ensureSearchIndex()
 
           const idx = await searchIndexPromise
-          try { console.log('[nimbi-cms test] search handleInput q="' + q + '" idxlen=' + (Array.isArray(idx) ? idx.length : 'nil')) } catch (e) {}
+          __nimbiDebugLog('[nimbi-cms test] search handleInput q="' + q + '" idxlen=' + (Array.isArray(idx) ? idx.length : 'nil'))
           const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
-          try { console.log('[nimbi-cms test] filtered len=' + (Array.isArray(filtered) ? filtered.length : 'nil')) } catch (e) {}
+          __nimbiDebugLog('[nimbi-cms test] filtered len=' + (Array.isArray(filtered) ? filtered.length : 'nil'))
           showResults(filtered.slice(0, 10))
-        } catch (err) { console.warn('[nimbi-cms] search input handler failed', err); showResults([]) }
+        } catch (err) { __nimbiDebugWarn('[nimbi-cms] search input handler failed', err); showResults([]) }
       }, 50)
 
       try {
@@ -657,7 +673,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       try {
         searchIndexPromise = ensureSearchIndex()
       } catch (err) {
-        console.warn('[nimbi-cms] eager search index init failed', err)
+        __nimbiDebugWarn('[nimbi-cms] eager search index init failed', err)
         searchIndexPromise = Promise.resolve([])
       }
         searchIndexPromise.finally(() => {
@@ -675,10 +691,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               try {
                 await rs.handleSitemapRequest({ index: Array.isArray(idx) ? idx : undefined, homePage, contentBase, indexDepth, noIndexing, includeAllMarkdown: true })
               } catch (err) {
-                console.warn && console.warn('[nimbi-cms] sitemap trigger failed', err)
+                __nimbiDebugWarn('[nimbi-cms] sitemap trigger failed', err)
               }
             } catch (err) {
-              try { console.warn && console.warn('[nimbi-cms] sitemap dynamic import failed', err) } catch (_) {}
+              try { __nimbiDebugWarn('[nimbi-cms] sitemap dynamic import failed', err) } catch (_) {}
             }
           })()
         })
@@ -747,7 +763,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                 if (titleText) {
                   const slugKey = slugify(titleText)
                   if (slugKey) {
-                    try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { console.warn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
+                    try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { __nimbiDebugWarn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
                     item.href = buildPageUrl(slugKey, frag)
                   } else {
                     item.href = buildPageUrl(htmlPath, frag)
@@ -768,7 +784,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       } else {
         item.href = href
       }
-    } catch (e) { console.warn('[nimbi-cms] nav item href parse failed', e); item.href = href }
+    } catch (e) { __nimbiDebugWarn('[nimbi-cms] nav item href parse failed', e); item.href = href }
     try {
       const displayName = (a.textContent && String(a.textContent).trim()) ? String(a.textContent).trim() : null
       if (displayName) {
@@ -806,9 +822,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                   }
                 }
               }
-        } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }
+        } catch (ee) { __nimbiDebugWarn('[nimbi-cms] nav slug mapping failed', ee) }
       }
-    } catch (ee) { console.warn('[nimbi-cms] nav slug mapping failed', ee) }
+    } catch (ee) { __nimbiDebugWarn('[nimbi-cms] nav slug mapping failed', ee) }
 
     item.textContent = a.textContent || href
     start.appendChild(item)
@@ -852,7 +868,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
           runRenderWithTransition()
         }
-      } catch (e) { console.warn('[nimbi-cms] navbar click handler failed', e) }
+      } catch (e) { __nimbiDebugWarn('[nimbi-cms] navbar click handler failed', e) }
         try {
           const burgerEl = navbar && navbar.querySelector ? navbar.querySelector('.navbar-burger') : null
           const targetId = burgerEl && burgerEl.dataset ? burgerEl.dataset.target : null
@@ -862,9 +878,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             burgerEl.setAttribute('aria-expanded', 'false')
             if (target) target.classList.remove('is-active')
           }
-        } catch (err) { console.warn('[nimbi-cms] mobile menu close failed', err) }
+        } catch (err) { __nimbiDebugWarn('[nimbi-cms] mobile menu close failed', err) }
     })
-  } catch (e) { console.warn('[nimbi-cms] attach content click handler failed', e) }
+  } catch (e) { __nimbiDebugWarn('[nimbi-cms] attach content click handler failed', e) }
 
   try {
     container.addEventListener('click', (ev) => {
@@ -883,10 +899,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           runRenderWithTransition()
         }
       } catch (e) {
-        console.warn('[nimbi-cms] container click URL parse failed', e)
+        __nimbiDebugWarn('[nimbi-cms] container click URL parse failed', e)
       }
     })
-  } catch (e) { console.warn('[nimbi-cms] build navbar failed', e) }
+  } catch (e) { __nimbiDebugWarn('[nimbi-cms] build navbar failed', e) }
   
 
   return { navbar, linkEls }

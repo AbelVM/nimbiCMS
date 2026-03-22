@@ -197,6 +197,9 @@ export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
 export function getLanguages(): string[]
 export function _storeSlugMapping(slug: string, rel: string): void
+export const slugResolvers: Set<Function>
+export const allMarkdownPaths: string[]
+export const homePage: string
 export function setHomePage(p: string): any
 export function _setSearchIndex(arr: any): any
 export function uniqueSlug(base: string, existing: Set<string>): string
@@ -207,11 +210,8 @@ export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchR
 export function getSearchIndex(): any
 export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean}): Promise<Array>
 export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean,timeoutMs?:number}): Promise<Array>
-export const CRAWL_MAX_QUEUE: any
-
-
-
-
+export const CRAWL_MAX_QUEUE: number
+export const defaultCrawlMaxQueue: number
 
 
 
@@ -252,12 +252,12 @@ export function markNotFound(opts: any): any
 
 
 // --- from src/runtimeSitemap.js
-export function generateSitemapJson(opts: any): any
+export function generateSitemapJson(opts: object): {generatedAt:string,entries:Array}
+export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[]): string
+export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
+export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function handleSitemapRequest(opts: any): any
 export function exposeSitemapGlobals(opts: any): any
-
-
-
 
 // --- from src/router.js
 export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
@@ -339,6 +339,11 @@ export function simpleUnion(): string|number
 export function recordExample(): Record<string, number[]>
 export function sum(opts: any): {sum:number}
 export function callIt(cb: (...args:any[])=>any): void
+
+// --- from src/debug.js
+
+
+
 
 // --- from src/codeblocksManager.js
 export const HLJS_ALIAS_MAP: Record<string,string>

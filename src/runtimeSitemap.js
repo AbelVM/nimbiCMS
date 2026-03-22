@@ -14,6 +14,23 @@
 import { allMarkdownPaths, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
 import { normalizePath } from './utils/helpers.js'
 
+// Debug logging helper — logs only when `window.__nimbiCMSDebug` is truthy.
+function _debugLog(...args) {
+  try {
+    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
+      console.log(...args)
+    }
+  } catch (_) {}
+}
+
+function _debugWarn(...args) {
+  try {
+    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
+      console.warn(...args)
+    }
+  } catch (_) {}
+}
+
 function _getBase() {
   try {
     if (typeof location !== 'undefined' && location && typeof location.pathname === 'string') {
@@ -55,6 +72,16 @@ function makeEntryFromIndexItem(baseNoQs, it) {
   } catch { return null }
 }
 
+/**
+ * Generate sitemap JSON from the runtime search index (or a provided snapshot).
+ * @param {Object} [opts]
+ * @param {boolean} [opts.includeAllMarkdown]
+ * @param {Array} [opts.index] - optional snapshot array of index entries
+ * @param {string} [opts.homePage]
+ * @param {string} [opts.navigationPage]
+ * @param {string} [opts.notFoundPage]
+ * @returns {{generatedAt:string,entries:Array}} sitemap JSON object
+ */
 export async function generateSitemapJson(opts = {}) {
   const {
     includeAllMarkdown = true,
@@ -96,33 +123,33 @@ export async function generateSitemapJson(opts = {}) {
     if (typeof notFoundPage === 'string' && notFoundPage.trim()) {
       const nfPath = normalizePath(String(notFoundPage))
       try {
-        if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(nfPath)) {
-          try { excludedSlugs.add(mdToSlug.get(nfPath)) } catch {}
-        } else {
-          try {
-            const nfRes = await fetchMarkdown(nfPath, opts && opts.contentBase ? opts.contentBase : undefined)
-            if (nfRes && nfRes.raw) {
+            if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(nfPath)) {
+              try { excludedSlugs.add(mdToSlug.get(nfPath)) } catch {}
+            } else {
               try {
-                let h = null
-                if (nfRes.isHtml) {
+                const nfRes = await fetchMarkdown(nfPath, opts && opts.contentBase ? opts.contentBase : undefined)
+                if (nfRes && nfRes.raw) {
                   try {
-                    const parser = new DOMParser()
-                    const doc = parser.parseFromString(nfRes.raw, 'text/html')
-                    const h1 = doc.querySelector('h1') || doc.querySelector('title')
-                    if (h1 && h1.textContent) h = h1.textContent.trim()
+                    let h = null
+                    if (nfRes.isHtml) {
+                      try {
+                        const parser = new DOMParser()
+                        const doc = parser.parseFromString(nfRes.raw, 'text/html')
+                        const h1 = doc.querySelector('h1') || doc.querySelector('title')
+                        if (h1 && h1.textContent) h = h1.textContent.trim()
+                      } catch {}
+                    } else {
+                      const m = (nfRes.raw || '').match(/^#\s+(.+)$/m)
+                      if (m && m[1]) h = m[1].trim()
+                    }
+                    if (h) excludedSlugs.add(slugify(h))
                   } catch {}
-                } else {
-                  const m = (nfRes.raw || '').match(/^#\s+(.+)$/m)
-                  if (m && m[1]) h = m[1].trim()
                 }
-                if (h) excludedSlugs.add(slugify(h))
-              } catch {}
+              } catch {
+                /* ignore fetch failures for notFoundPage */
+              }
             }
-          } catch {
-            /* ignore fetch failures for notFoundPage */
-          }
-        }
-      } catch {}
+          } catch {}
     }
   } catch {}
 
@@ -424,52 +451,64 @@ export async function generateSitemapJson(opts = {}) {
   } catch (_) {}
 
   try {
-    try { console.log('[runtimeSitemap] generateSitemapJson finalEntries.titleSource:', JSON.stringify(final.map(e => ({ slug: e.slug, title: e.title, titleSource: e._titleSource || null })), null, 2)) } catch (e) {}
+    try { _debugLog('[runtimeSitemap] generateSitemapJson finalEntries.titleSource:', JSON.stringify(final.map(e => ({ slug: e.slug, title: e.title, titleSource: e._titleSource || null })), null, 2)) } catch (e) {}
   } catch (_) {}
 
   // Attempt to fetch H1 titles for entries that did not come from the live index.
   try {
-    for (const e of final) {
-      try {
-        if (!e || !e.slug) continue
-        const eBase = String(e.slug).split('::')[0]
-        if (excludedSlugs.has(eBase)) continue
-        if (e._titleSource === 'index') continue
-        // Resolve a candidate path for this slug
-        let candidatePath = null
+    const MAX_FETCH_CONCURRENCY = 4
+    let _nextIndex = 0
+    const total = final.length
+    const workers = Array.from({ length: Math.min(MAX_FETCH_CONCURRENCY, total) }).map(async () => {
+      while (true) {
+        const i = _nextIndex++
+        if (i >= total) break
+        const e = final[i]
         try {
-          if (slugToMd && slugToMd.has(e.slug)) {
-            const mv = slugToMd.get(e.slug)
-            if (typeof mv === 'string') candidatePath = normalizePath(String(mv))
-            else if (mv && typeof mv === 'object') candidatePath = normalizePath(String(mv.default || ''))
-          }
-          if (!candidatePath && e.sourcePath) candidatePath = e.sourcePath
-        } catch (_) {}
-        if (!candidatePath) continue
-        if (excludedPaths.has(candidatePath)) continue
-        // Avoid fetching candidate paths not known to runtime to reduce
-        // noisy 404s when the server doesn't expose those files.
-        if (!_isKnownPath(candidatePath)) continue
-        try {
-          const md = await fetchMarkdown(candidatePath, opts && opts.contentBase ? opts.contentBase : undefined)
-          if (!md || !md.raw) continue
-          if (md && typeof md.status === 'number' && md.status === 404) continue
-          if (md && md.raw) {
-            const hh = (md.raw || '').match(/^#\s+(.+)$/m)
-            const title = hh && hh[1] ? hh[1].trim() : ''
-            if (title) {
-              e.title = title
-              e._titleSource = 'fetched'
+          if (!e || !e.slug) continue
+          const eBase = String(e.slug).split('::')[0]
+          if (excludedSlugs.has(eBase)) continue
+          if (e._titleSource === 'index') continue
+          // Resolve a candidate path for this slug
+          let candidatePath = null
+          try {
+            if (slugToMd && slugToMd.has(e.slug)) {
+              const mv = slugToMd.get(e.slug)
+              if (typeof mv === 'string') candidatePath = normalizePath(String(mv))
+              else if (mv && typeof mv === 'object') candidatePath = normalizePath(String(mv.default || ''))
             }
-          }
-        } catch (_) {}
-      } catch (_) {}
-    }
-  } catch (_) {}
+            if (!candidatePath && e.sourcePath) candidatePath = e.sourcePath
+          } catch (_) { continue }
+          if (!candidatePath) continue
+          if (excludedPaths.has(candidatePath)) continue
+          if (!_isKnownPath(candidatePath)) continue
+          try {
+            const md = await fetchMarkdown(candidatePath, opts && opts.contentBase ? opts.contentBase : undefined)
+            if (!md || !md.raw) continue
+            if (md && typeof md.status === 'number' && md.status === 404) continue
+            if (md && md.raw) {
+              const hh = (md.raw || '').match(/^#\s+(.+)$/m)
+              const title = hh && hh[1] ? hh[1].trim() : ''
+              if (title) {
+                e.title = title
+                e._titleSource = 'fetched'
+              }
+            }
+          } catch (err) { _debugLog('[runtimeSitemap] fetch title failed for', candidatePath, err) }
+        } catch (err) { _debugLog('[runtimeSitemap] worker loop failure', err) }
+      }
+    })
+    await Promise.all(workers)
+  } catch (err) { _debugLog('[runtimeSitemap] title enrichment failed', err) }
 
   return { generatedAt: new Date().toISOString(), entries: final }
 }
 
+/**
+ * Render sitemap JSON to XML sitemap format.
+ * @param {{generatedAt:string,entries:Array}|Array} json - sitemap JSON or entries array
+ * @returns {string} XML sitemap string
+ */
 export function generateSitemapXml(json) {
   const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
 
@@ -486,6 +525,11 @@ export function generateSitemapXml(json) {
   return s
 }
 
+/**
+ * Render sitemap JSON to an RSS 2.0 feed.
+ * @param {{generatedAt:string,entries:Array}|Array} json - sitemap JSON or entries array
+ * @returns {string} RSS XML string
+ */
 export function generateRssXml(json) {
   const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
   const base = _getBase().split('?')[0]
@@ -512,6 +556,11 @@ export function generateRssXml(json) {
   return s
 }
 
+/**
+ * Render sitemap JSON to an Atom feed.
+ * @param {{generatedAt:string,entries:Array}|Array} json - sitemap JSON or entries array
+ * @returns {string} Atom XML string
+ */
 export function generateAtomXml(json) {
   const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
   const base = _getBase().split('?')[0]
@@ -557,6 +606,24 @@ function _writeXmlToDocument(xml, mimeType = 'application/xml') {
   }
 }
 
+// Generate a minimal HTML representation of the sitemap JSON.
+function _generateHtmlFromJson(finalJson) {
+  try {
+    const entries = (finalJson && Array.isArray(finalJson.entries)) ? finalJson.entries : (Array.isArray(finalJson) ? finalJson : [])
+    let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
+    html += '<h1>Sitemap</h1><ul>'
+    for (const e of entries) {
+      try {
+        html += `<li><a href="${_escapeXml(String(e && e.loc ? e.loc : ''))}">${_escapeXml(String((e && (e.title || e.slug)) || e && e.loc || ''))}</a></li>`
+      } catch (_) {}
+    }
+    html += '</ul></body></html>'
+    return html
+  } catch (_) {
+    return '<!doctype html><html><body><pre>failed to render sitemap</pre></body></html>'
+  }
+}
+
 // Schedule a sitemap write so multiple concurrent calls don't race and
 // overwrite a larger sitemap with a smaller one. The scheduler keeps the
 // largest pending `finalJson` and performs a single write shortly after
@@ -570,11 +637,7 @@ function _scheduleSitemapWrite(finalJson, mimeType = 'application/xml') {
         if (mimeType === 'application/rss+xml') out = generateRssXml(finalJson)
         else if (mimeType === 'application/atom+xml') out = generateAtomXml(finalJson)
         else if (mimeType === 'text/html') {
-          let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
-          html += '<h1>Sitemap</h1><ul>'
-          for (const e of (finalJson && finalJson.entries) || []) html += `<li><a href="${_escapeXml(String(e.loc || ''))}">${_escapeXml(String(e.title || e.slug || e.loc || ''))}</a></li>`
-          html += '</ul></body></html>'
-          out = html
+          out = _generateHtmlFromJson(finalJson)
         } else out = generateSitemapXml(finalJson)
         _writeXmlToDocument(out, mimeType)
         try { if (typeof window !== 'undefined') { window.__nimbiSitemapRenderedAt = Date.now(); window.__nimbiSitemapJson = finalJson; window.__nimbiSitemapFinal = finalJson.entries || [] } } catch {}
@@ -597,11 +660,7 @@ function _scheduleSitemapWrite(finalJson, mimeType = 'application/xml') {
           if (p.mimeType === 'application/rss+xml') out = generateRssXml(p.finalJson)
           else if (p.mimeType === 'application/atom+xml') out = generateAtomXml(p.finalJson)
           else if (p.mimeType === 'text/html') {
-            let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
-            html += '<h1>Sitemap</h1><ul>'
-            for (const e of (p.finalJson && p.finalJson.entries) || []) html += `<li><a href="${_escapeXml(String(e.loc || ''))}">${_escapeXml(String(e.title || e.slug || e.loc || ''))}</a></li>`
-            html += '</ul></body></html>'
-            out = html
+            out = _generateHtmlFromJson(p.finalJson)
           } else out = generateSitemapXml(p.finalJson)
 
           try { _writeXmlToDocument(out, p.mimeType) } catch (e) {}
@@ -619,6 +678,12 @@ function _scheduleSitemapWrite(finalJson, mimeType = 'application/xml') {
  * Handle runtime requests for /sitemap, ?sitemap, ?rss, ?atom, etc.
  * opts should be the same options that `init()` used (we expect init to
  * pass `indexDepth` and `noIndexing` so rebuild uses the same params).
+ */
+/**
+ * Handle runtime requests for sitemap/rss/atom/html. When run in a
+ * browser context this may write the generated XML/HTML to the document.
+ * @param {Object} [opts] - options forwarded from init (contentBase, indexDepth, noIndexing, index, etc.)
+ * @returns {Promise<boolean>} true when the request was handled (output written)
  */
 export async function handleSitemapRequest(opts = {}) {
   try {
@@ -711,8 +776,8 @@ export async function handleSitemapRequest(opts = {}) {
               }
             } catch (_e) {}
           }
-          try { console.log('[runtimeSitemap] providedIndex.dedupedByBase:', JSON.stringify(Array.from(map.values()), null, 2)) } catch (e) { console.log('[runtimeSitemap] providedIndex.dedupedByBase (count):', map.size) }
-        } catch (e) { console.warn('[runtimeSitemap] logging provided index failed', e) }
+          try { _debugLog('[runtimeSitemap] providedIndex.dedupedByBase:', JSON.stringify(Array.from(map.values()), null, 2)) } catch (e) { _debugLog('[runtimeSitemap] providedIndex.dedupedByBase (count):', map.size) }
+        } catch (e) { _debugWarn('[runtimeSitemap] logging provided index failed', e) }
       }
     } catch (e) {}
 
@@ -741,7 +806,7 @@ export async function handleSitemapRequest(opts = {}) {
           idx = await buildSearchIndex(opts && opts.contentBase ? opts.contentBase : undefined, indexDepth, noIndexing, seeds.length ? seeds : undefined)
         }
       } catch (e) {
-        console.warn('[runtimeSitemap] rebuild index failed', e)
+        _debugWarn('[runtimeSitemap] rebuild index failed', e)
         idx = Array.isArray(searchIndex) && searchIndex.length ? searchIndex : []
       }
     }
@@ -750,8 +815,8 @@ export async function handleSitemapRequest(opts = {}) {
     // which pages/anchors are available at runtime.
     try {
       const len = Array.isArray(idx) ? idx.length : 0
-      try { console.log('[runtimeSitemap] usedIndex.full.length (before rebuild):', len) } catch (e) {}
-      try { console.log('[runtimeSitemap] usedIndex.full (before rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+      try { _debugLog('[runtimeSitemap] usedIndex.full.length (before rebuild):', len) } catch (e) {}
+      try { _debugLog('[runtimeSitemap] usedIndex.full (before rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
     } catch (e) {}
 
     // Rebuild the search index on-demand to ensure we include all pages
@@ -786,14 +851,14 @@ export async function handleSitemapRequest(opts = {}) {
         idx = Array.from(bySlug.values())
       }
     } catch (e) {
-      try { console.warn('[runtimeSitemap] rebuild index call failed', e) } catch (_) {}
+      try { _debugWarn('[runtimeSitemap] rebuild index call failed', e) } catch (_) {}
     }
 
     // Debug: log the full index after optional rebuild
     try {
       const len2 = Array.isArray(idx) ? idx.length : 0
-      try { console.log('[runtimeSitemap] usedIndex.full.length (after rebuild):', len2) } catch (e) {}
-      try { console.log('[runtimeSitemap] usedIndex.full (after rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+        try { _debugLog('[runtimeSitemap] usedIndex.full.length (after rebuild):', len2) } catch (e) {}
+      try { _debugLog('[runtimeSitemap] usedIndex.full (after rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
     } catch (e) {}
 
     // Generate JSON using the gathered index
@@ -821,7 +886,7 @@ export async function handleSitemapRequest(opts = {}) {
           }
         } catch {}
       }
-      try { console.log('[runtimeSitemap] finalEntries.dedupedByBase:', JSON.stringify(deduped, null, 2)) } catch (e) { console.log('[runtimeSitemap] finalEntries.dedupedByBase (count):', deduped.length) }
+      try { _debugLog('[runtimeSitemap] finalEntries.dedupedByBase:', JSON.stringify(deduped, null, 2)) } catch (e) { _debugLog('[runtimeSitemap] finalEntries.dedupedByBase (count):', deduped.length) }
     } catch (e) {
       try { deduped = Array.isArray(json && json.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
     }
@@ -845,7 +910,7 @@ export async function handleSitemapRequest(opts = {}) {
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
-        try { console.log('[runtimeSitemap] skip RSS write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        try { _debugLog('[runtimeSitemap] skip RSS write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
         return true
       }
       _scheduleSitemapWrite(finalJson, 'application/rss+xml')
@@ -856,7 +921,7 @@ export async function handleSitemapRequest(opts = {}) {
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
-        try { console.log('[runtimeSitemap] skip Atom write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        try { _debugLog('[runtimeSitemap] skip Atom write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
         return true
       }
       _scheduleSitemapWrite(finalJson, 'application/atom+xml')
@@ -867,7 +932,7 @@ export async function handleSitemapRequest(opts = {}) {
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
-        try { console.log('[runtimeSitemap] skip XML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        try { _debugLog('[runtimeSitemap] skip XML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
         return true
       }
       _scheduleSitemapWrite(finalJson, 'application/xml')
@@ -881,17 +946,17 @@ export async function handleSitemapRequest(opts = {}) {
         let existingRenderedLen = -1
         try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
         if (existingRenderedLen > newLen) {
-          try { console.log('[runtimeSitemap] skip HTML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+          try { _debugLog('[runtimeSitemap] skip HTML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
           return true
         }
         _scheduleSitemapWrite(finalJson, 'text/html')
         return true
-      } catch (e) { console.warn('[runtimeSitemap] render HTML failed', e); return false }
+      } catch (e) { _debugWarn('[runtimeSitemap] render HTML failed', e); return false }
     }
 
     return false
   } catch (e) {
-    console.warn('[runtimeSitemap] handleSitemapRequest failed', e)
+    _debugWarn('[runtimeSitemap] handleSitemapRequest failed', e)
     return false
   }
 }
@@ -900,6 +965,12 @@ export async function handleSitemapRequest(opts = {}) {
  * Build sitemap JSON and expose it on `window` for debugging/consumers.
  * This runs the same generator used by `handleSitemapRequest` but
  * deliberately does not attempt to write XML to the document.
+ */
+/**
+ * Generate sitemap JSON and expose `window.__nimbiSitemapJson` and
+ * `window.__nimbiSitemapFinal` for diagnostics. Does not write XML to the document.
+ * @param {Object} [opts]
+ * @returns {Promise<{json:Object,deduped:Array}|null>} generated JSON and deduped entries
  */
 export async function exposeSitemapGlobals(opts = {}) {
   try {

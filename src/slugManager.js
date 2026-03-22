@@ -25,6 +25,11 @@ export const slugToMd = new Map()
  * @typedef {{raw:string,isHtml?:boolean,status?:number}} FetchResult
  */
 
+/**
+ * Configured available language codes for the site (e.g. ['en','fr']).
+ * When non-empty, slug mappings may store language-specific paths.
+ * @type {string[]}
+ */
 export let availableLanguages = []
 
 /**
@@ -61,13 +66,21 @@ export function getLanguages() { return availableLanguages }
 import * as l10n from './l10nManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 
-let _slugWorker = null
 import slugWorkerCode from './worker/slugWorker.js?raw'
 
 import { makeWorkerPool, createWorkerFromRaw } from './worker-manager.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 const _slugWorkerManager = makeWorkerPool(() => createWorkerFromRaw(slugWorkerCode), 'slugManager', poolSize)
+
+// Debug logging helper — logs only when `window.__nimbiCMSDebug` is truthy.
+function _debugLog(...args) {
+  try {
+    if (typeof window !== 'undefined' && window.__nimbiCMSDebug) {
+      console.log(...args)
+    }
+  } catch (_) {}
+}
 
 /**
  * Lazily return a worker instance used for slug-related background tasks.
@@ -133,6 +146,13 @@ export function _storeSlugMapping(slug, rel) {
   }
 }
 
+/**
+ * Set of custom slug resolver functions.
+ * Each resolver is a function `(slug, contentBase)` that may return a
+ * markdown path string or a Promise resolving to a string, or `null` if
+ * the slug cannot be resolved.
+ * @type {Set<Function>}
+ */
 export const slugResolvers = new Set()
 /**
  * Register a custom resolver function. The function should accept a slug
@@ -156,10 +176,25 @@ export const mdToSlug = new Map()
 
 let _allMd = {}
 
+/**
+ * Array of discovered markdown/html paths (relative to content base).
+ * Populated by `_setAllMd` or via `setContentBase` when an index is applied.
+ * @type {string[]}
+ */
 export let allMarkdownPaths = []
 
+/**
+ * Path to the not-found (404) page relative to the content base.
+ * Used as a fallback when requested markdown pages are missing.
+ * @type {string}
+ */
 export let notFoundPage = '_404.md'
 
+/**
+ * Path to the home page relative to the content base.
+ * Used as a fallback during slug resolution when appropriate.
+ * @type {string}
+ */
 export let homePage = '_home.md'
 
 /**
@@ -216,7 +251,7 @@ export function _setSearchIndex(arr) {
           }
         } catch (_) {}
       } catch (e) {
-        console.warn('[slugManager] replacing searchIndex by assignment fallback', e)
+        _debugLog('[slugManager] replacing searchIndex by assignment fallback', e)
         try { searchIndex = Array.from(arr) } catch (_) { /* swallow */ }
       }
   } catch (e) {}
@@ -275,11 +310,11 @@ export function setContentBase(contentBase) {
         }
       } catch (err) {
         prefix = String(contentBase || '')
-        console.warn('[slugManager] parse contentBase failed', err)
+        _debugLog('[slugManager] parse contentBase failed', err)
       }
       prefix = ensureTrailingSlash(prefix)
     }
-  } catch (err) { prefix = ''; console.warn('[slugManager] setContentBase prefix derivation failed', err) }
+  } catch (err) { prefix = ''; _debugLog('[slugManager] setContentBase prefix derivation failed', err) }
 
   if (!prefix) prefix = _deriveCommonPrefix(keys)
 
@@ -291,7 +326,7 @@ export function setContentBase(contentBase) {
       rel = normalizePath(fullPath)
     }
     allMarkdownPaths.push(rel)
-    try { refreshIndexPaths() } catch (err) { console.warn('[slugManager] refreshIndexPaths failed', err) }
+    try { refreshIndexPaths() } catch (err) { _debugLog('[slugManager] refreshIndexPaths failed', err) }
 
     const val = _allMd[fullPath]
     if (typeof val === 'string') {
@@ -323,14 +358,14 @@ export function setContentBase(contentBase) {
               slugToMd.set(slugKey, rel)
             }
             mdToSlug.set(rel, slugKey)
-          } catch (_e) { console.warn('[slugManager] set slug mapping failed', _e) }
+          } catch (_e) { _debugLog('[slugManager] set slug mapping failed', _e) }
         }
       }
     }
   }
 }
 
-try { setContentBase() } catch (err) { console.warn('[slugManager] initial setContentBase failed', err) }
+try { setContentBase() } catch (err) { _debugLog('[slugManager] initial setContentBase failed', err) }
 
 /**
  * Generate a URL-friendly slug from a text string.
@@ -481,6 +516,11 @@ export function resolveSlugPath(slug) {
   return null
 }
 
+/**
+ * Cache of ongoing or completed `fetchMarkdown` promises keyed by resolved URL.
+ * Maps absolute URL string -> Promise<FetchResult>.
+ * @type {Map<string, Promise<FetchResult>>}
+ */
 export const fetchCache = new Map()
 /**
  * Clear internal fetch cache used by `fetchMarkdown`.
@@ -510,7 +550,7 @@ export let fetchMarkdown = async function(path, base) {
         path = mapped
       }
     }
-  } catch (err) { console.warn('[slugManager] slug mapping normalization failed', err) }
+  } catch (err) { _debugLog('[slugManager] slug mapping normalization failed', err) }
   const baseClean = base == null ? '' : trimTrailingSlash(String(base))
   let url = ''
   try {
@@ -558,7 +598,7 @@ export let fetchMarkdown = async function(path, base) {
             const raw404 = await r404.text()
             return { raw: raw404, status: 404 }
           }
-        } catch (_ee) { console.warn('[slugManager] fetching fallback 404 failed', _ee) }
+        } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
       }
       let body = ''
       try {
@@ -571,7 +611,7 @@ export let fetchMarkdown = async function(path, base) {
         }
       } catch (err) {
         body = ''
-        console.warn('[slugManager] reading error body failed', err)
+        _debugLog('[slugManager] reading error body failed', err)
       }
       console.error('fetchMarkdown failed:', { url, status: res ? res.status : undefined, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) })
       throw new Error('failed to fetch md')
@@ -591,7 +631,7 @@ export let fetchMarkdown = async function(path, base) {
           const raw404 = await r404.text()
           return { raw: raw404, status: 404 }
         }
-      } catch (_ee) { console.warn('[slugManager] fetching fallback 404 failed', _ee) }
+      } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
       console.error('fetchMarkdown: server returned HTML for .md request', url)
       throw new Error('failed to fetch md')
     }
@@ -614,6 +654,11 @@ export function setFetchMarkdown(fn) {
   }
 }
 
+/**
+ * Cache used by `crawlForSlug` to memoize results keyed by decoded slug.
+ * Values are the resolved path string or `null` when not found.
+ * @type {Map<string,string|null>}
+ */
 export const crawlCache = new Map()
 
 /**
@@ -676,6 +721,18 @@ try {
 } catch (_) {}
 
 let _indexPromise = null
+
+/**
+ * Build the runtime search index by scanning known markdown/html paths
+ * and crawling where necessary. The returned array is the authoritative
+ * `searchIndex` used by runtime sitemap and search consumers.
+ *
+ * @param {string} [contentBase] - Base URL where content is hosted.
+ * @param {number} [indexDepth=1] - Depth of indexing (1=page, 2=include H2s, 3=include H3s).
+ * @param {Array<string>|undefined} [noIndexing] - Paths to exclude from indexing.
+ * @param {Array<string>|undefined} [seedPaths] - Optional seed paths to prioritize.
+ * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>} - Resolves to the authoritative search index.
+ */
 export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing = undefined, seedPaths = undefined) {
   const earlyExcludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : []
   try {
@@ -733,7 +790,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       if (crawled && crawled.length) {
         paths = paths.concat(crawled)
       }
-    } catch (err) { console.warn('[slugManager] crawlAllMarkdown during buildSearchIndex failed', err) }
+    } catch (err) { _debugLog('[slugManager] crawlAllMarkdown during buildSearchIndex failed', err) }
 
     try {
       const visited = new Set(paths)
@@ -787,11 +844,11 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
                     queue.push(href)
                     paths.push(href)
                   }
-                } catch (err) { console.warn('[slugManager] href processing failed', href, err) }
+                } catch (err) { _debugLog('[slugManager] href processing failed', href, err) }
               }
             }
           } catch (e) {
-            console.warn('[slugManager] discovery fetch failed for', p, e)
+            _debugLog('[slugManager] discovery fetch failed for', p, e)
           }
         }
       }
@@ -800,7 +857,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       for (let i = 0; i < fetchConcurrency; i++) workers.push(worker())
       await Promise.all(workers)
     } catch (e) {
-      console.warn('[slugManager] discovery loop failed', e)
+      _debugLog('[slugManager] discovery loop failed', e)
     }
 
     const seen = new Set()
@@ -810,132 +867,157 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       seen.add(p)
       return true
     })
-
     const idx = []
+
+    // Concurrently fetch page bodies but preserve original path ordering
+    // when generating the index entries. We fetch pages in parallel up to
+    // `fetchConcurrency`, then process them sequentially so tests and
+    // consumers that rely on deterministic ordering remain stable.
+    const pathMdMap = new Map()
+    const pathsToFetch = paths.filter(p => /\.(?:md|html?)(?:$|[?#])/i.test(p))
+    const fetchConcurrency = Math.max(1, Math.min(poolSize, pathsToFetch.length || 1))
+    const fetchQueue = pathsToFetch.slice()
+    const fetchWorkers = []
+    for (let i = 0; i < fetchConcurrency; i++) {
+      fetchWorkers.push((async () => {
+        while (fetchQueue.length) {
+          const p = fetchQueue.shift()
+          if (!p) break
+          try {
+            const md = await fetchMarkdown(p, contentBase)
+            pathMdMap.set(p, md)
+          } catch (err) {
+            _debugLog('[slugManager] buildSearchIndex: entry fetch failed', p, err)
+            pathMdMap.set(p, null)
+          }
+        }
+      })())
+    }
+    await Promise.all(fetchWorkers)
+
     for (const path of paths) {
       if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue
       try {
-        const md = await fetchMarkdown(path, contentBase)
-        if (md && md.raw) {
-          if (md.status === 404) continue
-          let title = ''
-          let excerpt = ''
-          if (md.isHtml) {
-            try {
-              const parser = new DOMParser()
-              const doc = parser.parseFromString(md.raw, 'text/html')
-              const titleEl = doc.querySelector('title') || doc.querySelector('h1')
-              if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
-              const p = doc.querySelector('p')
-              if (p && p.textContent) excerpt = p.textContent.trim()
-                if (indexDepth >= 2) {
-                try {
-                  const topH1 = doc.querySelector('h1')
-                  const parentTitle = topH1 && topH1.textContent ? topH1.textContent.trim() : (title || '')
-                  const pageSlug = (() => {
-                    try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { /* ignore */ }
-                    return slugify(title || path)
-                  })()
-                  const h2s = Array.from(doc.querySelectorAll('h2'))
-                  for (const h2 of h2s) {
-                    try {
-                      const h2Text = (h2.textContent || '').trim()
-                      if (!h2Text) continue
-                      const anchor = h2.id ? h2.id : slugify(h2Text)
-                      const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
-                      let h2Excerpt = ''
-                      let sib = h2.nextElementSibling
-                      while (sib && sib.tagName && sib.tagName.toLowerCase() === 'script') sib = sib.nextElementSibling
-                      if (sib && sib.textContent) h2Excerpt = String(sib.textContent).trim()
-                      idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
-                    } catch (err) { console.warn('[slugManager] indexing H2 failed', err) }
-                  }
-                  if (indexDepth === 3) {
-                    try {
-                      const h3s = Array.from(doc.querySelectorAll('h3'))
-                      for (const h3 of h3s) {
-                        try {
-                          const h3Text = (h3.textContent || '').trim()
-                          if (!h3Text) continue
-                          const anchor3 = h3.id ? h3.id : slugify(h3Text)
-                          const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
-                          let h3Excerpt = ''
-                          let sib3 = h3.nextElementSibling
-                          while (sib3 && sib3.tagName && sib3.tagName.toLowerCase() === 'script') sib3 = sib3.nextElementSibling
-                          if (sib3 && sib3.textContent) h3Excerpt = String(sib3.textContent).trim()
-                          idx.push({ slug: h3Slug, title: h3Text, excerpt: h3Excerpt, path, parentTitle })
-                        } catch (err) { console.warn('[slugManager] indexing H3 failed', err) }
-                      }
-                    } catch (err) { console.warn('[slugManager] collect H3s failed', err) }
-                  }
-                } catch (err) { console.warn('[slugManager] collect H2s failed', err) }
-              }
-            } catch (err) { console.warn('[slugManager] parsing HTML for index failed', err) }
-          } else {
-            const raw = md.raw
-            const h1m = raw.match(/^#\s+(.+)$/m)
-            title = h1m ? h1m[1].trim() : ''
-            try { title = unescapeMarkdown(title) } catch (_) {}
-            const parts = raw.split(/\r?\n\s*\r?\n/)
-            if (parts.length > 1) {
-              for (let i = 1; i < parts.length; i++) {
-                const p = parts[i].trim()
-                if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
-              }
-            }
-            if (indexDepth >= 2) {
-              let parentTitle = ''
-              let pageSlug = ''
+        const md = pathMdMap.get(path)
+        if (!md || !md.raw) continue
+        if (md.status === 404) continue
+        let title = ''
+        let excerpt = ''
+        if (md.isHtml) {
+          try {
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(md.raw, 'text/html')
+            const titleEl = doc.querySelector('title') || doc.querySelector('h1')
+            if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
+            const p = doc.querySelector('p')
+            if (p && p.textContent) excerpt = p.textContent.trim()
+              if (indexDepth >= 2) {
               try {
-                const h1 = (raw.match(/^#\s+(.+)$/m) || [])[1]
-                parentTitle = h1 ? h1.trim() : ''
-                pageSlug = (function() { try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { } return slugify(title || path) })()
-                const h2re = /^##\s+(.+)$/gm
-                let m2
-                while ((m2 = h2re.exec(raw))) {
+                const topH1 = doc.querySelector('h1')
+                const parentTitle = topH1 && topH1.textContent ? topH1.textContent.trim() : (title || '')
+                const pageSlug = (() => {
+                  try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { /* ignore */ }
+                  return slugify(title || path)
+                })()
+                const h2s = Array.from(doc.querySelectorAll('h2'))
+                for (const h2 of h2s) {
                   try {
-                    const h2Text = (m2[1] || '').trim()
-                      const unescH2 = unescapeMarkdown(h2Text)
+                    const h2Text = (h2.textContent || '').trim()
                     if (!h2Text) continue
-                    const anchor = slugify(h2Text)
+                    const anchor = h2.id ? h2.id : slugify(h2Text)
                     const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
-                    const after = raw.slice(h2re.lastIndex)
-                    const paraMatch = after.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
-                    const h2Excerpt = paraMatch && paraMatch[1] ? String(paraMatch[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
-                      idx.push({ slug: h2Slug, title: unescH2, excerpt: h2Excerpt, path, parentTitle })
-                  } catch (err) { console.warn('[slugManager] indexing markdown H2 failed', err) }
+                    let h2Excerpt = ''
+                    let sib = h2.nextElementSibling
+                    while (sib && sib.tagName && sib.tagName.toLowerCase() === 'script') sib = sib.nextElementSibling
+                    if (sib && sib.textContent) h2Excerpt = String(sib.textContent).trim()
+                    idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
+                  } catch (err) { _debugLog('[slugManager] indexing H2 failed', err) }
                 }
-              } catch (err) { console.warn('[slugManager] collect markdown H2s failed', err) }
-              if (indexDepth === 3) {
-                try {
-                  const h3re = /^###\s+(.+)$/gm
-                  let m3
-                  while ((m3 = h3re.exec(raw))) {
-                    try {
-                      const h3Text = (m3[1] || '').trim()
-                        const unescH3 = unescapeMarkdown(h3Text)
-                      if (!h3Text) continue
-                      const anchor3 = slugify(h3Text)
-                      const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
-                      const after3 = raw.slice(h3re.lastIndex)
-                      const paraMatch3 = after3.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
-                      const h3Excerpt = paraMatch3 && paraMatch3[1] ? String(paraMatch3[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
-                        idx.push({ slug: h3Slug, title: unescH3, excerpt: h3Excerpt, path, parentTitle })
-                    } catch (err) { console.warn('[slugManager] indexing markdown H3 failed', err) }
-                  }
-                } catch (err) { console.warn('[slugManager] collect markdown H3s failed', err) }
-              }
+                if (indexDepth === 3) {
+                  try {
+                    const h3s = Array.from(doc.querySelectorAll('h3'))
+                    for (const h3 of h3s) {
+                      try {
+                        const h3Text = (h3.textContent || '').trim()
+                        if (!h3Text) continue
+                        const anchor3 = h3.id ? h3.id : slugify(h3Text)
+                        const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
+                        let h3Excerpt = ''
+                        let sib3 = h3.nextElementSibling
+                        while (sib3 && sib3.tagName && sib3.tagName.toLowerCase() === 'script') sib3 = sib3.nextElementSibling
+                        if (sib3 && sib3.textContent) h3Excerpt = String(sib3.textContent).trim()
+                        idx.push({ slug: h3Slug, title: h3Text, excerpt: h3Excerpt, path, parentTitle })
+                      } catch (err) { _debugLog('[slugManager] indexing H3 failed', err) }
+                    }
+                  } catch (err) { _debugLog('[slugManager] collect H3s failed', err) }
+                }
+              } catch (err) { _debugLog('[slugManager] collect H2s failed', err) }
+            }
+          } catch (err) { _debugLog('[slugManager] parsing HTML for index failed', err) }
+        } else {
+          const raw = md.raw
+          const h1m = raw.match(/^#\s+(.+)$/m)
+          title = h1m ? h1m[1].trim() : ''
+          try { title = unescapeMarkdown(title) } catch (_) {}
+          const parts = raw.split(/\r?\n\s*\r?\n/)
+          if (parts.length > 1) {
+            for (let i = 1; i < parts.length; i++) {
+              const p = parts[i].trim()
+              if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
             }
           }
-          let slug = ''
-          try {
-            if (mdToSlug.has(path)) slug = mdToSlug.get(path)
-          } catch (err) { console.warn('[slugManager] mdToSlug access failed', err) }
-          if (!slug) slug = slugify(title || path)
-          idx.push({ slug, title, excerpt, path })
+          if (indexDepth >= 2) {
+            let parentTitle = ''
+            let pageSlug = ''
+            try {
+              const h1 = (raw.match(/^#\s+(.+)$/m) || [])[1]
+              parentTitle = h1 ? h1.trim() : ''
+              pageSlug = (function() { try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { } return slugify(title || path) })()
+              const h2re = /^##\s+(.+)$/gm
+              let m2
+              while ((m2 = h2re.exec(raw))) {
+                try {
+                  const h2Text = (m2[1] || '').trim()
+                    const unescH2 = unescapeMarkdown(h2Text)
+                  if (!h2Text) continue
+                  const anchor = slugify(h2Text)
+                  const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
+                  const after = raw.slice(h2re.lastIndex)
+                  const paraMatch = after.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
+                  const h2Excerpt = paraMatch && paraMatch[1] ? String(paraMatch[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
+                    idx.push({ slug: h2Slug, title: unescH2, excerpt: h2Excerpt, path, parentTitle })
+                } catch (err) { _debugLog('[slugManager] indexing markdown H2 failed', err) }
+              }
+            } catch (err) { _debugLog('[slugManager] collect markdown H2s failed', err) }
+            if (indexDepth === 3) {
+              try {
+                const h3re = /^###\s+(.+)$/gm
+                let m3
+                while ((m3 = h3re.exec(raw))) {
+                  try {
+                    const h3Text = (m3[1] || '').trim()
+                      const unescH3 = unescapeMarkdown(h3Text)
+                    if (!h3Text) continue
+                    const anchor3 = slugify(h3Text)
+                    const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
+                    const after3 = raw.slice(h3re.lastIndex)
+                    const paraMatch3 = after3.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
+                    const h3Excerpt = paraMatch3 && paraMatch3[1] ? String(paraMatch3[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
+                      idx.push({ slug: h3Slug, title: unescH3, excerpt: h3Excerpt, path, parentTitle })
+                  } catch (err) { _debugLog('[slugManager] indexing markdown H3 failed', err) }
+                }
+              } catch (err) { _debugLog('[slugManager] collect markdown H3s failed', err) }
+            }
+          }
         }
+        let slug = ''
+        try {
+          if (mdToSlug.has(path)) slug = mdToSlug.get(path)
+        } catch (err) { _debugLog('[slugManager] mdToSlug access failed', err) }
+        if (!slug) slug = slugify(title || path)
+        idx.push({ slug, title, excerpt, path })
       } catch (err) {
-        console.warn('[slugManager] buildSearchIndex: entry fetch failed', err)
+        _debugLog('[slugManager] buildSearchIndex: entry processing failed', err)
       }
     }
     try {
@@ -977,7 +1059,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         }
       } catch (e) {}
     } catch (err) {
-      console.warn('[slugManager] filtering index by excludes failed', err)
+      _debugLog('[slugManager] filtering index by excludes failed', err)
       try {
         if (!Array.isArray(searchIndex)) searchIndex = []
         searchIndex.length = 0
@@ -993,7 +1075,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
     }
     return searchIndex
   })()
-  try { await _indexPromise } catch (err) { console.warn('[slugManager] awaiting _indexPromise failed', err) }
+  try { await _indexPromise } catch (err) { _debugLog('[slugManager] awaiting _indexPromise failed', err) }
   _indexPromise = null
   return searchIndex
 }
@@ -1087,7 +1169,18 @@ export async function whenSearchIndexReady(opts = {}) {
     }
   }
 
+/**
+ * Default maximum number of entries the crawler queue will accept. This is
+ * used as a safety cap to avoid unbounded crawling on poorly-behaved sites.
+ * @type {number}
+ */
 export const CRAWL_MAX_QUEUE = 1000
+
+/**
+ * Mutable default used by crawler functions; may be changed via
+ * `setDefaultCrawlMaxQueue` to tune crawling behavior at runtime.
+ * @type {number}
+ */
 export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
 
 /**
@@ -1136,88 +1229,91 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
     }
   } catch (err) { baseForResolve = origin + '/' }
 
+  const concurrency = Math.max(1, Math.min(poolSize, 6))
+  // Process directories in batches to avoid workers exiting before newly
+  // discovered directories are enqueued. This preserves discovery completeness
+  // while bounding concurrency.
   while (queue.length && !found) {
-    if (queue.length > maxQueue) {
-      break
-    }
-    const relDir = queue.shift()
-    if (seenDirs.has(relDir)) continue
-    seenDirs.add(relDir)
-    // Resolve directory URL via URL resolution to preserve slashes.
-    let url = ''
-    try {
-      url = new URL(relDir || '', baseForResolve).toString()
-    } catch (err) {
-      url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
-    }
-    try {
-      let res
+    if (queue.length > maxQueue) break
+    const batch = queue.splice(0, concurrency)
+    await Promise.all(batch.map(async (relDir) => {
+      if (relDir == null) return
+      if (seenDirs.has(relDir)) return
+      seenDirs.add(relDir)
+      let url = ''
       try {
-        res = await globalThis.fetch(url)
-      } catch (errFetch) {
-        console.warn('[slugManager] crawlAllMarkdown: fetch failed', { url, error: errFetch })
-        continue
+        url = new URL(relDir || '', baseForResolve).toString()
+      } catch (err) {
+        url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
       }
-      if (!res || !res.ok) {
-        if (res && !res.ok) console.warn('[slugManager] crawlAllMarkdown: directory fetch non-ok', { url, status: res.status })
-        continue
-      }
-      const text = await res.text()
-      const doc = _crawlParser.parseFromString(text, 'text/html')
-      const links = doc.querySelectorAll(_crawlLinkSelector)
-        // Use the current directory URL as the base for resolving links found
-        // inside this directory listing so relative links resolve correctly.
-        const linkBase = url
-          for (const a of links) {
+      try {
+        let res
         try {
-          let href = a.getAttribute('href') || ''
-          if (!href) continue
-          if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
-          if (href.endsWith('/')) {
-            try {
-              const resolved = new URL(href, linkBase)
-              const basePath = new URL(baseForResolve).pathname
-              const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
-              const subNorm = ensureTrailingSlash(normalizePath(sub))
-              if (!seenDirs.has(subNorm)) queue.push(subNorm)
-            } catch (err) {
-              const sub = normalizePath(relDir + href)
-              if (!seenDirs.has(sub)) queue.push(sub)
-            }
-            continue
-          }
-          if (href.toLowerCase().endsWith('.md')) {
-            let path = ''
-            try {
-              const resolved = new URL(href, linkBase)
-              const basePath = new URL(baseForResolve).pathname
-              path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
-            } catch (err) {
-              path = (relDir + href).replace(/^\//, '')
-            }
-            path = normalizePath(path)
-            try {
-              if (mdToSlug.has(path)) {
-                continue
+          res = await globalThis.fetch(url)
+        } catch (errFetch) {
+          _debugLog('[slugManager] crawlForSlug: fetch failed', { url, error: errFetch })
+          return
+        }
+        if (!res || !res.ok) {
+          if (res && !res.ok) _debugLog('[slugManager] crawlForSlug: directory fetch non-ok', { url, status: res.status })
+          return
+        }
+        const text = await res.text()
+        const doc = _crawlParser.parseFromString(text, 'text/html')
+        const links = doc.querySelectorAll(_crawlLinkSelector)
+        const linkBase = url
+        for (const a of links) {
+          try {
+            if (found) break
+            let href = a.getAttribute('href') || ''
+            if (!href) continue
+            if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
+            if (href.endsWith('/')) {
+              try {
+                const resolved = new URL(href, linkBase)
+                const basePath = new URL(baseForResolve).pathname
+                const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
+                const subNorm = ensureTrailingSlash(normalizePath(sub))
+                if (!seenDirs.has(subNorm)) queue.push(subNorm)
+              } catch (err) {
+                const sub = normalizePath(relDir + href)
+                if (!seenDirs.has(sub)) queue.push(sub)
               }
-              for (const v of slugToMd.values()) {
-                if (v === path) { continue }
+              continue
+            }
+            if (href.toLowerCase().endsWith('.md')) {
+              let path = ''
+              try {
+                const resolved = new URL(href, linkBase)
+                const basePath = new URL(baseForResolve).pathname
+                path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
+              } catch (err) {
+                path = (relDir + href).replace(/^\//, '')
               }
-            } catch (err) { console.warn('[slugManager] slug map access failed', err) }
-            try {
-              const md = await fetchMarkdown(path, contentBase)
-              if (md && md.raw) {
-                const m = (md.raw || '').match(/^#\s+(.+)$/m)
-                if (m && m[1] && slugify(m[1].trim()) === decoded) {
-                  found = path
-                  break
+              path = normalizePath(path)
+              try {
+                if (mdToSlug.has(path)) {
+                  continue
                 }
-              }
-            } catch (err) { console.warn('[slugManager] crawlForSlug: fetchMarkdown failed', err) }
-          }
-        } catch (err) { console.warn('[slugManager] crawlForSlug: link iteration failed', err) }
-      }
-    } catch (err) { console.warn('[slugManager] crawlForSlug: directory fetch failed', err) }
+                for (const v of slugToMd.values()) {
+                  if (v === path) { continue }
+                }
+              } catch (err) { _debugLog('[slugManager] slug map access failed', err) }
+              try {
+                const md = await fetchMarkdown(path, contentBase)
+                if (md && md.raw) {
+                  const m = (md.raw || '').match(/^#\s+(.+)$/m)
+                  if (m && m[1] && slugify(m[1].trim()) === decoded) {
+                    found = path
+                    break
+                  }
+                }
+              } catch (err) { _debugLog('[slugManager] crawlForSlug: fetchMarkdown failed', err) }
+            }
+          } catch (err) { _debugLog('[slugManager] crawlForSlug: link iteration failed', err) }
+        }
+      } catch (err) { _debugLog('[slugManager] crawlForSlug: directory fetch failed', err) }
+    }))
   }
   crawlCache.set(decoded, found)
   return found
@@ -1251,68 +1347,72 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
     }
   } catch (err) { baseForResolve = origin + '/' }
 
+  const concurrency = Math.max(1, Math.min(poolSize, 6))
+  // Process directories in batches so newly-discovered directories are
+  // handled in subsequent iterations rather than risking worker exit.
   while (queue.length) {
     if (queue.length > maxQueue) break
-    const relDir = queue.shift()
-    if (seenDirs.has(relDir)) continue
-    seenDirs.add(relDir)
-    // Resolve the current directory URL via URL resolution to avoid
-    // duplicated path segments and preserve slashes.
-    let url = ''
-    try {
-      url = new URL(relDir || '', baseForResolve).toString()
-    } catch (err) {
-      url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
-    }
-    try {
-      let res
+    const batch = queue.splice(0, concurrency)
+    await Promise.all(batch.map(async (relDir) => {
+      if (relDir == null) return
+      if (seenDirs.has(relDir)) return
+      seenDirs.add(relDir)
+      let url = ''
       try {
-        res = await globalThis.fetch(url)
-      } catch (errFetch) {
-        console.warn('[slugManager] crawlAllMarkdown: fetch failed', { url, error: errFetch })
-        continue
+        url = new URL(relDir || '', baseForResolve).toString()
+      } catch (err) {
+        url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
       }
-      if (!res || !res.ok) {
-        if (res && !res.ok) console.warn('[slugManager] crawlAllMarkdown: directory fetch non-ok', { url, status: res.status })
-        continue
-      }
-      const text = await res.text()
-      const doc = _crawlParser.parseFromString(text, 'text/html')
-      const links = doc.querySelectorAll(_crawlLinkSelector)
-      const linkBase = url
-      for (const a of links) {
+      try {
+        let res
         try {
-          let href = a.getAttribute('href') || ''
-          if (!href) continue
-          if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
-          if (href.endsWith('/')) {
+          res = await globalThis.fetch(url)
+        } catch (errFetch) {
+          _debugLog('[slugManager] crawlAllMarkdown: fetch failed', { url, error: errFetch })
+          return
+        }
+        if (!res || !res.ok) {
+          if (res && !res.ok) _debugLog('[slugManager] crawlAllMarkdown: directory fetch non-ok', { url, status: res.status })
+          return
+        }
+        const text = await res.text()
+        const doc = _crawlParser.parseFromString(text, 'text/html')
+        const links = doc.querySelectorAll(_crawlLinkSelector)
+        const linkBase = url
+        for (const a of links) {
+          try {
+            let href = a.getAttribute('href') || ''
+            if (!href) continue
+            if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
+            if (href.endsWith('/')) {
+              try {
+                const resolved = new URL(href, linkBase)
+                const basePath = new URL(baseForResolve).pathname
+                const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
+                const subNorm = ensureTrailingSlash(normalizePath(sub))
+                if (!seenDirs.has(subNorm)) queue.push(subNorm)
+              } catch (err) {
+                const sub = relDir + href
+                if (!seenDirs.has(sub)) queue.push(sub)
+              }
+              continue
+            }
+            let path = ''
             try {
               const resolved = new URL(href, linkBase)
               const basePath = new URL(baseForResolve).pathname
-              const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
-              const subNorm = ensureTrailingSlash(normalizePath(sub))
-              if (!seenDirs.has(subNorm)) queue.push(subNorm)
+              path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
             } catch (err) {
-              const sub = relDir + href
-              if (!seenDirs.has(sub)) queue.push(sub)
+              path = (relDir + href).replace(/^\//, '')
             }
-            continue
-          }
-          let path = ''
-          try {
-            const resolved = new URL(href, linkBase)
-            const basePath = new URL(baseForResolve).pathname
-            path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
-          } catch (err) {
-            path = (relDir + href).replace(/^\//, '')
-          }
-          path = normalizePath(path)
-          if (/\.(md|html?)$/i.test(path)) {
-            result.add(path)
-          }
-        } catch (err) { console.warn('[slugManager] crawlAllMarkdown: link iteration failed', err) }
-      }
-    } catch (err) { console.warn('[slugManager] crawlAllMarkdown: directory fetch failed', err) }
+            path = normalizePath(path)
+            if (/\.(md|html?)$/i.test(path)) {
+              result.add(path)
+            }
+          } catch (err) { _debugLog('[slugManager] crawlAllMarkdown: link iteration failed', err) }
+        }
+      } catch (err) { _debugLog('[slugManager] crawlAllMarkdown: directory fetch failed', err) }
+    }))
   }
 
   return Array.from(result)
@@ -1343,7 +1443,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         mdToSlug.set(res, decoded)
         return res
       }
-    } catch (err) { console.warn('[slugManager] slug resolver failed', err) }
+    } catch (err) { _debugLog('[slugManager] slug resolver failed', err) }
   }
 
   if (allMarkdownPaths && allMarkdownPaths.length) {
@@ -1368,7 +1468,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
             }
           }
         }
-      } catch (err) { console.warn('[slugManager] manifest title fetch failed', err) }
+      } catch (err) { _debugLog('[slugManager] manifest title fetch failed', err) }
     }
   }
 
@@ -1382,7 +1482,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         return match.path
       }
     }
-  } catch (err) { console.warn('[slugManager] buildSearchIndex lookup failed', err) }
+  } catch (err) { _debugLog('[slugManager] buildSearchIndex lookup failed', err) }
 
   try {
     const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue)
@@ -1391,7 +1491,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       mdToSlug.set(foundCrawl, decoded)
       return foundCrawl
     }
-  } catch (err) { console.warn('[slugManager] crawlForSlug lookup failed', err) }
+  } catch (err) { _debugLog('[slugManager] crawlForSlug lookup failed', err) }
 
   const candidates = [`${decoded}.html`, `${decoded}.md`]
   for (const cand of candidates) {
@@ -1402,7 +1502,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         mdToSlug.set(cand, decoded)
         return cand
       }
-    } catch (err) { console.warn('[slugManager] candidate fetch failed', err) }
+    } catch (err) { _debugLog('[slugManager] candidate fetch failed', err) }
   }
 
   if (allMarkdownPaths && allMarkdownPaths.length) {
@@ -1414,7 +1514,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
           mdToSlug.set(p, decoded)
           return p
         }
-      } catch (err) { console.warn('[slugManager] build-time filename match failed', err) }
+      } catch (err) { _debugLog('[slugManager] build-time filename match failed', err) }
     }
   }
 
@@ -1440,7 +1540,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       }
     }
   } catch (e) {
-    console.warn('[slugManager] home page fetch failed', e)
+    _debugLog('[slugManager] home page fetch failed', e)
   }
   return null
 }
