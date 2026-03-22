@@ -80,7 +80,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
  * @param {string} [initialDocumentTitle] - Fallback site/document title.
  * @returns {void}
  */
-export function setMetaTags(data, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
+export function setMetaTags(data, titleOverride, imageOverride, descOverride, _initialDocumentTitle = '') {
   const meta = data.meta || {}
   const existingHtmlDesc = (document && document.querySelector) ? (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '' : ''
   const finalDesc = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description && String(meta.description).trim()) ? meta.description : (existingHtmlDesc && String(existingHtmlDesc).trim()) ? existingHtmlDesc : ''

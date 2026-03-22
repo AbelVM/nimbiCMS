@@ -6,12 +6,12 @@
  *
  * @module router
  */
-import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath, notFoundPage, homePage } from './slugManager.js'
+import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath, notFoundPage } from './slugManager.js'
 import * as l10n from './l10nManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
-import { isDebug, isDebugLevel, incrementCounter, debugError, debugWarn, debugInfo, debugLog, syncLegacyCounter } from './utils/debug.js'
+import { isDebugLevel, incrementCounter, debugError, debugWarn, debugLog, syncLegacyCounter } from './utils/debug.js'
 import { refreshIndexPaths, indexSet } from './indexManager.js'
 export let RESOLUTION_CACHE_MAX = 100
 
@@ -420,9 +420,9 @@ export async function fetchPageData(raw, contentBase) {
                   try {
                     const nf = await fetchMarkdown(notFoundPage, contentBase)
                     if (nf && nf.raw) {
-                      try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
-                      return { data: nf, pagePath: notFoundPage, anchor }
-                    }
+                          try { markNotFound(nf.meta || {}, notFoundPage) } catch (_e) {}
+                          return { data: nf, pagePath: notFoundPage, anchor }
+                        }
                   } catch (_e) { /* ignore notFoundPage probe */ }
                 }
 
@@ -459,9 +459,9 @@ export async function fetchPageData(raw, contentBase) {
                   try {
                     const nf = await fetchMarkdown(notFoundPage, contentBase)
                     if (nf && nf.raw) {
-                      try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
-                      return { data: nf, pagePath: notFoundPage, anchor }
-                    }
+                          try { markNotFound(nf.meta || {}, notFoundPage) } catch (_e) {}
+                          return { data: nf, pagePath: notFoundPage, anchor }
+                        }
                   } catch (_e) { /* ignore notFoundPage probe */ }
                 }
 
@@ -742,7 +742,7 @@ export async function fetchPageData(raw, contentBase) {
                       try {
                         const nf = await fetchMarkdown(notFoundPage, contentBase)
                         if (nf && nf.raw) {
-                          try { markNotFound(nf.meta || {}, notFoundPage) } catch (e) {}
+                          try { markNotFound(nf.meta || {}, notFoundPage) } catch (_e) {}
                           return { data: nf, pagePath: notFoundPage, anchor }
                         }
                       } catch (_e) { /* ignore notFoundPage probe errors */ }

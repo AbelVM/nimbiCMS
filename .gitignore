@@ -44,3 +44,4 @@ tmp/
 temp/
 a11y-report.json
 vitest-coverage.txt
+tools/audit/*.json

@@ -11,8 +11,8 @@ import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
 import { buildCosmeticUrl, parseHrefToRoute } from './utils/urlHelper.js'
-import { setTag, setStructuredData, setMetaTags, markNotFound } from './seoManager.js'
-import { debugLog, debugWarn, debugError, debugInfo, isDebugLevel, incrementCounter } from './utils/debug.js'
+import { markNotFound } from './seoManager.js'
+import { debugWarn, debugInfo, isDebugLevel } from './utils/debug.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
 /**

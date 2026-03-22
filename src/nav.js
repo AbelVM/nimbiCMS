@@ -11,7 +11,7 @@ import { t } from './l10nManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths, searchIndex } from './slugManager.js'
-import { debugLog, debugWarn, isDebugLevel, incrementCounter } from './utils/debug.js'
+import { debugLog, debugWarn } from './utils/debug.js'
 
 function safeGet(mod, name) {
   try {

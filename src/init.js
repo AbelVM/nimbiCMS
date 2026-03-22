@@ -16,7 +16,7 @@ import { injectSeoForPage, setSeoMap } from './seoManager.js'
 import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
 import { ensureBulma, setStyle, registerThemedElement } from './bulmaManager.js'
-import { setDebugLevel, debugWarn, debugInfo, debugLog, incrementCounter, hasLegacyDebug } from './utils/debug.js'
+import { setDebugLevel, debugWarn, debugInfo } from './utils/debug.js'
 
 /**
  * Parse well-known `initCMS` options from the current page URL's query

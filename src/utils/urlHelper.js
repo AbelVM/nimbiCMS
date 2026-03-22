@@ -8,7 +8,7 @@
  *
  * @module utils/urlHelper
  */
-import { buildPageUrl as buildCanonicalPageUrl } from './helpers.js'
+ 
 
 /**
  * Route descriptor returned by {@link parseHrefToRoute}.
@@ -167,8 +167,4 @@ export function toCanonicalHref(href) {
   return String(href || '')
 }
 
-/**
- * Re-export the canonical page URL builder from `./helpers.js` so callers
- * of this module can import it via `utils/urlHelper`.
- */
-export { buildCanonicalPageUrl }
+ 

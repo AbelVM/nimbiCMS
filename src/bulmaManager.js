@@ -11,7 +11,7 @@
 /** @type {'light'|'dark'|'system'} */
 let currentStyle = 'light'
 
-import { debugLog, debugWarn, isDebug } from './utils/debug.js'
+import { debugLog, debugWarn } from './utils/debug.js'
 
 /**
  * @typedef {Record<string,string>} ThemeVars

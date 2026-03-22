@@ -7,7 +7,7 @@
  * @module codeblocksManager
  */
 import hljs from 'highlight.js/lib/core'
-import { debugWarn, debugError } from './utils/debug.js'
+import { debugWarn } from './utils/debug.js'
 
 /**
  * Expose the internal `hljs` (highlight.js core) instance for tests

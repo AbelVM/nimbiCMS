@@ -1790,115 +1790,7 @@ const is = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   setLang: Ni,
   t: Ft
 }, Symbol.toStringTag, { value: "Module" }));
-function Bi(e) {
-  return !e || typeof e != "string" ? !1 : /^(https?:)?\/\//.test(e) || e.startsWith("mailto:") || e.startsWith("tel:");
-}
-function le(e) {
-  return String(e || "").replace(/^[.\/]+/, "");
-}
-function Bt(e) {
-  return String(e || "").replace(/\/+$/, "");
-}
-function Ct(e) {
-  return Bt(e) + "/";
-}
 function as(e) {
-  try {
-    if (!e || typeof document > "u" || !document.head || e.startsWith("data:") || document.head.querySelector(`link[rel="preload"][as="image"][href="${e}"]`)) return;
-    const n = document.createElement("link");
-    n.rel = "preload", n.as = "image", n.href = e, document.head.appendChild(n);
-  } catch (t) {
-    _("[helpers] preloadImage failed", t);
-  }
-}
-function Sn(e, t = 0, n = !1) {
-  try {
-    if (typeof window > "u" || !e || !e.querySelectorAll) return;
-    const i = Array.from(e.querySelectorAll("img"));
-    if (!i.length) return;
-    const r = e, a = r && r.getBoundingClientRect ? r.getBoundingClientRect() : null, s = 0, l = typeof window < "u" && (window.innerHeight || document.documentElement.clientHeight) || 0, o = a ? Math.max(s, a.top) : s, c = (a ? Math.min(l, a.bottom) : l) + Number(t || 0);
-    let u = 0;
-    r && (u = r.clientHeight || (a ? a.height : 0)), u || (u = l - s);
-    let h = 0.6;
-    try {
-      const y = r && window.getComputedStyle ? window.getComputedStyle(r) : null, f = y && y.getPropertyValue("--nimbi-image-max-height-ratio"), w = f ? parseFloat(f) : NaN;
-      !Number.isNaN(w) && w > 0 && w <= 1 && (h = w);
-    } catch (y) {
-      _("[helpers] read CSS ratio failed", y);
-    }
-    const m = Math.max(200, Math.floor(u * h));
-    let d = !1, g = null;
-    if (i.forEach((y) => {
-      try {
-        const f = y.getAttribute ? y.getAttribute("loading") : void 0;
-        f !== "eager" && y.setAttribute && y.setAttribute("loading", "lazy");
-        const w = y.getBoundingClientRect ? y.getBoundingClientRect() : null, b = y.src || y.getAttribute && y.getAttribute("src"), k = w && w.height > 1 ? w.height : m, S = w ? w.top : 0, v = S + k;
-        w && k > 0 && S <= c && v >= o && (y.setAttribute ? (y.setAttribute("loading", "eager"), y.setAttribute("fetchpriority", "high"), y.setAttribute("data-eager-by-nimbi", "1")) : (y.loading = "eager", y.fetchPriority = "high"), as(b), d = !0), !g && w && w.top <= c && (g = { img: y, src: b, rect: w, beforeLoading: f });
-      } catch (f) {
-        _("[helpers] setEagerForAboveFoldImages per-image failed", f);
-      }
-    }), !d && g) {
-      const { img: y, src: f, rect: w, beforeLoading: b } = g;
-      try {
-        y.setAttribute ? (y.setAttribute("loading", "eager"), y.setAttribute("fetchpriority", "high"), y.setAttribute("data-eager-by-nimbi", "1")) : (y.loading = "eager", y.fetchPriority = "high");
-      } catch (k) {
-        _("[helpers] setEagerForAboveFoldImages fallback failed", k);
-      }
-    }
-  } catch (i) {
-    _("[helpers] setEagerForAboveFoldImages failed", i);
-  }
-}
-function Me(e, t = null, n) {
-  try {
-    const i = typeof n == "string" ? n : typeof window < "u" && window.location ? window.location.search : "", r = new URLSearchParams(i.startsWith("?") ? i.slice(1) : i), a = String(e || "");
-    r.delete("page");
-    const s = new URLSearchParams();
-    s.set("page", a);
-    for (const [p, c] of r.entries())
-      s.append(p, c);
-    const l = s.toString();
-    let o = l ? `?${l}` : "";
-    return t && (o += `#${encodeURIComponent(t)}`), o || `?page=${encodeURIComponent(a)}`;
-  } catch {
-    const r = `?page=${encodeURIComponent(String(e || ""))}`;
-    return t ? `${r}#${encodeURIComponent(t)}` : r;
-  }
-}
-function zn(e) {
-  try {
-    const t = e();
-    return t && typeof t.then == "function" ? t.catch((n) => {
-      _("[helpers] safe swallowed error", n);
-    }) : t;
-  } catch (t) {
-    _("[helpers] safe swallowed error", t);
-  }
-}
-try {
-  typeof globalThis < "u" && !globalThis.safe && (globalThis.safe = zn);
-} catch (e) {
-  _("[helpers] global attach failed", e);
-}
-function ss(e) {
-  try {
-    if (!e && e !== 0) return "";
-    const t = String(e), n = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-    return t.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (i, r) => {
-      if (!r) return i;
-      if (r[0] === "#")
-        try {
-          return r[1] === "x" || r[1] === "X" ? String.fromCharCode(parseInt(r.slice(2), 16)) : String.fromCharCode(parseInt(r.slice(1), 10));
-        } catch {
-          return i;
-        }
-      return n[r] !== void 0 ? n[r] : i;
-    });
-  } catch {
-    return String(e || "");
-  }
-}
-function os(e) {
   try {
     return String(e || "").split("/").map((t) => encodeURIComponent(t)).join("/");
   } catch {
@@ -1906,7 +1798,7 @@ function os(e) {
   }
 }
 function ii(e, t = null, n = void 0) {
-  let r = "#/" + os(String(e || ""));
+  let r = "#/" + as(String(e || ""));
   t && (r += "#" + encodeURIComponent(String(t)));
   try {
     let a = "";
@@ -1973,7 +1865,7 @@ function Ye(e) {
     return { type: "unknown", page: e, anchor: null, params: "" };
   }
 }
-const ls = `/**
+const ss = `/**
  * @module worker/slugWorker
  */
 import { buildSearchIndex, crawlForSlug } from '../slugManager.js'
@@ -2043,7 +1935,7 @@ export async function handleSlugWorkerMessage(msg) {
   }
 }
 `;
-function cs(e, t = "worker") {
+function os(e, t = "worker") {
   let n = null;
   function i(...o) {
     try {
@@ -2112,7 +2004,7 @@ function cs(e, t = "worker") {
   }
   return { get: r, send: s, terminate: a };
 }
-function qi(e, t = "worker-pool", n = 2) {
+function Bi(e, t = "worker-pool", n = 2) {
   const i = new Array(n).fill(null);
   let r = 0;
   function a(...d) {
@@ -2236,7 +2128,7 @@ function Zt(e) {
 }
 const Ge = /* @__PURE__ */ new Set();
 function Nt(e) {
-  us(), Ge.clear();
+  ls(), Ge.clear();
   for (const t of Te)
     t && Ge.add(t);
   ai(K), ai(j), Nt._refreshed = !0;
@@ -2254,8 +2146,116 @@ function si(e) {
   };
 }
 let oi = !1;
-function us() {
+function ls() {
   oi || (si(K), si(j), oi = !0);
+}
+function qi(e) {
+  return !e || typeof e != "string" ? !1 : /^(https?:)?\/\//.test(e) || e.startsWith("mailto:") || e.startsWith("tel:");
+}
+function le(e) {
+  return String(e || "").replace(/^[.\/]+/, "");
+}
+function Bt(e) {
+  return String(e || "").replace(/\/+$/, "");
+}
+function Ct(e) {
+  return Bt(e) + "/";
+}
+function cs(e) {
+  try {
+    if (!e || typeof document > "u" || !document.head || e.startsWith("data:") || document.head.querySelector(`link[rel="preload"][as="image"][href="${e}"]`)) return;
+    const n = document.createElement("link");
+    n.rel = "preload", n.as = "image", n.href = e, document.head.appendChild(n);
+  } catch (t) {
+    _("[helpers] preloadImage failed", t);
+  }
+}
+function Sn(e, t = 0, n = !1) {
+  try {
+    if (typeof window > "u" || !e || !e.querySelectorAll) return;
+    const i = Array.from(e.querySelectorAll("img"));
+    if (!i.length) return;
+    const r = e, a = r && r.getBoundingClientRect ? r.getBoundingClientRect() : null, s = 0, l = typeof window < "u" && (window.innerHeight || document.documentElement.clientHeight) || 0, o = a ? Math.max(s, a.top) : s, c = (a ? Math.min(l, a.bottom) : l) + Number(t || 0);
+    let u = 0;
+    r && (u = r.clientHeight || (a ? a.height : 0)), u || (u = l - s);
+    let h = 0.6;
+    try {
+      const y = r && window.getComputedStyle ? window.getComputedStyle(r) : null, f = y && y.getPropertyValue("--nimbi-image-max-height-ratio"), w = f ? parseFloat(f) : NaN;
+      !Number.isNaN(w) && w > 0 && w <= 1 && (h = w);
+    } catch (y) {
+      _("[helpers] read CSS ratio failed", y);
+    }
+    const m = Math.max(200, Math.floor(u * h));
+    let d = !1, g = null;
+    if (i.forEach((y) => {
+      try {
+        const f = y.getAttribute ? y.getAttribute("loading") : void 0;
+        f !== "eager" && y.setAttribute && y.setAttribute("loading", "lazy");
+        const w = y.getBoundingClientRect ? y.getBoundingClientRect() : null, b = y.src || y.getAttribute && y.getAttribute("src"), k = w && w.height > 1 ? w.height : m, S = w ? w.top : 0, v = S + k;
+        w && k > 0 && S <= c && v >= o && (y.setAttribute ? (y.setAttribute("loading", "eager"), y.setAttribute("fetchpriority", "high"), y.setAttribute("data-eager-by-nimbi", "1")) : (y.loading = "eager", y.fetchPriority = "high"), cs(b), d = !0), !g && w && w.top <= c && (g = { img: y, src: b, rect: w, beforeLoading: f });
+      } catch (f) {
+        _("[helpers] setEagerForAboveFoldImages per-image failed", f);
+      }
+    }), !d && g) {
+      const { img: y, src: f, rect: w, beforeLoading: b } = g;
+      try {
+        y.setAttribute ? (y.setAttribute("loading", "eager"), y.setAttribute("fetchpriority", "high"), y.setAttribute("data-eager-by-nimbi", "1")) : (y.loading = "eager", y.fetchPriority = "high");
+      } catch (k) {
+        _("[helpers] setEagerForAboveFoldImages fallback failed", k);
+      }
+    }
+  } catch (i) {
+    _("[helpers] setEagerForAboveFoldImages failed", i);
+  }
+}
+function Me(e, t = null, n) {
+  try {
+    const i = typeof n == "string" ? n : typeof window < "u" && window.location ? window.location.search : "", r = new URLSearchParams(i.startsWith("?") ? i.slice(1) : i), a = String(e || "");
+    r.delete("page");
+    const s = new URLSearchParams();
+    s.set("page", a);
+    for (const [p, c] of r.entries())
+      s.append(p, c);
+    const l = s.toString();
+    let o = l ? `?${l}` : "";
+    return t && (o += `#${encodeURIComponent(t)}`), o || `?page=${encodeURIComponent(a)}`;
+  } catch {
+    const r = `?page=${encodeURIComponent(String(e || ""))}`;
+    return t ? `${r}#${encodeURIComponent(t)}` : r;
+  }
+}
+function zn(e) {
+  try {
+    const t = e();
+    return t && typeof t.then == "function" ? t.catch((n) => {
+      _("[helpers] safe swallowed error", n);
+    }) : t;
+  } catch (t) {
+    _("[helpers] safe swallowed error", t);
+  }
+}
+try {
+  typeof globalThis < "u" && !globalThis.safe && (globalThis.safe = zn);
+} catch (e) {
+  _("[helpers] global attach failed", e);
+}
+function us(e) {
+  try {
+    if (!e && e !== 0) return "";
+    const t = String(e), n = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+    return t.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (i, r) => {
+      if (!r) return i;
+      if (r[0] === "#")
+        try {
+          return r[1] === "x" || r[1] === "X" ? String.fromCharCode(parseInt(r.slice(2), 16)) : String.fromCharCode(parseInt(r.slice(1), 10));
+        } catch {
+          return i;
+        }
+      return n[r] !== void 0 ? n[r] : i;
+    });
+  } catch {
+    return String(e || "");
+  }
 }
 const K = /* @__PURE__ */ new Map();
 let We = [], kr = !1;
@@ -2268,7 +2268,7 @@ function Di(e) {
 function ds() {
   return We;
 }
-const sn = typeof navigator < "u" && navigator.hardwareConcurrency ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2, ji = qi(() => Zt(ls), "slugManager", sn);
+const sn = typeof navigator < "u" && navigator.hardwareConcurrency ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2, ji = Bi(() => Zt(ss), "slugManager", sn);
 function fs() {
   try {
     if (wr()) return !0;
@@ -8488,7 +8488,7 @@ function jo() {
     }
   };
 }
-const ma = qi(() => jo(), "markdown", Do), _i = typeof DOMParser < "u" ? new DOMParser() : null, Mt = () => ma.get(), $r = (e, t = 3e3) => ma.send(e, t), ht = [];
+const ma = Bi(() => jo(), "markdown", Do), _i = typeof DOMParser < "u" ? new DOMParser() : null, Mt = () => ma.get(), $r = (e, t = 3e3) => ma.send(e, t), ht = [];
 function fr(e) {
   if (e && (typeof e == "object" || typeof e == "function")) {
     ht.push(e);
@@ -9056,7 +9056,7 @@ function Qo(e, t, n = "") {
     (t || []).forEach((o) => {
       try {
         if (!o || o.level === 1) return;
-        const p = Number(o.level) >= 2 ? Number(o.level) : 2, c = document.createElement("li"), u = document.createElement("a"), h = ss(o.text || ""), m = o.id || ke(h);
+        const p = Number(o.level) >= 2 ? Number(o.level) : 2, c = document.createElement("li"), u = document.createElement("a"), h = us(o.text || ""), m = o.id || ke(h);
         u.textContent = h;
         try {
           const f = String(n || "").replace(/^[\\.\\/]+/, ""), w = f && j && j.has && j.has(f) ? j.get(f) : f;
@@ -9198,7 +9198,7 @@ async function zr(e, t, n, i = {}) {
         } catch {
         }
         const h = u.getAttribute("href") || "";
-        if (!h || Bi(h)) continue;
+        if (!h || qi(h)) continue;
         try {
           if (h.startsWith("?") || h.indexOf("?") !== -1)
             try {
@@ -10016,7 +10016,7 @@ function vi(e, t, n) {
   } catch {
   }
 }
-const wa = cs(() => {
+const wa = os(() => {
   const e = Zt(Uo);
   if (e)
     try {
@@ -11148,7 +11148,7 @@ async function ll(e, t, n, i, r, a, s, l, o = "eager", p = 1, c = void 0, u = "f
       const N = E.target && E.target.closest ? E.target.closest("a") : null;
       if (!N) return;
       const P = N.getAttribute("href") || "";
-      if (P && !Bi(P))
+      if (P && !qi(P))
         try {
           const B = new URL(P, location.href), T = B.searchParams.get("page"), I = B.hash ? B.hash.replace(/^#/, "") : null;
           T && (E.preventDefault(), history.pushState({ page: T }, "", Me(T, I)), U());
