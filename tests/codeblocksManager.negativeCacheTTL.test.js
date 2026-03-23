@@ -14,6 +14,12 @@ describe('codeblocksManager negative-cache TTL retry', () => {
     const baseTime = Date.now()
     vi.setSystemTime(baseTime)
 
+    // Stub global fetch so loadSupportedLanguages resolves quickly
+    const _origFetch = globalThis.fetch
+    try {
+      globalThis.fetch = async () => ({ ok: true, text: async () => '' })
+    } catch (e) {}
+
     const mod = await import('../src/codeblocksManager.js')
     const { registerLanguage, SUPPORTED_HLJS_MAP, hljs } = mod
     const spyRegister = vi.spyOn(hljs, 'registerLanguage').mockImplementation(() => {})
@@ -36,6 +42,11 @@ describe('codeblocksManager negative-cache TTL retry', () => {
     expect(ok).toBe(true)
     expect(spy).toHaveBeenCalled()
 
+    // restore timers and fetch
     vi.useRealTimers()
+    try {
+      if (_origFetch === undefined) delete globalThis.fetch
+      else globalThis.fetch = _origFetch
+    } catch (e) {}
   }, 20000)
 })

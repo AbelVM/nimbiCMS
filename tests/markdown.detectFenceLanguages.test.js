@@ -1,3 +1,35 @@
+import { test, expect } from 'vitest'
+import { detectFenceLanguages, detectFenceLanguagesAsync } from '../src/markdown.js'
+
+test('detectFenceLanguages honors supportedMap and skips bad languages', async () => {
+  const md = [
+    '```js',
+    "console.log('hi')",
+    '```',
+    '',
+    '```python',
+    "print(1)",
+    '```',
+    '',
+    '```magic',
+    'x',
+    '```'
+  ].join('\n')
+
+  const supportedMap = new Map([
+    ['javascript', 'javascript'],
+    ['python', 'python']
+  ])
+
+  const set = detectFenceLanguages(md, supportedMap)
+  expect(set.has('javascript')).toBe(true)
+  expect(set.has('python')).toBe(true)
+  expect(set.has('magic')).toBe(false)
+
+  const asyncSet = await detectFenceLanguagesAsync(md, supportedMap)
+  expect(asyncSet.has('javascript')).toBe(true)
+  expect(asyncSet.has('python')).toBe(true)
+})
 import { it, expect } from 'vitest'
 import { detectFenceLanguages } from '../src/markdown.js'
 import { HLJS_ALIAS_MAP, BAD_LANGUAGES } from '../src/codeblocksManager.js'

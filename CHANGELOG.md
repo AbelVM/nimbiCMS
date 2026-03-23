@@ -13,6 +13,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[FEAT]** Centralized logging behavior
 - **[PERF]** Improved parallel indexing, 6x
 - **[CHORE]** Improved JSDoc coverage and quality
+- **[CHORE]** Raised tests coverage
 
 ## v1.0.5
 
