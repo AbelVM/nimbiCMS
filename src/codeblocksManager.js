@@ -8,6 +8,7 @@
  */
 import hljs from 'highlight.js/lib/core'
 import { debugWarn } from './utils/debug.js'
+import { LRUCache } from './utils/cache.js'
 
 /**
  * Expose the internal `hljs` (highlight.js core) instance for tests
@@ -85,7 +86,7 @@ let loadSupportedLanguagesPromise = null
  * values hold promise/module/ok/ts metadata to support negative caching.
  * @type {LanguageImportCacheMap}
  */
-const languageImportCache = new Map()
+const languageImportCache = new LRUCache({ maxSize: 500 })
 
 /**
  * Optional custom importer used for tests or bespoke loading strategies.

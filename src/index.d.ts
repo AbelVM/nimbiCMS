@@ -432,4 +432,8 @@ export function resetDebugCounters(): void
 // --- from src/utils/concurrency.js
 export function runWithConcurrency(items: T[], worker: (item:T, index:number)=>Promise<U>, concurrency: number): Promise<Array<U>>
 
+// --- from src/utils/cache.js
+export function createLRUCache(opts: any): any
+
+
 // --- from src/lib/index.js

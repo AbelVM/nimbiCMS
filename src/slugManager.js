@@ -73,6 +73,7 @@ import { runWithConcurrency } from './utils/concurrency.js'
 
 import slugWorkerCode from './worker/slugWorker.js?raw'
 
+import { LRUCache } from './utils/cache.js'
 import { makeWorkerPool, createWorkerFromRaw } from './worker-manager.js'
 import { debugLog, debugWarn, debugError, isDebug } from './utils/debug.js'
 
@@ -615,7 +616,7 @@ export function resolveSlugPath(slug) {
  * Maps absolute URL string -> Promise<FetchResult>.
  * @type {Map<string, Promise<FetchResult>>}
  */
-export const fetchCache = new Map()
+export const fetchCache = new LRUCache({ maxSize: 2000 })
 /**
  * Clear internal fetch cache used by `fetchMarkdown`.
  * @returns {void} - No return value.
@@ -628,7 +629,7 @@ export function clearFetchCache() { fetchCache.clear(); negativeFetchCache.clear
  * without issuing a network request.
  * @type {Map<string, number>}
  */
-export const negativeFetchCache = new Map()
+export const negativeFetchCache = new LRUCache({ maxSize: 2000 })
 
 let NEGATIVE_CACHE_TTL_MS = 60 * 1000 // 1 minute default
 

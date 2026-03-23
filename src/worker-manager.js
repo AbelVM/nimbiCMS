@@ -9,6 +9,7 @@
  */
 
 import { debugWarn } from './utils/debug.js'
+import { LRUCache } from './utils/cache.js'
 
 /**
  * Shape of a request sent to the worker manager. `type` is the worker action
@@ -357,7 +358,11 @@ export function createWorkerFromRaw(code) {
   try {
     if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && code) {
       try {
-        if (!createWorkerFromRaw._blobUrlCache) createWorkerFromRaw._blobUrlCache = new Map()
+        if (!createWorkerFromRaw._blobUrlCache) {
+          createWorkerFromRaw._blobUrlCache = new LRUCache({ maxSize: 200, onEvict: (k, v) => {
+            try { if (typeof URL !== 'undefined' && v) URL.revokeObjectURL(v) } catch (e) {}
+          } })
+        }
         const cache = createWorkerFromRaw._blobUrlCache
         let workerUrl = cache.get(code)
         if (!workerUrl) {
