@@ -758,7 +758,9 @@ export async function fetchPageData(raw, contentBase) {
             const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
             const rawLower = (raw || '').toLowerCase()
             const looksLikeHtml = (ct && ct.indexOf && ct.indexOf('text/html') !== -1) || rawLower.indexOf('<!doctype') !== -1 || rawLower.indexOf('<html') !== -1
-            if (!looksLikeHtml && _routerShouldLog()) debugWarn('[router] absolute fetch returned non-HTML', { abs, contentType: ct, snippet: rawLower.slice(0, 200) })
+            if (!looksLikeHtml && _routerShouldLog()) {
+              try { debugWarn('[router] absolute fetch returned non-HTML', () => ({ abs, contentType: ct, snippet: rawLower.slice(0, 200) })) } catch (_e) {}
+            }
             if (looksLikeHtml) {
               const rawLowerForDir = (raw || '').toLowerCase()
               const looksLikeDirListing = /<title>\s*index of\b/i.test(raw) || /<h1>\s*index of\b/i.test(raw) || rawLowerForDir.indexOf('parent directory') !== -1 || /<title>\s*directory listing/i.test(raw) || /<h1>\s*directory listing/i.test(raw)

@@ -16,7 +16,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Memoize expensive transforms
 - **[PERF]** Use Sets/Maps for membership checks
 - **[PERF]** Batch DOM updates
-- **[PERF]**
+- **[PERF]** Gate expensive debug/log formatting
 - **[PERF]**
 - **[PERF]**
 - **[PERF]**

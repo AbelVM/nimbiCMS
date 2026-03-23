@@ -741,9 +741,9 @@ export let fetchMarkdown = async function(path, base, opts) {
       try {
         const status = res ? res.status : undefined
         if (status === 404) {
-          try { debugWarn('fetchMarkdown failed (404):', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
+          try { debugWarn('fetchMarkdown failed (404):', () => ({ url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) })) } catch (e) {}
         } else {
-          try { debugError('fetchMarkdown failed:', { url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) }) } catch (e) {}
+          try { debugError('fetchMarkdown failed:', () => ({ url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) })) } catch (e) {}
         }
       } catch (e) {}
       throw new Error('failed to fetch md')

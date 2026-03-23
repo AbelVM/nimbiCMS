@@ -258,7 +258,7 @@ export async function initCMS(options = {}) {
       } catch (e) {}
     }
   } catch (e) {}
-  try { debugInfo('[nimbi-cms] initCMS called', { options: finalOptions }) } catch (e) {}
+  try { debugInfo('[nimbi-cms] initCMS called', () => ({ options: finalOptions })) } catch (e) {}
   if (queryOpts && typeof queryOpts.bulmaCustomize === 'string' && queryOpts.bulmaCustomize.trim()) {
     finalOptions.bulmaCustomize = queryOpts.bulmaCustomize
   }
@@ -623,7 +623,7 @@ export async function initCMS(options = {}) {
           const sm = await import('./slugManager.js')
           if (sm && typeof sm._setAllMd === 'function') {
             sm._setAllMd(manifest)
-            try { debugInfo('[nimbi-cms diagnostic] applied content manifest', { manifestKeys: Object.keys(manifest).length }) } catch (e) {}
+            try { debugInfo('[nimbi-cms diagnostic] applied content manifest', () => ({ manifestKeys: Object.keys(manifest).length })) } catch (e) {}
           }
         } catch (e) { debugWarn('[nimbi-cms] applying content manifest failed', e) }
       }
@@ -636,14 +636,14 @@ export async function initCMS(options = {}) {
         // Log current slug/index sizes after applying manifest + setContentBase
         try {
           const sm2 = await import('./slugManager.js')
-          try {
-            debugInfo('[nimbi-cms diagnostic] after setContentBase', {
+            try {
+            debugInfo('[nimbi-cms diagnostic] after setContentBase', () => ({
               manifestKeys: manifest && typeof manifest === 'object' ? Object.keys(manifest).length : 0,
               slugToMdSize: (sm2 && sm2.slugToMd && typeof sm2.slugToMd.size === 'number') ? sm2.slugToMd.size : undefined,
               allMarkdownPathsLength: (sm2 && Array.isArray(sm2.allMarkdownPaths)) ? sm2.allMarkdownPaths.length : undefined,
               allMarkdownPathsSetSize: (sm2 && sm2.allMarkdownPathsSet && typeof sm2.allMarkdownPathsSet.size === 'number') ? sm2.allMarkdownPathsSet.size : undefined,
               searchIndexLength: (sm2 && Array.isArray(sm2.searchIndex)) ? sm2.searchIndex.length : undefined
-            })
+            }))
           } catch (e) {}
         } catch (e) {}
       } catch (e) {}
@@ -925,7 +925,7 @@ export async function initCMS(options = {}) {
               // Diagnostic: log slug/index sizes after index refresh
               try {
                 const sm3 = await import('./slugManager.js')
-                try { debugInfo('[nimbi-cms diagnostic] after refreshIndexPaths', { slugToMdSize: (sm3 && sm3.slugToMd && typeof sm3.slugToMd.size === 'number') ? sm3.slugToMd.size : undefined, allMarkdownPathsLength: (sm3 && Array.isArray(sm3.allMarkdownPaths)) ? sm3.allMarkdownPaths.length : undefined, allMarkdownPathsSetSize: (sm3 && sm3.allMarkdownPathsSet && typeof sm3.allMarkdownPathsSet.size === 'number') ? sm3.allMarkdownPathsSet.size : undefined }) } catch (e) {}
+                try { debugInfo('[nimbi-cms diagnostic] after refreshIndexPaths', () => ({ slugToMdSize: (sm3 && sm3.slugToMd && typeof sm3.slugToMd.size === 'number') ? sm3.slugToMd.size : undefined, allMarkdownPathsLength: (sm3 && Array.isArray(sm3.allMarkdownPaths)) ? sm3.allMarkdownPaths.length : undefined, allMarkdownPathsSetSize: (sm3 && sm3.allMarkdownPathsSet && typeof sm3.allMarkdownPathsSet.size === 'number') ? sm3.allMarkdownPathsSet.size : undefined })) } catch (e) {}
               } catch (e) {}
             } catch (e) {}
               // If no build-time manifest and slug maps are sparse, try using
@@ -1009,7 +1009,7 @@ export async function initCMS(options = {}) {
                       } catch (_) {}
                     }
                     if (added) {
-                      try { debugInfo('[nimbi-cms diagnostic] populated slugToMd from sitemap/searchIndex', { added, total: (sm4 && sm4.slugToMd && typeof sm4.slugToMd.size === 'number') ? sm4.slugToMd.size : undefined }) } catch (_) {}
+                      try { debugInfo('[nimbi-cms diagnostic] populated slugToMd from sitemap/searchIndex', () => ({ added, total: (sm4 && sm4.slugToMd && typeof sm4.slugToMd.size === 'number') ? sm4.slugToMd.size : undefined })) } catch (_) {}
                       try {
                         const im2 = await import('./indexManager.js')
                         if (im2 && typeof im2.refreshIndexPaths === 'function') im2.refreshIndexPaths(contentBase)
