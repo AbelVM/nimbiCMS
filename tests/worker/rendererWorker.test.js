@@ -23,6 +23,7 @@ describe('renderer worker (unit)', () => {
     let rewritten = src.replace(/(^|\n)onmessage\s*=/g, '$1globalThis.onmessage =')
     // fix relative import paths so the temp module resolves correctly from tests/
     rewritten = rewritten.replace("../utils/frontmatter.js", "../../src/utils/frontmatter.js")
+    rewritten = rewritten.replace("../utils/cache.js", "../../src/utils/cache.js")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module.mjs')
     fs.writeFileSync(tmpPath, rewritten, 'utf8')
     // store tmpPath for use in tests

@@ -3,6 +3,7 @@
  */
 import * as _markedModule from 'marked'
 import { parseFrontmatter } from '../utils/frontmatter.js'
+import { LRUCache } from '../utils/cache.js'
 
 // Lightweight local HTML entity decoder to avoid importing utils in worker
 function decodeHtmlEntitiesLocal(s) {
@@ -59,14 +60,93 @@ function slugifyHeading(s) { try { return String(s || '').toLowerCase().trim().r
 let hljs = null
 const HLJS_CDN_BASE = 'https://cdn.jsdelivr.net/npm/highlight.js'
 
+// Cache for dynamic import attempts (module URL -> { promise, module, ok, ts })
+const __importCache = new LRUCache({ maxSize: 500 })
+
+/** Milliseconds to retain a negative cache entry when dynamic import fails. */
+let __IMPORT_NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * Clear renderer import cache (useful for tests).
+ * @returns {void}
+ */
+export function clearRendererImportCache() { __importCache.clear(); hljs = null }
+
+/**
+ * Adjust negative-cache TTL for renderer dynamic imports.
+ * @param {number} ms - Milliseconds to keep negative entries.
+ */
+export function setRendererImportNegativeCacheTTL(ms) { __IMPORT_NEGATIVE_CACHE_TTL_MS = Number(ms) || 0 }
+
+/**
+ * Import a module URL with negative-caching/backoff to avoid repeated failed
+ * CDN attempts. Returns the module or null on failure.
+ * @param {string} url
+ * @returns {Promise<Module|null>}
+ */
+async function importModuleWithCache(url) {
+  try {
+    if (!url) return null
+    const now = Date.now()
+    let cached = __importCache.get(url)
+    if (cached) {
+      if (cached.ok === false && (now - (cached.ts || 0) >= __IMPORT_NEGATIVE_CACHE_TTL_MS)) {
+        __importCache.delete(url)
+        cached = undefined
+      }
+    }
+    if (cached) {
+      if (cached.module) return cached.module
+      if (cached.promise) {
+        try { return await cached.promise } catch (err) { return null }
+      }
+    }
+
+    const entry = { promise: null, module: null, ok: null, ts: Date.now() }
+    __importCache.set(url, entry)
+    entry.promise = (async () => {
+      try {
+        // Use dynamic import at runtime. In Node tests this supports file:// imports.
+        return await import(url)
+      } catch (err) {
+        return null
+      }
+    })()
+    try {
+      const mod = await entry.promise
+      entry.module = mod
+      entry.ok = !!mod
+      entry.ts = Date.now()
+      return mod
+    } catch (err) {
+      entry.module = null
+      entry.ok = false
+      entry.ts = Date.now()
+      return null
+    }
+  } catch (err) {
+    return null
+  }
+}
+
 async function ensureHljs() {
   if (hljs) return hljs
   try {
+    const url = HLJS_CDN_BASE + '/lib/core.js'
+    // Try a static import for the known CDN core path so test mocks
+    // (vitest `vi.mock('https://cdn.jsdelivr.net/...')`) can intercept it.
     try {
-      const mod = await import(HLJS_CDN_BASE + '/lib/core.js')
-      hljs = mod.default || mod
+      const mod = await import('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js')
+      if (mod) {
+        hljs = mod.default || mod
+        try { __importCache.set(url, { promise: null, module: mod, ok: true, ts: Date.now() }) } catch (_) {}
+      } else {
+        hljs = null
+      }
     } catch (e) {
-      hljs = null
+      const mod = await importModuleWithCache(url)
+      if (mod) hljs = mod.default || mod
+      else hljs = null
     }
   } catch (e) {
     hljs = null
@@ -119,8 +199,9 @@ onmessage = async (ev) => {
           postMessage({ type: 'register-error', name, error: 'hljs unavailable' })
           return
         }
-        const mod = await import(url)
-        const lang = mod.default || mod
+        const mod = await importModuleWithCache(url)
+        const lang = mod ? (mod.default || mod) : null
+        if (!lang) throw new Error('failed to import language module')
         hljs.registerLanguage(name, lang)
         postMessage({ type: 'registered', name })
       } catch (e) {
@@ -211,8 +292,9 @@ export async function handleWorkerMessage(msg) {
       try {
         const availableHljs = await ensureHljs()
         if (!availableHljs) return { type: 'register-error', name, error: 'hljs unavailable' }
-        const mod = await import(url)
-        const lang = mod.default || mod
+        const mod = await importModuleWithCache(url)
+        const lang = mod ? (mod.default || mod) : null
+        if (!lang) return { type: 'register-error', name, error: 'failed to import language module' }
         hljs.registerLanguage(name, lang)
         return { type: 'registered', name }
       } catch (e) {

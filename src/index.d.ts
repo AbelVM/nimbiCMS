@@ -371,6 +371,8 @@ export function registerThemedElement(el: any): () => void
 export function handleSlugWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/renderer.js
+export function clearRendererImportCache(): any
+export function setRendererImportNegativeCacheTTL(ms: number): any
 export function handleWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/anchorWorker.js

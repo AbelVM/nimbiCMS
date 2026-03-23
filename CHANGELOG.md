@@ -11,6 +11,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[FEAT]** Added dynamic RSS 2.0 and ATOM 1.0 endpoints
 - **[FEAT]** More flexible defaults for `homePage` and `notFoundPage`
 - **[FEAT]** Centralized logging behavior
+- **[FEAT]** Improved UI responsiveness for heavy indexing
 - **[PERF]** Improved parallel indexing: 6x faster
 - **[PERF]** Reuse DOMParser
 - **[PERF]** Memoize expensive transforms

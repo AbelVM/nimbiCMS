@@ -20,6 +20,7 @@ describe('renderer worker extra', () => {
     let rewritten = src.replace('let hljs = null', "let hljs = { registerLanguage: function(name, lang) { this[name]=lang }, getLanguage: function(n){ return !!this[n] }, highlight: function(c, o){ return c } }")
     rewritten = rewritten.replace(/(^|\n)onmessage\s*=/g, '$1globalThis.onmessage =')
     rewritten = rewritten.replace("../utils/frontmatter.js", "../../src/utils/frontmatter.js")
+    rewritten = rewritten.replace("../utils/cache.js", "../../src/utils/cache.js")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_extra.mjs')
     fs.writeFileSync(tmpPath, rewritten, 'utf8')
     globalThis._rendererTestModuleExtra = tmpPath
