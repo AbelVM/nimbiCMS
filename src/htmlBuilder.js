@@ -6,7 +6,7 @@
  *
  * @module htmlBuilder
  */
-import { slugify, mdToSlug, slugToMd, _storeSlugMapping, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, allMarkdownPathsSet, HOME_SLUG } from './slugManager.js'
+import { slugify, mdToSlug, slugToMd, _storeSlugMapping, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, allMarkdownPathsSet, HOME_SLUG, getFetchConcurrency } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
@@ -787,16 +787,9 @@ export async function preScanHtmlSlugs(linkEls, base) {
     } catch (err) { debugWarn('[htmlBuilder] fetchAndExtract failed', err) }
   }
 
-  const CONCURRENCY = 5
   const paths = Array.from(htmlPaths)
-  let idx = 0
-  const runners = []
-  while (idx < paths.length) {
-    const chunk = paths.slice(idx, idx + CONCURRENCY)
-    runners.push(Promise.all(chunk.map(fetchAndExtract)))
-    idx += CONCURRENCY
-  }
-  await Promise.all(runners)
+  const concurrency = Math.max(1, Math.min(getFetchConcurrency(), paths.length || 1))
+  await runWithConcurrency(paths, fetchAndExtract, concurrency)
 }
 
 /**

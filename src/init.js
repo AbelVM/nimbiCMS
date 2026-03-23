@@ -51,6 +51,8 @@ import { setDebugLevel, debugWarn, debugInfo } from './utils/debug.js'
  * @property {string|null} [l10nFile]
  * @property {number} [cacheTtlMinutes]
  * @property {number} [cacheMaxEntries]
+ * @property {number} [fetchConcurrency]
+ * @property {number} [negativeFetchCacheTTL]
  * @property {string} [homePage]
  * @property {string|null} [notFoundPage]
  * @property {string} [navigationPage]
@@ -152,6 +154,14 @@ export function parseInitOptionsFromQuery(queryString) {
     }
     if (params.has('availableLanguages')) {
       out.availableLanguages = params.get('availableLanguages').split(',').map(s => s.trim()).filter(Boolean)
+    }
+    if (params.has('fetchConcurrency')) {
+      const n = Number(params.get('fetchConcurrency'))
+      if (Number.isInteger(n) && n >= 1) out.fetchConcurrency = n
+    }
+    if (params.has('negativeFetchCacheTTL')) {
+      const n = Number(params.get('negativeFetchCacheTTL'))
+      if (Number.isFinite(n) && n >= 0) out.negativeFetchCacheTTL = n
     }
     if (params.has('indexDepth')) {
       const n = Number(params.get('indexDepth'))
@@ -463,6 +473,14 @@ export async function initCMS(options = {}) {
     throw new TypeError('initCMS(options): "skipRootReadme" must be a boolean when provided')
   }
 
+  if (finalOptions.fetchConcurrency != null && (typeof finalOptions.fetchConcurrency !== 'number' || !Number.isInteger(finalOptions.fetchConcurrency) || finalOptions.fetchConcurrency < 1)) {
+    throw new TypeError('initCMS(options): "fetchConcurrency" must be a positive integer when provided')
+  }
+
+  if (finalOptions.negativeFetchCacheTTL != null && (typeof finalOptions.negativeFetchCacheTTL !== 'number' || !Number.isFinite(finalOptions.negativeFetchCacheTTL) || finalOptions.negativeFetchCacheTTL < 0)) {
+    throw new TypeError('initCMS(options): "negativeFetchCacheTTL" must be a non-negative number (ms) when provided')
+  }
+
   if (homePage != null && (typeof homePage !== 'string' || !homePage.trim() || !/\.(md|html)$/.test(homePage))) {
     throw new TypeError('initCMS(options): "homePage" must be a non-empty string ending with .md or .html')
   }
@@ -667,6 +685,16 @@ export async function initCMS(options = {}) {
       import('./slugManager.js').then(({ setDefaultCrawlMaxQueue }) => {
         try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
       })
+    }
+    if (typeof finalOptions.fetchConcurrency === 'number') {
+      import('./slugManager.js').then(({ setFetchConcurrency }) => {
+        try { setFetchConcurrency(finalOptions.fetchConcurrency) } catch (e) { debugWarn('[nimbi-cms] setFetchConcurrency failed', e) }
+      }).catch(() => {})
+    }
+    if (typeof finalOptions.negativeFetchCacheTTL === 'number') {
+      import('./slugManager.js').then(({ setFetchNegativeCacheTTL }) => {
+        try { setFetchNegativeCacheTTL(finalOptions.negativeFetchCacheTTL) } catch (e) { debugWarn('[nimbi-cms] setFetchNegativeCacheTTL failed', e) }
+      }).catch(() => {})
     }
   } catch (err) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
 

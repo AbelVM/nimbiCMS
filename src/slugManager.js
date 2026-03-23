@@ -641,6 +641,26 @@ export function setFetchNegativeCacheTTL(ms) {
   NEGATIVE_CACHE_TTL_MS = Number(ms) || 0
 }
 
+// Configurable fetch concurrency used by index/crawl operations. Defaults
+// to a small value derived from the worker pool size to avoid unbounded
+// parallelism when crawling large sites.
+let FETCH_CONCURRENCY = Math.max(1, Math.min(poolSize, 5))
+
+/**
+ * Set the maximum concurrent fetches used by the runtime indexer/crawler.
+ * @param {number} n - Maximum concurrent fetches (must be >= 1)
+ * @returns {void}
+ */
+export function setFetchConcurrency(n) {
+  try { FETCH_CONCURRENCY = Math.max(1, Number(n) || 1) } catch (e) { FETCH_CONCURRENCY = 1 }
+}
+
+/**
+ * Get the currently configured fetch concurrency.
+ * @returns {number}
+ */
+export function getFetchConcurrency() { return FETCH_CONCURRENCY }
+
 /**
  * Fetch markdown content by path.
  * Accepts cosmetic or canonical hrefs and extracts page token for internal fetches.
@@ -990,7 +1010,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       const visited = new Set(paths)
       const queue = [...paths]
 
-      const fetchConcurrency = Math.max(1, poolSize)
+      const fetchConcurrency = Math.max(1, Math.min(getFetchConcurrency(), queue.length || getFetchConcurrency()))
 
       const worker = async () => {
         while (true) {
@@ -1069,7 +1089,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
     // consumers that rely on deterministic ordering remain stable.
     const pathMdMap = new Map()
     const pathsToFetch = paths.filter(p => /\.(?:md|html?)(?:$|[?#])/i.test(p))
-    const fetchConcurrency = Math.max(1, Math.min(poolSize, pathsToFetch.length || 1))
+    const fetchConcurrency = Math.max(1, Math.min(getFetchConcurrency(), pathsToFetch.length || 1))
     const fetchQueue = pathsToFetch.slice()
     const fetchWorkers = []
     for (let i = 0; i < fetchConcurrency; i++) {

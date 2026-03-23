@@ -210,6 +210,8 @@ export function isExternalLinkWithBase(href: string, contentBase: string): boole
 export function unescapeMarkdown(s: string): string
 export const negativeFetchCache: any
 export function setFetchNegativeCacheTTL(ms: any): any
+export function setFetchConcurrency(n: number): void
+export function getFetchConcurrency(): number
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): void
 export function getSearchIndex(): any
 export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean}): Promise<Array>
