@@ -6,7 +6,7 @@
  *
  * @module htmlBuilder
  */
-import { slugify, mdToSlug, slugToMd, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, HOME_SLUG } from './slugManager.js'
+import { slugify, mdToSlug, slugToMd, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, allMarkdownPathsSet, HOME_SLUG } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
@@ -40,7 +40,7 @@ function _hbShouldProbe(contentBase) {
   try { if (isDebugLevel(3)) return true } catch (e) {}
   try { if (typeof notFoundPage === 'string' && notFoundPage) return true } catch (e) {}
   try { if (slugToMd && slugToMd.size) return true } catch (e) {}
-  try { if (allMarkdownPaths && allMarkdownPaths.length) return true } catch (e) {}
+  try { if (allMarkdownPathsSet && allMarkdownPathsSet.size) return true } catch (e) {}
   return false
 }
 

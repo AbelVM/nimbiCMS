@@ -10,7 +10,7 @@ import { createNavTree, preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js
 import { t } from './l10nManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
-import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths, searchIndex } from './slugManager.js'
+import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths, allMarkdownPathsSet, searchIndex } from './slugManager.js'
 import { debugLog, debugWarn } from './utils/debug.js'
 
 function safeGet(mod, name) {
@@ -830,8 +830,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                     } else {
                       const norm = String(mappingTarget || '').replace(/^\.\//, '')
                       const baseName = norm.replace(/^.*\//, '')
-                      if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length) {
-                        if (allMarkdownPaths.includes(norm) || allMarkdownPaths.includes(baseName)) persistMapping = true
+                      if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
+                        if (allMarkdownPathsSet.has(norm) || allMarkdownPathsSet.has(baseName)) persistMapping = true
                       }
                     }
                   } catch (err) { persistMapping = false }

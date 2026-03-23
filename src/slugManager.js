@@ -186,6 +186,13 @@ let _allMd = {}
  * @type {string[]}
  */
 export let allMarkdownPaths = []
+/**
+ * Derived Set for fast membership checks against `allMarkdownPaths`.
+ * Consumers should prefer `allMarkdownPathsSet.has(path)` when checking
+ * whether a path is known to avoid O(n) array scans.
+ * @type {Set<string>}
+ */
+export const allMarkdownPathsSet = new Set()
 
 /**
  * Path to the not-found (404) page relative to the content base.
@@ -341,6 +348,7 @@ export const slugify = memoize(function(s) {
  */
 export function setContentBase(contentBase) {
   slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
+  try { allMarkdownPathsSet.clear() } catch (e) {}
   availableLanguages = availableLanguages || []
 
   const keys = Object.keys(_allMd || {})
@@ -373,6 +381,7 @@ export function setContentBase(contentBase) {
       rel = normalizePath(fullPath)
     }
     allMarkdownPaths.push(rel)
+    try { allMarkdownPathsSet.add(rel) } catch (e) {}
     try { refreshIndexPaths() } catch (err) { _debugLog('[slugManager] refreshIndexPaths failed', err) }
 
     const val = _allMd[fullPath]
@@ -586,7 +595,7 @@ export let fetchMarkdown = async function(path, base, opts) {
   // avoid issuing network probes for guessed candidates. This prevents
   // spurious requests like `/bad_slug`, `/bad_slug.md`, or `_home.md`
   // when the runtime intends to render an inline 404 fallback.
-  const allowFetch = (opts && opts.force === true) || (typeof notFoundPage === 'string' && notFoundPage) || (slugToMd && slugToMd.size) || (allMarkdownPaths && allMarkdownPaths.length) || isDebug()
+  const allowFetch = (opts && opts.force === true) || (typeof notFoundPage === 'string' && notFoundPage) || (slugToMd && slugToMd.size) || (allMarkdownPathsSet && allMarkdownPathsSet.size) || isDebug()
   if (!allowFetch) {
     throw new Error('failed to fetch md')
   }
@@ -829,7 +838,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         }
       }
     } catch (_) {}
-    if (allMarkdownPaths && allMarkdownPaths.length) {
+    if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length) {
       paths = Array.from(allMarkdownPaths)
     }
     if (!paths.length) {
@@ -1493,7 +1502,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   // candidates like `slug.html`/`slug.md` when the runtime will render
   // an inline 404 instead.
   try {
-    const allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(decoded) || (allMarkdownPaths && allMarkdownPaths.length) || refreshIndexPaths._refreshed || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))
+    const allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(decoded) || (allMarkdownPathsSet && allMarkdownPathsSet.size) || refreshIndexPaths._refreshed || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))
     if (!allowCandidateProbing) return null
   } catch (_e) {}
 
@@ -1508,7 +1517,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     } catch (err) { _debugLog('[slugManager] slug resolver failed', err) }
   }
 
-  if (allMarkdownPaths && allMarkdownPaths.length) {
+  if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
     if (listSlugCache.has(decoded)) {
       const p = listSlugCache.get(decoded)
       slugToMd.set(decoded, p); mdToSlug.set(p, decoded)
@@ -1567,7 +1576,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     } catch (err) { _debugLog('[slugManager] candidate fetch failed', err) }
   }
 
-  if (allMarkdownPaths && allMarkdownPaths.length) {
+  if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
     for (const p of allMarkdownPaths) {
       try {
         const name = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')

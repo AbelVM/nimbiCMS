@@ -7,7 +7,7 @@
  *
  * @module indexManager
  */
-import { slugToMd, mdToSlug, allMarkdownPaths } from './slugManager.js';
+import { slugToMd, mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from './slugManager.js';
 
 /**
  * Runtime set of known markdown paths collected from the index and slug maps.
@@ -24,8 +24,15 @@ export const indexSet = new Set();
 export function refreshIndexPaths(contentBase) {
   _ensureMapsTracked();
   indexSet.clear();
-  for (const v of allMarkdownPaths) {
-    if (v) indexSet.add(v);
+  // Prefer the authoritative array when present (tests may mutate it directly).
+  if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length) {
+    for (const v of allMarkdownPaths) {
+      if (v) indexSet.add(v);
+    }
+  } else {
+    for (const v of allMarkdownPathsSet) {
+      if (v) indexSet.add(v);
+    }
   }
   _augmentIndexWithMap(slugToMd);
   _augmentIndexWithMap(mdToSlug);

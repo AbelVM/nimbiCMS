@@ -199,6 +199,7 @@ export function getLanguages(): string[]
 export function _storeSlugMapping(slug: string, rel: string): void
 export const slugResolvers: Set<Function>
 export const allMarkdownPaths: string[]
+export const allMarkdownPathsSet: Set<string>
 export const homePage: string
 export const HOME_SLUG: string
 export function setHomePage(p: string): void

@@ -5,7 +5,7 @@
  *
  * @module runtimeSitemap
  */
-import { allMarkdownPaths, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
+import { allMarkdownPaths, allMarkdownPathsSet, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
 import { normalizePath } from './utils/helpers.js'
 import { debugLog, debugWarn } from './utils/debug.js'
 
@@ -171,7 +171,7 @@ export async function generateSitemapJson(opts = {}) {
     try {
       if (!p || typeof p !== 'string') return false
       const np = normalizePath(String(p))
-      try { if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length && allMarkdownPaths.includes(np)) return true } catch {}
+      try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function' && allMarkdownPathsSet.has(np)) return true } catch {}
       try { if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(np)) return true } catch {}
       try { if (pathMap && pathMap.has(np)) return true } catch {}
       try {

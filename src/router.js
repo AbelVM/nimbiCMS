@@ -161,7 +161,7 @@ export function _purgeExpiredEntries() {
  * programs that need to enumerate available pages.
  * @type {string[]}
  */
-export { allMarkdownPaths } from './slugManager.js'
+export { allMarkdownPaths, allMarkdownPathsSet } from './slugManager.js'
 
  
 

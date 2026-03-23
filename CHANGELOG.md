@@ -13,7 +13,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[FEAT]** Centralized logging behavior
 - **[PERF]** Improved parallel indexing, 6x
 - **[PERF]** Reuse DOMParser
-- **[PERF]**
+- **[PERF]** Memoize expensive transforms
 - **[PERF]**
 - **[PERF]**
 - **[PERF]**
