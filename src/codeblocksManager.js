@@ -8,7 +8,7 @@
  */
 import hljs from 'highlight.js/lib/core'
 import { debugWarn } from './utils/debug.js'
-import { LRUCache } from './utils/cache.js'
+import { runImportWithCache, clearImportCache, setImportNegativeCacheTTL } from './utils/importCache.js'
 
 /**
  * Expose the internal `hljs` (highlight.js core) instance for tests
@@ -82,11 +82,10 @@ export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 let loadSupportedLanguagesPromise = null
 
 /**
- * Cache for language import attempts. Keys are canonical language ids;
- * values hold promise/module/ok/ts metadata to support negative caching.
- * @type {LanguageImportCacheMap}
+ * Note: language import attempts now use the shared `runImportWithCache`
+ * helper (backed by a shared LRU). The local LRU was removed so multiple
+ * import sites reuse the same negative-cache/dedupe behavior.
  */
-const languageImportCache = new LRUCache({ maxSize: 500 })
 
 /**
  * Optional custom importer used for tests or bespoke loading strategies.
@@ -116,14 +115,14 @@ export function setLanguageImporter(fn) {
  * Clear internal language import cache (for tests).
  * @returns {void}
  */
-export function clearLanguageImportCache() { languageImportCache.clear() }
+export function clearLanguageImportCache() { clearImportCache() }
 
 /**
  * Adjust negative-cache TTL (milliseconds) used when import attempts fail.
  * @param {number} ms - Milliseconds to use for negative caching.
  * @returns {void}
  */
-export function setLanguageImportNegativeCacheTTL(ms) { NEGATIVE_CACHE_TTL_MS = Number(ms) || 0 }
+export function setLanguageImportNegativeCacheTTL(ms) { NEGATIVE_CACHE_TTL_MS = Number(ms) || 0; setImportNegativeCacheTTL(ms) }
 
 /**
  * Load the list of supported highlight.js languages from the canonical
@@ -306,76 +305,28 @@ export async function registerLanguage(name, modulePath) {
     let lastErr = null
     for (const candidate of candidates) {
       try {
-        
-        const now = Date.now()
-        let cached = languageImportCache.get(candidate)
-        if (cached) {
-          if (cached.ok === false && (now - (cached.ts || 0) >= NEGATIVE_CACHE_TTL_MS)) {
-            languageImportCache.delete(candidate)
-            cached = undefined
-          }
-        }
-
-        if (cached) {
-          if (cached.module) {
-            mod = cached.module
-          } else if (cached.promise) {
-            try {
-              mod = await cached.promise
-            } catch (cacheErr) {
-              mod = null
-            }
-          }
-        } else {
-          
-          const entry = { promise: null, module: null, ok: null, ts: 0 }
-          languageImportCache.set(candidate, entry)
-          entry.promise = (async () => {
-            try {
-              // If a custom importer has been provided (testing or alternative
-              // loader), prefer it. It should resolve to the module or null.
-              if (typeof languageImporter === 'function') {
-                try {
-                  return await languageImporter(candidate)
-                } catch (_liErr) {
-                  return null
-                }
-              }
-              try {
-                try {
-                  return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)
-                } catch (_withExt) {
-                  return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}`)
-                }
-              } catch (_localErr) {
-                try {
-                  const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
-                  return await new Function('u', 'return import(u)')(esmUrl)
-                } catch (_esmErr) {
-                  try {
-                    const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
-                    return await new Function('u', 'return import(u)')(moduleUrl)
-                  } catch (_cdnErr) {
-                    return null
-                  }
-                }
-              }
-            } catch (err) {
-              return null
-            }
-          })()
+        mod = await runImportWithCache(candidate, async () => {
           try {
-            mod = await entry.promise
-            entry.module = mod
-            entry.ok = !!mod
-            entry.ts = Date.now()
-          } catch (err) {
-            entry.module = null
-            entry.ok = false
-            entry.ts = Date.now()
-            mod = null
-          }
-        }
+            // If a custom importer has been provided (testing or alternative
+            // loader), prefer it. It should resolve to the module or null.
+            if (typeof languageImporter === 'function') {
+              try { return await languageImporter(candidate) } catch (_liErr) { return null }
+            }
+            try {
+              try { return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`) } catch (_withExt) { return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}`) }
+            } catch (_localErr) {
+              try {
+                const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
+                return await import(esmUrl)
+              } catch (_esmErr) {
+                try {
+                  const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
+                  return await import(moduleUrl)
+                } catch (_cdnErr) { return null }
+              }
+            }
+          } catch (err) { return null }
+        })
 
         if (mod) {
           const langDef = mod.default || mod

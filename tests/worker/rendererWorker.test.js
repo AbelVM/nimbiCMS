@@ -24,6 +24,7 @@ describe('renderer worker (unit)', () => {
     // fix relative import paths so the temp module resolves correctly from tests/
     rewritten = rewritten.replace("../utils/frontmatter.js", "../../src/utils/frontmatter.js")
     rewritten = rewritten.replace("../utils/cache.js", "../../src/utils/cache.js")
+    rewritten = rewritten.replace("../utils/importCache.js", "../../src/utils/importCache.js")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module.mjs')
     fs.writeFileSync(tmpPath, rewritten, 'utf8')
     // store tmpPath for use in tests

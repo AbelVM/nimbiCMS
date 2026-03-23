@@ -15,6 +15,7 @@ describe('renderer worker edges', () => {
     let rewritten = src.replace(/(^|\n)onmessage\s*=\s*/g, '$1globalThis.onmessage = ')
     rewritten = rewritten.replace("../utils/frontmatter.js", "../../src/utils/frontmatter.js")
     rewritten = rewritten.replace("../utils/cache.js", "../../src/utils/cache.js")
+    rewritten = rewritten.replace("../utils/importCache.js", "../../src/utils/importCache.js")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_edge.mjs')
     fs.writeFileSync(tmpPath, rewritten, 'utf8')
     globalThis._rendererEdgeModule = tmpPath

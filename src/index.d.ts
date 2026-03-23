@@ -372,7 +372,7 @@ export function handleSlugWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/renderer.js
 export function clearRendererImportCache(): any
-export function setRendererImportNegativeCacheTTL(ms: number): any
+export function setRendererImportNegativeCacheTTL(ms: any): any
 export function handleWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/anchorWorker.js
@@ -397,6 +397,12 @@ export function resetSharedParser(): void
 
 // --- from src/utils/l10n-defaults.js
 export const DEFAULT_L10N: Record<string, L10nEntry>
+
+// --- from src/utils/importCache.js
+export function clearImportCache(): any
+export function setImportNegativeCacheTTL(ms: any): any
+export function runImportWithCache(key: string, loader: () => Promise<any>): Promise<any|null>
+export function importUrlWithCache(url: string): Promise<any|null>
 
 // --- from src/utils/idle.js
 export function yieldToEventLoop(): Promise<void>
