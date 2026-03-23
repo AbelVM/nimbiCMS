@@ -183,6 +183,8 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 // --- from src/worker-manager.js
 export function makeWorkerPool(createWorker: any, name: any, size: any): any
+export function makeWorkerManagerFromRaw(code: string, handleFn: {function(object):Promise<object>}, name: string): ReturnType<typeof makeWorkerManager>
+export function makeWorkerPoolFromRaw(code: string, handleFn: {function(object):Promise<object>}, name: string, size: number): ReturnType<typeof makeWorkerPool>
 
 
 

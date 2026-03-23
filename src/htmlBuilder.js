@@ -32,7 +32,7 @@ function fullCosmetic(page, anchor = null) {
   }
 }
 import { registerThemedElement } from './bulmaManager.js'
-import { makeWorkerManager, createWorkerFromRaw } from './worker-manager.js'
+import { makeWorkerManagerFromRaw } from './worker-manager.js'
 import anchorWorkerCode from './worker/anchorWorker.js?raw'
 import * as AnchorModule from './worker/anchorWorker.js'
 
@@ -1285,33 +1285,7 @@ export function renderNotFound(contentWrap, t, e) {
   }
 
  
-const _anchorManager = makeWorkerManager(() => {
-  const w = createWorkerFromRaw(anchorWorkerCode)
-  if (w) {
-    try {
-      if (!(typeof process !== 'undefined' && process.env && process.env.VITEST)) return w
-    } catch (e) { return w }
-  }
-
-  const listeners = { message: [], error: [] }
-  return {
-    addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
-    removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
-    postMessage(msg) {
-      setTimeout(async () => {
-        try {
-          const out = await AnchorModule.handleAnchorWorkerMessage(msg)
-          const ev = { data: out }
-          ;(listeners.message || []).forEach(fn => fn(ev))
-        } catch (e) {
-          const ev = { data: { id: msg && msg.id, error: String(e) } }
-          ;(listeners.message || []).forEach(fn => fn(ev))
-        }
-      }, 0)
-    },
-    terminate() { Object.keys(listeners).forEach(k => listeners[k].length = 0) }
-  }
-}, 'anchor')
+const _anchorManager = makeWorkerManagerFromRaw(anchorWorkerCode, AnchorModule && AnchorModule.handleAnchorWorkerMessage, 'anchor')
 
 /**
  * @returns {Worker|null}

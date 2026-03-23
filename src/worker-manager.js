@@ -253,6 +253,99 @@ export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
 }
 
 /**
+ * Create a worker manager from raw worker source plus an optional inline
+ * fallback handler. This wraps `createWorkerFromRaw` and, when workers are
+ * unavailable or tests request an inline implementation, returns a shim that
+ * forwards messages to `handleFn`.
+ *
+ * @param {string} code - Raw worker source (string) used to create a Blob URL.
+ * @param {function(object):Promise<object>} handleFn - Inline handler invoked when no Worker is available.
+ * @param {string} [name='worker'] - Friendly name for logging.
+ * @returns {ReturnType<typeof makeWorkerManager>} - A worker manager instance.
+ */
+export function makeWorkerManagerFromRaw(code, handleFn, name = 'worker') {
+  const factory = () => {
+    try {
+      const w = createWorkerFromRaw(code)
+      if (w) {
+        try {
+          // Prefer the real Worker in non-test environments. In Vitest
+          // tests some Worker environments behave differently so allow
+          // inline shims when `process.env.VITEST` is truthy.
+          if (!(typeof process !== 'undefined' && process.env && process.env.VITEST)) return w
+        } catch (e) { return w }
+      }
+    } catch (e) { /* fall through to inline shim */ }
+
+    if (typeof handleFn !== 'function') return null
+
+    const listeners = { message: [], error: [] }
+    return {
+      addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
+      removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
+      postMessage(msg) {
+        setTimeout(async () => {
+          try {
+            const out = await handleFn(msg)
+            const ev = { data: out }
+            ;(listeners.message || []).forEach(fn => fn(ev))
+          } catch (e) {
+            const ev = { data: { id: msg && msg.id, error: String(e) } }
+            ;(listeners.message || []).forEach(fn => fn(ev))
+          }
+        }, 0)
+      },
+      terminate() { Object.keys(listeners).forEach(k => listeners[k].length = 0) }
+    }
+  }
+  return makeWorkerManager(factory, name)
+}
+
+/**
+ * Create a worker pool from raw worker source plus an optional inline
+ * fallback handler. This mirrors `makeWorkerManagerFromRaw` but returns a
+ * pooled manager created by `makeWorkerPool`.
+ *
+ * @param {string} code - Raw worker source string.
+ * @param {function(object):Promise<object>} handleFn - Inline handler when no Worker available.
+ * @param {string} [name='worker-pool'] - Friendly name.
+ * @param {number} [size=2] - Pool size.
+ * @returns {ReturnType<typeof makeWorkerPool>} - Worker pool manager.
+ */
+export function makeWorkerPoolFromRaw(code, handleFn, name = 'worker-pool', size = 2) {
+  const factory = () => {
+    try {
+      const w = createWorkerFromRaw(code)
+      if (w) {
+        try { if (!(typeof process !== 'undefined' && process.env && process.env.VITEST)) return w } catch (e) { return w }
+      }
+    } catch (e) { /* fall through to inline shim */ }
+
+    if (typeof handleFn !== 'function') return null
+
+    const listeners = { message: [], error: [] }
+    return {
+      addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
+      removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
+      postMessage(msg) {
+        setTimeout(async () => {
+          try {
+            const out = await handleFn(msg)
+            const ev = { data: out }
+            ;(listeners.message || []).forEach(fn => fn(ev))
+          } catch (e) {
+            const ev = { data: { id: msg && msg.id, error: String(e) } }
+            ;(listeners.message || []).forEach(fn => fn(ev))
+          }
+        }, 0)
+      },
+      terminate() { Object.keys(listeners).forEach(k => listeners[k].length = 0) }
+    }
+  }
+  return makeWorkerPool(factory, name, size)
+}
+
+/**
  * Convenience helper that builds a `Blob` URL from a raw worker source string
  * and returns a newly constructed `Worker`. If the environment does not
  * support `Blob`/`URL.createObjectURL` this returns `null`.

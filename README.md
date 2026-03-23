@@ -261,6 +261,8 @@ This behavior is covered by the test-suite (see the canonical-link and URL handl
 | `cacheTtlMinutes` | `number` | `5` | TTL for slug-resolution cache entries (minutes). Set `0` to disable expiration. |
 | `cacheMaxEntries` | `number` | — | Maximum entries in the router resolution cache. |
 | `crawlMaxQueue` | `number` | `1000` | Upper bound on directories queued during breadth-first crawl (0 disables the guard). |
+| `fetchConcurrency` | `number | 'auto'` | `'auto'` | Limits the number of simultaneous network fetches used for probing external HTML, building the search index, and slug resolution. Accepts a positive integer or `'auto'` (default). When `'auto'`, nimbiCMS derives a safe concurrency from `navigator.hardwareConcurrency` and caps it at `5`. Set to `1` to serialize requests. |
+| `negativeFetchCacheTTL` | `number` | `60000` | Milliseconds to keep negative (failed) fetch responses in cache to avoid repeated failing requests. Default `60000` (1 minute). Set to `0` to disable negative caching. |
 
 ### Advanced and Extensions
 
