@@ -285,15 +285,36 @@ describe('slugManager module', () => {
     expect(idx.map(e => e.path).sort()).toEqual(['a.md','sub/b.md'])
   })
 
-  it('buildSearchIndex falls back to slugToMd entries when allMarkdownPaths is empty', async () => {
+  it('buildSearchIndex falls back to mdToSlug entries when allMarkdownPaths is empty', async () => {
     const base = 'http://example.com/content/'
     // ensure index cache is cleared so we actually execute the logic
     slugMgr.searchIndex.splice(0)
-    // clear any existing paths and map two files via slugToMd
+    // clear any existing paths and maps
     slugMgr.allMarkdownPaths.splice(0)
     slugMgr.slugToMd.clear()
-    slugMgr.slugToMd.set('foo', 'foo.md')
-    slugMgr.slugToMd.set('bar', 'sub/bar.md')
+    slugMgr.mdToSlug.clear()
+    // seed mdToSlug (path -> slug) so buildSearchIndex can use these keys
+    slugMgr.mdToSlug.set('foo.md', 'foo')
+    slugMgr.mdToSlug.set('sub/bar.md', 'bar')
+    global.fetch = vi.fn(async (url) => {
+      if (url.endsWith('foo.md')) return { ok: true, text: () => Promise.resolve('# Foo') }
+      if (url.endsWith('sub/bar.md')) return { ok: true, text: () => Promise.resolve('# Bar') }
+      return { ok: false, status: 404, text: () => Promise.resolve('') }
+    })
+    const idx = await slugMgr.buildSearchIndex(base)
+    expect(idx.map(e => e.path).sort()).toEqual(['foo.md', 'sub/bar.md'])
+  })
+
+  it('_storeSlugMapping updates allMarkdownPathsSet and allMarkdownPaths', () => {
+    // clear state
+    slugMgr.slugToMd.clear()
+    slugMgr.mdToSlug.clear()
+    slugMgr.allMarkdownPaths.splice(0)
+    try { slugMgr.allMarkdownPathsSet.clear() } catch (_) {}
+    // store mapping
+    slugMgr._storeSlugMapping('s', 'p.md')
+    expect(slugMgr.allMarkdownPathsSet.has('p.md')).toBe(true)
+    expect(slugMgr.allMarkdownPaths).toContain('p.md')
   })
 
   it('buildSearchIndex ignores non-md entries from allMarkdownPaths', async () => {

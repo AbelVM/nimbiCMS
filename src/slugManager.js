@@ -151,8 +151,17 @@ export function _storeSlugMapping(slug, rel) {
   try {
     if (rel && typeof rel === 'string') {
       try { mdToSlug.set(rel, slug) } catch (_) {}
-      try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-      try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
+      try {
+        // Prefer fast Set membership checks when available to avoid O(n) array scans.
+        if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
+          if (!allMarkdownPathsSet.has(rel)) {
+            try { allMarkdownPathsSet.add(rel) } catch (_) {}
+            try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+          }
+        } else {
+          try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+        }
+      } catch (_) {}
     }
   } catch (_) {}
 }
@@ -849,8 +858,24 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
       paths = Array.from(allMarkdownPaths)
     }
     if (!paths.length) {
-      for (const v of slugToMd.values()) {
-        if (v) paths.push(v)
+      // Prefer direct path keys from mdToSlug when available (O(1) lookups
+      // and direct iteration of known paths). Fall back to scanning
+      // slugToMd values for legacy/multilingual entries.
+      if (mdToSlug && typeof mdToSlug.size === 'number' && mdToSlug.size) {
+        try { paths = Array.from(mdToSlug.keys()) } catch (_) { paths = [] }
+      } else {
+        for (const v of slugToMd.values()) {
+          if (!v) continue
+          if (typeof v === 'string') {
+            paths.push(v)
+          } else if (v && typeof v === 'object') {
+            if (v.default) paths.push(v.default)
+            const langs = v.langs || {}
+            for (const k of Object.keys(langs || {})) {
+              try { if (langs[k]) paths.push(langs[k]) } catch (_) {}
+            }
+          }
+        }
       }
     }
     try {

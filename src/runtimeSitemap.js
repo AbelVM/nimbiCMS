@@ -175,19 +175,27 @@ export async function generateSitemapJson(opts = {}) {
       try { if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(np)) return true } catch {}
       try { if (pathMap && pathMap.has(np)) return true } catch {}
       try {
-        for (const v of slugToMd.values()) {
-          try {
-            if (!v) continue
-            if (typeof v === 'string') {
-              if (normalizePath(String(v)) === np) return true
-            } else if (v && typeof v === 'object') {
-              if (v.default && normalizePath(String(v.default)) === np) return true
-              const langs = v.langs || {}
-              for (const lk of Object.keys(langs || {})) {
-                try { if (langs[lk] && normalizePath(String(langs[lk])) === np) return true } catch {}
+        // Prefer scanning mdToSlug keys (path -> slug) which is simpler and
+        // avoids inspecting potentially complex slugToMd value objects.
+        if (mdToSlug && typeof mdToSlug.keys === 'function' && mdToSlug.size) {
+          for (const k of mdToSlug.keys()) {
+            try { if (normalizePath(String(k)) === np) return true } catch {}
+          }
+        } else {
+          for (const v of slugToMd.values()) {
+            try {
+              if (!v) continue
+              if (typeof v === 'string') {
+                if (normalizePath(String(v)) === np) return true
+              } else if (v && typeof v === 'object') {
+                if (v.default && normalizePath(String(v.default)) === np) return true
+                const langs = v.langs || {}
+                for (const lk of Object.keys(langs || {})) {
+                  try { if (langs[lk] && normalizePath(String(langs[lk])) === np) return true } catch {}
+                }
               }
-            }
-          } catch {}
+            } catch {}
+          }
         }
       } catch {}
     } catch {}

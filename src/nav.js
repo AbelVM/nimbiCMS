@@ -22,8 +22,17 @@ function storeSlugMapping(slug, rel) {
   } catch (_) {}
   try { if (slug && rel && slugToMd && typeof slugToMd.set === 'function' && !slugToMd.has(slug)) slugToMd.set(slug, rel) } catch (_) {}
   try { if (rel && mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slug) } catch (_) {}
-  try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-  try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
+  try {
+    // Prefer Set checks for membership; keep array in sync for consumers
+    if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
+      if (!allMarkdownPathsSet.has(rel)) {
+        try { allMarkdownPathsSet.add(rel) } catch (_) {}
+        try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+      }
+    } else {
+      try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+    }
+  } catch (_) {}
 }
 
 function safeGet(mod, name) {
