@@ -46,6 +46,82 @@ function safeGet(mod, name) {
   }
 }
 
+// Normalize resolved search index entries so slugs are homogeneous
+// across the app (nav, TOC, search). Rules:
+// - Prefer canonical slug mappings (mdToSlug / findSlugForPath)
+// - Prefer title/H1-derived slugs when available
+// - Only fallback to a file-basename-derived slug when the page has
+//   no H1/title (allowed per user preference)
+function normalizeSearchIndexEntries(entries) {
+  try {
+    if (!Array.isArray(entries)) return entries
+    entries.forEach(it => {
+      try {
+        if (!it || typeof it !== 'object') return
+        let raw = (typeof it.slug === 'string') ? String(it.slug) : ''
+        // preserve anchor part (page::anchor)
+        let anchor = null
+        if (raw && raw.indexOf('::') !== -1) {
+          const parts = raw.split('::')
+          raw = parts[0] || ''
+          anchor = parts.slice(1).join('::') || null
+        }
+
+        // If raw looks like a path/file (contains dot or slash) try to
+        // resolve a canonical slug via path -> slug maps. Prefer explicit
+        // entry.path when present.
+        const looksFiley = !!(raw && (raw.indexOf('.') !== -1 || raw.indexOf('/') !== -1))
+        let canonical = ''
+        try {
+          if (it.path && typeof it.path === 'string') {
+            const pn = normalizePath(String(it.path || ''))
+            // prefer any existing mapping for this path
+            canonical = findSlugForPath(pn) || (mdToSlug && mdToSlug.has(pn) ? mdToSlug.get(pn) : '') || ''
+            if (!canonical) {
+              // If the index entry included a title (H1), prefer that
+              if (it.title && String(it.title).trim()) {
+                canonical = slugify(String(it.title).trim())
+              } else {
+                // No H1/title: allow basename-derived slug as fallback
+                const base = pn.replace(/^.*\//, '').replace(/\.(?:md|html?)$/i, '')
+                canonical = slugify(base || pn)
+              }
+            }
+          } else if (looksFiley) {
+            // no explicit path: strip extension and try to resolve by
+            // basename or fall back to title if available
+            const baseOnly = String(raw).replace(/\.(?:md|html?)$/i, '')
+            const found = findSlugForPath(baseOnly) || (mdToSlug && mdToSlug.has(baseOnly) ? mdToSlug.get(baseOnly) : '') || ''
+            if (found) canonical = found
+            else if (it.title && String(it.title).trim()) canonical = slugify(String(it.title).trim())
+            else canonical = slugify(baseOnly)
+          } else {
+            // Not file-like; if no slug but title exists, slugify title
+            if (!raw && it.title && String(it.title).trim()) canonical = slugify(String(it.title).trim())
+            else canonical = raw || ''
+          }
+        } catch (e) {
+          try { canonical = (it.title && String(it.title).trim()) ? slugify(String(it.title).trim()) : (raw ? slugify(raw) : '') } catch (_) { canonical = raw }
+        }
+
+        // Reattach anchor if present
+        let finalSlug = canonical || ''
+        if (anchor) finalSlug = finalSlug ? `${finalSlug}::${anchor}` : (`${slugify(anchor)}`)
+        if (finalSlug) it.slug = finalSlug
+
+        // Persist mapping so other consumers (nav / toc) will use same slug
+        try {
+          if (it.path && finalSlug) {
+            const pageOnly = String(finalSlug).split('::')[0]
+            try { storeSlugMapping(pageOnly, normalizePath(String(it.path || ''))) } catch (_) {}
+          }
+        } catch (_) {}
+      } catch (_) {}
+    })
+  } catch (_) {}
+  return entries
+}
+
 /**
  * @typedef {{path:string,name:string,isIndex?:boolean,children?:NavTreeItem[]}} NavTreeItem
  */
@@ -124,6 +200,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   // one-time guard so we only trigger sitemap build once when spinner removal fires
   let sitemapTriggered = false
   let resolvedIndexForSitemap = null
+  // Map of normalized navigation href -> slug (helps resolve search results)
+  const navHrefToSlug = new Map()
 
   /**
    * Close the mobile hamburger menu and update ARIA attributes.
@@ -165,6 +243,113 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           try { if (contentEl) contentEl.classList.remove('is-inactive') } catch (e) {}
         }
       } catch (e) { try { if (contentEl) contentEl.classList.remove('is-inactive') } catch (e2) {} }
+    }
+  }
+
+  /**
+   * Resolve an index entry's slug/path into a canonical page slug and optional fragment.
+   * This guards against builders that may emit a file path into `entry.slug`.
+   * @param {{slug?:string,path?:string}} entry
+   * @returns {{page:string,hash:string|null}}
+   */
+  function resolveEntryTarget(entry) {
+    try {
+      let s = (entry && typeof entry.slug === 'string') ? String(entry.slug) : ''
+      let hash = null
+      // Extract heading fragment early from the slug token so that
+      // when we prefer `entry.path` for slug resolution we still
+      // preserve and return the anchor fragment.
+      try {
+        if (s && s.indexOf('::') !== -1) {
+          const partsHash = s.split('::')
+          hash = partsHash.slice(1).join('::') || null
+        }
+      } catch (_) {}
+
+      // If an explicit path is provided prefer resolving that to a
+      // canonical slug first (this handles cases where index entries
+      // contain file-like slugs such as `brochure.md::anchor`).
+      try {
+        if (entry && entry.path && typeof entry.path === 'string') {
+          const pathNorm = normalizePath(String(entry.path || ''))
+          const base = pathNorm.replace(/^.*\//, '')
+          try {
+            if (navHrefToSlug && navHrefToSlug.has(pathNorm)) return { page: navHrefToSlug.get(pathNorm), hash }
+            if (navHrefToSlug && navHrefToSlug.has(base)) return { page: navHrefToSlug.get(base), hash }
+          } catch (_) {}
+          try {
+            if (mdToSlug && mdToSlug.has(pathNorm)) return { page: mdToSlug.get(pathNorm), hash }
+          } catch (_) {}
+          try {
+            const found = findSlugForPath(pathNorm)
+            if (found) return { page: found, hash }
+          } catch (_) {}
+          // fallthrough: we'll still try the slug/token from entry below
+        }
+      } catch (_) {}
+
+      // split heading anchors encoded as `page::anchor`
+      if (s && s.indexOf('::') !== -1) {
+        const parts = s.split('::')
+        s = parts[0] || ''
+        hash = parts.slice(1).join('::') || null
+      }
+
+      // If slug looks like a path (contains dot or slash), try to resolve
+      // a real slug via known mappings (prefer entry.path when present),
+      // otherwise normalize by stripping extensions and slugifying.
+      if (s && (s.includes('.') || s.includes('/'))) {
+        const candidatePath = normalizePath((entry && entry.path) ? String(entry.path) : s)
+        const candBase = candidatePath.replace(/^.*\//, '')
+        try {
+          if (navHrefToSlug && navHrefToSlug.has(candidatePath)) return { page: navHrefToSlug.get(candidatePath), hash }
+          if (navHrefToSlug && navHrefToSlug.has(candBase)) return { page: navHrefToSlug.get(candBase), hash }
+        } catch (_) {}
+        try {
+          let found = findSlugForPath(candidatePath)
+          if (!found) {
+            // permissive scan of slugToMd values
+            try {
+              const normCand = String(candidatePath || '').replace(/^\/+/, '')
+              const candBase2 = normCand.replace(/^.*\//, '')
+              for (const [k, v] of slugToMd.entries()) {
+                try {
+                  let val = null
+                  if (typeof v === 'string') val = normalizePath(String(v || ''))
+                  else if (v && typeof v === 'object') {
+                    if (v.default) val = normalizePath(String(v.default || ''))
+                    else val = null
+                  }
+                  if (!val) continue
+                  if (val === normCand || val.endsWith('/' + normCand) || normCand.endsWith('/' + val) || val.endsWith(candBase2) || normCand.endsWith(candBase2)) {
+                    found = k
+                    break
+                  }
+                } catch (_) {}
+              }
+            } catch (_) {}
+          }
+          if (found) s = found
+          else {
+            // Strip file extension and slugify the basename as a safe fallback
+            try {
+              const baseOnly = String(s).replace(/\.(?:md|html?)$/i, '')
+              s = slugify(baseOnly || candidatePath)
+            } catch (e) {
+              s = slugify(candidatePath)
+            }
+          }
+        } catch (e) {
+          s = slugify(candidatePath)
+        }
+      }
+
+      if (!s && entry && entry.path) {
+        s = slugify(normalizePath(String(entry.path || '')))
+      }
+      return { page: s, hash }
+    } catch (err) {
+      return { page: (entry && entry.slug) || '', hash: null }
     }
   }
 
@@ -214,8 +399,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
 
     searchIndexPromise.then((idx) => {
       try {
-        // capture resolved index for sitemap trigger
+        // capture resolved index for sitemap
         try { resolvedIndexForSitemap = Array.isArray(idx) ? idx : null } catch (_) { resolvedIndexForSitemap = null }
+        // Normalize slugs so external builders cannot inject file/path slugs
+        try { normalizeSearchIndexEntries(idx) } catch (_) {}
         try {
           if (typeof window !== 'undefined') {
             try {
@@ -223,6 +410,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                 try {
                   const fmMod = await import('./slugManager.js')
                   try {
+                    // Update slugManager's live searchIndex if available
+                    try { if (fmMod && typeof fmMod._setSearchIndex === 'function') fmMod._setSearchIndex(Array.isArray(idx) ? idx : []) } catch (_) {}
                     Object.defineProperty(window, '__nimbiResolvedIndex', {
                       get() { return (fmMod && Array.isArray(fmMod.searchIndex)) ? fmMod.searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : []) },
                       enumerable: true,
@@ -242,9 +431,11 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           }
         } catch (e) {}
         const qnow = String(searchInput && searchInput.value || '').trim().toLowerCase()
+        // resolved index available; qnow captured above
         if (!qnow) return
         if (!Array.isArray(idx) || !idx.length) return
         const filteredNow = idx.filter(e => (e.title && e.title.toLowerCase().includes(qnow)) || (e.excerpt && e.excerpt.toLowerCase().includes(qnow)))
+        // filteredNow computed above
         if (!filteredNow || !filteredNow.length) return
         const resultsEl = document.getElementById('nimbi-search-results')
         if (!resultsEl) return
@@ -262,11 +453,12 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               }
               const a = document.createElement('a')
               a.className = 'panel-block nimbi-search-result'
-              a.href = buildPageUrl(it.slug)
+              const _t = resolveEntryTarget(it)
+              a.href = buildPageUrl(_t.page, _t.hash)
               a.setAttribute('role', 'button')
               try {
-                if (it.path && typeof it.slug === 'string') {
-                  try { storeSlugMapping(it.slug, it.path) } catch (ee) {}
+                if (it.path && typeof it.path === 'string') {
+                  try { storeSlugMapping(_t.page, it.path) } catch (ee) {}
                 }
               } catch (e) {}
               const title = document.createElement('div')
@@ -620,44 +812,82 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         } catch (e) {}
       }
 
-      try {
-        const panel = document.createElement('div')
-        panel.className = 'panel nimbi-search-panel'
-        items.forEach(it => {
-          if (it.parentTitle) {
-            const heading = document.createElement('p')
-            heading.textContent = it.parentTitle
-            heading.className = 'panel-heading nimbi-search-title nimbi-search-parent'
-            panel.appendChild(heading)
-          }
-          const a = document.createElement('a')
-          a.className = 'panel-block nimbi-search-result'
-          a.href = buildPageUrl(it.slug)
-          a.setAttribute('role', 'button')
+        try {
+          // Build the panel children in a fragment and append once to minimize reflows.
+          const panel = document.createElement('div')
+          panel.className = 'panel nimbi-search-panel'
+          const frag = document.createDocumentFragment()
+          items.forEach(it => {
+            if (it.parentTitle) {
+              const heading = document.createElement('p')
+              heading.textContent = it.parentTitle
+              heading.className = 'panel-heading nimbi-search-title nimbi-search-parent'
+              frag.appendChild(heading)
+            }
+              const a = document.createElement('a')
+              a.className = 'panel-block nimbi-search-result'
+              const _t = resolveEntryTarget(it)
+              a.href = buildPageUrl(_t.page, _t.hash)
+            a.setAttribute('role', 'button')
               try {
-                if (it.path && typeof it.slug === 'string') {
-                  try { storeSlugMapping(it.slug, it.path) } catch (ee) {}
+                if (it.path && typeof it.path === 'string') {
+                  try { storeSlugMapping(_t.page, it.path) } catch (ee) {}
                 }
               } catch (e) {}
-          const title = document.createElement('div')
-          title.className = 'is-size-6 has-text-weight-semibold'
-          title.textContent = it.title
-          a.appendChild(title)
-          a.addEventListener('click', () => {
-            if (dropdown) {
-              dropdown.classList.remove('is-active')
-              try { document.documentElement.classList.remove('nimbi-search-open') } catch (e) {}
-            }
-            try { dropdownContent.style.display = 'none' } catch (e) {}
-            try { dropdownContent.classList.remove('is-open') } catch (e) {}
-            try { dropdownContent.removeAttribute('tabindex') } catch (e) {}
-            try { dropdownContent.removeEventListener('keydown', resultsKeydown) } catch (e) {}
-            try { if (searchInput) searchInput.removeEventListener('keydown', inputKeyHandler) } catch (e) {}
+            const title = document.createElement('div')
+            title.className = 'is-size-6 has-text-weight-semibold'
+            title.textContent = it.title
+            a.appendChild(title)
+            a.addEventListener('click', (ev) => {
+              try {
+                try { ev && ev.preventDefault && ev.preventDefault() } catch (e) {}
+                try { ev && ev.stopPropagation && ev.stopPropagation() } catch (e) {}
+                // Hide the dropdown/UI immediately
+                if (dropdown) {
+                  dropdown.classList.remove('is-active')
+                  try { document.documentElement.classList.remove('nimbi-search-open') } catch (e) {}
+                }
+                try { dropdownContent.style.display = 'none' } catch (e) {}
+                try { dropdownContent.classList.remove('is-open') } catch (e) {}
+                try { dropdownContent.removeAttribute('tabindex') } catch (e) {}
+                try { dropdownContent.removeEventListener('keydown', resultsKeydown) } catch (e) {}
+                try { if (searchInput) searchInput.removeEventListener('keydown', inputKeyHandler) } catch (e) {}
+
+                // Perform SPA navigation via history + render helper rather than
+                // letting the browser do a full navigation; this avoids duplicate
+                // render paths (default navigation + SPA handler). Use
+                // runRenderWithTransition (defined in this scope) to trigger a
+                // single controlled render.
+                try {
+                  const hrefVal = a.getAttribute && a.getAttribute('href') || ''
+                  let pageParam = null
+                  let hash = null
+                  try {
+                    const u = new URL(hrefVal, location.href)
+                    pageParam = u.searchParams.get('page')
+                    hash = u.hash ? u.hash.replace(/^#/, '') : null
+                  } catch (e) { /* ignore URL parse errors, fall back to navigation */ }
+
+                  if (pageParam) {
+                    try {
+                      history.pushState({ page: pageParam }, '', buildPageUrl(pageParam, hash))
+                      try { runRenderWithTransition() } catch (e) { /* best-effort: if helper missing, fallback to window render */
+                        try { if (typeof window !== 'undefined' && typeof window.renderByQuery === 'function') window.renderByQuery() } catch (e2) {}
+                      }
+                      return
+                    } catch (e) { /* if pushState fails, fall through to location change */ }
+                  }
+                } catch (e) { /* ignore navigation helper failures */ }
+
+                // Fallback: let the browser navigate
+                try { window.location.href = a.href } catch (e) {}
+              } catch (e) { /* swallow per-item click errors */ }
+            })
+            frag.appendChild(a)
           })
-          panel.appendChild(a)
-        })
-        dropdownContent.appendChild(panel)
-      } catch (e) { /* ignore render errors */ }
+          panel.appendChild(frag)
+          dropdownContent.appendChild(panel)
+        } catch (e) { /* ignore render errors */ }
       if (dropdown) {
         dropdown.classList.add('is-active')
         try { document.documentElement.classList.add('nimbi-search-open') } catch (e) {}
@@ -681,14 +911,13 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       const handleInput = debounce(async () => {
         const domInput = document.querySelector('input#nimbi-search')
         const q = String(domInput && domInput.value || '').trim().toLowerCase()
+        // read current input value and proceed
         if (!q) { showResults([]); return }
         try {
           await ensureSearchIndex()
 
           const idx = await searchIndexPromise
-          debugLog('[nimbi-cms test] search handleInput q="' + q + '" idxlen=' + (Array.isArray(idx) ? idx.length : 'nil'))
-          const filtered = idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q)))
-          debugLog('[nimbi-cms test] filtered len=' + (Array.isArray(filtered) ? filtered.length : 'nil'))
+          const filtered = Array.isArray(idx) ? idx.filter(e => (e.title && e.title.toLowerCase().includes(q)) || (e.excerpt && e.excerpt.toLowerCase().includes(q))) : []
           showResults(filtered.slice(0, 10))
         } catch (err) { debugWarn('[nimbi-cms] search input handler failed', err); showResults([]) }
       }, 50)
@@ -760,6 +989,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   }
 
   
+  // Batch-create navbar items into a fragment and append once to start
+  const startFrag = document.createDocumentFragment()
   for (let i = 0; i < linkEls.length; i++) {
     const a = linkEls[i]
     if (i === 0) continue
@@ -857,6 +1088,14 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                   } catch (err) { persistMapping = false }
                     if (persistMapping) {
                     try { storeSlugMapping(slugKey, mappingTarget) } catch (ee) {}
+                    try {
+                      // remember mapping for quick nav->slug resolution (basename and full)
+                      const norm = normalizePath(String(mappingTarget || '').split(/[?#]/)[0])
+                      if (norm) {
+                        try { navHrefToSlug.set(norm, slugKey) } catch (_) {}
+                        try { const b = norm.replace(/^.*\//, ''); if (b) navHrefToSlug.set(b, slugKey) } catch (_) {}
+                      }
+                    } catch (_) {}
                   }
                 }
               }
@@ -865,8 +1104,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     } catch (ee) { debugWarn('[nimbi-cms] nav slug mapping failed', ee) }
 
     item.textContent = a.textContent || href
-    start.appendChild(item)
+    startFrag.appendChild(item)
   }
+
+  try { start.appendChild(startFrag) } catch (e) { /* fallback: if append fails, leave per-item appended above */ }
 
   
   

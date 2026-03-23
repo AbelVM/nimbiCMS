@@ -607,6 +607,29 @@ export let fetchMarkdown = async function(path, base, opts) {
       }
     }
   } catch (err) { _debugLog('[slugManager] slug mapping normalization failed', err) }
+  // Normalize inputs that may include anchor-like suffixes ("::anchor").
+  // These can accidentally be treated as URL schemes by `new URL()`
+  // (e.g. "readme.md::runtime-path-sanitization"). Prefer resolving
+  // the left-hand part via slug maps when available, otherwise strip
+  // the trailing "::..." to avoid creating an invalid URL scheme.
+  try {
+    if (typeof path === 'string' && path.indexOf('::') !== -1) {
+      const left = String(path).split('::', 1)[0]
+      if (left) {
+        try {
+          if (slugToMd.has(left)) {
+            const mapped = resolveSlugPath(left) || slugToMd.get(left)
+            if (mapped) path = mapped
+            else path = left
+          } else {
+            path = left
+          }
+        } catch (_) {
+          path = left
+        }
+      }
+    }
+  } catch (err) { _debugLog('[slugManager] path sanitize failed', err) }
   // If a notFoundPage is not configured and we have no index/mappings,
   // avoid issuing network probes for guessed candidates. This prevents
   // spurious requests like `/bad_slug`, `/bad_slug.md`, or `_home.md`

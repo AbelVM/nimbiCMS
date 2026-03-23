@@ -63,6 +63,12 @@ export function createUI(opts) {
 
   let currentPagePath = null
   const siteNav = createNavTree(t, [{ path: homePage, name: t('home'), isIndex: true, children: [] }])
+  // Serialize renders to avoid concurrent duplicate rendering when multiple
+  // navigation events fire in quick succession (e.g. popstate + script-driven calls).
+  // `_isRendering` guards active render; `_queuedRender` signals a subsequent
+  // render should run once the active render completes.
+  let _isRendering = false
+  let _queuedRender = false
 
   async function renderPage(raw, hashAnchor) {
     let data, pagePath, anchor
@@ -130,6 +136,14 @@ export function createUI(opts) {
   }
 
   async function renderByQuery() {
+    // Prevent concurrent renders: if a render is already in progress, mark
+    // that another render is desired and return. When the active render
+    // completes it will re-run `renderByQuery` to pick up the latest URL.
+    if (_isRendering) {
+      _queuedRender = true
+      return
+    }
+    _isRendering = true
     try {
       try { incrementCounter('renderByQuery') } catch (_) {}
       try { syncLegacyCounter('renderByQuery') } catch (_) {}
@@ -151,8 +165,14 @@ export function createUI(opts) {
       await renderPage(raw, hashAnchor)
     } catch (e) {
       debugWarn('[nimbi-cms] renderByQuery failed', e)
-        try { if (!notFoundPage && navWrap && navWrap.innerHTML !== undefined) navWrap.innerHTML = '' } catch (err) {}
-        renderNotFound(contentWrap, t, e)
+      try { if (!notFoundPage && navWrap && navWrap.innerHTML !== undefined) navWrap.innerHTML = '' } catch (err) {}
+      renderNotFound(contentWrap, t, e)
+    } finally {
+      _isRendering = false
+      if (_queuedRender) {
+        _queuedRender = false
+        try { await renderByQuery() } catch (e) { /* ignore re-run errors */ }
+      }
     }
   }
 

@@ -53,8 +53,17 @@ function storeSlugMapping(slug, rel) {
   } catch (_) {}
   try { if (slug && rel && slugToMd && typeof slugToMd.set === 'function' && !slugToMd.has(slug)) slugToMd.set(slug, rel) } catch (_) {}
   try { if (rel && mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slug) } catch (_) {}
-  try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-  try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
+  try {
+    // Prefer fast Set membership checks when available to avoid O(n) array scans.
+    if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
+      if (!allMarkdownPathsSet.has(rel)) {
+        try { allMarkdownPathsSet.add(rel) } catch (_) {}
+        try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+      }
+    } else {
+      try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+    }
+  } catch (_) {}
 }
 
 /**
@@ -106,42 +115,77 @@ export function createNavTree(t, tree) {
   nav.appendChild(label)
   const ul = document.createElement('ul')
   ul.className = 'menu-list';
-  tree.forEach((item) => {
-    const li = document.createElement('li')
-    const a = document.createElement('a')
-    try {
-      const p = String(item.path || '')
+  // Batch li creation into a DocumentFragment to minimize layout thrashing.
+  try {
+    const frag = document.createDocumentFragment()
+    tree.forEach((item) => {
+      const li = document.createElement('li')
+      const a = document.createElement('a')
       try {
-        a.setAttribute('href', buildPageUrl(p))
-      } catch (e) {
-        if (p && p.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p))
-        else a.setAttribute('href', fullCosmetic(p))
-      }
-    } catch (e) { a.setAttribute('href', '#' + item.path) }
-    a.textContent = item.name
-    li.appendChild(a)
-    if (item.children && item.children.length) {
-      const subul = document.createElement('ul')
-      item.children.forEach((c) => {
-        const cli = document.createElement('li')
-        const ca = document.createElement('a')
+        const p = String(item.path || '')
         try {
-          const cp = String(c.path || '')
+          a.setAttribute('href', buildPageUrl(p))
+        } catch (e) {
+          if (p && p.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p))
+          else a.setAttribute('href', fullCosmetic(p))
+        }
+      } catch (e) { a.setAttribute('href', '#' + item.path) }
+      a.textContent = item.name
+      li.appendChild(a)
+      if (item.children && item.children.length) {
+        const subul = document.createElement('ul')
+        item.children.forEach((c) => {
+          const cli = document.createElement('li')
+          const ca = document.createElement('a')
           try {
-            ca.setAttribute('href', buildPageUrl(cp))
-          } catch (e) {
-            if (cp && cp.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp))
-            else ca.setAttribute('href', fullCosmetic(cp))
-          }
-        } catch (e) { ca.setAttribute('href', '#' + c.path) }
-        ca.textContent = c.name
-        cli.appendChild(ca)
-        subul.appendChild(cli)
-      })
-      li.appendChild(subul)
-    }
-    ul.appendChild(li)
-  })
+            const cp = String(c.path || '')
+            try {
+              ca.setAttribute('href', buildPageUrl(cp))
+            } catch (e) {
+              if (cp && cp.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp))
+              else ca.setAttribute('href', fullCosmetic(cp))
+            }
+          } catch (e) { ca.setAttribute('href', '#' + c.path) }
+          ca.textContent = c.name
+          cli.appendChild(ca)
+          subul.appendChild(cli)
+        })
+        li.appendChild(subul)
+      }
+      frag.appendChild(li)
+    })
+    ul.appendChild(frag)
+  } catch (err) {
+    // Fallback to safe per-item append on error
+    tree.forEach((item) => {
+      try {
+        const li = document.createElement('li')
+        const a = document.createElement('a')
+        try {
+          const p = String(item.path || '')
+          try { a.setAttribute('href', buildPageUrl(p)) } catch (e) { if (p && p.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p)); else a.setAttribute('href', fullCosmetic(p)) }
+        } catch (e) { a.setAttribute('href', '#' + item.path) }
+        a.textContent = item.name
+        li.appendChild(a)
+        if (item.children && item.children.length) {
+          const subul = document.createElement('ul')
+          item.children.forEach((c) => {
+            const cli = document.createElement('li')
+            const ca = document.createElement('a')
+            try {
+              const cp = String(c.path || '')
+              try { ca.setAttribute('href', buildPageUrl(cp)) } catch (e) { if (cp && cp.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp)); else ca.setAttribute('href', fullCosmetic(cp)) }
+            } catch (e) { ca.setAttribute('href', '#' + c.path) }
+            ca.textContent = c.name
+            cli.appendChild(ca)
+            subul.appendChild(cli)
+          })
+          li.appendChild(subul)
+        }
+        ul.appendChild(li)
+      } catch (e) { debugWarn('[htmlBuilder] createNavTree item failed', e) }
+    })
+  }
   nav.appendChild(ul)
   return nav
 }

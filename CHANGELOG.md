@@ -14,7 +14,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Improved parallel indexing, 6x
 - **[PERF]** Reuse DOMParser
 - **[PERF]** Memoize expensive transforms
-- **[PERF]**
+- **[PERF]** Use Sets/Maps for membership checks
 - **[PERF]**
 - **[PERF]**
 - **[PERF]**
