@@ -70,6 +70,12 @@ export function createUI(opts) {
   let _isRendering = false
   let _queuedRender = false
 
+  /**
+   * Render a page into the UI.
+   * @param {string|null|undefined} raw - The raw page identifier or path to render.
+   * @param {string|null|undefined} hashAnchor - Optional anchor to scroll to after render.
+   * @returns {Promise<void>}
+   */
   async function renderPage(raw, hashAnchor) {
     let data, pagePath, anchor
     try {
@@ -135,6 +141,11 @@ export function createUI(opts) {
     currentPagePath = pagePath
   }
 
+  /**
+   * Render the current page based on the URL or configured `homePage`.
+   * Serializes renders to avoid duplicate concurrent work.
+   * @returns {Promise<void>}
+   */
   async function renderByQuery() {
     // Prevent concurrent renders: if a render is already in progress, mark
     // that another render is desired and return. When the active render
@@ -178,8 +189,17 @@ export function createUI(opts) {
 
   window.addEventListener('popstate', renderByQuery)
 
+  /**
+   * Compute the sessionStorage key used to persist scroll position
+   * for the current URL.
+   * @returns {string}
+   */
   const scrollStoreKey = () => `nimbi-cms-scroll:${location.pathname}${location.search}`
 
+  /**
+   * Persist current scroll position for the page into sessionStorage.
+   * @returns {void}
+   */
   const saveScrollPosition = () => {
     try {
       const containerEl = container || document.querySelector('.nimbi-cms')
@@ -194,6 +214,10 @@ export function createUI(opts) {
     }
   }
 
+  /**
+   * Restore persisted scroll position from sessionStorage, if present.
+   * @returns {void}
+   */
   const restoreScrollPosition = () => {
     try {
       const containerEl = container || document.querySelector('.nimbi-cms')

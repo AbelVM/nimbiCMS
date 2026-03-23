@@ -32,6 +32,20 @@ const HIGHLIGHT_JS_VERSION = typeof __HIGHLIGHT_JS_VERSION__ !== 'undefined'
  */
 
 /**
+ * Entry stored in the language import cache.
+ * @typedef {Object} LanguageImportCacheEntry
+ * @property {Promise<unknown>} [promise]
+ * @property {unknown} [module]
+ * @property {boolean} [ok]
+ * @property {number} [ts]
+ */
+
+/**
+ * Map of canonical language id -> LanguageImportCacheEntry
+ * @typedef {Map<string,LanguageImportCacheEntry>} LanguageImportCacheMap
+ */
+
+/**
  * Map of supported highlight.js language keys to canonical module name.
  * @type {Map<string,string>}
  */
@@ -57,6 +71,11 @@ HLJS_ALIAS_MAP.html = 'xml'
 HLJS_ALIAS_MAP.xhtml = 'xml'
 HLJS_ALIAS_MAP.markup = 'xml'
 
+
+/**
+ * Languages known to be invalid or undesirable for auto-registration.
+ * @type {Set<string>}
+ */
 export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
@@ -64,24 +83,29 @@ let loadSupportedLanguagesPromise = null
 /**
  * Cache for language import attempts. Keys are canonical language ids;
  * values hold promise/module/ok/ts metadata to support negative caching.
- * @type {Map<string,{promise?:Promise<unknown>,module?:unknown,ok?:boolean,ts?:number}>}
+ * @type {LanguageImportCacheMap}
  */
 const languageImportCache = new Map()
 
 /**
  * Optional custom importer used for tests or bespoke loading strategies.
- * When set to a function `(candidate)=>Promise<Module|null>` it will be
- * invoked instead of the internal import+CDN fallbacks. This enables
- * reliable unit tests and alternative loading strategies.
- * @type {function|null}
+ * When set to a function `(candidate: string) => Promise<Module|null>` it
+ * will be invoked instead of the internal import+CDN fallbacks. This
+ * enables reliable unit tests and alternative loading strategies.
+ * @type {((candidate: string) => Promise<unknown>)|null}
  */
 export let languageImporter = null
 
+/**
+ * Milliseconds to retain a negative cache entry when import attempts fail.
+ * @type {number}
+ */
 let NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
 
 /**
  * Set a custom importer function for language modules.
- * @param {function|null} fn
+ * @param {((candidate: string) => Promise<unknown>)|null} fn - Importer function or `null` to clear.
+ * @returns {void}
  */
 export function setLanguageImporter(fn) {
   languageImporter = (typeof fn === 'function') ? fn : null
@@ -89,12 +113,14 @@ export function setLanguageImporter(fn) {
 
 /**
  * Clear internal language import cache (for tests).
+ * @returns {void}
  */
 export function clearLanguageImportCache() { languageImportCache.clear() }
 
 /**
  * Adjust negative-cache TTL (milliseconds) used when import attempts fail.
- * @param {number} ms
+ * @param {number} ms - Milliseconds to use for negative caching.
+ * @returns {void}
  */
 export function setLanguageImportNegativeCacheTTL(ms) { NEGATIVE_CACHE_TTL_MS = Number(ms) || 0 }
 

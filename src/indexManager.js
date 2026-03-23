@@ -10,15 +10,28 @@
 import { slugToMd, mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from './slugManager.js';
 
 /**
+ * A Map-like interface used by index augmentation helpers.
+ * @typedef {Object} MapLike
+ * @property {function(string, *): *} set
+ * @property {function(): Iterable<*>} values
+ */
+
+/**
  * Runtime set of known markdown paths collected from the index and slug maps.
+ * Values are normalized, content-base-relative paths (strings) suitable for
+ * consumption by other runtime modules (slug lookups, indexing, sitemaps).
+ * Populated by `refreshIndexPaths()` and by the tracking wrappers installed
+ * via `_ensureMapsTracked()` when slug maps are mutated.
  * Other modules read this set to enumerate available pages.
  * @type {Set<string>}
  */
 export const indexSet = new Set();
 /**
- * Refresh the internal index set from available markdown paths and slug maps.
+ * Refresh the internal `indexSet` from available markdown paths and slug maps.
  * Useful when the content base or path list changes at runtime (tests/plugins).
- * @param {string} contentBase - Base path for content used by the indexer.
+ * This clears and repopulates `indexSet` and augments it with values
+ * discovered in slug maps.
+ * @param {string|URL} contentBase - Base path or URL for content used by the indexer.
  * @returns {void}
  */
 export function refreshIndexPaths(contentBase) {
@@ -39,6 +52,12 @@ export function refreshIndexPaths(contentBase) {
   refreshIndexPaths._refreshed = true;
 }
 
+/**
+ * Add all values from a Map-like object into the runtime `indexSet`.
+ * Accepts Map or Map-like objects that expose a `values()` iterator.
+ * @param {MapLike|Map<any, any>} map
+ * @returns {void}
+ */
 function _augmentIndexWithMap(map) {
   if (!map || typeof map.values !== 'function') return;
   for (const v of map.values()) {
@@ -48,7 +67,7 @@ function _augmentIndexWithMap(map) {
 
 /**
  * Instrument a map so that any value inserted also populates the index set.
- * @param {{set:function}} map - A Map-like object whose `set` method will be wrapped.
+ * @param {MapLike|Map<any, any>} map - A Map-like object whose `set` method will be wrapped.
  * @returns {void}
  */
 function _trackMap(map) {
@@ -60,10 +79,7 @@ function _trackMap(map) {
   };
 }
 
-/**
- * Lazily install tracking wrappers on the slug maps; idempotent.
- * @returns {void}
- */
+/** Lazily install tracking wrappers on the slug maps; idempotent. @returns {void} */
 let _mapsTracked = false;
 function _ensureMapsTracked() {
   if (_mapsTracked) return;

@@ -10,6 +10,7 @@ import { createNavTree, preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js
 import { t } from './l10nManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
+import { getSharedParser } from './utils/sharedDomParser.js'
 import { slugify, slugToMd, mdToSlug, _storeSlugMapping, fetchMarkdown, allMarkdownPaths, allMarkdownPathsSet, searchIndex } from './slugManager.js'
 import { debugLog, debugWarn } from './utils/debug.js'
 
@@ -46,12 +47,12 @@ function safeGet(mod, name) {
   }
 }
 
-// Normalize resolved search index entries so slugs are homogeneous
-// across the app (nav, TOC, search). Rules:
-// - Prefer canonical slug mappings (mdToSlug / findSlugForPath)
-// - Prefer title/H1-derived slugs when available
-// - Only fallback to a file-basename-derived slug when the page has
-//   no H1/title (allowed per user preference)
+/**
+ * Normalize resolved search index entries so slugs are homogeneous
+ * across the app (nav, TOC, search).
+ * @param {Array} entries - Array of index entry objects to normalize.
+ * @returns {Array} The same array of entries (normalized in-place).
+ */
 function normalizeSearchIndexEntries(entries) {
   try {
     if (!Array.isArray(entries)) return entries
@@ -142,30 +143,19 @@ export function createSiteNav(homePage) {
 }
 
 /**
- * Build the main navigation bar DOM and wire up SPA navigation callbacks.
- * Previously this logic lived directly inside `initCMS` in nimbi-cms.js.
- *
- * @param {HTMLElement} navbarWrap - element where the navbar header should be
- *   inserted (typically a <header> element).
- * @param {HTMLElement} container - main content container; clicks inside
- *   this element will also be intercepted for SPA navigation.
- * @param {string} navHtml - HTML representation of the navigation obtained
- *   by parsing `_navigation.md`.
- * @param {string} contentBase - base URL used when resolving slugs.
- * @param {string} homePage - default home page slug used for the brand link
- * @param {Function} t - translation helper from l10nManager.
- * @param {Function} renderByQuery - callback invoked when the user navigates
- *   via the navbar or content links.  This allows the UI layer to render the
- *   requested page without creating a circular dependency.
- * @param {boolean} effectiveSearchEnabled - whether search UI should be rendered
- * @param {('eager'|'lazy')} searchIndexMode - search index option
- *   forwarded from `initCMS`; only relevant if a search input is present.
- * @param {1|2|3} indexDepth - include H2 headings in the search index when 2; include H3 when 3
- * @returns {Promise<NavBuildResult>} resolves with an object containing `navbar` and `linkEls`
- */
-/**
  * Build the site navigation DOM and wire SPA navigation handlers.
- * Minimal descriptive JSDoc placed adjacent to the exported symbol.
+ * @param {HTMLElement} navbarWrap - Element where the navbar header should be inserted.
+ * @param {HTMLElement} container - Main content container for click interception.
+ * @param {string} navHtml - HTML representation of the navigation.
+ * @param {string} contentBase - Base URL used when resolving slugs.
+ * @param {string} homePage - Default home page slug used for the brand link.
+ * @param {(key: string) => string} t - Translation helper from l10nManager.
+ * @param {() => (void|Promise<void>)} renderByQuery - Callback invoked when navigating to render a page; may return a Promise.
+ * @param {boolean} effectiveSearchEnabled - Whether search UI should be rendered.
+ * @param {'eager'|'lazy'} [searchIndexMode='eager'] - Search index mode forwarded from initCMS.
+ * @param {number} [indexDepth=1] - Index depth (1|2|3).
+ * @param {string[]|undefined} [noIndexing] - Optional list of paths to exclude from indexing.
+ * @param {string} [logoOption='favicon'] - Navbar logo option.
  * @returns {Promise<NavBuildResult>}
  */
 export async function buildNav(navbarWrap, container, navHtml, contentBase, homePage, t, renderByQuery, effectiveSearchEnabled, searchIndexMode = 'eager', indexDepth = 1, noIndexing = undefined, logoOption = 'favicon') {
@@ -173,7 +163,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     throw new TypeError('navbarWrap must be an HTMLElement')
   }
 
-  const parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+  const parser = getSharedParser()
   const navDoc = parser ? parser.parseFromString(navHtml || '', 'text/html') : null
   const linkEls = navDoc ? navDoc.querySelectorAll('a') : []
 
@@ -556,9 +546,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         try {
           const res = await fetchMarkdown(homePage, contentBase)
           if (!res || !res.raw) return null
-          const p = new DOMParser()
-          const d = p.parseFromString(res.raw, 'text/html')
-          const img = d.querySelector('img')
+          const p = getSharedParser()
+          const d = p ? p.parseFromString(res.raw, 'text/html') : null
+          const img = d ? d.querySelector('img') : null
           if (!img) return null
           const src = img.getAttribute('src') || ''
           if (!src) return null
@@ -733,9 +723,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             let h1 = null
             if (md.isHtml) {
               try {
-                const parser2 = new DOMParser()
-                const doc = parser2.parseFromString(md.raw, 'text/html')
-                const h1el = doc.querySelector('h1') || doc.querySelector('title')
+                const parser2 = getSharedParser()
+                const doc = parser2 ? parser2.parseFromString(md.raw, 'text/html') : null
+                const h1el = doc ? (doc.querySelector('h1') || doc.querySelector('title')) : null
                 if (h1el && h1el.textContent) h1 = String(h1el.textContent).trim()
               } catch (_) {}
             } else {
@@ -1193,10 +1183,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             const res = await fetchMarkdown(htmlPath, contentBase)
             if (res && res.raw) {
               try {
-                const parser2 = new DOMParser()
-                const doc = parser2.parseFromString(res.raw, 'text/html')
-                const titleTag = doc.querySelector('title')
-                const h1 = doc.querySelector('h1')
+                const parser2 = getSharedParser()
+                const doc = parser2 ? parser2.parseFromString(res.raw, 'text/html') : null
+                const titleTag = doc ? doc.querySelector('title') : null
+                const h1 = doc ? doc.querySelector('h1') : null
                 const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
                 if (titleText) {
                   const slugKey = slugify(titleText)

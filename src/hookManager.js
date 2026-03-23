@@ -23,6 +23,17 @@ const hooks = {
  */
 
 /**
+ * The context object passed to hook callbacks. Hooks may read or
+ * augment this object with runtime values for downstream consumers.
+ * @typedef {Record<string,unknown>} HookContext
+ */
+
+/**
+ * Known hook names accepted by the hook manager.
+ * @typedef {'onPageLoad'|'onNavBuild'|'transformHtml'} HookName
+ */
+
+/**
  * Internal hooks registry typed for documentation.
  * @type {{onPageLoad:HookCallback[], onNavBuild:HookCallback[], transformHtml:HookCallback[]}}
  */
@@ -30,8 +41,8 @@ const hooks = {
 
 /**
  * Register a hook callback for the given hook name.
- * @param {string} name - Hook name to register (e.g. 'onPageLoad').
- * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback function to register.
+ * @param {HookName} name - Hook name to register (e.g. 'onPageLoad').
+ * @param {HookCallback} fn - Callback function to register.
  * @returns {void}
  */
 export function addHook(name, fn) {
@@ -46,14 +57,14 @@ export function addHook(name, fn) {
 
 /**
  * Register a callback to be invoked after each page is rendered.
- * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback invoked with the render context.
+ * @param {HookCallback} fn - Callback invoked with the render context.
  * @returns {void}
  */
 export function onPageLoad(fn) { addHook('onPageLoad', fn); }
 
 /**
  * Register a callback once the navigation DOM has been built.
- * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback invoked with the navigation context.
+ * @param {HookCallback} fn - Callback invoked with the navigation context.
  * @returns {void}
  */
 export function onNavBuild(fn) { addHook('onNavBuild', fn); }
@@ -61,7 +72,7 @@ export function onNavBuild(fn) { addHook('onNavBuild', fn); }
 /**
  * Register a callback that can mutate the article element before it is
  * appended to the document. The callback receives the render context.
- * @param {(ctx:Record<string,unknown>)=>void|Promise<void>} fn - Callback which can modify the render context or DOM.
+ * @param {HookCallback} fn - Callback which can modify the render context or DOM.
  * @returns {void}
  */
 export function transformHtml(fn) { addHook('transformHtml', fn); }
@@ -70,8 +81,8 @@ export function transformHtml(fn) { addHook('transformHtml', fn); }
  * Invoke all registered hook callbacks for the given hook `name` with a
  * supplied context object. Errors from individual callbacks are swallowed.
  *
- * @param {string} name - Hook name to invoke (e.g. 'onPageLoad').
- * @param {Record<string,unknown>} ctx - Context object passed to each callback.
+ * @param {HookName} name - Hook name to invoke (e.g. 'onPageLoad').
+ * @param {HookContext} ctx - Context object passed to each callback.
  * @returns {Promise<void>} - Resolves once all registered callbacks have completed.
  */
 export async function runHooks(name, ctx) {

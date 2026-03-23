@@ -68,6 +68,8 @@ export function getLanguages() { return availableLanguages }
 
 import * as l10n from './l10nManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
+import { getSharedParser } from './utils/sharedDomParser.js'
+import { runWithConcurrency } from './utils/concurrency.js'
 
 import slugWorkerCode from './worker/slugWorker.js?raw'
 
@@ -632,14 +634,20 @@ let NEGATIVE_CACHE_TTL_MS = 60 * 1000 // 1 minute default
 
 /**
  * Adjust the negative-cache TTL (milliseconds). Useful for tests.
- * @param {number} ms
+ * @param {number} ms - Milliseconds to use for negative caching.
+ * @returns {void}
  */
 export function setFetchNegativeCacheTTL(ms) {
   NEGATIVE_CACHE_TTL_MS = Number(ms) || 0
 }
 
 /**
- * @type {(path: string, base?: string) => Promise<FetchResult>
+ * Fetch markdown content by path.
+ * Accepts cosmetic or canonical hrefs and extracts page token for internal fetches.
+ * @param {string} path - Path or cosmetic/canonical href (may contain query/hash).
+ * @param {string} [base] - Optional base content URL (relative or absolute).
+ * @param {{force?:boolean}} [opts] - Options object ({force:true} bypasses guard).
+ * @returns {Promise<FetchResult>} Resolves with the fetched content or rejects on failure.
  */
 export let fetchMarkdown = async function(path, base, opts) {
   if (!path) throw new Error('path required')
@@ -1092,15 +1100,15 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         let pageSlug = null
         if (md.isHtml) {
           try {
-            const parser = new DOMParser()
-            const doc = parser.parseFromString(md.raw, 'text/html')
-            const titleEl = doc.querySelector('title') || doc.querySelector('h1')
+            const parser = getSharedParser()
+            const doc = parser ? parser.parseFromString(md.raw, 'text/html') : null
+            const titleEl = doc ? (doc.querySelector('title') || doc.querySelector('h1')) : null
             if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
-            const p = doc.querySelector('p')
+            const p = doc ? doc.querySelector('p') : null
             if (p && p.textContent) excerpt = p.textContent.trim()
               if (indexDepth >= 2) {
               try {
-                const topH1 = doc.querySelector('h1')
+                const topH1 = doc ? doc.querySelector('h1') : null
                 const parentTitle = topH1 && topH1.textContent ? topH1.textContent.trim() : (title || '')
                 // Derive and persist a unique page slug for this path so H2/H3
                 // anchors and the final page entry use a stable, non-colliding
@@ -1426,7 +1434,7 @@ export async function whenSearchIndexReady(opts = {}) {
     const start = Date.now()
     while (Date.now() - start < timeoutMs) {
       if (Array.isArray(searchIndex) && searchIndex.length) return searchIndex
-      // eslint-disable-next-line no-await-in-loop
+       
       await new Promise(r => setTimeout(r, 150))
     }
     return searchIndex
@@ -1482,7 +1490,7 @@ export function setDefaultCrawlMaxQueue(n) {
   if (typeof n === 'number' && n >= 0) defaultCrawlMaxQueue = n
 }
 
-const _crawlParser = new DOMParser()
+const _crawlParser = getSharedParser()
 const _crawlLinkSelector = 'a[href]'
 
 /**
@@ -1526,7 +1534,7 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
   while (queue.length && !found) {
     if (queue.length > maxQueue) break
     const batch = queue.splice(0, concurrency)
-    await Promise.all(batch.map(async (relDir) => {
+    await runWithConcurrency(batch, async (relDir) => {
       if (relDir == null) return
       if (seenDirs.has(relDir)) return
       seenDirs.add(relDir)
@@ -1603,7 +1611,7 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
           } catch (err) { _debugLog('[slugManager] crawlForSlug: link iteration failed', err) }
         }
       } catch (err) { _debugLog('[slugManager] crawlForSlug: directory fetch failed', err) }
-    }))
+    }, concurrency)
   }
   crawlCache.set(decoded, found)
   return found
@@ -1643,7 +1651,7 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
   while (queue.length) {
     if (queue.length > maxQueue) break
     const batch = queue.splice(0, concurrency)
-    await Promise.all(batch.map(async (relDir) => {
+    await runWithConcurrency(batch, async (relDir) => {
       if (relDir == null) return
       if (seenDirs.has(relDir)) return
       seenDirs.add(relDir)
@@ -1702,7 +1710,7 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
           } catch (err) { _debugLog('[slugManager] crawlAllMarkdown: link iteration failed', err) }
         }
       } catch (err) { _debugLog('[slugManager] crawlAllMarkdown: directory fetch failed', err) }
-    }))
+    }, concurrency)
   }
 
   return Array.from(result)

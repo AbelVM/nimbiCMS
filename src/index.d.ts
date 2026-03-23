@@ -256,7 +256,7 @@ export function markNotFound(opts: any): any
 
 
 // --- from src/runtimeSitemap.js
-export function generateSitemapJson(opts: object): any
+export function generateSitemapJson(opts: object): Promise<SitemapJson>
 export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
@@ -303,7 +303,7 @@ export function setLang(lang: string): void
 
 
 // --- from src/init.js
-export function parseInitOptionsFromQuery(queryString: string): object
+export function parseInitOptionsFromQuery(queryString: string): any
 export const currentHighlightTheme: string
 export const initialDocumentTitle: string
 
@@ -313,7 +313,7 @@ export const indexSet: any
 
 
 // --- from src/imagePreview.js
-export function attachImagePreview(opts: any): any
+export function attachImagePreview(opts: any): void
 
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
@@ -330,7 +330,7 @@ export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, 
 
 
 // --- from src/hookManager.js
-export function runHooks(name: string, ctx: Record<string,unknown>): Promise<void>
+export function runHooks(name: any, ctx: any): Promise<void>
 
 
 
@@ -346,15 +346,15 @@ export function callIt(cb: (...args:any[])=>any): void
 
 // --- from src/codeblocksManager.js
 export const HLJS_ALIAS_MAP: Record<string,string>
-export const languageImporter: Map<string,{promise?:Promise<unknown>,module?:unknown,ok?:boolean,ts?:number}>
+export const BAD_LANGUAGES: Set<string>
+export const languageImporter: any
 export function setLanguageImporter(fn: any): any
-export function clearLanguageImportCache(): any
-export function setLanguageImportNegativeCacheTTL(ms: number): any
+export function clearLanguageImportCache(): void
+export function setLanguageImportNegativeCacheTTL(ms: number): void
 export function loadSupportedLanguages(url: string): Promise<void>
 export function registerLanguage(name: string, modulePath: string): Promise<boolean>
 export function observeCodeBlocks(root: any): any
 export function setHighlightTheme(opts: {useCdn?:boolean}): void
-
 
 
 // --- from src/bulmaManager.js
@@ -378,9 +378,9 @@ export function parseHrefToRoute(href: string): any
 export function toCanonicalHref(href: string): string
 
 // --- from src/utils/sharedDomParser.js
-
-
-
+export function getSharedParser(): DOMParser|null
+export function setSharedParser(parser: DOMParser|null): void
+export function resetSharedParser(): void
 
 // --- from src/utils/renderer-manager.js
 
@@ -413,16 +413,19 @@ export function parseFrontmatter(md: string): {content:string, data: Record<stri
 // --- from src/utils/debug.js
 export function setDebugLevel(level: any): any
 export function getDebugLevel(): number
-export function isDebugLevel(level: number): any
-export function isDebug(): any
+export function isDebugLevel(level: number): boolean
+export function isDebug(): boolean
 export function debugError(...args: any): void
 export function debugWarn(...args: any): void
 export function debugInfo(...args: any): void
 export function debugLog(...args: any): void
-export function incrementCounter(name: string): any
-export function syncLegacyCounter(name: string): any
+export function incrementCounter(name: string): void
+export function syncLegacyCounter(name: string): void
 export function hasLegacyDebug(): boolean
 export function getDebugCounters(): Record<string,number>
-export function resetDebugCounters(): any
+export function resetDebugCounters(): void
+
+// --- from src/utils/concurrency.js
+export function runWithConcurrency(items: T[], worker: (item:T, index:number)=>Promise<U>, concurrency: number): Promise<Array<U>>
 
 // --- from src/lib/index.js

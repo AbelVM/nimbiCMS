@@ -29,6 +29,11 @@ function decodeHtmlEntitiesLocal(s) {
 
 const marked = (_markedModule && (_markedModule.marked || _markedModule)) || undefined
 
+// Hoisted regex and helpers to avoid reallocation per-message
+const FENCE_RE = /```\s*([a-zA-Z0-9_\-+]+)?/g
+const FALLBACK_KNOWN = new Set(['bash','sh','zsh','javascript','js','python','py','php','java','c','cpp','rust','go','ruby','perl','r','scala','swift','kotlin','cs','csharp','html','css','json','xml','yaml','yml','dockerfile','docker'])
+function slugifyHeading(s) { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+
 /**
  * Worker entrypoint for rendering markdown to HTML and registering
  * highlight.js languages on demand.
@@ -128,14 +133,13 @@ onmessage = async (ev) => {
       const mdText = msg.md || ''
       const supported = msg.supported || []
       const res = new Set()
-      const re = /```\s*([a-zA-Z0-9_\-+]+)?/g
+      const re = new RegExp(FENCE_RE.source, FENCE_RE.flags)
       let m
       while ((m = re.exec(mdText))) {
         if (m[1]) {
           const name = String(m[1]).toLowerCase()
           if (!name) continue
           if (name.length >= 5 && name.length <= 30 && /^[a-z][a-z0-9_\-+]*$/.test(name)) res.add(name)
-          const FALLBACK_KNOWN = new Set(['bash','sh','zsh','javascript','js','python','py','php','java','c','cpp','rust','go','ruby','perl','r','scala','swift','kotlin','cs','csharp','html','css','json','xml','yaml','yml','dockerfile','docker'])
           if (FALLBACK_KNOWN.has(name)) res.add(name)
           if (supported && supported.length) {
             try {
@@ -155,9 +159,7 @@ onmessage = async (ev) => {
     
     const heads = []
     const idCounts = new Map()
-    const slugify = (s) => {
-      try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' }
-    }
+    const slugify = slugifyHeading
     html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
       const level = Number(lvl)
       let text = inner.replace(/<[^>]+>/g, '').trim()
@@ -222,14 +224,13 @@ export async function handleWorkerMessage(msg) {
       const mdText = msg.md || ''
       const supported = msg.supported || []
       const res = new Set()
-      const re = /``\`\s*([a-zA-Z0-9_\-+]+)?/g
+      const re = new RegExp(FENCE_RE.source, FENCE_RE.flags)
       let m
       while ((m = re.exec(mdText))) {
         if (m[1]) {
           const name = String(m[1]).toLowerCase()
           if (!name) continue
           if (name.length >= 5 && name.length <= 30 && /^[a-z][a-z0-9_\-+]*$/.test(name)) res.add(name)
-          const FALLBACK_KNOWN = new Set(['bash','sh','zsh','javascript','js','python','py','php','java','c','cpp','rust','go','ruby','perl','r','scala','swift','kotlin','cs','csharp','html','css','json','xml','yaml','yml','dockerfile','docker'])
           if (FALLBACK_KNOWN.has(name)) res.add(name)
           if (supported && supported.length) {
             try {
@@ -248,9 +249,7 @@ export async function handleWorkerMessage(msg) {
 
     const heads = []
     const idCounts = new Map()
-    const slugify = (s) => {
-      try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' }
-    }
+    const slugify = slugifyHeading
     html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
       const level = Number(lvl)
       let text = inner.replace(/<[^>]+>/g, '').trim()

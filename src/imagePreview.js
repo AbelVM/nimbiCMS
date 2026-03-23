@@ -337,6 +337,7 @@ function _createModal() {
  * Set the current zoom factor for the preview image.
  *
  * @param {number} value Zoom factor (0.1-4). The zoom is clamped.
+ * @returns {void}
  */
 function setZoom(value) {
   if (!_img) return
@@ -379,6 +380,7 @@ function setZoom(value) {
  * Set the zoom level so the image fits within the visible preview area.
  *
  * This is used for the "fit to screen" button and when the preview is first opened.
+ * @returns {void}
  */
 function fitToScreen() {
   if (!_img) return
@@ -405,6 +407,7 @@ function fitToScreen() {
  * @param {string} [alt] Alt text for the previewed image
  * @param {number} [naturalWidth] Optional natural width of the image (for when known in advance)
  * @param {number} [naturalHeight] Optional natural height of the image
+ * @returns {void}
  */
 function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
   const modal = _createModal()
@@ -470,6 +473,7 @@ function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
 
 /**
  * Close the image preview modal, if open.
+ * @returns {void}
  */
 function closePreview() {
   if (!_modal) return
@@ -488,6 +492,7 @@ function closePreview() {
  * When an image is clicked, a modal opens and provides zoom/pan controls.
  * @param {HTMLElement} root The DOM element containing images to enhance.
  * @param {{t?: (key: string) => string}} [options] Optional helpers, such as localization.
+ * @returns {void}
  */
 export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
   if (!root || !root.querySelectorAll) return

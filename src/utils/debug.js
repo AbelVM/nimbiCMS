@@ -25,7 +25,7 @@ let _debugLevel = 0 // default: disabled
 
 /**
  * Internal counters map used for lightweight instrumentation.
- * @type {Object<string,number>}
+ * @type {Record<string,number>}
  */
 const _counters = Object.create(null)
 
@@ -53,6 +53,7 @@ export function getDebugLevel() {
 /**
  * Returns true when the configured debug level is >= `level`.
  * @param {number} [level=1]
+ * @returns {boolean}
  */
 export function isDebugLevel(level = 1) {
   try { return Number(_debugLevel) >= Number(level || 1) } catch (e) { return false }
@@ -60,6 +61,7 @@ export function isDebugLevel(level = 1) {
 
 /**
  * Convenience: whether any debug is enabled (level > 0).
+ * @returns {boolean}
  */
 export function isDebug() { return isDebugLevel(1) }
 
@@ -119,6 +121,7 @@ export function debugLog(...args) {
  * Increment a named debug counter (useful for tests). No-op when debug
  * level is 0 to avoid unnecessary work.
  * @param {string} name
+ * @returns {void}
  */
 export function incrementCounter(name) {
   try {
@@ -134,6 +137,7 @@ export function incrementCounter(name) {
  * when present. This centralizes the remaining legacy-global touchpoints so
  * callers don't need to reference `__nimbiCMSDebug` directly.
  * @param {string} name
+ * @returns {void}
  */
 export function syncLegacyCounter(name) {
   try {
@@ -157,7 +161,7 @@ export function hasLegacyDebug() {
 
 /**
  * Read counters as a plain object snapshot.
- * @returns {Object<string,number>}
+ * @returns {Record<string,number>}
  */
 export function getDebugCounters() {
   try { return Object.assign({}, _counters) } catch (e) { return {} }
@@ -165,6 +169,7 @@ export function getDebugCounters() {
 
 /**
  * Reset counters (test helper).
+ * @returns {void}
  */
 export function resetDebugCounters() {
   try {

@@ -2,6 +2,7 @@
  * @module worker/anchorWorker
  */
 import { _rewriteAnchors } from '../htmlBuilder.js'
+import { getSharedParser } from '../utils/sharedDomParser.js'
 
 /**
  * Worker entrypoint for rewriting anchor hrefs inside rendered HTML.
@@ -26,11 +27,16 @@ onmessage = async (ev) => {
       const { id, html, contentBase, pagePath } = msg
       try {
         
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(html || '', 'text/html')
-        const article = doc.body
-        await _rewriteAnchors(article, contentBase, pagePath, { canonical: true })
-        postMessage({ id, result: doc.body.innerHTML })
+        const parser = getSharedParser()
+        if (!parser) {
+          // No DOMParser available in this environment; return original HTML unchanged
+          postMessage({ id, result: html })
+        } else {
+          const doc = parser.parseFromString(html || '', 'text/html')
+          const article = doc.body
+          await _rewriteAnchors(article, contentBase, pagePath, { canonical: true })
+          postMessage({ id, result: doc.body.innerHTML })
+        }
       } catch (e) {
         postMessage({ id, error: String(e) })
       }
@@ -51,7 +57,10 @@ export async function handleAnchorWorkerMessage(msg) {
     if (msg && msg.type === 'rewriteAnchors') {
       const { id, html, contentBase, pagePath } = msg
       try {
-        const parser = new DOMParser()
+        const parser = getSharedParser()
+        if (!parser) {
+          return { id, result: html }
+        }
         const doc = parser.parseFromString(html || '', 'text/html')
         const article = doc.body
         await _rewriteAnchors(article, contentBase, pagePath, { canonical: true })

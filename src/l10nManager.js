@@ -25,6 +25,10 @@ if (typeof navigator !== 'undefined') {
 }
 if (!DEFAULT_L10N[detectedLang]) detectedLang = 'en'
 
+/**
+ * Currently selected UI language code (short form, e.g. 'en').
+ * @type {string}
+ */
 export let currentLang = detectedLang
 
 /**

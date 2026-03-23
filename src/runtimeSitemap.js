@@ -5,8 +5,9 @@
  *
  * @module runtimeSitemap
  */
-import { allMarkdownPaths, allMarkdownPathsSet, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
+import { allMarkdownPathsSet, slugToMd, mdToSlug, searchIndex, buildSearchIndex, fetchMarkdown, slugify, whenSearchIndexReady } from './slugManager.js'
 import { normalizePath } from './utils/helpers.js'
+import { getSharedParser } from './utils/sharedDomParser.js'
 import { debugLog, debugWarn } from './utils/debug.js'
 
 // Backwards-compatible underscore-prefixed aliases used in older code paths
@@ -45,6 +46,12 @@ function _escapeXml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 }
 
+/**
+ * Escape a string for safe inclusion in XML.
+ * @param {string} s
+ * @returns {string}
+ */
+
 function _humanizeSlug(slug) {
   try {
     if (!slug || typeof slug !== 'string') return ''
@@ -55,6 +62,12 @@ function _humanizeSlug(slug) {
     return parts.map(p => p ? (p.charAt(0).toUpperCase() + p.slice(1)) : '').join(' ').trim()
   } catch { return String(slug) }
 }
+
+/**
+ * Humanize a slug/token into a readable title string.
+ * @param {string} slug
+ * @returns {string}
+ */
 
 /**
  * Convert an index entry (or slug) to a canonical sitemap entry object.
@@ -84,7 +97,7 @@ function makeEntryFromIndexItem(baseNoQs, it) {
  * @param {string} [opts.homePage]
  * @param {string} [opts.navigationPage]
  * @param {string} [opts.notFoundPage]
- * @returns {SitemapJson} sitemap JSON object
+ * @returns {Promise<SitemapJson>} sitemap JSON object
  */
 export async function generateSitemapJson(opts = {}) {
   const {
@@ -136,10 +149,15 @@ export async function generateSitemapJson(opts = {}) {
                     let h = null
                     if (nfRes.isHtml) {
                       try {
-                        const parser = new DOMParser()
-                        const doc = parser.parseFromString(nfRes.raw, 'text/html')
-                        const h1 = doc.querySelector('h1') || doc.querySelector('title')
-                        if (h1 && h1.textContent) h = h1.textContent.trim()
+                        const parser = getSharedParser()
+                        if (parser) {
+                          const doc = parser.parseFromString(nfRes.raw, 'text/html')
+                          const h1 = doc.querySelector('h1') || doc.querySelector('title')
+                          if (h1 && h1.textContent) h = h1.textContent.trim()
+                        } else {
+                          const m = (nfRes.raw || '').match(/<h1[^>]*>(.*?)<\/h1>|<title[^>]*>(.*?)<\/title>/i)
+                          if (m) h = (m[1] || m[2] || '').trim()
+                        }
                       } catch {}
                     } else {
                       const m = (nfRes.raw || '').match(/^#\s+(.+)$/m)

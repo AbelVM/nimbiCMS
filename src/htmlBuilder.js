@@ -14,6 +14,7 @@ import { buildCosmeticUrl, parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
 import { debugWarn, debugInfo, isDebugLevel } from './utils/debug.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
+import { runWithConcurrency } from './utils/concurrency.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
 /**
@@ -518,7 +519,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           } catch (err) { /* ignore per-path fallback errors */ }
         }
       } else {
-        await Promise.all(Array.from(pending).map(async rel => {
+        await runWithConcurrency(Array.from(pending), async (rel) => {
         try {
           try {
             const m = String(rel).match(/([^\/]+)\.md$/)
@@ -548,7 +549,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             }
           }
           } catch (err) { debugWarn('[htmlBuilder] fetchMarkdown during rewriteAnchors failed', err) }
-        }))
+        }, 6)
       }
     }
 
@@ -569,15 +570,15 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           } catch (err) { /* ignore per-path fallback errors */ }
         }
       } else {
-        await Promise.all(Array.from(htmlPending).map(async rel => {
+        await runWithConcurrency(Array.from(htmlPending), async (rel) => {
         try {
           const res = await fetchMarkdown(rel, contentBase)
           if (res && res.raw) {
             try {
               const parser = getSharedParser()
-              const doc = parser.parseFromString(res.raw, 'text/html')
-              const titleTag = doc.querySelector('title')
-              const h1 = doc.querySelector('h1')
+              const doc = parser ? parser.parseFromString(res.raw, 'text/html') : null
+              const titleTag = doc ? doc.querySelector('title') : null
+              const h1 = doc ? doc.querySelector('h1') : null
               const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
                 ? titleTag.textContent.trim()
                 : (h1 && h1.textContent ? h1.textContent.trim() : null)
@@ -590,7 +591,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             } catch (err) { debugWarn('[htmlBuilder] parse fetched HTML failed', err) }
           }
         } catch (err) { debugWarn('[htmlBuilder] fetchMarkdown for htmlPending failed', err) }
-        }))
+        }, 5)
       }
     }
 

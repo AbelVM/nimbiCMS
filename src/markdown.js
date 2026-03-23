@@ -111,6 +111,7 @@ export const markdownPlugins = []
  * Register a new marked plugin.  The object is passed directly to
  * `marked.use()` which merges its fields into the global parser.
  * @param {MarkdownPlugin} plugin - Markdown plugin object to register with `marked`.
+ * @returns {void}
  */
 export function addMarkdownExtension(plugin) {
   if (plugin && (typeof plugin === 'object' || typeof plugin === 'function')) {
@@ -122,6 +123,7 @@ export function addMarkdownExtension(plugin) {
 /**
  * Replace the full plugin list.  Existing list is cleared first.
  * @param {MarkdownPlugin[]} plugins - array of markdown plugins to register
+ * @returns {void}
  */
 export function setMarkdownExtensions(plugins) {
   markdownPlugins.length = 0
@@ -140,8 +142,8 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
  * Convert markdown string to HTML and extract a table-of-contents list.
  * Preserves frontmatter metadata.
  *
- * @param {string} md - markdown source string to convert
- * @returns {Promise<ParseResult>} - Promise resolving to the parsed HTML, metadata, and table-of-contents.
+ * @param {string} [md] - Markdown source string to convert; falsy values are treated as an empty string.
+ * @returns {Promise<ParseResult>} Promise resolving to the parsed HTML, metadata, and table-of-contents.
  */
 export async function parseMarkdownToHtml(md) {
   if (markdownPlugins && markdownPlugins.length) {
@@ -383,9 +385,9 @@ export async function parseMarkdownToHtml(md) {
 /**
  * Detect fenced code block languages in a markdown string.
  * Kept immediately above the exported symbol for TypeDoc.
- * @param {string} md - markdown source
- * @param {Map<string,string>} [supportedMap] - optional supported languages map
- * @returns {Set<string>} set of detected language identifiers
+ * @param {string} [md] - Markdown source string to scan for fenced code blocks.
+ * @param {Map<string,string>} [supportedMap] - Optional map of supported language alias -> canonical name.
+ * @returns {Set<string>} - Set of detected language identifiers (canonical or fallback names)
  */
 export function detectFenceLanguages(md, supportedMap) {
   const set = new Set()
@@ -439,9 +441,9 @@ export function detectFenceLanguages(md, supportedMap) {
 
 /**
  * Asynchronous detection that attempts to use the renderer worker if available.
- * @param {string} mdText
- * @param {Map<string,string>} [supportedMap]
- * @returns {Promise<Set<string>>}
+ * @param {string} [mdText] - Markdown source string to scan for fenced code blocks.
+ * @param {Map<string,string>} [supportedMap] - Optional map of supported language alias -> canonical name.
+ * @returns {Promise<Set<string>>} Promise resolving to a set of detected language identifiers.
  */
 export async function detectFenceLanguagesAsync(mdText, supportedMap) {
   if (markdownPlugins && markdownPlugins.length) return detectFenceLanguages(mdText || '', supportedMap)

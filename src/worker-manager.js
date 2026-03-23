@@ -141,7 +141,7 @@ export function makeWorkerManager(createWorker, name = 'worker') {
  * @param {function(): (Worker|null)} createWorker - factory for a single Worker instance
  * @param {string} [name='worker-pool'] - friendly name
  * @param {number} [size=2] - number of workers in the pool
- * @returns {Object} - manager with `get`, `send`, and `terminate`
+ * @returns {WorkerManager} - manager with `get`, `send`, and `terminate`
  */
 export function makeWorkerPool(createWorker, name = 'worker-pool', size = 2) {
   const _ws = new Array(size).fill(null)

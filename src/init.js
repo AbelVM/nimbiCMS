@@ -6,13 +6,14 @@
  * @module init
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, notFoundPage } from './slugManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage } from './slugManager.js'
 import * as router from './router.js'
 import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
 import { createUI } from './ui.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { normalizePath } from './utils/helpers.js'
+import { getSharedParser } from './utils/sharedDomParser.js'
 import { injectSeoForPage, setSeoMap } from './seoManager.js'
 import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
@@ -40,14 +41,53 @@ import { setDebugLevel, debugWarn, debugInfo } from './utils/debug.js'
  * The returned object contains only keys for params that were present and
  * successfully parsed.
  *
+ * @typedef {Object} ParsedInitOptions
+ * @property {string} [contentPath]
+ * @property {boolean} [searchIndex]
+ * @property {'eager'|'lazy'} [searchIndexMode]
+ * @property {'light'|'dark'|'system'} [defaultStyle]
+ * @property {string} [bulmaCustomize]
+ * @property {string} [lang]
+ * @property {string|null} [l10nFile]
+ * @property {number} [cacheTtlMinutes]
+ * @property {number} [cacheMaxEntries]
+ * @property {string} [homePage]
+ * @property {string|null} [notFoundPage]
+ * @property {string} [navigationPage]
+ * @property {string[]} [availableLanguages]
+ * @property {number} [indexDepth]
+ * @property {string[]} [noIndexing]
+ *
+ * @typedef {Object} InitOptions
+ * @property {string|Element} el
+ * @property {string} [contentPath]
+ * @property {number} [crawlMaxQueue]
+ * @property {boolean} [searchIndex]
+ * @property {'eager'|'lazy'} [searchIndexMode]
+ * @property {'light'|'dark'|'system'} [defaultStyle]
+ * @property {string} [bulmaCustomize]
+ * @property {string} [lang]
+ * @property {string|null} [l10nFile]
+ * @property {number} [cacheTtlMinutes]
+ * @property {number} [cacheMaxEntries]
+ * @property {Array<Record<string,unknown>>} [markdownExtensions]
+ * @property {string[]} [availableLanguages]
+ * @property {string} [homePage]
+ * @property {string|null} [notFoundPage]
+ * @property {boolean} [skipRootReadme]
+ * @property {boolean} [allowUrlPathOverrides]
+ * @property {Object} [seoMap]
+ * @property {Object} [manifest]
+ * @property {boolean} [exposeSitemap]
+ *
  * @param {string} [queryString] optional query string (for tests); defaults to window.location.search
- * @returns {Object} - Parsed options object containing any recognized and parsed query parameters.
+ * @returns {ParsedInitOptions} - Parsed options object containing any recognized and parsed query parameters.
  */
 /**
  * Parse URL query string into a normalized `initCMS` options object.
  * Conservative, descriptive helper used by `initCMS` and tests.
  * @param {string} [queryString]
- * @returns {Object}
+ * @returns {ParsedInitOptions}
  */
 export function parseInitOptionsFromQuery(queryString) {
   try {
@@ -196,7 +236,7 @@ export let initialDocumentTitle = ''
  * Throws a `TypeError` when options are of the wrong type so configuration
  * mistakes are surfaced early (e.g. passing a number for `contentPath`).
  *
- * @param {Record<string,unknown>} [options={}] - Initialization options provided by the caller.
+ * @param {InitOptions} [options={}] - Initialization options provided by the caller.
  * @param {boolean} [options.allowUrlPathOverrides=false] - advanced opt-in that
  *   allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via
  *   URL query parameters. This is disabled by default for security; enabling
@@ -221,7 +261,7 @@ export let initialDocumentTitle = ''
 /**
  * Initialize the Nimbi CMS runtime on the host page.
  * Conservative wrapper used by consumers to mount UI and start routing.
- * @param {Record<string,unknown>} [options]
+ * @param {InitOptions} [options]
  * @returns {Promise<void>}
  */
 export async function initCMS(options = {}) {
@@ -704,7 +744,7 @@ export async function initCMS(options = {}) {
                 try { debugWarn('[nimbi-cms] fetched navigation candidate', np, 'contentBase=', contentBase) } catch (_) {}
                 _earlyParsedNav = await markdown.parseMarkdownToHtml(_earlyNavMd.raw || '')
                 try {
-                  const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+                  const parser = getSharedParser()
                   if (parser && _earlyParsedNav && _earlyParsedNav.html) {
                     const doc = parser.parseFromString(_earlyParsedNav.html, 'text/html')
                     const a = doc.querySelector('a')

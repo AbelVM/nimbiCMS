@@ -19,8 +19,8 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Gate expensive debug/log formatting
 - **[PERF]** Fetch caching & dedupe
 - **[PERF]** Negative cache for dynamic imports
-- **[PERF]**
-- **[PERF]**
+- **[PERF]** Limit and tune concurrency
+- **[PERF]** Hot-regex & allocations
 - **[PERF]**
 - **[PERF]**
 - **[CHORE]** Improved JSDoc coverage and quality

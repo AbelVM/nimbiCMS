@@ -11,6 +11,7 @@ import * as l10n from './l10nManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
+import { getSharedParser } from './utils/sharedDomParser.js'
 import { isDebugLevel, incrementCounter, debugError, debugWarn, debugLog, syncLegacyCounter } from './utils/debug.js'
 import { refreshIndexPaths, indexSet } from './indexManager.js'
 export let RESOLUTION_CACHE_MAX = 100
@@ -556,9 +557,9 @@ export async function fetchPageData(raw, contentBase) {
         if (requestedSlug && !slugToMd.has(requestedSlug)) {
           try {
             let title = ''
-            if (data && data.isHtml) {
+                if (data && data.isHtml) {
               try {
-                const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+                const parser = getSharedParser()
                 if (parser) {
                   const doc = parser.parseFromString(data.raw || '', 'text/html')
                   const h1 = doc.querySelector('h1') || doc.querySelector('title')
@@ -771,7 +772,7 @@ export async function fetchPageData(raw, contentBase) {
                   const absUrl = abs
                   const baseHref = new URL('.', absUrl).toString()
                   try {
-                    const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+                    const parser = getSharedParser()
                     if (parser) {
                       const doc = parser.parseFromString(raw || '', 'text/html')
                       const rewrite = (attr, el) => {
