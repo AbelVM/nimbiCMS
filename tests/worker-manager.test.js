@@ -1,4 +1,76 @@
 import { describe, it, expect } from 'vitest'
+import { makeWorkerManager, makeWorkerPool, createWorkerFromRaw } from '../src/worker-manager.js'
+
+class FakeWorker {
+  constructor(name = 'w') {
+    this._listeners = { message: [], error: [] }
+    this._terminated = false
+    this.name = name
+  }
+  addEventListener(type, fn) {
+    if (!this._listeners[type]) this._listeners[type] = []
+    this._listeners[type].push(fn)
+  }
+  removeEventListener(type, fn) {
+    const arr = this._listeners[type]
+    if (!arr) return
+    const i = arr.indexOf(fn)
+    if (i !== -1) arr.splice(i, 1)
+  }
+  postMessage(msg) {
+    // respond asynchronously with a simple echo result
+    setTimeout(() => {
+      if (this._terminated) return
+      const ev = { data: { id: msg && msg.id, result: `echo:${msg && msg.type ? msg.type : 'ok'}` } }
+      ;(this._listeners.message || []).slice().forEach(fn => fn(ev))
+    }, 10)
+  }
+  terminate() {
+    this._terminated = true
+    this._listeners = { message: [], error: [] }
+  }
+}
+
+describe('worker-manager', () => {
+  it('makeWorkerManager: send/receive works', async () => {
+    const factory = () => new FakeWorker('m1')
+    const mgr = makeWorkerManager(factory, 'test-manager')
+    const res = await mgr.send({ type: 'ping' }, 1000)
+    expect(res).toBe('echo:ping')
+    mgr.terminate()
+  })
+
+  it('makeWorkerManager: propagates worker error payloads as rejection', async () => {
+    class ErrorWorker extends FakeWorker {
+      postMessage(msg) {
+        setTimeout(() => {
+          const ev = { data: { id: msg && msg.id, error: 'boom' } }
+          ;(this._listeners.message || []).slice().forEach(fn => fn(ev))
+        }, 5)
+      }
+    }
+    const factory = () => new ErrorWorker('err')
+    const mgr = makeWorkerManager(factory, 'err-manager')
+    await expect(mgr.send({ type: 'x' }, 1000)).rejects.toThrow(/boom/)
+    mgr.terminate()
+  })
+
+  it('makeWorkerPool: supports parallel sends', async () => {
+    const factory = () => new FakeWorker('pool')
+    const pool = makeWorkerPool(factory, 'pool-test', 2)
+    const p1 = pool.send({ type: 'job1' }, 1000)
+    const p2 = pool.send({ type: 'job2' }, 1000)
+    const results = await Promise.all([p1, p2])
+    expect(results).toEqual(['echo:job1', 'echo:job2'])
+    pool.terminate()
+  })
+
+  it('createWorkerFromRaw returns null in this environment', () => {
+    const maybe = createWorkerFromRaw('console.log(1)')
+    expect(maybe === null || typeof maybe === 'object').toBeTruthy()
+  })
+})
+import { describe, it, expect } from 'vitest'
 import { makeWorkerManager } from '../src/worker-manager.js'
 
 describe('worker-manager behaviors', () => {

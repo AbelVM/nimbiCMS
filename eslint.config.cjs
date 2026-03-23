@@ -23,8 +23,8 @@ module.exports = [
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'unused-imports/no-unused-imports': 'warn',
       'unused-imports/no-unused-vars': ['warn', { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' }],
-      'no-console': 'off'
-      , 'nimbi-debug/no-eager-debug': 'warn'
+      'no-console': 'off',
+      'nimbi-debug/no-eager-debug': 'warn'
     }
   }
 ]
