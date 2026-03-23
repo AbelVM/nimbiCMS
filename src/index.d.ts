@@ -370,6 +370,11 @@ export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): st
 export function parseHrefToRoute(href: string): any
 export function toCanonicalHref(href: string): string
 
+// --- from src/utils/sharedDomParser.js
+
+
+
+
 // --- from src/utils/renderer-manager.js
 
 

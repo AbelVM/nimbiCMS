@@ -13,6 +13,7 @@ import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash,
 import { buildCosmeticUrl, parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
 import { debugWarn, debugInfo, isDebugLevel } from './utils/debug.js'
+import { getSharedParser } from './utils/sharedDomParser.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
 /**
@@ -513,7 +514,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           const res = await fetchMarkdown(rel, contentBase)
           if (res && res.raw) {
             try {
-              const parser = HTML_PARSER || new DOMParser()
+              const parser = getSharedParser()
               const doc = parser.parseFromString(res.raw, 'text/html')
               const titleTag = doc.querySelector('title')
               const h1 = doc.querySelector('h1')
@@ -707,7 +708,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
       const res = await fetchMarkdown(htmlPath, base)
       if (res && res.raw) {
         try {
-            const parser = HTML_PARSER || new DOMParser()
+            const parser = getSharedParser()
             const doc = parser.parseFromString(res.raw, 'text/html')
             const titleTag = doc.querySelector('title')
             const h1 = doc.querySelector('h1')
@@ -820,11 +821,11 @@ export async function preMapMdSlugs(linkEls, contentBase) {
  * @param {string} raw - HTML string to parse
  * @returns {ParsedPage}
  */
-const HTML_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+const HTML_PARSER = getSharedParser()
 
 function parseHtml(raw) {
   try {
-    const parser = HTML_PARSER || new DOMParser()
+    const parser = getSharedParser()
     const doc = parser.parseFromString(raw || '', 'text/html')
     addHeadingIds(doc)
     try {
@@ -930,7 +931,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     let parsed = null
     if (data.isHtml) {
       try {
-        const parser = (typeof DOMParser !== 'undefined') ? new DOMParser() : null
+        const parser = getSharedParser()
         if (parser) {
           const doc = parser.parseFromString(data.raw || '', 'text/html')
           try { rewriteRelativeAssets(doc.body, pagePath, contentBase) } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle (inner)', err) }

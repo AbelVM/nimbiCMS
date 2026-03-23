@@ -12,6 +12,7 @@ import * as RendererModule from './worker/renderer.js'
 import { makeWorkerPool } from './worker-manager.js'
 import emojimap from './utils/emojiMap.js'
 import { debugWarn } from './utils/debug.js'
+import { getSharedParser } from './utils/sharedDomParser.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
@@ -49,7 +50,7 @@ function _createRendererInstance() {
 
 const _rendererManager = makeWorkerPool(() => _createRendererInstance(), 'markdown', poolSize)
 
-const SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+// use shared DOMParser helper (see src/utils/sharedDomParser.js)
 
 /**
  * Table-of-contents entry extracted from a parsed document.
@@ -150,7 +151,7 @@ export async function parseMarkdownToHtml(md) {
     try { markdownPlugins.forEach(p => marked.use(p)) } catch (e) { debugWarn('[markdown] apply plugins failed', e) }
     const html = marked.parse(content)
     try {
-      const parser = SHARED_DOM_PARSER || (typeof DOMParser !== 'undefined' ? new DOMParser() : null)
+      const parser = getSharedParser()
       if (parser) {
         const doc = parser.parseFromString(html, 'text/html')
         // add heading ids and build toc
@@ -343,7 +344,7 @@ export async function parseMarkdownToHtml(md) {
       const moved = (typeof document !== 'undefined' && document.documentElement && document.documentElement.getAttribute)
         ? document.documentElement.getAttribute('data-nimbi-logo-moved') || '' : ''
       if (moved) {
-        const parser = SHARED_DOM_PARSER || (typeof DOMParser !== 'undefined' ? new DOMParser() : null)
+        const parser = getSharedParser()
         if (parser) {
           const doc = parser.parseFromString(html, 'text/html')
           const imgs = doc.querySelectorAll('img')
