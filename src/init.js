@@ -12,6 +12,7 @@ import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
 import { createUI } from './ui.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
+import { normalizePath } from './utils/helpers.js'
 import { injectSeoForPage, setSeoMap } from './seoManager.js'
 import { runHooks } from './hookManager.js'
 import { t, loadL10nFile, setLang } from './l10nManager.js'
@@ -123,30 +124,9 @@ export function parseInitOptionsFromQuery(queryString) {
     }
 
     return out
-  } catch (err) {
+  } catch (e) {
     return {}
   }
-}
-
-/**
- * Rejects suspicious paths that could lead to path traversal or external URLs.
- * Returns true if the path is safe to use as a content path segment.
- * Safe rules:
- *  - must be a string
- *  - must not contain ".." segments
- *  - must not be an absolute URL (protocol://) or start with //
- *  - must not start with a leading slash (we normalize to relative)
- * @param {string} p - candidate content path segment
- * @returns {boolean} true when the path is considered safe
- */
-function isSafeContentPath(p) {
-  if (typeof p !== 'string') return false
-  if (!p.trim()) return false
-  if (p.includes('..')) return false
-  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(p)) return false // protocol://
-  if (p.startsWith('//')) return false
-  if (p.startsWith('/') || /^[A-Za-z]:\\/.test(p)) return false
-  return true
 }
 
 /**
@@ -171,6 +151,29 @@ function isSafePagePath(name) {
   if (s.startsWith('/') || /^[A-Za-z]:\\/.test(s)) return false
   const normalized = s.replace(/^\.\//, '')
   if (!/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(md|html)$/.test(normalized)) return false
+  return true
+}
+
+/**
+ * Validate a `contentPath` override supplied via URL.
+ * Accepts relative paths like `./content/` or `content/` but rejects
+ * protocol absolute, leading-slash absolute, Windows absolute, or
+ * parent-directory references ("..").
+ * @param {string} p
+ * @returns {boolean}
+ */
+function isSafeContentPath(p) {
+  if (typeof p !== 'string') return false
+  const s = p.trim()
+  if (!s) return false
+  // Allow '.' or './' as explicit page-relative indicators (same as empty)
+  if (s === '.' || s === './') return true
+  if (s.includes('..')) return false
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(s)) return false
+  if (s.startsWith('//')) return false
+  if (s.startsWith('/') || /^[A-Za-z]:\\/.test(s)) return false
+  const normalized = s.replace(/^\.\//, '')
+  if (!/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\/?$/.test(normalized)) return false
   return true
 }
 
@@ -604,7 +607,48 @@ export async function initCMS(options = {}) {
     }
   } catch (err) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
 
-  try { setContentBase(contentBase) } catch (err) { debugWarn('[nimbi-cms] setContentBase failed', err) }
+  try {
+    // If an authoritative content manifest was provided by the caller
+    // (or injected on the global), apply it to the slug manager before
+    // calling `setContentBase`. This ensures `allMarkdownPaths` and
+    // slug maps are populated deterministically so direct URL loads
+    // (hard refreshes) can resolve pages that are not present in the
+    // navigation file.
+    try {
+      const manifest = (finalOptions && finalOptions.manifest) ? finalOptions.manifest :
+        (typeof globalThis !== 'undefined' && globalThis.__NIMBI_CMS_MANIFEST__) ? globalThis.__NIMBI_CMS_MANIFEST__ :
+        (typeof window !== 'undefined' && window.__NIMBI_CMS_MANIFEST__) ? window.__NIMBI_CMS_MANIFEST__ : null
+      if (manifest && typeof manifest === 'object') {
+        try {
+          const sm = await import('./slugManager.js')
+          if (sm && typeof sm._setAllMd === 'function') {
+            sm._setAllMd(manifest)
+            try { debugInfo('[nimbi-cms diagnostic] applied content manifest', { manifestKeys: Object.keys(manifest).length }) } catch (e) {}
+          }
+        } catch (e) { debugWarn('[nimbi-cms] applying content manifest failed', e) }
+      }
+
+      try {
+        setContentBase(contentBase)
+      } catch (err) { debugWarn('[nimbi-cms] setContentBase failed', err) }
+
+      try {
+        // Log current slug/index sizes after applying manifest + setContentBase
+        try {
+          const sm2 = await import('./slugManager.js')
+          try {
+            debugInfo('[nimbi-cms diagnostic] after setContentBase', {
+              manifestKeys: manifest && typeof manifest === 'object' ? Object.keys(manifest).length : 0,
+              slugToMdSize: (sm2 && sm2.slugToMd && typeof sm2.slugToMd.size === 'number') ? sm2.slugToMd.size : undefined,
+              allMarkdownPathsLength: (sm2 && Array.isArray(sm2.allMarkdownPaths)) ? sm2.allMarkdownPaths.length : undefined,
+              allMarkdownPathsSetSize: (sm2 && sm2.allMarkdownPathsSet && typeof sm2.allMarkdownPathsSet.size === 'number') ? sm2.allMarkdownPathsSet.size : undefined,
+              searchIndexLength: (sm2 && Array.isArray(sm2.searchIndex)) ? sm2.searchIndex.length : undefined
+            })
+          } catch (e) {}
+        } catch (e) {}
+      } catch (e) {}
+    } catch (e) {}
+  } catch (err) { debugWarn('[nimbi-cms] setContentBase failed', err) }
   try { setNotFoundPage(notFoundPage) } catch (err) { debugWarn('[nimbi-cms] setNotFoundPage failed', err) }
   try {
     // Optional: attach a small sitemap download UI when a host enables it
@@ -742,6 +786,38 @@ export async function initCMS(options = {}) {
     }
     const { navbar, linkEls } = await buildNav(navbarWrap, container, parsedNav.html || '', contentBase, homePage, t, ui.renderByQuery, effectiveSearchEnabled, searchIndexMode, indexDepth, noIndexing, navbarLogo)
     try { await runHooks('onNavBuild', { navWrap, navbar, linkEls, contentBase }) } catch (e) { debugWarn('[nimbi-cms] onNavBuild hooks failed', e) }
+    try {
+      // Ensure nav link slugs are present in slugManager for mocked environments
+      try {
+        if (linkEls && linkEls.length) {
+          const sm = await import('./slugManager.js')
+          for (const a of Array.from(linkEls || [])) {
+            try {
+              const href = (a && a.getAttribute) ? (a.getAttribute('href') || '') : ''
+              if (!href) continue
+              let path = String(href || '').split(/::|#/, 1)[0]
+              path = String(path || '').split('?')[0]
+              if (!path) continue
+              if (!/\.(?:md|html?)$/.test(path)) path = path + '.html'
+              const baseName = String(path || '').replace(/^.*\//, '').replace(/\?.*$/, '')
+              const slugKey = String(baseName || '').replace(/\s+/g, '-').toLowerCase()
+              if (!slugKey) continue
+              try {
+                if (sm && typeof sm._storeSlugMapping === 'function') {
+                  try { sm._storeSlugMapping(slugKey, path) } catch (_) {}
+                } else if (sm && sm.slugToMd && typeof sm.slugToMd.set === 'function') {
+                  try { sm.slugToMd.set(slugKey, path) } catch (_) {}
+                }
+                try { if (sm && sm.mdToSlug && typeof sm.mdToSlug.set === 'function') sm.mdToSlug.set(path, slugKey) } catch (_) {}
+                try { if (sm && Array.isArray(sm.allMarkdownPaths) && !sm.allMarkdownPaths.includes(path)) sm.allMarkdownPaths.push(path) } catch (_) {}
+                try { if (sm && sm.allMarkdownPathsSet && typeof sm.allMarkdownPathsSet.add === 'function') sm.allMarkdownPathsSet.add(path) } catch (_) {}
+              } catch (_) {}
+            } catch (_) {}
+          }
+          try { const im2 = await import('./indexManager.js'); if (im2 && typeof im2.refreshIndexPaths === 'function') im2.refreshIndexPaths(contentBase) } catch (_) {}
+        }
+      } catch (e) {}
+    } catch (e) {}
     
       try {
         // If the current URL is requesting a sitemap/rss/atom, run the
@@ -806,6 +882,116 @@ export async function initCMS(options = {}) {
       } catch (e) {}
 
     try {
+      // Refresh the runtime index set from any slug mappings created
+      // during nav build so initial direct page loads can probe
+      // candidates (crawl/index lookups) even when no build-time
+      // manifest was provided.
+      try {
+        const im = await import('./indexManager.js')
+        if (im && typeof im.refreshIndexPaths === 'function') {
+          try {
+            im.refreshIndexPaths(contentBase)
+            try {
+              // Diagnostic: log slug/index sizes after index refresh
+              try {
+                const sm3 = await import('./slugManager.js')
+                try { debugInfo('[nimbi-cms diagnostic] after refreshIndexPaths', { slugToMdSize: (sm3 && sm3.slugToMd && typeof sm3.slugToMd.size === 'number') ? sm3.slugToMd.size : undefined, allMarkdownPathsLength: (sm3 && Array.isArray(sm3.allMarkdownPaths)) ? sm3.allMarkdownPaths.length : undefined, allMarkdownPathsSetSize: (sm3 && sm3.allMarkdownPathsSet && typeof sm3.allMarkdownPathsSet.size === 'number') ? sm3.allMarkdownPathsSet.size : undefined }) } catch (e) {}
+              } catch (e) {}
+            } catch (e) {}
+              // If no build-time manifest and slug maps are sparse, try using
+              // the runtime sitemap / search index exposed on `window` to
+              // populate slug->md mappings so direct URL loads can resolve.
+                try {
+                const sm4 = await import('./slugManager.js')
+                const currentSize = (sm4 && sm4.slugToMd && typeof sm4.slugToMd.size === 'number') ? sm4.slugToMd.size : 0
+                // Decide whether to seed: prefer targeted seeding when the
+                // currently requested slug/path is missing, otherwise seed
+                // when maps appear sparse. This avoids noisy work on large
+                // sites while fixing direct-load cases.
+                let shouldSeed = false
+                try {
+                  if (!manifest) {
+                    if (currentSize < 30) shouldSeed = true
+                    try {
+                      const parsedCurrent = parseHrefToRoute(typeof location !== 'undefined' ? location.href : '')
+                      if (parsedCurrent) {
+                        if (parsedCurrent.type === 'cosmetic' && parsedCurrent.page) {
+                          try { if (!sm4.slugToMd.has(parsedCurrent.page)) shouldSeed = true } catch (_) {}
+                        } else if ((parsedCurrent.type === 'path' || parsedCurrent.type === 'canonical') && parsedCurrent.page) {
+                          try {
+                            const rp = normalizePath(parsedCurrent.page)
+                            if (!(sm4.mdToSlug && sm4.mdToSlug.has(rp)) && !(sm4.allMarkdownPathsSet && sm4.allMarkdownPathsSet.has(rp))) shouldSeed = true
+                          } catch (_) {}
+                        }
+                      }
+                    } catch (_) {}
+                  }
+                } catch (_) {}
+
+                if (shouldSeed) {
+                  let resolvedIndex = null
+                  try { resolvedIndex = (typeof window !== 'undefined' && (window.__nimbiSitemapFinal || window.__nimbiResolvedIndex || window.__nimbiSearchIndex || window.__nimbiLiveSearchIndex || window.__nimbiSearchIndex)) || null } catch (_) { resolvedIndex = null }
+                  if (Array.isArray(resolvedIndex) && resolvedIndex.length) {
+                    let added = 0
+                    for (const it of resolvedIndex) {
+                      try {
+                        if (!it || !it.slug) continue
+                        const baseSlug = String(it.slug).split('::')[0]
+                        if (sm4.slugToMd.has(baseSlug)) continue
+                        let rawPath = it.sourcePath || it.path || null
+                        if (!rawPath && Array.isArray(resolvedIndex)) {
+                          const found = (resolvedIndex || []).find(si => si && si.slug === it.slug)
+                          if (found && found.path) rawPath = found.path
+                        }
+                        if (!rawPath) continue
+                        try { rawPath = String(rawPath) } catch (_) { continue }
+
+                        // Normalize to a content-base relative path similar to
+                        // how `buildSearchIndex` and `slugManager` represent
+                        // paths. Attempt URL resolution when possible so
+                        // absolute URLs or root-prefixed paths are handled.
+                        let rel = null
+                        try {
+                          const baseForResolve = (contentBase && typeof contentBase === 'string') ? contentBase : (typeof location !== 'undefined' && location.origin ? location.origin + '/' : '')
+                          try {
+                            const u = new URL(rawPath, baseForResolve)
+                            const baseUrl = new URL(baseForResolve)
+                            if (u.origin === baseUrl.origin) {
+                              const basePath = baseUrl.pathname || '/'
+                              let p = u.pathname || ''
+                              if (p.startsWith(basePath)) p = p.slice(basePath.length)
+                              if (p.startsWith('/')) p = p.slice(1)
+                              rel = normalizePath(p)
+                            } else {
+                              rel = normalizePath(u.pathname || '')
+                            }
+                          } catch (e) {
+                            rel = normalizePath(rawPath)
+                          }
+                        } catch (e) { rel = normalizePath(rawPath) }
+
+                        if (!rel) continue
+                        rel = String(rel).split(/[?#]/)[0]
+                        rel = normalizePath(rel)
+
+                        try { sm4._storeSlugMapping(baseSlug, rel) } catch (_) {}
+                        added++
+                      } catch (_) {}
+                    }
+                    if (added) {
+                      try { debugInfo('[nimbi-cms diagnostic] populated slugToMd from sitemap/searchIndex', { added, total: (sm4 && sm4.slugToMd && typeof sm4.slugToMd.size === 'number') ? sm4.slugToMd.size : undefined }) } catch (_) {}
+                      try {
+                        const im2 = await import('./indexManager.js')
+                        if (im2 && typeof im2.refreshIndexPaths === 'function') im2.refreshIndexPaths(contentBase)
+                      } catch (_) {}
+                    }
+                  }
+                }
+              } catch (_) {}
+          } catch (e) { debugWarn('[nimbi-cms] refreshIndexPaths after nav build failed', e) }
+        }
+      } catch (e) {}
+
       const computeAndSet = () => {
         const navHeight = (navbarWrap && navbarWrap.getBoundingClientRect && Math.round(navbarWrap.getBoundingClientRect().height)) || (navbarWrap && navbarWrap.offsetHeight) || 0
         if (navHeight > 0) {

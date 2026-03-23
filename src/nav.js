@@ -10,8 +10,21 @@ import { createNavTree, preScanHtmlSlugs, preMapMdSlugs } from './htmlBuilder.js
 import { t } from './l10nManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
-import { slugify, slugToMd, mdToSlug, fetchMarkdown, allMarkdownPaths, allMarkdownPathsSet, searchIndex } from './slugManager.js'
+import { slugify, slugToMd, mdToSlug, _storeSlugMapping, fetchMarkdown, allMarkdownPaths, allMarkdownPathsSet, searchIndex } from './slugManager.js'
 import { debugLog, debugWarn } from './utils/debug.js'
+
+// Helper to store slug mapping with fallback when slugManager is mocked
+function storeSlugMapping(slug, rel) {
+  try {
+    if (typeof _storeSlugMapping === 'function') {
+      try { _storeSlugMapping(slug, rel); return } catch (_) {}
+    }
+  } catch (_) {}
+  try { if (slug && rel && slugToMd && typeof slugToMd.set === 'function' && !slugToMd.has(slug)) slugToMd.set(slug, rel) } catch (_) {}
+  try { if (rel && mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slug) } catch (_) {}
+  try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+  try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
+}
 
 function safeGet(mod, name) {
   try {
@@ -244,8 +257,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               a.setAttribute('role', 'button')
               try {
                 if (it.path && typeof it.slug === 'string') {
-                  try { slugToMd.set(it.slug, it.path) } catch (ee) {}
-                  try { mdToSlug.set(it.path, it.slug) } catch (ee) {}
+                  try { storeSlugMapping(it.slug, it.path) } catch (ee) {}
                 }
               } catch (e) {}
               const title = document.createElement('div')
@@ -615,8 +627,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           a.setAttribute('role', 'button')
               try {
                 if (it.path && typeof it.slug === 'string') {
-                  try { slugToMd.set(it.slug, it.path) } catch (ee) {}
-                  try { mdToSlug.set(it.path, it.slug) } catch (ee) {}
+                  try { storeSlugMapping(it.slug, it.path) } catch (ee) {}
                 }
               } catch (e) {}
           const title = document.createElement('div')
@@ -781,8 +792,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                 const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim()) ? titleTag.textContent.trim() : (h1 && h1.textContent ? h1.textContent.trim() : null)
                 if (titleText) {
                   const slugKey = slugify(titleText)
-                  if (slugKey) {
-                    try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (ee) { debugWarn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
+                    if (slugKey) {
+                    try { storeSlugMapping(slugKey, htmlPath) } catch (ee) { debugWarn('[nimbi-cms] slugToMd/mdToSlug set failed', ee) }
                     item.href = buildPageUrl(slugKey, frag)
                   } else {
                     item.href = buildPageUrl(htmlPath, frag)
@@ -835,9 +846,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                       }
                     }
                   } catch (err) { persistMapping = false }
-                  if (persistMapping) {
-                    try { slugToMd.set(slugKey, mappingTarget) } catch (ee) {}
-                    try { mdToSlug.set(mappingTarget, slugKey) } catch (ee) {}
+                    if (persistMapping) {
+                    try { storeSlugMapping(slugKey, mappingTarget) } catch (ee) {}
                   }
                 }
               }

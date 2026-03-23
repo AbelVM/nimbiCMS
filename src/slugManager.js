@@ -148,6 +148,13 @@ export function _storeSlugMapping(slug, rel) {
   } else {
     slugToMd.set(slug, rel)
   }
+  try {
+    if (rel && typeof rel === 'string') {
+      try { mdToSlug.set(rel, slug) } catch (_) {}
+      try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+      try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
+    }
+  } catch (_) {}
 }
 
 /**
@@ -1509,18 +1516,17 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   for (const resolver of slugResolvers) {
     try {
       const res = await resolver(decoded, contentBase)
-      if (res) {
-        _storeSlugMapping(decoded, res)
-        mdToSlug.set(res, decoded)
-        return res
-      }
+        if (res) {
+          _storeSlugMapping(decoded, res)
+          return res
+        }
     } catch (err) { _debugLog('[slugManager] slug resolver failed', err) }
   }
 
   if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
     if (listSlugCache.has(decoded)) {
       const p = listSlugCache.get(decoded)
-      slugToMd.set(decoded, p); mdToSlug.set(p, decoded)
+      _storeSlugMapping(decoded, p)
       return p
     }
     for (const p of allMarkdownPaths) {
@@ -1534,7 +1540,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
             listPathsFetched.add(p)
             if (cand) listSlugCache.set(cand, p)
             if (cand === decoded) {
-              _storeSlugMapping(decoded, p); mdToSlug.set(p, decoded)
+              _storeSlugMapping(decoded, p)
               return p
             }
           }
@@ -1549,7 +1555,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       const match = idx.find(e => e.slug === decoded)
       if (match) {
         _storeSlugMapping(decoded, match.path)
-        mdToSlug.set(match.path, decoded)
         return match.path
       }
     }
@@ -1559,7 +1564,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue)
     if (foundCrawl) {
       _storeSlugMapping(decoded, foundCrawl)
-      mdToSlug.set(foundCrawl, decoded)
       return foundCrawl
     }
   } catch (err) { _debugLog('[slugManager] crawlForSlug lookup failed', err) }
@@ -1568,9 +1572,8 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   for (const cand of candidates) {
     try {
       const res = await fetchMarkdown(cand, contentBase)
-      if (res && res.raw) {
+        if (res && res.raw) {
         _storeSlugMapping(decoded, cand)
-        mdToSlug.set(cand, decoded)
         return cand
       }
     } catch (err) { _debugLog('[slugManager] candidate fetch failed', err) }
@@ -1582,7 +1585,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         const name = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
         if (slugify(name) === decoded) {
           _storeSlugMapping(decoded, p)
-          mdToSlug.set(p, decoded)
           return p
         }
       } catch (err) { _debugLog('[slugManager] build-time filename match failed', err) }
@@ -1602,7 +1604,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
             const homeSlug = slugify(mhome[1].trim())
             if (homeSlug === decoded) {
               _storeSlugMapping(decoded, homePage)
-              mdToSlug.set(homePage, decoded)
               return homePage
             }
           }

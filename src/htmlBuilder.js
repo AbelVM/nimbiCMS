@@ -6,7 +6,7 @@
  *
  * @module htmlBuilder
  */
-import { slugify, mdToSlug, slugToMd, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, allMarkdownPathsSet, HOME_SLUG } from './slugManager.js'
+import { slugify, mdToSlug, slugToMd, _storeSlugMapping, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, allMarkdownPathsSet, HOME_SLUG } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
@@ -42,6 +42,19 @@ function _hbShouldProbe(contentBase) {
   try { if (slugToMd && slugToMd.size) return true } catch (e) {}
   try { if (allMarkdownPathsSet && allMarkdownPathsSet.size) return true } catch (e) {}
   return false
+}
+
+// Helper to store slug mapping with a fallback for mocked slugManager
+function storeSlugMapping(slug, rel) {
+  try {
+    if (typeof _storeSlugMapping === 'function') {
+      try { _storeSlugMapping(slug, rel); return } catch (_) {}
+    }
+  } catch (_) {}
+  try { if (slug && rel && slugToMd && typeof slugToMd.set === 'function' && !slugToMd.has(slug)) slugToMd.set(slug, rel) } catch (_) {}
+  try { if (rel && mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slug) } catch (_) {}
+  try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+  try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
 }
 
 /**
@@ -452,10 +465,10 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           try {
             const m = String(rel).match(/([^\/]+)\.md$/)
             const basename = m && m[1]
-            if (basename) {
+                if (basename) {
               const candidate = slugify(basename)
               if (candidate) {
-                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] setting fallback slug mapping failed', err) }
+                try { storeSlugMapping(candidate, rel) } catch (err) { debugWarn('[htmlBuilder] setting fallback slug mapping failed', err) }
               }
             }
           } catch (err) { /* ignore per-path fallback errors */ }
@@ -470,7 +483,10 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
               try {
                 const mapped = slugToMd.get(basename)
                 if (mapped) {
-                  try { mdToSlug.set(mapped, basename) } catch (err) { debugWarn('[htmlBuilder] mdToSlug.set failed', err) }
+                  try {
+                    const pathVal = (typeof mapped === 'string') ? mapped : (mapped && mapped.default ? mapped.default : null)
+                    if (pathVal) storeSlugMapping(basename, pathVal)
+                  } catch (err) { debugWarn('[htmlBuilder] _storeSlugMapping failed', err) }
                 }
               } catch (err) { debugWarn('[htmlBuilder] reading slugToMd failed', err) }
               return
@@ -482,9 +498,9 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             const m2 = (mdData.raw || '').match(/^#\s+(.+)$/m)
             if (m2 && m2[1]) {
               const candidate = slugify(m2[1].trim())
-              if (candidate) {
-                try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] setting slug mapping failed', err) }
-              }
+                if (candidate) {
+                  try { storeSlugMapping(candidate, rel) } catch (err) { debugWarn('[htmlBuilder] setting slug mapping failed', err) }
+                }
             }
           }
           } catch (err) { debugWarn('[htmlBuilder] fetchMarkdown during rewriteAnchors failed', err) }
@@ -500,10 +516,10 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           try {
             const m = String(rel).match(/([^\/]+)\.html$/)
             const basename = m && m[1]
-            if (basename) {
+                if (basename) {
               const candidate = slugify(basename)
               if (candidate) {
-                try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, rel); if (!mdToSlug.has(rel)) mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] setting fallback html slug mapping failed', err) }
+                try { storeSlugMapping(candidate, rel) } catch (err) { debugWarn('[htmlBuilder] setting fallback html slug mapping failed', err) }
               }
             }
           } catch (err) { /* ignore per-path fallback errors */ }
@@ -524,7 +540,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
               if (titleText) {
                 const slugKey = slugify(titleText)
                 if (slugKey) {
-                  try { slugToMd.set(slugKey, rel); mdToSlug.set(rel, slugKey) } catch (err) { debugWarn('[htmlBuilder] setting html slug mapping failed', err) }
+                  try { storeSlugMapping(slugKey, rel) } catch (err) { debugWarn('[htmlBuilder] setting html slug mapping failed', err) }
                 }
               }
             } catch (err) { debugWarn('[htmlBuilder] parse fetched HTML failed', err) }
@@ -593,7 +609,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
     if (!displayTitle && pagePath) displayTitle = String(pagePath)
     if (displayTitle) slugKey = slugify(displayTitle)
     if (!slugKey) slugKey = HOME_SLUG
-    try { if (pagePath) { slugToMd.set(slugKey, pagePath); mdToSlug.set(pagePath, slugKey) } } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
+    try { if (pagePath) { try { storeSlugMapping(slugKey, pagePath) } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) } } } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
         try {
         // Prefer a normalized anchor extracted via `parseHrefToRoute`, but
         // avoid persisting an anchor from a different page when rendering a new page.
@@ -685,7 +701,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
 
   if (!htmlPaths.size) return
 
-  if (!_hbShouldProbe(base)) {
+    if (!_hbShouldProbe(base)) {
     try { debugWarn('[htmlBuilder] skipping preScanHtmlSlugs (probing disabled)') } catch (e) {}
     // Create conservative mappings from html filenames when probing disabled
     for (const htmlPath of Array.from(htmlPaths)) {
@@ -695,7 +711,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
         if (basename) {
           const candidate = slugify(basename)
           if (candidate) {
-            try { if (!slugToMd.has(candidate)) slugToMd.set(candidate, htmlPath); if (!mdToSlug.has(htmlPath)) mdToSlug.set(htmlPath, candidate) } catch (err) { debugWarn('[htmlBuilder] setting fallback preScanHtmlSlugs mapping failed', err) }
+              try { storeSlugMapping(candidate, htmlPath) } catch (err) { debugWarn('[htmlBuilder] setting fallback preScanHtmlSlugs mapping failed', err) }
           }
         }
       } catch (err) { /* ignore per-path errors */ }
@@ -718,7 +734,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
             if (titleText) {
               const slugKey = slugify(titleText)
               if (slugKey) {
-                try { slugToMd.set(slugKey, htmlPath); mdToSlug.set(htmlPath, slugKey) } catch (err) { debugWarn('[htmlBuilder] set slugToMd/mdToSlug failed', err) }
+                try { storeSlugMapping(slugKey, htmlPath) } catch (err) { debugWarn('[htmlBuilder] set slugToMd/mdToSlug failed', err) }
               }
             }
           } catch (err) { debugWarn('[htmlBuilder] parse HTML title failed', err) }
@@ -790,7 +806,12 @@ export async function preMapMdSlugs(linkEls, contentBase) {
         if (basename && slugToMd.has(basename)) {
           try {
               const mapped = slugToMd.get(basename)
-              if (mapped) mdToSlug.set(mapped, basename)
+              if (mapped) {
+                try {
+                  const pathVal = (typeof mapped === 'string') ? mapped : (mapped && mapped.default ? mapped.default : null)
+                  if (pathVal) storeSlugMapping(basename, pathVal)
+                } catch (err) { debugWarn('[htmlBuilder] _storeSlugMapping failed', err) }
+              }
               } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs slug map access failed', err) }
           return
         }
@@ -802,9 +823,9 @@ export async function preMapMdSlugs(linkEls, contentBase) {
           const m2 = (mdData.raw || '').match(/^#\s+(.+)$/m)
           if (m2 && m2[1]) {
             const candidate = slugify(m2[1].trim())
-            if (candidate) {
-              try { slugToMd.set(candidate, rel); mdToSlug.set(rel, candidate) } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs setting slug mapping failed', err) }
-            }
+                if (candidate) {
+                  try { storeSlugMapping(candidate, rel) } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs setting slug mapping failed', err) }
+                }
           }
         }
       } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs fetch failed', err) }
