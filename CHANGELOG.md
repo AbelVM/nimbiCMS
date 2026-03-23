@@ -15,7 +15,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Reuse DOMParser
 - **[PERF]** Memoize expensive transforms
 - **[PERF]** Use Sets/Maps for membership checks
-- **[PERF]**
+- **[PERF]** Batch DOM updates
 - **[PERF]**
 - **[PERF]**
 - **[PERF]**

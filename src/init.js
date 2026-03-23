@@ -789,7 +789,7 @@ export async function initCMS(options = {}) {
     try {
       // Ensure nav link slugs are present in slugManager for mocked environments
       try {
-        if (linkEls && linkEls.length) {
+          if (linkEls && linkEls.length) {
           const sm = await import('./slugManager.js')
           for (const a of Array.from(linkEls || [])) {
             try {
@@ -799,18 +799,48 @@ export async function initCMS(options = {}) {
               path = String(path || '').split('?')[0]
               if (!path) continue
               if (!/\.(?:md|html?)$/.test(path)) path = path + '.html'
-              const baseName = String(path || '').replace(/^.*\//, '').replace(/\?.*$/, '')
-              const slugKey = String(baseName || '').replace(/\s+/g, '-').toLowerCase()
-              if (!slugKey) continue
+              // Normalize path to a content-base relative canonical form
+              let rel = null
+              try { rel = normalizePath(String(path || '')) } catch (_) { rel = String(path || '') }
+              const baseName = String(rel || '').replace(/^.*\//, '').replace(/\?.*$/, '')
+              if (!baseName) continue
               try {
-                if (sm && typeof sm._storeSlugMapping === 'function') {
-                  try { sm._storeSlugMapping(slugKey, path) } catch (_) {}
-                } else if (sm && sm.slugToMd && typeof sm.slugToMd.set === 'function') {
-                  try { sm.slugToMd.set(slugKey, path) } catch (_) {}
-                }
-                try { if (sm && sm.mdToSlug && typeof sm.mdToSlug.set === 'function') sm.mdToSlug.set(path, slugKey) } catch (_) {}
-                try { if (sm && Array.isArray(sm.allMarkdownPaths) && !sm.allMarkdownPaths.includes(path)) sm.allMarkdownPaths.push(path) } catch (_) {}
-                try { if (sm && sm.allMarkdownPathsSet && typeof sm.allMarkdownPathsSet.add === 'function') sm.allMarkdownPathsSet.add(path) } catch (_) {}
+                // Prefer using slugManager.slugify when available to produce
+                // consistent slugs; avoid clobbering existing slug keys by
+                // generating a unique candidate when collisions would occur.
+                let candidate = null
+                try { if (sm && typeof sm.slugify === 'function') candidate = sm.slugify(baseName.replace(/\.(?:md|html?)$/i, '')) } catch (_) { candidate = String(baseName || '').replace(/\s+/g, '-').toLowerCase() }
+                if (!candidate) continue
+                let slugKeyFinal = candidate
+                try {
+                  if (sm && sm.slugToMd && typeof sm.slugToMd.has === 'function' && sm.slugToMd.has(candidate)) {
+                    // If the existing mapping belongs to the same path, keep it.
+                    const existing = sm.slugToMd.get(candidate)
+                    let belongs = false
+                    try {
+                      if (typeof existing === 'string') {
+                        if (existing === path) belongs = true
+                      } else if (existing && typeof existing === 'object') {
+                        if (existing.default === path) belongs = true
+                        for (const k of Object.keys(existing.langs || {})) { if (existing.langs[k] === path) { belongs = true; break } }
+                      }
+                    } catch (_) {}
+                    if (!belongs && typeof sm.uniqueSlug === 'function') {
+                      try { slugKeyFinal = sm.uniqueSlug(candidate, new Set(sm.slugToMd.keys())) } catch (_) { slugKeyFinal = candidate }
+                    }
+                  }
+                } catch (_) {}
+
+                try {
+                  if (sm && typeof sm._storeSlugMapping === 'function') {
+                    try { sm._storeSlugMapping(slugKeyFinal, rel) } catch (_) {}
+                  } else if (sm && sm.slugToMd && typeof sm.slugToMd.set === 'function') {
+                    try { sm.slugToMd.set(slugKeyFinal, rel) } catch (_) {}
+                  }
+                  try { if (sm && sm.mdToSlug && typeof sm.mdToSlug.set === 'function') sm.mdToSlug.set(rel, slugKeyFinal) } catch (_) {}
+                  try { if (sm && Array.isArray(sm.allMarkdownPaths) && !sm.allMarkdownPaths.includes(rel)) sm.allMarkdownPaths.push(rel) } catch (_) {}
+                  try { if (sm && sm.allMarkdownPathsSet && typeof sm.allMarkdownPathsSet.add === 'function') sm.allMarkdownPathsSet.add(rel) } catch (_) {}
+                } catch (_) {}
               } catch (_) {}
             } catch (_) {}
           }

@@ -131,35 +131,71 @@ export async function crawlForSlugWorker(slug, base, maxQueue) {
  */
 export function _storeSlugMapping(slug, rel) {
   if (!slug) return
-  if (availableLanguages && availableLanguages.length) {
-    const parts = rel.split('/')
-    const firstSeg = parts[0]
-    const isLang = availableLanguages.includes(firstSeg)
-    let entry = slugToMd.get(slug)
-    if (!entry || typeof entry === 'string') {
-      entry = { default: typeof entry === 'string' ? entry : undefined, langs: {} }
-    }
-    if (isLang) {
-      entry.langs[firstSeg] = rel
-    } else {
-      entry.default = rel
-    }
-    slugToMd.set(slug, entry)
-  } else {
-    slugToMd.set(slug, rel)
-  }
+  // Normalize the provided relative path so stored keys are consistent
+  let relNorm = null
+  try { relNorm = typeof rel === 'string' ? normalizePath(rel) : normalizePath(String(rel || '')) } catch (_) { relNorm = String(rel || '') }
+  if (!relNorm) return
+
   try {
-    if (rel && typeof rel === 'string') {
-      try { mdToSlug.set(rel, slug) } catch (_) {}
+    if (availableLanguages && availableLanguages.length) {
+      const parts = String(relNorm).split('/')
+      const firstSeg = parts[0]
+      const isLang = availableLanguages.includes(firstSeg)
+      let entry = slugToMd.get(slug)
+      if (!entry || typeof entry === 'string') {
+        entry = { default: typeof entry === 'string' ? normalizePath(entry) : undefined, langs: {} }
+      } else {
+        try { if (entry.default) entry.default = normalizePath(entry.default) } catch (_) {}
+      }
+      if (isLang) {
+        entry.langs[firstSeg] = relNorm
+      } else {
+        entry.default = relNorm
+      }
+      slugToMd.set(slug, entry)
+    } else {
+      // If slug already exists and points to a different path, avoid
+      // clobbering the existing mapping. Instead, generate a unique
+      // slug and store the mapping under that new key so distinct
+      // pages do not collide on the same canonical slug.
+      const existing = slugToMd.has(slug) ? slugToMd.get(slug) : undefined
+      if (existing) {
+        let existingPath = null
+        try {
+          if (typeof existing === 'string') existingPath = normalizePath(existing)
+          else if (existing && typeof existing === 'object') existingPath = existing.default ? normalizePath(existing.default) : null
+        } catch (_) { existingPath = null }
+        if (!existingPath || existingPath === relNorm) {
+          slugToMd.set(slug, relNorm)
+        } else {
+          try {
+            const taken = new Set()
+            for (const k of slugToMd.keys()) taken.add(k)
+            const newSlug = typeof uniqueSlug === 'function' ? uniqueSlug(slug, taken) : `${slug}-2`
+            slugToMd.set(newSlug, relNorm)
+            // Use the newly chosen slug for reverse mapping below
+            slug = newSlug
+          } catch (_) {
+            // fallback: do not overwrite existing mapping
+          }
+        }
+      } else {
+        slugToMd.set(slug, relNorm)
+      }
+    }
+  } catch (_) {}
+
+  try {
+    if (relNorm) {
+      try { mdToSlug.set(relNorm, slug) } catch (_) {}
       try {
-        // Prefer fast Set membership checks when available to avoid O(n) array scans.
         if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
-          if (!allMarkdownPathsSet.has(rel)) {
-            try { allMarkdownPathsSet.add(rel) } catch (_) {}
-            try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+          if (!allMarkdownPathsSet.has(relNorm)) {
+            try { allMarkdownPathsSet.add(relNorm) } catch (_) {}
+            try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(relNorm)) allMarkdownPaths.push(relNorm) } catch (_) {}
           }
         } else {
-          try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+          try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(relNorm)) allMarkdownPaths.push(relNorm) } catch (_) {}
         }
       } catch (_) {}
     }
@@ -1019,6 +1055,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         if (md.status === 404) continue
         let title = ''
         let excerpt = ''
+        let pageSlug = null
         if (md.isHtml) {
           try {
             const parser = new DOMParser()
@@ -1031,10 +1068,41 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
               try {
                 const topH1 = doc.querySelector('h1')
                 const parentTitle = topH1 && topH1.textContent ? topH1.textContent.trim() : (title || '')
-                const pageSlug = (() => {
-                  try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { /* ignore */ }
-                  return slugify(title || path)
-                })()
+                // Derive and persist a unique page slug for this path so H2/H3
+                // anchors and the final page entry use a stable, non-colliding
+                // base slug. Prefer existing `mdToSlug` when present.
+                try {
+                  const existing = (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(path)) ? mdToSlug.get(path) : null
+                  if (existing) {
+                    pageSlug = existing
+                  } else {
+                    let cand = slugify(title || path)
+                    const taken = new Set()
+                    try { for (const k of slugToMd.keys()) taken.add(k) } catch (_) {}
+                    try {
+                      for (const it of idx) {
+                        if (it && it.slug) taken.add(String(it.slug).split('::')[0])
+                      }
+                    } catch (_) {}
+                    let belongs = false
+                    try {
+                      if (slugToMd.has(cand)) {
+                        const val = slugToMd.get(cand)
+                        if (typeof val === 'string') {
+                          if (val === path) belongs = true
+                        } else if (val && typeof val === 'object') {
+                          if (val.default === path) belongs = true
+                          for (const k of Object.keys(val.langs || {})) { if (val.langs[k] === path) { belongs = true; break } }
+                        }
+                      }
+                    } catch (_) {}
+                    if (!belongs && taken.has(cand)) {
+                      cand = uniqueSlug(cand, taken)
+                    }
+                    pageSlug = cand
+                    try { if (!mdToSlug.has(path)) _storeSlugMapping(pageSlug, path) } catch (_) {}
+                  }
+                } catch (err) { _debugLog('[slugManager] derive pageSlug failed', err) }
                 const h2s = Array.from(doc.querySelectorAll('h2'))
                 for (const h2 of h2s) {
                   try {
@@ -1082,13 +1150,44 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
               if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
             }
           }
-          if (indexDepth >= 2) {
+            if (indexDepth >= 2) {
             let parentTitle = ''
-            let pageSlug = ''
             try {
               const h1 = (raw.match(/^#\s+(.+)$/m) || [])[1]
               parentTitle = h1 ? h1.trim() : ''
-              pageSlug = (function() { try { if (mdToSlug.has(path)) return mdToSlug.get(path) } catch (err) { } return slugify(title || path) })()
+              // Derive and persist a unique page slug for this markdown path
+              try {
+                const existing = (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(path)) ? mdToSlug.get(path) : null
+                if (existing) {
+                  pageSlug = existing
+                } else {
+                  let cand = slugify(title || path)
+                  const taken = new Set()
+                  try { for (const k of slugToMd.keys()) taken.add(k) } catch (_) {}
+                  try {
+                    for (const it of idx) {
+                      if (it && it.slug) taken.add(String(it.slug).split('::')[0])
+                    }
+                  } catch (_) {}
+                  let belongs = false
+                  try {
+                    if (slugToMd.has(cand)) {
+                      const val = slugToMd.get(cand)
+                      if (typeof val === 'string') {
+                        if (val === path) belongs = true
+                      } else if (val && typeof val === 'object') {
+                        if (val.default === path) belongs = true
+                        for (const k of Object.keys(val.langs || {})) { if (val.langs[k] === path) { belongs = true; break } }
+                      }
+                    }
+                  } catch (_) {}
+                  if (!belongs && taken.has(cand)) {
+                    cand = uniqueSlug(cand, taken)
+                  }
+                  pageSlug = cand
+                  try { if (!mdToSlug.has(path)) _storeSlugMapping(pageSlug, path) } catch (_) {}
+                }
+              } catch (err) { _debugLog('[slugManager] derive pageSlug failed', err) }
               const h2re = /^##\s+(.+)$/gm
               let m2
               while ((m2 = h2re.exec(raw))) {
@@ -1130,7 +1229,48 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
         try {
           if (mdToSlug.has(path)) slug = mdToSlug.get(path)
         } catch (err) { _debugLog('[slugManager] mdToSlug access failed', err) }
-        if (!slug) slug = slugify(title || path)
+
+        // Ensure we derive and persist a deterministic, unique page slug for
+        // every path so multiple pages with identical titles don't collapse
+        // into the same base slug in the sitemap. This runs regardless of
+        // `indexDepth` so the canonical slug maps are populated consistently.
+        if (!slug) {
+          try {
+            if (!pageSlug) {
+              const existing = (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(path)) ? mdToSlug.get(path) : null
+              if (existing) {
+                pageSlug = existing
+              } else {
+                let cand = slugify(title || path)
+                const taken = new Set()
+                try { for (const k of slugToMd.keys()) taken.add(k) } catch (_) {}
+                try {
+                  for (const it of idx) {
+                    if (it && it.slug) taken.add(String(it.slug).split('::')[0])
+                  }
+                } catch (_) {}
+                let belongs = false
+                try {
+                  if (slugToMd.has(cand)) {
+                    const val = slugToMd.get(cand)
+                    if (typeof val === 'string') {
+                      if (val === path) belongs = true
+                    } else if (val && typeof val === 'object') {
+                      if (val.default === path) belongs = true
+                      for (const k of Object.keys(val.langs || {})) { if (val.langs[k] === path) { belongs = true; break } }
+                    }
+                  }
+                } catch (_) {}
+                if (!belongs && taken.has(cand)) {
+                  cand = uniqueSlug(cand, taken)
+                }
+                pageSlug = cand
+                try { if (!mdToSlug.has(path)) _storeSlugMapping(pageSlug, path) } catch (_) {}
+              }
+            }
+          } catch (err) { _debugLog('[slugManager] derive pageSlug failed', err) }
+          slug = pageSlug || slugify(title || path)
+        }
         idx.push({ slug, title, excerpt, path })
       } catch (err) {
         _debugLog('[slugManager] buildSearchIndex: entry processing failed', err)
