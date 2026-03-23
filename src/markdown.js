@@ -7,9 +7,10 @@
  * @module markdown
  */
 import { marked } from 'marked'
+import rendererWorkerCode from './worker/renderer.js?raw'
 import RendererWorker from './worker/renderer.js?worker&inline'
 import * as RendererModule from './worker/renderer.js'
-import { makeWorkerPool } from './worker-manager.js'
+import * as WorkerManager from './worker-manager.js'
 import emojimap from './utils/emojiMap.js'
 import { debugWarn } from './utils/debug.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
@@ -22,13 +23,18 @@ const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurre
  * (`postMessage`, `addEventListener`, `removeEventListener`, `terminate`).
  * @returns {Worker|Object|null}
  */
-function _createRendererInstance() {
+const _rendererManager = WorkerManager.makeWorkerPool(() => {
+  // Prefer bundler-provided worker class (test mocks target `?worker&inline`).
   if (typeof Worker !== 'undefined') {
-    try { return new RendererWorker() } catch (e) { /* fallthrough to inline */ }
+    try { return new RendererWorker() } catch (e) { /* fallthrough to raw/inline */ }
   }
 
+  // Try creating a worker from raw code if available.
+  try { if (WorkerManager.createWorkerFromRaw) return WorkerManager.createWorkerFromRaw(rendererWorkerCode) } catch (e) {}
+
+  // Inline shim: forward to module handler and emulate Worker message events.
   const listeners = { message: [], error: [] }
-  const w = {
+  return {
     addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
     removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
     postMessage(msg) {
@@ -36,19 +42,16 @@ function _createRendererInstance() {
         try {
           const out = await RendererModule.handleWorkerMessage(msg)
           const ev = { data: out }
-          (listeners.message || []).forEach(fn => fn(ev))
+          ;(listeners.message || []).forEach(fn => fn(ev))
         } catch (e) {
           const ev = { data: { id: msg && msg.id, error: String(e) } }
-          (listeners.message || []).forEach(fn => fn(ev))
+          ;(listeners.message || []).forEach(fn => fn(ev))
         }
       }, 0)
     },
     terminate() { Object.keys(listeners).forEach(k => listeners[k].length = 0) }
   }
-  return w
-}
-
-const _rendererManager = makeWorkerPool(() => _createRendererInstance(), 'markdown', poolSize)
+}, 'markdown', poolSize)
 
 // use shared DOMParser helper (see src/utils/sharedDomParser.js)
 
