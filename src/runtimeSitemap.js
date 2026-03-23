@@ -115,7 +115,6 @@ export async function generateSitemapJson(opts = {}) {
   const excludedPaths = new Set()
   try { if (typeof notFoundPage === 'string' && notFoundPage.trim()) excludedPaths.add(normalizePath(String(notFoundPage))) } catch {}
   try { if (typeof navigationPage === 'string' && navigationPage.trim()) excludedPaths.add(normalizePath(String(navigationPage))) } catch {}
-
   // Also compute excluded slugs for notFoundPage so we never include a
   // page derived from the site's 404 content (title 'Not Found' etc.). We
   // attempt to resolve a slug for the configured notFoundPage via the
@@ -463,7 +462,9 @@ export async function generateSitemapJson(opts = {}) {
   } catch (_) {}
 
   try {
-    try { _debugLog('[runtimeSitemap] generateSitemapJson finalEntries.titleSource:', JSON.stringify(final.map(e => ({ slug: e.slug, title: e.title, titleSource: e._titleSource || null })), null, 2)) } catch (e) {}
+    try {
+      _debugLog(() => '[runtimeSitemap] generateSitemapJson finalEntries.titleSource: ' + JSON.stringify(final.map(e => ({ slug: e.slug, title: e.title, titleSource: e._titleSource || null })), null, 2))
+    } catch (e) { /* avoid noisy stringify errors */ }
   } catch (_) {}
 
   // Attempt to fetch H1 titles for entries that did not come from the live index.
@@ -788,7 +789,7 @@ export async function handleSitemapRequest(opts = {}) {
               }
             } catch (_e) {}
           }
-          try { _debugLog('[runtimeSitemap] providedIndex.dedupedByBase:', JSON.stringify(Array.from(map.values()), null, 2)) } catch (e) { _debugLog('[runtimeSitemap] providedIndex.dedupedByBase (count):', map.size) }
+          try { _debugLog(() => '[runtimeSitemap] providedIndex.dedupedByBase: ' + JSON.stringify(Array.from(map.values()), null, 2)) } catch (e) { _debugLog(() => '[runtimeSitemap] providedIndex.dedupedByBase (count): ' + String(map.size)) }
         } catch (e) { _debugWarn('[runtimeSitemap] logging provided index failed', e) }
       }
     } catch (e) {}
@@ -827,8 +828,8 @@ export async function handleSitemapRequest(opts = {}) {
     // which pages/anchors are available at runtime.
     try {
       const len = Array.isArray(idx) ? idx.length : 0
-      try { _debugLog('[runtimeSitemap] usedIndex.full.length (before rebuild):', len) } catch (e) {}
-      try { _debugLog('[runtimeSitemap] usedIndex.full (before rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+      try { _debugLog(() => '[runtimeSitemap] usedIndex.full.length (before rebuild): ' + String(len)) } catch (e) {}
+      try { _debugLog(() => '[runtimeSitemap] usedIndex.full (before rebuild): ' + JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
     } catch (e) {}
 
     // Rebuild the search index on-demand to ensure we include all pages
@@ -869,8 +870,8 @@ export async function handleSitemapRequest(opts = {}) {
     // Debug: log the full index after optional rebuild
     try {
       const len2 = Array.isArray(idx) ? idx.length : 0
-        try { _debugLog('[runtimeSitemap] usedIndex.full.length (after rebuild):', len2) } catch (e) {}
-      try { _debugLog('[runtimeSitemap] usedIndex.full (after rebuild):', JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+        try { _debugLog(() => '[runtimeSitemap] usedIndex.full.length (after rebuild): ' + String(len2)) } catch (e) {}
+      try { _debugLog(() => '[runtimeSitemap] usedIndex.full (after rebuild): ' + JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
     } catch (e) {}
 
     // Generate JSON using the gathered index
@@ -898,7 +899,7 @@ export async function handleSitemapRequest(opts = {}) {
           }
         } catch {}
       }
-      try { _debugLog('[runtimeSitemap] finalEntries.dedupedByBase:', JSON.stringify(deduped, null, 2)) } catch (e) { _debugLog('[runtimeSitemap] finalEntries.dedupedByBase (count):', deduped.length) }
+      try { _debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase: ' + JSON.stringify(deduped, null, 2)) } catch (e) { _debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase (count): ' + String(deduped.length)) }
     } catch (e) {
       try { deduped = Array.isArray(json && json.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
     }

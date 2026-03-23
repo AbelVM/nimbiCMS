@@ -20,25 +20,33 @@ function zr() {
 }
 function Wn(...e) {
   try {
-    Zt(1) && console && typeof console.error == "function" && console.error(...e);
+    if (!Zt(1) || !console || typeof console.error != "function") return;
+    const t = e.map((n) => typeof n == "function" ? n() : n);
+    console.error(...t);
   } catch {
   }
 }
 function _(...e) {
   try {
-    Zt(2) && console && typeof console.warn == "function" && console.warn(...e);
+    if (!Zt(2) || !console || typeof console.warn != "function") return;
+    const t = e.map((n) => typeof n == "function" ? n() : n);
+    console.warn(...t);
   } catch {
   }
 }
 function Tt(...e) {
   try {
-    Zt(3) && console && typeof console.info == "function" && console.info(...e);
+    if (!Zt(3) || !console || typeof console.info != "function") return;
+    const t = e.map((n) => typeof n == "function" ? n() : n);
+    console.info(...t);
   } catch {
   }
 }
 function $t(...e) {
   try {
-    Zt(3) && console && typeof console.log == "function" && console.log(...e);
+    if (!Zt(3) || !console || typeof console.log != "function") return;
+    const t = e.map((n) => typeof n == "function" ? n() : n);
+    console.log(...t);
   } catch {
   }
 }
@@ -13608,7 +13616,7 @@ async function Vr(e = {}) {
   }
   try {
     try {
-      Ve("[runtimeSitemap] generateSitemapJson finalEntries.titleSource:", JSON.stringify(b.map((m) => ({ slug: m.slug, title: m.title, titleSource: m._titleSource || null })), null, 2));
+      Ve(() => "[runtimeSitemap] generateSitemapJson finalEntries.titleSource: " + JSON.stringify(b.map((m) => ({ slug: m.slug, title: m.title, titleSource: m._titleSource || null })), null, 2));
     } catch {
     }
   } catch {
@@ -13932,11 +13940,11 @@ async function vl(e = {}) {
     try {
       const c = Array.isArray(a) ? a.length : 0;
       try {
-        Ve("[runtimeSitemap] usedIndex.full.length (before rebuild):", c);
+        Ve(() => "[runtimeSitemap] usedIndex.full.length (before rebuild): " + String(c));
       } catch {
       }
       try {
-        Ve("[runtimeSitemap] usedIndex.full (before rebuild):", JSON.stringify(a, null, 2));
+        Ve(() => "[runtimeSitemap] usedIndex.full (before rebuild): " + JSON.stringify(a, null, 2));
       } catch {
       }
     } catch {
@@ -13989,11 +13997,11 @@ async function vl(e = {}) {
     try {
       const c = Array.isArray(a) ? a.length : 0;
       try {
-        Ve("[runtimeSitemap] usedIndex.full.length (after rebuild):", c);
+        Ve(() => "[runtimeSitemap] usedIndex.full.length (after rebuild): " + String(c));
       } catch {
       }
       try {
-        Ve("[runtimeSitemap] usedIndex.full (after rebuild):", JSON.stringify(a, null, 2));
+        Ve(() => "[runtimeSitemap] usedIndex.full (after rebuild): " + JSON.stringify(a, null, 2));
       } catch {
       }
     } catch {
@@ -14021,9 +14029,9 @@ async function vl(e = {}) {
         } catch {
         }
       try {
-        Ve("[runtimeSitemap] finalEntries.dedupedByBase:", JSON.stringify(o, null, 2));
+        Ve(() => "[runtimeSitemap] finalEntries.dedupedByBase: " + JSON.stringify(o, null, 2));
       } catch {
-        Ve("[runtimeSitemap] finalEntries.dedupedByBase (count):", o.length);
+        Ve(() => "[runtimeSitemap] finalEntries.dedupedByBase (count): " + String(o.length));
       }
     } catch {
       try {

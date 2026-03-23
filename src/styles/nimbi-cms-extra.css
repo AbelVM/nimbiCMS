@@ -231,8 +231,7 @@
 }
 
 .nimbi-article .nimbi-reading-time {
-    font-size: 0.75rem;
-    
+    font-size: 0.75rem;    
     display: inline-block;
     margin-left: 0;
     color: inherit;
@@ -259,7 +258,9 @@
     margin: 0 0.25rem;
 }
 
-.nimbi-article.content {}
+.nimbi-article.content {
+    padding-bottom: 1rem;
+}
 
 .nimbi-toc-inner ul {
     list-style: none;

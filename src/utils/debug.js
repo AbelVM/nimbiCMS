@@ -69,7 +69,11 @@ export function isDebug() { return isDebugLevel(1) }
  * @returns {void}
  */
 export function debugError(...args) {
-  try { if (isDebugLevel(1) && console && typeof console.error === 'function') console.error(...args) } catch (e) {}
+  try {
+    if (!isDebugLevel(1) || !console || typeof console.error !== 'function') return
+    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
+    console.error(...resolved)
+  } catch (e) {}
 }
 
 /**
@@ -78,7 +82,11 @@ export function debugError(...args) {
  * @returns {void}
  */
 export function debugWarn(...args) {
-  try { if (isDebugLevel(2) && console && typeof console.warn === 'function') console.warn(...args) } catch (e) {}
+  try {
+    if (!isDebugLevel(2) || !console || typeof console.warn !== 'function') return
+    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
+    console.warn(...resolved)
+  } catch (e) {}
 }
 
 /**
@@ -87,7 +95,11 @@ export function debugWarn(...args) {
  * @returns {void}
  */
 export function debugInfo(...args) {
-  try { if (isDebugLevel(3) && console && typeof console.info === 'function') console.info(...args) } catch (e) {}
+  try {
+    if (!isDebugLevel(3) || !console || typeof console.info !== 'function') return
+    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
+    console.info(...resolved)
+  } catch (e) {}
 }
 
 /**
@@ -96,7 +108,11 @@ export function debugInfo(...args) {
  * @returns {void}
  */
 export function debugLog(...args) {
-  try { if (isDebugLevel(3) && console && typeof console.log === 'function') console.log(...args) } catch (e) {}
+  try {
+    if (!isDebugLevel(3) || !console || typeof console.log !== 'function') return
+    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
+    console.log(...resolved)
+  } catch (e) {}
 }
 
 /**
