@@ -225,6 +225,7 @@ This behavior is covered by the test-suite (see the canonical-link and URL handl
 | `indexDepth` | `1 \| 2 \| 3` | `1` | How deep headings are indexed (H1, H2, H3). |
 | `noIndexing` | `string[]` | — | Paths (relative) to exclude from discovery and indexing. |
 | `skipRootReadme` | `boolean` | `false` | When `true`, skip link discovery inside a repository-root `README.md`. |
+| `manifest` | `Record<string,string>` | `null` | Optional in-memory content manifest mapping absolute paths (for example `/content/page.md`) to raw page text. When provided the runtime pre-seeds `allMarkdownPaths` and slug mappings and avoids network discovery; this is commonly used by build-time tooling that inlines page sources into a bundle. The init routine also honors a global `__NIMBI_CMS_MANIFEST__` if present. |
 
 ### Routing and Pages
 
