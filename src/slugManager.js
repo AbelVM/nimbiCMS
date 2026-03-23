@@ -618,7 +618,25 @@ export const fetchCache = new Map()
  * Clear internal fetch cache used by `fetchMarkdown`.
  * @returns {void} - No return value.
  */
-export function clearFetchCache() { fetchCache.clear() }
+export function clearFetchCache() { fetchCache.clear(); negativeFetchCache.clear() }
+
+/**
+ * Short-term negative cache for failed fetches. Maps absolute URL -> expiresAt (ms).
+ * When a URL is present and not expired, `fetchMarkdown` will reject immediately
+ * without issuing a network request.
+ * @type {Map<string, number>}
+ */
+export const negativeFetchCache = new Map()
+
+let NEGATIVE_CACHE_TTL_MS = 60 * 1000 // 1 minute default
+
+/**
+ * Adjust the negative-cache TTL (milliseconds). Useful for tests.
+ * @param {number} ms
+ */
+export function setFetchNegativeCacheTTL(ms) {
+  NEGATIVE_CACHE_TTL_MS = Number(ms) || 0
+}
 
 /**
  * @type {(path: string, base?: string) => Promise<FetchResult>
@@ -706,6 +724,15 @@ export let fetchMarkdown = async function(path, base, opts) {
   } catch (err) {
     url = (typeof location !== 'undefined' && location.origin ? location.origin : 'http://localhost') + '/' + path.replace(/^\//, '')
   }
+  // Check short-term negative cache first to avoid repeated failed fetches
+  try {
+    const neg = negativeFetchCache.get(url)
+    if (neg && neg > Date.now()) {
+      return Promise.reject(new Error('failed to fetch md'))
+    }
+    if (neg) negativeFetchCache.delete(url)
+  } catch (_) {}
+
   if (fetchCache.has(url)) {
     return fetchCache.get(url)
   }
@@ -774,8 +801,15 @@ export let fetchMarkdown = async function(path, base, opts) {
     return isHtml ? { raw, isHtml: true } : { raw }
   })()
 
-  fetchCache.set(url, promise)
-  return promise
+  // Track failures so we can negative-cache them briefly and allow retries later
+  const tracked = promise.catch(err => {
+    try { negativeFetchCache.set(url, Date.now() + NEGATIVE_CACHE_TTL_MS) } catch (_) {}
+    try { fetchCache.delete(url) } catch (_) {}
+    throw err
+  })
+
+  fetchCache.set(url, tracked)
+  return tracked
 }
 
 /**

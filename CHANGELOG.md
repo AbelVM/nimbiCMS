@@ -17,7 +17,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Use Sets/Maps for membership checks
 - **[PERF]** Batch DOM updates
 - **[PERF]** Gate expensive debug/log formatting
-- **[PERF]**
+- **[PERF]** Fetch caching & dedupe
 - **[PERF]**
 - **[PERF]**
 - **[PERF]**
