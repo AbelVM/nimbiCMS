@@ -345,8 +345,31 @@ export async function initCMS(options = {}) {
     try {
       const mount = document.querySelector(el)
       if (mount && mount instanceof Element) {
-        mount.innerHTML = `<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;">` +
-          `<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">${String(err)}</pre></div>`
+        try {
+          const container = document.createElement('div')
+          container.style.padding = '1rem'
+          try { container.style.fontFamily = 'system-ui, sans-serif' } catch (_) {}
+          container.style.color = '#b00'
+          container.style.background = '#fee'
+          container.style.border = '1px solid #b00'
+          const strong = document.createElement('strong')
+          strong.textContent = 'NimbiCMS failed to initialize:'
+          container.appendChild(strong)
+          try { container.appendChild(document.createElement('br')) } catch (_) {}
+          const pre = document.createElement('pre')
+          try { pre.style.whiteSpace = 'pre-wrap' } catch (_) {}
+          pre.textContent = String(err)
+          container.appendChild(pre)
+          try {
+            if (typeof mount.replaceChildren === 'function') mount.replaceChildren(container)
+            else {
+              while (mount.firstChild) mount.removeChild(mount.firstChild)
+              mount.appendChild(container)
+            }
+          } catch (e) {
+            try { mount.innerHTML = '<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;">' + '<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">' + String(err) + '</pre></div>' } catch (_) {}
+          }
+        } catch (err) {}
       }
     } catch (_e) {
     }

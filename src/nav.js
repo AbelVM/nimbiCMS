@@ -430,7 +430,12 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         if (!filteredNow || !filteredNow.length) return
         const resultsEl = document.getElementById('nimbi-search-results')
         if (!resultsEl) return
-        resultsEl.innerHTML = ''
+        try {
+          if (typeof resultsEl.replaceChildren === 'function') resultsEl.replaceChildren()
+          else resultsEl.innerHTML = ''
+        } catch (e) {
+          try { resultsEl.innerHTML = '' } catch (_) {}
+        }
         try {
           const panel = document.createElement('div')
           panel.className = 'panel nimbi-search-panel'
@@ -870,7 +875,14 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
 
     const showResults = (items) => {
       if (!dropdownContent) return
-      dropdownContent.innerHTML = ''
+      try {
+        if (typeof dropdownContent.replaceChildren === 'function') dropdownContent.replaceChildren()
+        else {
+          while (dropdownContent.firstChild) dropdownContent.removeChild(dropdownContent.firstChild)
+        }
+      } catch (e) {
+        try { dropdownContent.innerHTML = '' } catch (_) {}
+      }
 
       let selectedIndex = -1
       function updateSelection(i) {

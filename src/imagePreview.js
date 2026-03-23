@@ -24,29 +24,111 @@ function _createModal() {
   modal.setAttribute('role', 'dialog')
   modal.setAttribute('aria-modal', 'true')
   modal.setAttribute('aria-label', _label('imagePreviewTitle', 'Image preview'))
-  modal.innerHTML = `
-    <div class="modal-background"></div>
-    <div class="modal-content">
-      <div class="nimbi-image-preview__content box" role="document">
-        <button class="button is-small nimbi-image-preview__close" type="button" data-nimbi-preview-close>✕</button>
-        <div class="nimbi-image-preview__image-wrapper">
-          <img data-nimbi-preview-image alt="" />
-        </div>
-        <div class="nimbi-image-preview__controls">
-          <div class="nimbi-image-preview__group">
-            <button class="button is-small" type="button" data-nimbi-preview-fit>⤢</button>
-            <button class="button is-small" type="button" data-nimbi-preview-original>1:1</button>
-            <button class="button is-small" type="button" data-nimbi-preview-reset>⟲</button>
+  // Build modal content via DOM APIs to avoid large innerHTML assignments.
+  try {
+    const bg = document.createElement('div')
+    bg.className = 'modal-background'
+
+    const modalContent = document.createElement('div')
+    modalContent.className = 'modal-content'
+
+    const contentBox = document.createElement('div')
+    contentBox.className = 'nimbi-image-preview__content box'
+    contentBox.setAttribute('role', 'document')
+
+    const closeButton = document.createElement('button')
+    closeButton.className = 'button is-small nimbi-image-preview__close'
+    closeButton.type = 'button'
+    closeButton.setAttribute('data-nimbi-preview-close', '')
+    closeButton.textContent = '✕'
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'nimbi-image-preview__image-wrapper'
+    const imgEl = document.createElement('img')
+    imgEl.setAttribute('data-nimbi-preview-image', '')
+    imgEl.alt = ''
+    wrapper.appendChild(imgEl)
+
+    const controls = document.createElement('div')
+    controls.className = 'nimbi-image-preview__controls'
+
+    const group1 = document.createElement('div')
+    group1.className = 'nimbi-image-preview__group'
+    const fitBtn = document.createElement('button')
+    fitBtn.className = 'button is-small'
+    fitBtn.type = 'button'
+    fitBtn.setAttribute('data-nimbi-preview-fit', '')
+    fitBtn.textContent = '⤢'
+    const originalBtn = document.createElement('button')
+    originalBtn.className = 'button is-small'
+    originalBtn.type = 'button'
+    originalBtn.setAttribute('data-nimbi-preview-original', '')
+    originalBtn.textContent = '1:1'
+    const resetBtn = document.createElement('button')
+    resetBtn.className = 'button is-small'
+    resetBtn.type = 'button'
+    resetBtn.setAttribute('data-nimbi-preview-reset', '')
+    resetBtn.textContent = '⟲'
+    group1.appendChild(fitBtn)
+    group1.appendChild(originalBtn)
+    group1.appendChild(resetBtn)
+
+    const group2 = document.createElement('div')
+    group2.className = 'nimbi-image-preview__group'
+    const zoomOut = document.createElement('button')
+    zoomOut.className = 'button is-small'
+    zoomOut.type = 'button'
+    zoomOut.setAttribute('data-nimbi-preview-zoom-out', '')
+    zoomOut.textContent = '−'
+    const zoomLabel = document.createElement('div')
+    zoomLabel.className = 'nimbi-image-preview__zoom'
+    zoomLabel.setAttribute('data-nimbi-preview-zoom-label', '')
+    zoomLabel.textContent = '100%'
+    const zoomIn = document.createElement('button')
+    zoomIn.className = 'button is-small'
+    zoomIn.type = 'button'
+    zoomIn.setAttribute('data-nimbi-preview-zoom-in', '')
+    zoomIn.textContent = '＋'
+    group2.appendChild(zoomOut)
+    group2.appendChild(zoomLabel)
+    group2.appendChild(zoomIn)
+
+    controls.appendChild(group1)
+    controls.appendChild(group2)
+
+    contentBox.appendChild(closeButton)
+    contentBox.appendChild(wrapper)
+    contentBox.appendChild(controls)
+    modalContent.appendChild(contentBox)
+
+    modal.appendChild(bg)
+    modal.appendChild(modalContent)
+  } catch (e) {
+    // Fallback: use the original string if DOM building fails
+    modal.innerHTML = `
+      <div class="modal-background"></div>
+      <div class="modal-content">
+        <div class="nimbi-image-preview__content box" role="document">
+          <button class="button is-small nimbi-image-preview__close" type="button" data-nimbi-preview-close>✕</button>
+          <div class="nimbi-image-preview__image-wrapper">
+            <img data-nimbi-preview-image alt="" />
           </div>
-          <div class="nimbi-image-preview__group">
-            <button class="button is-small" type="button" data-nimbi-preview-zoom-out>−</button>
-            <div class="nimbi-image-preview__zoom" data-nimbi-preview-zoom-label>100%</div>
-            <button class="button is-small" type="button" data-nimbi-preview-zoom-in>＋</button>
+          <div class="nimbi-image-preview__controls">
+            <div class="nimbi-image-preview__group">
+              <button class="button is-small" type="button" data-nimbi-preview-fit>⤢</button>
+              <button class="button is-small" type="button" data-nimbi-preview-original>1:1</button>
+              <button class="button is-small" type="button" data-nimbi-preview-reset>⟲</button>
+            </div>
+            <div class="nimbi-image-preview__group">
+              <button class="button is-small" type="button" data-nimbi-preview-zoom-out>−</button>
+              <div class="nimbi-image-preview__zoom" data-nimbi-preview-zoom-label>100%</div>
+              <button class="button is-small" type="button" data-nimbi-preview-zoom-in>＋</button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  `
+    `
+  }
 
   modal.addEventListener('click', (event) => {
     if (event.target === modal) {

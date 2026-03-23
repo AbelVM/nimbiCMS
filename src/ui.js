@@ -70,6 +70,17 @@ export function createUI(opts) {
   let _isRendering = false
   let _queuedRender = false
 
+  // Helper to clear an element's children with modern API when available.
+  function _clearElement(el) {
+    try {
+      if (!el) return
+      if (typeof el.replaceChildren === 'function') return el.replaceChildren()
+      while (el.firstChild) el.removeChild(el.firstChild)
+    } catch (e) {
+      try { if (el) el.innerHTML = '' } catch (_) {}
+    }
+  }
+
   /**
    * Render a page into the UI.
    * @param {string|null|undefined} raw - The raw page identifier or path to render.
@@ -98,20 +109,20 @@ export function createUI(opts) {
       // `null`) we render a small inline 404 helper. In that case the
       // sidebar/nav TOC should be hidden so the page doesn't show stale
       // navigation for a missing route.
-      try { if (!notFoundPage && navWrap && navWrap.innerHTML !== undefined) navWrap.innerHTML = '' } catch (err) {}
+      try { if (!notFoundPage && navWrap) _clearElement(navWrap) } catch (err) {}
       renderNotFound(contentWrap, t, e)
       return
     }
     if (!anchor && hashAnchor) anchor = hashAnchor
 
     try { scrollToAnchorOrTop(null) } catch (_) { debugWarn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
-    contentWrap.innerHTML = ''
+    try { _clearElement(contentWrap) } catch (e) { try { contentWrap.innerHTML = '' } catch (_) {} }
 
     const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
 
     applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
 
-    navWrap.innerHTML = ''
+    try { _clearElement(navWrap) } catch (e) { try { navWrap.innerHTML = '' } catch (_) {} }
     if (toc) {
       navWrap.appendChild(toc)
       attachTocClickHandler(toc)
@@ -176,7 +187,7 @@ export function createUI(opts) {
       await renderPage(raw, hashAnchor)
     } catch (e) {
       debugWarn('[nimbi-cms] renderByQuery failed', e)
-      try { if (!notFoundPage && navWrap && navWrap.innerHTML !== undefined) navWrap.innerHTML = '' } catch (err) {}
+      try { if (!notFoundPage && navWrap) _clearElement(navWrap) } catch (err) {}
       renderNotFound(contentWrap, t, e)
     } finally {
       _isRendering = false

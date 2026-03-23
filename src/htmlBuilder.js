@@ -915,7 +915,22 @@ function parseHtml(raw) {
           try {
             if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
               const out = hljs.highlight ? hljs.highlight(codeEl.textContent || '', { language: 'plaintext' }) : null
-              if (out && out.value) codeEl.innerHTML = out.value
+              if (out && out.value) {
+                try {
+                  if (typeof document !== 'undefined' && document.createRange && typeof document.createRange === 'function') {
+                    const frag = document.createRange().createContextualFragment(out.value)
+                    if (typeof codeEl.replaceChildren === 'function') codeEl.replaceChildren(...Array.from(frag.childNodes))
+                    else {
+                      while (codeEl.firstChild) codeEl.removeChild(codeEl.firstChild)
+                      codeEl.appendChild(frag)
+                    }
+                  } else {
+                    codeEl.innerHTML = out.value
+                  }
+                } catch (err) {
+                  try { codeEl.innerHTML = out.value } catch (_) {}
+                }
+              }
             }
           } catch (err) { debugWarn('[htmlBuilder] plaintext highlight fallback failed', err) }
         }
@@ -1014,7 +1029,29 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
 
     const article = document.createElement('article')
     article.className = 'nimbi-article content'
-    article.innerHTML = parsed.html
+    try {
+      const _parser = getSharedParser && getSharedParser()
+      if (_parser) {
+        const doc = _parser.parseFromString(String(parsed.html || ''), 'text/html')
+        const nodes = Array.from(doc.body.childNodes || [])
+        if (nodes.length) article.replaceChildren(...nodes)
+        else article.innerHTML = parsed.html
+      } else {
+        try {
+          const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
+          if (range && typeof range.createContextualFragment === 'function') {
+            const frag = range.createContextualFragment(String(parsed.html || ''))
+            article.replaceChildren(...Array.from(frag.childNodes))
+          } else {
+            article.innerHTML = parsed.html
+          }
+        } catch (e) {
+          article.innerHTML = parsed.html
+        }
+      }
+    } catch (e) {
+      try { article.innerHTML = parsed.html } catch (err) { debugWarn('[htmlBuilder] set article html failed', err) }
+    }
     try { rewriteRelativeAssets(article, pagePath, contentBase) } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle', err) }
     try { addHeadingIds(article) } catch (err) { debugWarn('[htmlBuilder] addHeadingIds failed', err) }
     try {
@@ -1199,7 +1236,14 @@ export function executeEmbeddedScripts(article) {
  * @returns {void}
  */
 export function renderNotFound(contentWrap, t, e) {
-    if (contentWrap) contentWrap.innerHTML = ''
+    if (contentWrap) {
+      try {
+        if (typeof contentWrap.replaceChildren === 'function') contentWrap.replaceChildren()
+        else contentWrap.innerHTML = ''
+      } catch (err) {
+        try { contentWrap.innerHTML = '' } catch (_) {}
+      }
+    }
     const notFound = document.createElement('article')
     notFound.className = 'nimbi-article content nimbi-not-found'
     const h = document.createElement('h1')
@@ -1295,7 +1339,27 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   const html = String(article.innerHTML)
   const res = await _sendToAnchorWorker({ type: 'rewriteAnchors', html, contentBase, pagePath })
   if (res && typeof res === 'string') {
-    try { article.innerHTML = res } catch (e) { debugWarn('[htmlBuilder] applying rewritten anchors failed', e) }
+    try {
+      const _parser2 = getSharedParser && getSharedParser()
+      if (_parser2) {
+        const doc = _parser2.parseFromString(String(res || ''), 'text/html')
+        const nodes = Array.from(doc.body.childNodes || [])
+        if (nodes.length) article.replaceChildren(...nodes)
+        else article.innerHTML = res
+      } else {
+        try {
+          const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
+          if (range && typeof range.createContextualFragment === 'function') {
+            const frag = range.createContextualFragment(String(res || ''))
+            article.replaceChildren(...Array.from(frag.childNodes))
+          } else {
+            article.innerHTML = res
+          }
+        } catch (e) {
+          article.innerHTML = res
+        }
+      }
+    } catch (e) { debugWarn('[htmlBuilder] applying rewritten anchors failed', e) }
   }
 }
 

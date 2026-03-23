@@ -470,7 +470,22 @@ export function observeCodeBlocks(root = document) {
                   
                   if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
                     const out = hljs.highlight(code, { language: 'plaintext' })
-                    if (out && out.value) el.innerHTML = out.value
+                    if (out && out.value) {
+                      try {
+                        if (typeof document !== 'undefined' && document.createRange && typeof document.createRange === 'function') {
+                          const frag = document.createRange().createContextualFragment(out.value)
+                          if (typeof el.replaceChildren === 'function') el.replaceChildren(...Array.from(frag.childNodes))
+                          else {
+                            while (el.firstChild) el.removeChild(el.firstChild)
+                            el.appendChild(frag)
+                          }
+                        } else {
+                          el.innerHTML = out.value
+                        }
+                      } catch (err) {
+                        try { el.innerHTML = out.value } catch (_) {}
+                      }
+                    }
                   }
                 } catch (err) {
                   try { hljs.highlightElement(el) } catch (e) { debugWarn('[codeblocksManager] fallback highlightElement failed', e) }

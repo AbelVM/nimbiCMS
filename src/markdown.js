@@ -214,7 +214,21 @@ export async function parseMarkdownToHtml(md) {
           })
         } catch (e) {}
 
-        return { html: doc.body.innerHTML, meta: data || {}, toc: docToc }
+        try {
+          let htmlOut = null
+          try {
+            if (typeof XMLSerializer !== 'undefined') {
+              const ser = new XMLSerializer()
+              htmlOut = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
+            } else {
+              const nodes = Array.from(doc.body.childNodes || [])
+              htmlOut = nodes.map(n => (n && typeof n.outerHTML === 'string') ? n.outerHTML : (n && typeof n.textContent === 'string' ? n.textContent : '')).join('')
+            }
+          } catch (err) {
+            try { htmlOut = doc.body.innerHTML } catch (err2) { htmlOut = '' }
+          }
+          return { html: htmlOut, meta: data || {}, toc: docToc }
+        } catch (e) { return { html: '', meta: data || {}, toc: docToc } }
       }
     } catch (e) { /* fall through to return raw html */ }
     return { html, meta: data || {}, toc: [] }
@@ -357,7 +371,17 @@ export async function parseMarkdownToHtml(md) {
               if (abs === moved) img.remove()
             } catch (e) {}
           })
-          html = doc.body.innerHTML
+          try {
+            if (typeof XMLSerializer !== 'undefined') {
+              const ser = new XMLSerializer()
+              html = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
+            } else {
+              const nodes = Array.from(doc.body.childNodes || [])
+              html = nodes.map(n => (n && typeof n.outerHTML === 'string') ? n.outerHTML : (n && typeof n.textContent === 'string' ? n.textContent : '')).join('')
+            }
+          } catch (err) {
+            try { html = doc.body.innerHTML } catch (err2) { /* leave html as-is */ }
+          }
         } else {
           try {
             const escaped = moved.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

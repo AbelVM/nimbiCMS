@@ -633,7 +633,23 @@ function _writeXmlToDocument(xml, mimeType = 'application/xml') {
       }
     } catch (_) {}
   } catch (e) {
-    try { document.body.innerHTML = '<pre>' + _escapeXml(xml) + '</pre>' } catch (_) {}
+    try {
+      try {
+        const pre = document.createElement('pre')
+        try { pre.textContent = _escapeXml(xml) } catch (err) { try { pre.textContent = String(xml) } catch (_) {} }
+        if (document && document.body) {
+          try {
+            if (typeof document.body.replaceChildren === 'function') document.body.replaceChildren(pre)
+            else {
+              while (document.body.firstChild) document.body.removeChild(document.body.firstChild)
+              document.body.appendChild(pre)
+            }
+          } catch (err2) {
+            try { document.body.innerHTML = '<pre>' + _escapeXml(xml) + '</pre>' } catch (_) {}
+          }
+        }
+      } catch (err) {}
+    } catch (_) {}
   }
 }
 
