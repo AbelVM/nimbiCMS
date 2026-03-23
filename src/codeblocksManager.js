@@ -67,7 +67,36 @@ let loadSupportedLanguagesPromise = null
  * @type {Map<string,{promise?:Promise<unknown>,module?:unknown,ok?:boolean,ts?:number}>}
  */
 const languageImportCache = new Map()
-const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * Optional custom importer used for tests or bespoke loading strategies.
+ * When set to a function `(candidate)=>Promise<Module|null>` it will be
+ * invoked instead of the internal import+CDN fallbacks. This enables
+ * reliable unit tests and alternative loading strategies.
+ * @type {function|null}
+ */
+export let languageImporter = null
+
+let NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * Set a custom importer function for language modules.
+ * @param {function|null} fn
+ */
+export function setLanguageImporter(fn) {
+  languageImporter = (typeof fn === 'function') ? fn : null
+}
+
+/**
+ * Clear internal language import cache (for tests).
+ */
+export function clearLanguageImportCache() { languageImportCache.clear() }
+
+/**
+ * Adjust negative-cache TTL (milliseconds) used when import attempts fail.
+ * @param {number} ms
+ */
+export function setLanguageImportNegativeCacheTTL(ms) { NEGATIVE_CACHE_TTL_MS = Number(ms) || 0 }
 
 /**
  * Load the list of supported highlight.js languages from the canonical
@@ -276,6 +305,15 @@ export async function registerLanguage(name, modulePath) {
           languageImportCache.set(candidate, entry)
           entry.promise = (async () => {
             try {
+              // If a custom importer has been provided (testing or alternative
+              // loader), prefer it. It should resolve to the module or null.
+              if (typeof languageImporter === 'function') {
+                try {
+                  return await languageImporter(candidate)
+                } catch (_liErr) {
+                  return null
+                }
+              }
               try {
                 try {
                   return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`)

@@ -346,6 +346,10 @@ export function callIt(cb: (...args:any[])=>any): void
 
 // --- from src/codeblocksManager.js
 export const HLJS_ALIAS_MAP: Record<string,string>
+export const languageImporter: Map<string,{promise?:Promise<unknown>,module?:unknown,ok?:boolean,ts?:number}>
+export function setLanguageImporter(fn: any): any
+export function clearLanguageImportCache(): any
+export function setLanguageImportNegativeCacheTTL(ms: number): any
 export function loadSupportedLanguages(url: string): Promise<void>
 export function registerLanguage(name: string, modulePath: string): Promise<boolean>
 export function observeCodeBlocks(root: any): any

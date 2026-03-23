@@ -18,7 +18,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Batch DOM updates
 - **[PERF]** Gate expensive debug/log formatting
 - **[PERF]** Fetch caching & dedupe
-- **[PERF]**
+- **[PERF]** Negative cache for dynamic imports
 - **[PERF]**
 - **[PERF]**
 - **[PERF]**
