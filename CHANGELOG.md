@@ -21,6 +21,9 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Negative cache for dynamic imports
 - **[PERF]** Limit and tune concurrency
 - **[PERF]** Hot-regex & allocations
+- **[PERF]** Cache size / eviction policies
+- **[PERF]**
+- **[PERF]**
 - **[PERF]**
 - **[PERF]**
 - **[CHORE]** Improved JSDoc coverage and quality

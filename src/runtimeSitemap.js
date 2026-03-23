@@ -9,6 +9,7 @@ import { allMarkdownPathsSet, slugToMd, mdToSlug, searchIndex, buildSearchIndex,
 import { normalizePath } from './utils/helpers.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
 import { debugLog, debugWarn } from './utils/debug.js'
+import { yieldIfNeeded } from './utils/idle.js'
 
 // Backwards-compatible underscore-prefixed aliases used in older code paths
 const _debugLog = debugLog
@@ -219,7 +220,9 @@ export async function generateSitemapJson(opts = {}) {
     return false
   }
   if (Array.isArray(idx) && idx.length) {
+    let idxYieldCount = 0
     for (const it of idx) {
+      try { idxYieldCount++; await yieldIfNeeded(idxYieldCount, 64) } catch (_) {}
       try {
         if (!it || !it.slug) continue
         const slugKey = String(it.slug)
@@ -248,7 +251,9 @@ export async function generateSitemapJson(opts = {}) {
   // Optionally add all slugs discoverable from slugToMd / allMarkdownPaths
   if (includeAllMarkdown) {
     try {
+      let allMdYieldCount = 0
       for (const [slug, mdVal] of slugToMd.entries()) {
+        try { allMdYieldCount++; await yieldIfNeeded(allMdYieldCount, 128) } catch (_) {}
         try {
           if (!slug) continue
           const slugBase = String(slug).split('::')[0]
@@ -321,7 +326,9 @@ export async function generateSitemapJson(opts = {}) {
     // Limit to a reasonable number to avoid blowing up runtime
     const MAX_SOURCE_FETCH = 30
     let fetched = 0
+    let sourceYieldCount = 0
     for (const sp of sourcePaths) {
+      try { sourceYieldCount++; await yieldIfNeeded(sourceYieldCount, 8) } catch (_) {}
       if (fetched >= MAX_SOURCE_FETCH) break
       try {
         if (!sp || typeof sp !== 'string') continue
@@ -408,7 +415,9 @@ export async function generateSitemapJson(opts = {}) {
   // Ensure each base slug (strip any '::' anchor) has a page-level entry.
   try {
     const entriesBySlug = new Map()
+    let entriesYieldCount = 0
     for (const e of entries) {
+      try { entriesYieldCount++; await yieldIfNeeded(entriesYieldCount, 128) } catch (_) {}
       try {
         if (!e || !e.slug) continue
         entriesBySlug.set(String(e.slug), e)
@@ -465,7 +474,9 @@ export async function generateSitemapJson(opts = {}) {
   const final = []
   try {
     const seenFinal = new Set()
+    let finalYieldCount = 0
     for (const e of entries) {
+      try { finalYieldCount++; await yieldIfNeeded(finalYieldCount, 128) } catch (_) {}
       try {
         if (!e || !e.slug) continue
         const s = String(e.slug)

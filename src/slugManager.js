@@ -76,6 +76,7 @@ import slugWorkerCode from './worker/slugWorker.js?raw'
 import { LRUCache } from './utils/cache.js'
 import { makeWorkerPool, createWorkerFromRaw } from './worker-manager.js'
 import { debugLog, debugWarn, debugError, isDebug } from './utils/debug.js'
+import { yieldIfNeeded } from './utils/idle.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 const _slugWorkerManager = makeWorkerPool(() => createWorkerFromRaw(slugWorkerCode), 'slugManager', poolSize)
@@ -1013,6 +1014,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
 
       const fetchConcurrency = Math.max(1, Math.min(getFetchConcurrency(), queue.length || getFetchConcurrency()))
 
+      let workerYieldCount = 0
       const worker = async () => {
         while (true) {
           if (visited.size > defaultCrawlMaxQueue) break
@@ -1065,6 +1067,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
           } catch (e) {
             _debugLog('[slugManager] discovery fetch failed for', p, e)
           }
+          try { workerYieldCount++; await yieldIfNeeded(workerYieldCount, 32) } catch (_) {}
         }
       }
 
@@ -1110,7 +1113,9 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
     }
     await Promise.all(fetchWorkers)
 
+    let processYieldCount = 0
     for (const path of paths) {
+      try { processYieldCount++; await yieldIfNeeded(processYieldCount, 16) } catch (_) {}
       if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue
       try {
         const md = pathMdMap.get(path)
@@ -1667,6 +1672,7 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
   } catch (err) { baseForResolve = origin + '/' }
 
   const concurrency = Math.max(1, Math.min(poolSize, 6))
+  let crawlBatchYieldCount = 0
   // Process directories in batches so newly-discovered directories are
   // handled in subsequent iterations rather than risking worker exit.
   while (queue.length) {
@@ -1798,6 +1804,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
         }
       } catch (err) { _debugLog('[slugManager] manifest title fetch failed', err) }
     }
+    try { crawlBatchYieldCount++; await yieldIfNeeded(crawlBatchYieldCount, 8) } catch (_) {}
   }
 
   try {

@@ -396,6 +396,10 @@ export function resetSharedParser(): void
 // --- from src/utils/l10n-defaults.js
 export const DEFAULT_L10N: Record<string, L10nEntry>
 
+// --- from src/utils/idle.js
+export function yieldToEventLoop(): Promise<void>
+export function yieldIfNeeded(iteration: number, threshold: number): Promise<void>
+
 // --- from src/utils/helpers.js
 export const normalizePath: any
 export const trimTrailingSlash: any
