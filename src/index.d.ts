@@ -216,8 +216,8 @@ export function setFetchConcurrency(n: number): void
 export function getFetchConcurrency(): number
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): void
 export function getSearchIndex(): any
-export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean}): Promise<Array>
-export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:any[]<string>,seedPaths?:any[]<string>,startBuild?:boolean,timeoutMs?:number}): Promise<Array>
+export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}): Promise<Array>
+export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}): Promise<Array>
 export const CRAWL_MAX_QUEUE: number
 export const defaultCrawlMaxQueue: number
 

@@ -485,8 +485,6 @@ try { setContentBase() } catch (err) { _debugLog('[slugManager] initial setConte
  * Ensure a candidate slug is unique against an existing set.
  * If `base` collides, a numeric suffix is appended ("-2", "-3", ...).
  *
- * @exports uniqueSlug
- *
  * @param {string} base - Candidate slug.
  * @param {Set<string>} existing - Set of already-used slugs.
  * @returns {string} - A slug that does not appear in `existing`.
@@ -1410,7 +1408,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
  * off a build (worker-first) and await completion. Returns the live
  * `searchIndex` array (possibly empty on timeout).
  *
- * @param {{timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:Array<string>,seedPaths?:Array<string>,startBuild?:boolean}} opts
+ * @param {{timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}} opts
  * @returns {Promise<Array>} resolves to the live `searchIndex` array
  */
 export async function whenSearchIndexReady(opts = {}) {
@@ -1475,7 +1473,7 @@ export async function whenSearchIndexReady(opts = {}) {
    * until the index is available or a build completes. Callers that must
    * not use timeouts should use this API instead of `whenSearchIndexReady`.
    *
-   * @param {{contentBase?:string,indexDepth?:number,noIndexing?:Array<string>,seedPaths?:Array<string>,startBuild?:boolean,timeoutMs?:number}} opts
+  * @param {{contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}} opts
    * @returns {Promise<Array>} resolves to the live `searchIndex` array
    */
   export async function awaitSearchIndex(opts = {}) {
