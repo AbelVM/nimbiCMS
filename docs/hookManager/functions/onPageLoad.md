@@ -14,7 +14,7 @@ Register a callback to be invoked after each page is rendered.
 
 ### fn
 
-(`ctx`) => `void` \| `Promise`\<`void`\>
+[`HookCallback`](../type-aliases/HookCallback.md)
 
 Callback invoked with the render context.
 

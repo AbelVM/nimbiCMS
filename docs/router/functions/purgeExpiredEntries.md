@@ -8,6 +8,9 @@
 
 > **\_purgeExpiredEntries**(): `void`
 
+Remove expired entries from the `resolutionCache` according to `RESOLUTION_CACHE_TTL`.
+This is a no-op when TTL is not configured or set to a non-positive value.
+
 ## Returns
 
 `void`

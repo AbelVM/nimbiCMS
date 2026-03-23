@@ -6,7 +6,7 @@
 
 # Function: rewriteAnchors()
 
-> **rewriteAnchors**(`article`, `contentBase`, `pagePath?`): `Promise`\<`void`\>
+> **rewriteAnchors**(`article`, `contentBase`, `pagePath?`, `opts?`): `Promise`\<`void`\>
 
 Rewrite anchor hrefs in an article element to SPA `?page=` links where
 applicable. Performs slug lookups and may fetch markdown titles.
@@ -30,6 +30,8 @@ Base URL or path for site content.
 `string`
 
 Optional page path used for relative link resolution.
+
+### opts?
 
 ## Returns
 

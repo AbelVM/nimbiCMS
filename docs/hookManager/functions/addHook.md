@@ -8,15 +8,21 @@
 
 > **addHook**(`name`, `fn`): `void`
 
+Register a hook callback for the given hook name.
+
 ## Parameters
 
 ### name
 
-`any`
+[`HookName`](../type-aliases/HookName.md)
+
+Hook name to register (e.g. 'onPageLoad').
 
 ### fn
 
-`any`
+[`HookCallback`](../type-aliases/HookCallback.md)
+
+Callback function to register.
 
 ## Returns
 

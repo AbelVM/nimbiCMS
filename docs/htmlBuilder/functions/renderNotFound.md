@@ -15,19 +15,19 @@ Placed immediately above export for TypeDoc.
 
 ### contentWrap
 
-contentWrap parameter
+Container where the message will be rendered; may be null.
 
 `HTMLElement` | `null`
 
 ### t
 
-t parameter
+Translation function that accepts a key and returns a localized string.
 
 `Function` | `null`
 
 ### e
 
-e parameter
+Optional error whose message may be displayed to the user.
 
 `Error` | `null`
 

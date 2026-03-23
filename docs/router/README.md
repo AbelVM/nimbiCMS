@@ -6,9 +6,15 @@
 
 # router
 
+Routing and page resolution helpers.
+
+Utilities for resolving page slugs, caching resolution results, and
+supporting SPA-style navigation within the runtime.
+
 ## Type Aliases
 
 - [ResolutionRecord](type-aliases/ResolutionRecord.md)
+- [ResolutionValue](type-aliases/ResolutionValue.md)
 
 ## Variables
 
@@ -33,3 +39,9 @@
 ### allMarkdownPaths
 
 Re-exports [allMarkdownPaths](../slugManager/variables/allMarkdownPaths.md)
+
+***
+
+### allMarkdownPathsSet
+
+Re-exports [allMarkdownPathsSet](../slugManager/variables/allMarkdownPathsSet.md)

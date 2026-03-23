@@ -22,3 +22,5 @@ Custom fetch function used to load markdown. Receives `(path, base)` and must re
 ## Returns
 
 `void`
+
+- No return value.

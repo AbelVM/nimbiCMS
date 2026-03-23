@@ -22,3 +22,5 @@ path to use as the home page (relative to content base)
 ## Returns
 
 `void`
+
+- No return value.

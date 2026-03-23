@@ -6,6 +6,10 @@
 
 # gen-dts-sample
 
+Declarations generator test helpers.
+
+Small helper functions used by the `gen-dts` tests to exercise JSDoc parsing.
+
 ## Functions
 
 - [callIt](functions/callIt.md)

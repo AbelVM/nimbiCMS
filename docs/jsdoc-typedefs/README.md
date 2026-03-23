@@ -6,6 +6,10 @@
 
 # jsdoc-typedefs
 
+Shared JSDoc typedefs for type generation.
+
+Centralized typedefs used by declaration generation and tooling.
+
 ## Type Aliases
 
 - [ArticleResult](type-aliases/ArticleResult.md)

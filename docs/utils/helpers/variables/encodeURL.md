@@ -4,21 +4,15 @@
 
 [nimbi-cms](../../../README.md) / [utils/helpers](../README.md) / encodeURL
 
-# Function: encodeURL()
+# Variable: encodeURL
 
-> **encodeURL**(`u`): `string`
+> `const` **encodeURL**: `Function`
 
 Safely encode a URL or URL component using encodeURI.  Falls back to the
 original string if encoding fails.
 
-## Parameters
-
-### u
-
-`string`
+## Param
 
 URL or component to encode safely
 
 ## Returns
-
-`string`

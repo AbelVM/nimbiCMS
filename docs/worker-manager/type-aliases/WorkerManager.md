@@ -4,33 +4,31 @@
 
 [nimbi-cms](../../README.md) / [worker-manager](../README.md) / WorkerManager
 
-# Interface: WorkerManager
+# Type Alias: WorkerManager
 
-## Properties
+> **WorkerManager**\<\> = `object`
+
+## Type Parameters
+
+## Type Declaration
 
 ### get()
 
 > **get**: () => `Worker` \| `null`
 
-Return the Worker instance or null.
-
 #### Returns
 
 `Worker` \| `null`
-
-***
 
 ### send()
 
 > **send**: (`msg`, `timeout?`) => `Promise`\<`unknown`\>
 
-Send a message to the worker and await a response.
-
 #### Parameters
 
 ##### msg
 
-`any`
+[`WorkerRequest`](WorkerRequest.md)
 
 ##### timeout?
 
@@ -40,13 +38,9 @@ Send a message to the worker and await a response.
 
 `Promise`\<`unknown`\>
 
-***
-
 ### terminate()
 
 > **terminate**: () => `void`
-
-Terminate the worker and clear internal state.
 
 #### Returns
 

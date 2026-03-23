@@ -15,7 +15,7 @@ supplied context object. Errors from individual callbacks are swallowed.
 
 ### name
 
-`string`
+[`HookName`](../type-aliases/HookName.md)
 
 Hook name to invoke (e.g. 'onPageLoad').
 

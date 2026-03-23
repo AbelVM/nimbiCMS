@@ -6,4 +6,7 @@
 
 # Variable: homePage
 
-> **homePage**: `string` = `'_home.md'`
+> **homePage**: `string` = `null`
+
+Path to the home page relative to the content base.
+Used as a fallback during slug resolution when appropriate.

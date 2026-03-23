@@ -6,6 +6,10 @@
 
 # version
 
+Version utilities.
+
+Retrieve the build-injected package version string.
+
 ## Functions
 
 - [getVersion](functions/getVersion.md)

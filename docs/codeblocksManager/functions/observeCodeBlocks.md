@@ -21,5 +21,3 @@ Root node in which to observe code blocks.
 ## Returns
 
 `void`
-
-- No return value.

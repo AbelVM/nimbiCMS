@@ -6,6 +6,10 @@
 
 # ui
 
+UI exports and rendering helpers.
+
+Re-exports hook utilities and provides the `createUI` entrypoint.
+
 ## Interfaces
 
 - [UIOptions](interfaces/UIOptions.md)

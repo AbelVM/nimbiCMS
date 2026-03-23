@@ -6,14 +6,26 @@
 
 # Function: \_sendToRenderer()
 
-> **\_sendToRenderer**(`msg`): `any`
+> **\_sendToRenderer**(`msg`, `timeout?`): `Promise`\<[`RendererResult`](../type-aliases/RendererResult.md)\>
+
+Send a message to the renderer worker and await a response.
 
 ## Parameters
 
 ### msg
 
-`any`
+`Object`
+
+Message payload to send to the renderer.
+
+### timeout?
+
+`number` = `3000`
+
+Timeout in milliseconds.
 
 ## Returns
 
-`any`
+`Promise`\<[`RendererResult`](../type-aliases/RendererResult.md)\>
+
+Promise resolving with the renderer result.

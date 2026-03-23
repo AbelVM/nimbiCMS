@@ -4,21 +4,15 @@
 
 [nimbi-cms](../../../README.md) / [utils/helpers](../README.md) / normalizePath
 
-# Function: normalizePath()
+# Variable: normalizePath
 
-> **normalizePath**(`p`): `string`
+> `const` **normalizePath**: `Function`
 
 Normalize a path by stripping leading dots and slashes.  Useful for
 converting user-supplied paths into canonical relative identifiers.
 
-## Parameters
-
-### p
-
-`string`
+## Param
 
 input path to normalize (remove leading ./ or /)
 
 ## Returns
-
-`string`

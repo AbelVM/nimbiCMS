@@ -6,4 +6,7 @@
 
 # Variable: allMarkdownPaths
 
-> **allMarkdownPaths**: `any`[] = `[]`
+> **allMarkdownPaths**: `string`[] = `[]`
+
+Array of discovered markdown/html paths (relative to content base).
+Populated by `_setAllMd` or via `setContentBase` when an index is applied.

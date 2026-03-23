@@ -6,21 +6,21 @@
 
 # Function: parseMarkdownToHtml()
 
-> **parseMarkdownToHtml**(`md`): `Promise`\<[`ParseResult`](../type-aliases/ParseResult.md)\>
+> **parseMarkdownToHtml**(`md?`): `Promise`\<[`ParseResult`](../type-aliases/ParseResult.md)\>
 
 Convert markdown string to HTML and extract a table-of-contents list.
 Preserves frontmatter metadata.
 
 ## Parameters
 
-### md
+### md?
 
 `string`
 
-markdown source string to convert
+Markdown source string to convert; falsy values are treated as an empty string.
 
 ## Returns
 
 `Promise`\<[`ParseResult`](../type-aliases/ParseResult.md)\>
 
-- Promise resolving to the parsed HTML, metadata, and table-of-contents.
+Promise resolving to the parsed HTML, metadata, and table-of-contents.

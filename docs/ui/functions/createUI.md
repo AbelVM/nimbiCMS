@@ -8,7 +8,8 @@
 
 > **createUI**(`opts`): [`UIReturn`](../interfaces/UIReturn.md)
 
-Initialize UI rendering helpers for a mounted CMS instance.
+Create UI helpers and entrypoints for rendering pages in a mounted CMS.
+Placed adjacent to the exported symbol for clarity.
 
 ## Parameters
 
@@ -16,10 +17,6 @@ Initialize UI rendering helpers for a mounted CMS instance.
 
 [`UIOptions`](../interfaces/UIOptions.md)
 
-configuration options and DOM mounts for the UI
-
 ## Returns
 
 [`UIReturn`](../interfaces/UIReturn.md)
-
-- helpers and entrypoints for rendering the site

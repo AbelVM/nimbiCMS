@@ -8,21 +8,15 @@
 
 > **initCMS**(`options?`): `Promise`\<`void`\>
 
-Initialize the CMS in a host page.
-
-Throws a `TypeError` when options are of the wrong type so configuration
-mistakes are surfaced early (e.g. passing a number for `contentPath`).
+Initialize the Nimbi CMS runtime on the host page.
+Conservative wrapper used by consumers to mount UI and start routing.
 
 ## Parameters
 
 ### options?
 
-`Record`\<`string`, `unknown`\> = `{}`
-
-Initialization options provided by the caller.
+[`InitOptions`](../interfaces/InitOptions.md) = `{}`
 
 ## Returns
 
 `Promise`\<`void`\>
-
-resolves once the initial page has rendered

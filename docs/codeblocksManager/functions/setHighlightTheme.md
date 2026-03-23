@@ -9,6 +9,7 @@
 > **setHighlightTheme**(`theme`, `opts?`): `void`
 
 Switch highlight.js CSS theme, optionally loading from CDN.
+If `theme` is `'monokai'` (the default) the existing theme is removed.
 
 ## Parameters
 
@@ -29,5 +30,3 @@ Options object; `useCdn` controls CDN loading.
 ## Returns
 
 `void`
-
-- No return value.

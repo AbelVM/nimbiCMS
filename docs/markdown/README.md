@@ -6,6 +6,11 @@
 
 # markdown
 
+Markdown parsing and renderer helpers.
+
+Provides utilities for converting Markdown to HTML, managing renderer
+workers, and extracting table-of-contents data.
+
 ## Interfaces
 
 - [MarkdownPlugin](interfaces/MarkdownPlugin.md)

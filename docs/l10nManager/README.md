@@ -6,6 +6,11 @@
 
 # l10nManager
 
+Localization loader and translator.
+
+Provides runtime localization utilities: loading locale files and
+translating keys with optional replacements.
+
 ## Type Aliases
 
 - [L10NMap](type-aliases/L10NMap.md)

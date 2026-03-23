@@ -14,7 +14,7 @@ Register a callback once the navigation DOM has been built.
 
 ### fn
 
-(`ctx`) => `void` \| `Promise`\<`void`\>
+[`HookCallback`](../type-aliases/HookCallback.md)
 
 Callback invoked with the navigation context.
 

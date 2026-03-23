@@ -6,7 +6,7 @@
 
 # Function: makeWorkerManager()
 
-> **makeWorkerManager**(`createWorker`, `name?`): [`WorkerManager`](../interfaces/WorkerManager.md)
+> **makeWorkerManager**(`createWorker`, `name?`): [`WorkerManager`](../type-aliases/WorkerManager.md)
 
 Create a worker manager that lazily instantiates a Worker and provides
 request/response semantics with timeout and automatic cleanup on errors.
@@ -27,6 +27,6 @@ Friendly name used in console warnings.
 
 ## Returns
 
-[`WorkerManager`](../interfaces/WorkerManager.md)
+[`WorkerManager`](../type-aliases/WorkerManager.md)
 
 - The worker manager API with `get`, `send`, and `terminate` methods.

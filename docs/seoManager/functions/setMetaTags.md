@@ -6,7 +6,7 @@
 
 # Function: setMetaTags()
 
-> **setMetaTags**(`data`, `titleOverride?`, `imageOverride?`, `descOverride?`, `initialDocumentTitle?`): `void`
+> **setMetaTags**(`data`, `titleOverride?`, `imageOverride?`, `descOverride?`, `_initialDocumentTitle?`): `void`
 
 Populate standard meta tags (title, description, open-graph, twitter, etc.)
 
@@ -36,11 +36,9 @@ Optional image URL for Open Graph/Twitter.
 
 Optional description override.
 
-### initialDocumentTitle?
+### \_initialDocumentTitle?
 
 `string` = `''`
-
-Fallback site/document title.
 
 ## Returns
 

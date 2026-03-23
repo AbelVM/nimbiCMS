@@ -8,15 +8,18 @@
 
 > **refreshIndexPaths**(`contentBase`): `void`
 
-Refresh the internal index set from available markdown paths and slug maps.
+Refresh the internal `indexSet` from available markdown paths and slug maps.
+Useful when the content base or path list changes at runtime (tests/plugins).
+This clears and repopulates `indexSet` and augments it with values
+discovered in slug maps.
 
 ## Parameters
 
 ### contentBase
 
-`string`
+Base path or URL for content used by the indexer.
 
-Base path for content used by the indexer.
+`string` | `URL`
 
 ## Returns
 

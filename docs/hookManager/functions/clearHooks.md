@@ -8,6 +8,9 @@
 
 > **\_clearHooks**(): `void`
 
+Clear all registered hooks for every hook type.
+Useful in tests to reset hook state.
+
 ## Returns
 
 `void`

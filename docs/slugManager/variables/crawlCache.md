@@ -6,4 +6,7 @@
 
 # Variable: crawlCache
 
-> `const` **crawlCache**: `Map`\<`any`, `any`\>
+> `const` **crawlCache**: `Map`\<`string`, `string` \| `null`\>
+
+Cache used by `crawlForSlug` to memoize results keyed by decoded slug.
+Values are the resolved path string or `null` when not found.

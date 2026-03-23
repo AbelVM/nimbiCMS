@@ -4,19 +4,13 @@
 
 [nimbi-cms](../../../README.md) / [utils/helpers](../README.md) / ensureTrailingSlash
 
-# Function: ensureTrailingSlash()
+# Variable: ensureTrailingSlash
 
-> **ensureTrailingSlash**(`u`): `string`
+> `const` **ensureTrailingSlash**: `Function`
 
 Ensure the given URL/path ends with a single slash.  This wraps
 `trimTrailingSlash` and appends '/'.
 
-## Parameters
-
-### u
-
-`string`
+## Param
 
 ## Returns
-
-`string`

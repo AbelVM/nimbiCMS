@@ -22,3 +22,5 @@ path to use as the not-found page (relative to content base)
 ## Returns
 
 `void`
+
+- No return value.

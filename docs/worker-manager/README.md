@@ -6,14 +6,13 @@
 
 # worker-manager
 
-Generic worker manager to centralize Worker lifecycle and messaging.
+Worker manager utilities.
 
-## Interfaces
-
-- [WorkerManager](interfaces/WorkerManager.md)
+Manage lifecycle and messaging with the internal `Worker` instance.
 
 ## Type Aliases
 
+- [WorkerManager](type-aliases/WorkerManager.md)
 - [WorkerRequest](type-aliases/WorkerRequest.md)
 - [WorkerResponse](type-aliases/WorkerResponse.md)
 
@@ -21,4 +20,6 @@ Generic worker manager to centralize Worker lifecycle and messaging.
 
 - [createWorkerFromRaw](functions/createWorkerFromRaw.md)
 - [makeWorkerManager](functions/makeWorkerManager.md)
+- [makeWorkerManagerFromRaw](functions/makeWorkerManagerFromRaw.md)
 - [makeWorkerPool](functions/makeWorkerPool.md)
+- [makeWorkerPoolFromRaw](functions/makeWorkerPoolFromRaw.md)

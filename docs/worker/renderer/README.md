@@ -8,4 +8,6 @@
 
 ## Functions
 
+- [clearRendererImportCache](functions/clearRendererImportCache.md)
 - [handleWorkerMessage](functions/handleWorkerMessage.md)
+- [setRendererImportNegativeCacheTTL](functions/setRendererImportNegativeCacheTTL.md)

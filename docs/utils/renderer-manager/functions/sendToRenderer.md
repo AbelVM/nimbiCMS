@@ -6,14 +6,20 @@
 
 # Function: \_sendToRenderer()
 
-> **\_sendToRenderer**(`msg`): `any`
+> **\_sendToRenderer**(`msg`): `Promise`\<`unknown`\>
+
+Send a message to the renderer worker and await a response.
 
 ## Parameters
 
 ### msg
 
-`any`
+`Object`
+
+Message payload to send to the renderer.
 
 ## Returns
 
-`any`
+`Promise`\<`unknown`\>
+
+Promise resolving with the worker's result.

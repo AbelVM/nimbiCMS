@@ -18,7 +18,7 @@ so that scripts which query the DOM find their target elements.
 
 `HTMLElement`
 
-Article element containing script tags
+Article element containing script tags.
 
 ## Returns
 

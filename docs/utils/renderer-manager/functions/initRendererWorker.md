@@ -6,8 +6,12 @@
 
 # Function: initRendererWorker()
 
-> **initRendererWorker**(): `any`
+> **initRendererWorker**(): `Worker` \| `null`
+
+Return the underlying renderer worker instance, creating the pool lazily.
 
 ## Returns
 
-`any`
+`Worker` \| `null`
+
+Worker instance or null when unavailable.

@@ -34,3 +34,7 @@ Resolution record to store.
 ## Returns
 
 `void`
+
+## Exports
+
+resolutionCacheSet

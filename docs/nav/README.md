@@ -6,6 +6,11 @@
 
 # nav
 
+Navigation builder and DOM wiring utilities.
+
+Build navigation DOM, pre-scan links for slug mapping, and wire SPA
+navigation callbacks into the site header.
+
 ## Type Aliases
 
 - [NavBuildResult](type-aliases/NavBuildResult.md)

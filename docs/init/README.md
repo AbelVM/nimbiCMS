@@ -6,6 +6,15 @@
 
 # init
 
+Initialization API.
+
+Exports `initCMS` and helpers to initialize the CMS runtime.
+
+## Interfaces
+
+- [InitOptions](interfaces/InitOptions.md)
+- [ParsedInitOptions](interfaces/ParsedInitOptions.md)
+
 ## Variables
 
 - [currentHighlightTheme](variables/currentHighlightTheme.md)

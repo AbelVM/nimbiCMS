@@ -7,3 +7,5 @@
 # Variable: currentLang
 
 > **currentLang**: `string` = `detectedLang`
+
+Currently selected UI language code (short form, e.g. 'en').

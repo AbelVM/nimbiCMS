@@ -6,6 +6,11 @@
 
 # bulmaManager
 
+Bulma and theming helpers.
+
+Manage Bulma and theme variants, inject theme overrides, and provide
+helpers for loading remote or local Bulma themes.
+
 ## Type Aliases
 
 - [ThemeVars](type-aliases/ThemeVars.md)

@@ -4,19 +4,13 @@
 
 [nimbi-cms](../../../README.md) / [utils/helpers](../README.md) / decodeHtmlEntities
 
-# Function: decodeHtmlEntities()
+# Variable: decodeHtmlEntities
 
-> **decodeHtmlEntities**(`s`): `string`
+> `const` **decodeHtmlEntities**: `Function`
 
 Decode a small set of common HTML entities and numeric entities in a string.
 This is a lightweight fallback to avoid DOM-dependent decoding in workers.
 
-## Parameters
-
-### s
-
-`string`
+## Param
 
 ## Returns
-
-`string`

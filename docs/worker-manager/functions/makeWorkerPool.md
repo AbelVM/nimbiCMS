@@ -6,7 +6,7 @@
 
 # Function: makeWorkerPool()
 
-> **makeWorkerPool**(`createWorker`, `name?`, `size?`): `Object`
+> **makeWorkerPool**(`createWorker`, `name?`, `size?`): [`WorkerManager`](../type-aliases/WorkerManager.md)
 
 Create a simple pool of workers to allow parallel work.
 
@@ -32,6 +32,6 @@ number of workers in the pool
 
 ## Returns
 
-`Object`
+[`WorkerManager`](../type-aliases/WorkerManager.md)
 
 - manager with `get`, `send`, and `terminate`

@@ -6,6 +6,10 @@
 
 # nimbi-cms
 
+Nimbi CMS public entrypoint.
+
+Re-exports primary runtime APIs and default `initCMS`.
+
 ## References
 
 ### \_clearHooks

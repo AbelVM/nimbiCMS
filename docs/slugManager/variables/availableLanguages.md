@@ -6,6 +6,7 @@
 
 # Variable: availableLanguages
 
-> **availableLanguages**: `any`[] = `[]`
+> **availableLanguages**: `string`[] = `[]`
 
-Result returned from `fetchMarkdown`.
+Configured available language codes for the site (e.g. ['en','fr']).
+When non-empty, slug mappings may store language-specific paths.

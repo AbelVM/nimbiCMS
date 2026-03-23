@@ -15,7 +15,7 @@ appended to the document. The callback receives the render context.
 
 ### fn
 
-(`ctx`) => `void` \| `Promise`\<`void`\>
+[`HookCallback`](../type-aliases/HookCallback.md)
 
 Callback which can modify the render context or DOM.
 

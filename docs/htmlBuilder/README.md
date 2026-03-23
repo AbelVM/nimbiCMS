@@ -6,6 +6,11 @@
 
 # htmlBuilder
 
+HTML builder and article rendering helpers.
+
+Functions to parse markdown into article DOM, build TOC elements, and
+prepare content for rendering inside the UI.
+
 ## Type Aliases
 
 - [ArticleResult](type-aliases/ArticleResult.md)

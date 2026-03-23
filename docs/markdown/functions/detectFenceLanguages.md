@@ -6,27 +6,27 @@
 
 # Function: detectFenceLanguages()
 
-> **detectFenceLanguages**(`md`, `supportedMap?`): `Set`\<`string`\>
+> **detectFenceLanguages**(`md?`, `supportedMap?`): `Set`\<`string`\>
 
 Detect fenced code block languages in a markdown string.
 Kept immediately above the exported symbol for TypeDoc.
 
 ## Parameters
 
-### md
+### md?
 
 `string`
 
-markdown source
+Markdown source string to scan for fenced code blocks.
 
 ### supportedMap?
 
 `Map`\<`string`, `string`\>
 
-optional supported languages map
+Optional map of supported language alias -> canonical name.
 
 ## Returns
 
 `Set`\<`string`\>
 
-set of detected language identifiers
+- Set of detected language identifiers (canonical or fallback names)
