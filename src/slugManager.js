@@ -311,6 +311,27 @@ function _deriveCommonPrefix(paths) {
 
 import { refreshIndexPaths } from './indexManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
+import { memoize } from './utils/memoize.js'
+
+/**
+ * Generate a URL-friendly slug from a text string (memoized LRU).
+ * @param {string} s - Text to generate a URL-friendly slug from.
+ * @returns {string}
+ */
+export const slugify = memoize(function(s) {
+  const MAX_SLUG_LENGTH = 80 // reasonable default to avoid extremely long URLs
+  let slug = String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\- ]/g, '')
+    .replace(/ /g, '-')
+  slug = slug.replace(/(?:-?)(?:md|html)$/, '')
+  slug = slug.replace(/-+/g, '-')
+  slug = slug.replace(/^-|-$/g, '')
+  if (slug.length > MAX_SLUG_LENGTH) {
+    slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, '')
+  }
+  return slug
+}, 2000)
 
 /**
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
@@ -393,25 +414,7 @@ export function setContentBase(contentBase) {
 
 try { setContentBase() } catch (err) { _debugLog('[slugManager] initial setContentBase failed', err) }
 
-/**
- * Generate a URL-friendly slug from a text string.
- * @param {string} s - Text to generate a URL-friendly slug from.
- * @returns {string} - The generated slug string.
- */
-export function slugify(s) {
-  const MAX_SLUG_LENGTH = 80 // reasonable default to avoid extremely long URLs
-  let slug = String(s || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\- ]/g, '')
-    .replace(/ /g, '-')
-  slug = slug.replace(/(?:-?)(?:md|html)$/, '')
-  slug = slug.replace(/-+/g, '-')
-  slug = slug.replace(/^-|-$/g, '')
-  if (slug.length > MAX_SLUG_LENGTH) {
-    slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, '')
-  }
-  return slug
-}
+// `slugify` is defined earlier and memoized to reduce repeated work.
 
 /**
  * Ensure a candidate slug is unique against an existing set.

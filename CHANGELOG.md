@@ -12,6 +12,17 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[FEAT]** More flexible defaults for `homePage` and `notFoundPage`
 - **[FEAT]** Centralized logging behavior
 - **[PERF]** Improved parallel indexing, 6x
+- **[PERF]** Reuse DOMParser
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
+- **[PERF]**
 - **[CHORE]** Improved JSDoc coverage and quality
 - **[CHORE]** Raised tests coverage
 

@@ -11,6 +11,7 @@
  * @returns {boolean}
  */
 import { debugWarn } from './debug.js'
+import { memoize } from './memoize.js'
 
 export function isExternalLink(href) {
   if (!href || typeof href !== 'string') return false
@@ -24,9 +25,9 @@ export function isExternalLink(href) {
  * @param {string} p - input path to normalize (remove leading ./ or /)
  * @returns {string}
  */
-export function normalizePath(p) {
+export const normalizePath = memoize(function(p) {
   return String(p || '').replace(/^[.\/]+/, '')
-}
+}, 2000)
 
 /**
  * Remove one or more trailing slashes from a URL or path.  This is handy
@@ -35,9 +36,9 @@ export function normalizePath(p) {
  * @param {string} u - input path or URL to trim trailing slashes from
  * @returns {string}
  */
-export function trimTrailingSlash(u) {
+export const trimTrailingSlash = memoize(function(u) {
   return String(u || '').replace(/\/+$/, '')
-}
+}, 2000)
 
 /**
  * Ensure the given URL/path ends with a single slash.  This wraps
@@ -46,9 +47,9 @@ export function trimTrailingSlash(u) {
  * @param {string} u
  * @returns {string}
  */
-export function ensureTrailingSlash(u) {
-  return trimTrailingSlash(u) + '/'
-}
+export const ensureTrailingSlash = memoize(function(u) {
+  return trimTrailingSlash(String(u || '')) + '/'
+}, 2000)
 
 /**
  * Apply the lazy-loading attribute to an <img> element if not already set.
@@ -273,16 +274,16 @@ export function buildPageUrl(page, hash = null, baseSearch) {
  * @param {string} u - URL or component to encode safely
  * @returns {string}
  */
-export function encodeURL(u) {
+export const encodeURL = memoize(function(u) {
   try {
     const s = String(u || '')
     if (s.includes('%')) return s
     return encodeURI(s)
-  } catch (_) {
-    debugWarn('[helpers] encodeURL failed', _)
+  } catch (err) {
+    debugWarn('[helpers] encodeURL failed', err)
     return String(u || '')
   }
-}
+}, 2000)
 
 /**
  * Execute the given function and silently ignore any exceptions. Returns
@@ -318,7 +319,7 @@ try {
  * @param {string} s
  * @returns {string}
  */
-export function decodeHtmlEntities(s) {
+export const decodeHtmlEntities = memoize(function(s) {
   try {
     if (!s && s !== 0) return ''
     const str = String(s)
@@ -338,4 +339,4 @@ export function decodeHtmlEntities(s) {
   } catch (err) {
     return String(s || '')
   }
-}
+}, 2000)

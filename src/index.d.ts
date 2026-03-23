@@ -379,18 +379,21 @@ export function toCanonicalHref(href: string): string
 
 
 
+// --- from src/utils/memoize.js
+
+
 // --- from src/utils/l10n-defaults.js
 export const DEFAULT_L10N: Record<string, L10nEntry>
 
 // --- from src/utils/helpers.js
-export function normalizePath(p: string): string
-export function trimTrailingSlash(u: string): string
-export function ensureTrailingSlash(u: string): string
+export const normalizePath: any
+export const trimTrailingSlash: any
+export const ensureTrailingSlash: any
 export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): void
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
-export function encodeURL(u: string): string
+export const encodeURL: any
 export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
-export function decodeHtmlEntities(s: string): string
+export const decodeHtmlEntities: any
 
 
 
