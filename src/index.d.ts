@@ -383,6 +383,11 @@ export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): st
 export function parseHrefToRoute(href: string): any
 export function toCanonicalHref(href: string): string
 
+// --- from src/utils/textMetrics.js
+export function getReadingTime(text: string): any
+export function getTextMetrics(text: string): any
+export function clearTextMetricsCache(): void
+
 // --- from src/utils/sharedDomParser.js
 export function getSharedParser(): DOMParser|null
 export function setSharedParser(parser: DOMParser|null): void

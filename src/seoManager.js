@@ -7,7 +7,7 @@
  * @module seoManager
  */
 import { normalizePath } from './utils/helpers.js'
-import readingTime from 'reading-time/lib/reading-time'
+import { getTextMetrics } from './utils/textMetrics.js'
 import { debugWarn } from './utils/debug.js'
 
 /**
@@ -322,7 +322,8 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
   try {
     try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (_e) {}
     if (h1Text) {
-      const rt = readingTime(data.raw || '')
+      const metrics = getTextMetrics(data.raw || '')
+      const rt = metrics && metrics.readingTime ? metrics.readingTime : null
       const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
       const rtText = minutes ? t('readingTime', { minutes }) : ''
       if (!rtText) return
