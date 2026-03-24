@@ -15,6 +15,7 @@ import { markNotFound } from './seoManager.js'
 import { debugWarn, debugInfo, isDebugLevel } from './utils/debug.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
 import { runWithConcurrency } from './utils/concurrency.js'
+import { rafThrottle } from './utils/events.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
 /**
@@ -1617,7 +1618,7 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
           }
         } catch (err) { debugWarn('[htmlBuilder] onScroll handler failed', err) }
       }
-      safe(() => root.addEventListener('scroll', onScroll))
+      safe(() => root.addEventListener('scroll', rafThrottle(onScroll)))
       onScroll()
     } else {
       if (!btn._nimbiObserver) {

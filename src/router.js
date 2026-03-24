@@ -40,6 +40,22 @@ function _routerShouldLog() {
  */
 export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000 // five minutes
 
+// Controller used to cancel the previous in-flight `fetchPageData` call
+let _lastFetchPageDataController = null
+
+// Compatibility wrapper for calling `fetchMarkdown` while optionally
+// forwarding an AbortSignal. Some tests replace `fetchMarkdown` with a
+// spy that expects only two arguments; to remain compatible call the
+// original signature when the function reports a smaller `length`.
+function _fetchMd(path, base, signal) {
+  try {
+    if (typeof fetchMarkdown === 'function' && typeof fetchMarkdown.length === 'number' && fetchMarkdown.length >= 3) {
+      return fetchMarkdown(path, base, { signal })
+    }
+  } catch (_) {}
+  return fetchMarkdown(path, base)
+}
+
 /**
  * Modify the resolution cache time‑to‑live at runtime.
  * Accepts a value in milliseconds; passing a non‑positive value disables
@@ -176,7 +192,7 @@ export { allMarkdownPaths, allMarkdownPathsSet } from './slugManager.js'
  * @param {string} contentBase - content base URL for fetching markdown
  * @returns {Promise<string|null>} path of the discovered markdown or null
  */
-async function tryDiscoverFromIndex(decoded, contentBase) {
+async function tryDiscoverFromIndex(decoded, contentBase, signal) {
   const localCandidates = new Set(indexSet)
   let anchorsForIndex = []
   try {
@@ -254,7 +270,7 @@ async function tryDiscoverFromIndex(decoded, contentBase) {
   for (const candidate of localCandidates) {
     try {
       if (!candidate || !String(candidate).includes('.md')) continue
-      const idxMd = await fetchMarkdown(candidate, contentBase)
+      const idxMd = await _fetchMd(candidate, contentBase, signal)
       if (!idxMd || !idxMd.raw) continue
       const m = (idxMd.raw || '').match(/^#\s+(.+)$/m)
       if (m) {
@@ -335,6 +351,14 @@ export async function fetchPageData(raw, contentBase) {
     try { incrementCounter('fetchPageData') } catch (_) {}
     try { syncLegacyCounter('fetchPageData') } catch (_) {}
   } catch (_) {}
+  // Cancel any previous in-flight fetchPageData and create a fresh controller
+  try {
+    if (_lastFetchPageDataController && typeof _lastFetchPageDataController.abort === 'function') {
+      try { _lastFetchPageDataController.abort() } catch (_) {}
+    }
+  } catch (_) {}
+  _lastFetchPageDataController = (typeof AbortController !== 'undefined') ? new AbortController() : null
+  const _fetchController = _lastFetchPageDataController
   // Extract a parsed anchor from the current location in a robust way.
   // Use `parseHrefToRoute` so cosmetic hashes like "#/slug#anchor?x=1" are
   // normalized to just the anchor value instead of the raw hash payload.
@@ -381,7 +405,7 @@ export async function fetchPageData(raw, contentBase) {
       if (slugToMd.has(decoded)) {
         resolved = resolveSlugPath(decoded) || slugToMd.get(decoded)
       } else {
-        let idx = await tryDiscoverFromIndex(decoded, contentBase)
+        let idx = await tryDiscoverFromIndex(decoded, contentBase, _fetchController ? _fetchController.signal : undefined)
         if (idx) {
           resolved = idx
         } else if ((refreshIndexPaths._refreshed && indexSet && indexSet.size) || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))) {
@@ -410,7 +434,7 @@ export async function fetchPageData(raw, contentBase) {
     if (allowCandidateProbing && resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/'))) {
       const abs = resolved.startsWith('/') ? new URL(resolved, location.origin).toString() : resolved
       try {
-        const res = await fetch(abs)
+        const res = await fetch(abs, _fetchController ? { signal: _fetchController.signal } : undefined)
         if (res && res.ok) {
           const raw = await res.text()
           const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
@@ -428,14 +452,14 @@ export async function fetchPageData(raw, contentBase) {
                 try { relPath = new URL(abs).pathname.replace(/^\//, '') } catch (_) { relPath = String(abs || '').replace(/^\//, '') }
                 const alt = relPath.replace(/\.html$/i, '.md')
                 try {
-                  const mdData = await fetchMarkdown(alt, contentBase)
+                  const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
                   if (mdData && mdData.raw) {
                     return { data: mdData, pagePath: alt, anchor }
                   }
                 } catch (_e) { /* ignore md probe failure */ }
                 if (typeof notFoundPage === 'string' && notFoundPage) {
                   try {
-                    const nf = await fetchMarkdown(notFoundPage, contentBase)
+                    const nf = await _fetchMd(notFoundPage, contentBase, _fetchController ? _fetchController.signal : undefined)
                     if (nf && nf.raw) {
                           try { markNotFound(nf.meta || {}, notFoundPage) } catch (_e) {}
                           return { data: nf, pagePath: notFoundPage, anchor }
@@ -465,7 +489,7 @@ export async function fetchPageData(raw, contentBase) {
                 try { relPath = new URL(abs).pathname.replace(/^\//, '') } catch (_) { relPath = String(abs || '').replace(/^\//, '') }
                 const alt = relPath.replace(/\.html$/i, '.md')
                 try {
-                  const mdData = await fetchMarkdown(alt, contentBase)
+                  const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
                   if (mdData && mdData.raw) {
                     return { data: mdData, pagePath: alt, anchor }
                   }
@@ -474,7 +498,7 @@ export async function fetchPageData(raw, contentBase) {
                 }
                 if (typeof notFoundPage === 'string' && notFoundPage) {
                   try {
-                    const nf = await fetchMarkdown(notFoundPage, contentBase)
+                    const nf = await _fetchMd(notFoundPage, contentBase, _fetchController ? _fetchController.signal : undefined)
                     if (nf && nf.raw) {
                           try { markNotFound(nf.meta || {}, notFoundPage) } catch (_e) {}
                           return { data: nf, pagePath: notFoundPage, anchor }
@@ -562,7 +586,7 @@ export async function fetchPageData(raw, contentBase) {
       if (!candidate) continue
       try {
         const norm = normalizePath(candidate)
-        data = await fetchMarkdown(norm, contentBase)
+        data = await _fetchMd(norm, contentBase, _fetchController ? _fetchController.signal : undefined)
         pagePath = norm
 
         // Defensive check: if the user requested a bare slug (e.g. "potato")
@@ -598,14 +622,14 @@ export async function fetchPageData(raw, contentBase) {
                     const alt = norm.replace(/\.html$/i, '.md')
                     if (pageCandidates.includes(alt)) {
                       try {
-                        const mdData = await fetchMarkdown(alt, contentBase)
+                        const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
                         if (mdData && mdData.raw) {
                           data = mdData
                           pagePath = alt
                         } else {
                           if (typeof notFoundPage === 'string' && notFoundPage) {
                             try {
-                              const nf = await fetchMarkdown(notFoundPage, contentBase)
+                              const nf = await _fetchMd(notFoundPage, contentBase, _fetchController ? _fetchController.signal : undefined)
                               if (nf && nf.raw) {
                                 data = nf
                                 pagePath = notFoundPage
@@ -630,7 +654,7 @@ export async function fetchPageData(raw, contentBase) {
                         }
                       } catch (_e) {
                         try {
-                          const nf = await fetchMarkdown(notFoundPage, contentBase)
+                          const nf = await _fetchMd(notFoundPage, contentBase, _fetchController ? _fetchController.signal : undefined)
                           if (nf && nf.raw) {
                             data = nf
                             pagePath = notFoundPage
@@ -688,7 +712,7 @@ export async function fetchPageData(raw, contentBase) {
                 if (looksLikeHtml) {
                   let accepted = false
                   try {
-                    const mdData = await fetchMarkdown(alt, contentBase)
+                    const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
                     if (mdData && mdData.raw) {
                       data = mdData
                       pagePath = alt
@@ -696,7 +720,7 @@ export async function fetchPageData(raw, contentBase) {
                     } else {
                       if (typeof notFoundPage === 'string' && notFoundPage) {
                         try {
-                          const nf = await fetchMarkdown(notFoundPage, contentBase)
+                          const nf = await _fetchMd(notFoundPage, contentBase, _fetchController ? _fetchController.signal : undefined)
                           if (nf && nf.raw) {
                             data = nf
                             pagePath = notFoundPage
@@ -709,7 +733,7 @@ export async function fetchPageData(raw, contentBase) {
                     }
                   } catch (_e) {
                     try {
-                      const nf = await fetchMarkdown(notFoundPage, contentBase)
+                      const nf = await _fetchMd(notFoundPage, contentBase, _fetchController ? _fetchController.signal : undefined)
                       if (nf && nf.raw) {
                         data = nf
                         pagePath = notFoundPage
@@ -757,7 +781,7 @@ export async function fetchPageData(raw, contentBase) {
     // shell (homepage) for missing slugs.
                     if (typeof notFoundPage === 'string' && notFoundPage) {
                       try {
-                        const nf = await fetchMarkdown(notFoundPage, contentBase)
+                        const nf = await _fetchMd(notFoundPage, contentBase, _fetchController ? _fetchController.signal : undefined)
                         if (nf && nf.raw) {
                           try { markNotFound(nf.meta || {}, notFoundPage) } catch (_e) {}
                           return { data: nf, pagePath: notFoundPage, anchor }
@@ -769,7 +793,7 @@ export async function fetchPageData(raw, contentBase) {
           try {
           const abs = new URL(String(originalRaw || ''), location.href).toString()
           if (_routerShouldLog()) debugWarn('[router] attempting absolute HTML fetch fallback', abs)
-          const res = await fetch(abs)
+          const res = await fetch(abs, _fetchController ? { signal: _fetchController.signal } : undefined)
           if (res && res.ok) {
             const raw = await res.text()
             const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
@@ -894,7 +918,7 @@ export async function fetchPageData(raw, contentBase) {
           ]
           for (const abs of candidates) {
             try {
-              const res = await fetch(abs, { method: 'GET' })
+              const res = await fetch(abs, Object.assign({ method: 'GET' }, _fetchController ? { signal: _fetchController.signal } : {}))
               if (res && res.ok) {
                 const raw = await res.text()
                 return { data: { raw, isHtml: true }, pagePath: abs.replace(/^\//, ''), anchor }

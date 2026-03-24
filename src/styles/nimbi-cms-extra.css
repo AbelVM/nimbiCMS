@@ -529,10 +529,9 @@
 
 .nimbi-mount {
     position: relative;
-}
-
-.nimbi-mount {
     overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
 }
 
 .nimbi-mount .nimbi-site-navbar,

@@ -13,6 +13,7 @@ import { parseHrefToRoute } from './utils/urlHelper.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
 import { slugify, slugToMd, mdToSlug, _storeSlugMapping, fetchMarkdown, allMarkdownPaths, allMarkdownPathsSet, searchIndex } from './slugManager.js'
 import { debugLog, debugWarn } from './utils/debug.js'
+import { debounce, rafThrottle, scheduleDOMWrite } from './utils/events.js'
 
 // Helper to store slug mapping with fallback when slugManager is mocked
 function storeSlugMapping(slug, rel) {
@@ -467,7 +468,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
               panel.appendChild(a)
             } catch (e) { /* ignore per-item failures */ }
           })
-          resultsEl.appendChild(panel)
+          scheduleDOMWrite(() => { try { resultsEl.appendChild(panel) } catch (e) {} })
           try { resultsEl.style.display = 'block' } catch (e) {}
         } catch (e) { /* ignore panel render failures */ }
       } catch (e) { /* ignore */ }
@@ -1027,7 +1028,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             frag.appendChild(a)
           })
           panel.appendChild(frag)
-          dropdownContent.appendChild(panel)
+          scheduleDOMWrite(() => { try { dropdownContent.appendChild(panel) } catch (e) {} })
         } catch (e) { /* ignore render errors */ }
       if (dropdown) {
         dropdown.classList.add('is-active')
@@ -1040,13 +1041,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
       try { if (searchInput) searchInput.addEventListener('keydown', inputKeyHandler) } catch (e) {}
     }
 
-    const debounce = (fn, delay) => {
-      let timer = null
-      return (...args) => {
-        if (timer) clearTimeout(timer)
-        timer = setTimeout(() => fn(...args), delay)
-      }
-    }
+    
 
     if (searchInput) {
       const handleInput = debounce(async () => {

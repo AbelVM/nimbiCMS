@@ -432,6 +432,12 @@ export const decodeHtmlEntities: any
 // --- from src/utils/frontmatter.js
 export function parseFrontmatter(md: string): {content:string, data: Record<string,string>}
 
+// --- from src/utils/events.js
+
+
+
+
+
 // --- from src/utils/emojiMap.js
 
 // --- from src/utils/debug.js

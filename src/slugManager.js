@@ -832,6 +832,9 @@ export let fetchMarkdown = async function(path, base, opts) {
   } catch (err) {
     url = (typeof location !== 'undefined' && location.origin ? location.origin : 'http://localhost') + '/' + path.replace(/^\//, '')
   }
+  // Extract optional AbortSignal from opts (used to cancel stale fetches)
+  const signal = opts && opts.signal
+
   // Check short-term negative cache first to avoid repeated failed fetches
   try {
     const neg = negativeFetchCache.get(url)
@@ -846,13 +849,13 @@ export let fetchMarkdown = async function(path, base, opts) {
   }
 
   const promise = (async () => {
-    const res = await fetch(url)
+    const res = await fetch(url, signal ? { signal } : undefined)
     if (!res || typeof res.ok !== 'boolean' || !res.ok) {
       if (res && res.status === 404) {
           if (typeof notFoundPage === 'string' && notFoundPage) {
             try {
               const p404 = `${baseClean}/${notFoundPage}`
-              const r404 = await globalThis.fetch(p404)
+              const r404 = await globalThis.fetch(p404, signal ? { signal } : undefined)
               if (r404 && typeof r404.ok === 'boolean' && r404.ok) {
                 const raw404 = await r404.text()
                 return { raw: raw404, status: 404 }
@@ -895,7 +898,7 @@ export let fetchMarkdown = async function(path, base, opts) {
       try {
         if (typeof notFoundPage === 'string' && notFoundPage) {
           const p404 = `${baseClean}/${notFoundPage}`
-          const r404 = await globalThis.fetch(p404)
+          const r404 = await globalThis.fetch(p404, signal ? { signal } : undefined)
           if (r404.ok) {
             const raw404 = await r404.text()
             return { raw: raw404, status: 404 }
@@ -911,6 +914,11 @@ export let fetchMarkdown = async function(path, base, opts) {
 
   // Track failures so we can negative-cache them briefly and allow retries later
   const tracked = promise.catch(err => {
+    // Do not negative-cache aborted requests; allow retries when user retries
+    if (err && err.name === 'AbortError') {
+      try { fetchCache.delete(url) } catch (_) {}
+      throw err
+    }
     try { negativeFetchCache.set(url, Date.now() + NEGATIVE_CACHE_TTL_MS) } catch (_) {}
     try { fetchCache.delete(url) } catch (_) {}
     throw err
