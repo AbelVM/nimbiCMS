@@ -40,6 +40,7 @@ coverage/
 notes.md
 notes.txt
 docs-typedoc.json
+.tmp/
 tmp/
 temp/
 a11y-report.json
