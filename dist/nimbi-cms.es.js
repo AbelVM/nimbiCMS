@@ -15078,8 +15078,8 @@ async function xc(e = {}) {
 }
 async function hc() {
   try {
-    if ("1.0.5".trim())
-      return "1.0.5";
+    if ("1.0.6".trim())
+      return "1.0.6";
   } catch {
   }
   return "0.0.0";

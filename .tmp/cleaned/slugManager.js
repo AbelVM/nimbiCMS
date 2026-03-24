@@ -110,7 +110,6 @@ export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noInde
 }
 
 
-
 /**
  * Attempt to resolve a slug via the worker when available, otherwise fallback
  * to the main-thread `crawlForSlug` implementation.
@@ -1872,3 +1871,4 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   }
   return null
 }
+

@@ -5,6 +5,9 @@ All notable changes to **nimbiCMS** will be documented in this file.
 ## Unreleased
 
 - ...
+
+## v1.0.6 Need for Speed
+
 - **[FIX]** Slug dedupe regression
 - **[FIX]** Some resources were imported from CDN regardless being already bundled
 - **[FIX]** Stalled fetches are now being managed
@@ -29,7 +32,6 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Large DOM queries are now scoped
 - **[PERF]** Debounce/heavy-event throttling
 - **[PERF]** Streaming processing for big content
-- **[PERF]**
 - **[CHORE]** Improved JSDoc coverage and quality
 - **[CHORE]** Raised tests coverage
 
