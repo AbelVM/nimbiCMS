@@ -6,7 +6,7 @@
  * @module init
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage } from './slugManager.js'
+import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, watchForColdHashRoute } from './slugManager.js'
 import * as router from './router.js'
 import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
@@ -720,6 +720,35 @@ export async function initCMS(options = {}) {
       }
 
       try {
+        // If the page was loaded directly with a cosmetic hash route
+        // (e.g. site/#/slug#anchor?params) register a watcher so we can
+        // log to the console the moment the requested slug is added to
+        // the runtime slug->md map. This helps diagnose cold-load
+        // resolution for direct hash requests.
+        try {
+          const parsedCurrent = parseHrefToRoute(typeof window !== 'undefined' ? window.location.href : '')
+          if (parsedCurrent) {
+            try {
+              if (parsedCurrent.type === 'cosmetic') {
+                  try { watchForColdHashRoute(parsedCurrent) } catch (_) {}
+                } else if (parsedCurrent.type === 'canonical') {
+                  try { watchForColdHashRoute(parsedCurrent) } catch (_) {}
+                } else if (parsedCurrent.type === 'path') {
+                try {
+                  const locPath = (typeof location !== 'undefined' && location && location.pathname) ? String(location.pathname) : '/'
+                  const normalizedLoc = locPath.replace(/\/\/+$/, '')
+                  const normalizedPageDir = (pageDir || '').replace(/\/\/+$/, '')
+                  let cbPath = ''
+                  try { cbPath = (new URL(contentBase)).pathname.replace(/\/\/+$/, '') } catch (_) { cbPath = '' }
+                  if (normalizedLoc === normalizedPageDir || normalizedLoc === cbPath || normalizedLoc === '') {
+                    try { watchForColdHashRoute({ type: 'path', page: null, anchor: parsedCurrent.anchor || null, params: parsedCurrent.params || '' }) } catch (_) {}
+                  }
+                } catch (_) {}
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+
         setContentBase(contentBase)
       } catch (err) { debugWarn('[nimbi-cms] setContentBase failed', err) }
 
@@ -862,6 +891,27 @@ export async function initCMS(options = {}) {
   setStyle(defaultStyle)
   await ensureBulma(bulmaCustomize, pageDir)
   const ui = createUI({ contentWrap, navWrap, container, mountOverlay, t, contentBase, homePage, initialDocumentTitle, runHooks })
+  try {
+    if (typeof window !== 'undefined') {
+      try { window.__nimbiUI = ui } catch (_) {}
+      try {
+        window.addEventListener('nimbi.coldRouteResolved', function(ev) {
+          try {
+            if (ui && typeof ui.renderByQuery === 'function') {
+              ui.renderByQuery().catch(e => { try { debugWarn('[nimbi-cms] renderByQuery failed for cold-route event', e) } catch (_) {} })
+            }
+          } catch (_) {}
+        })
+      } catch (_) {}
+      try {
+        const q = Array.isArray(window.__nimbiColdRouteResolved) ? window.__nimbiColdRouteResolved.slice() : null
+        if (q && q.length) {
+          try { ui.renderByQuery().catch(() => {}) } catch (_) {}
+          try { window.__nimbiColdRouteResolved = [] } catch (_) {}
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
 
   try {
     const navbarWrap = document.createElement('header')
@@ -1142,7 +1192,6 @@ export async function initCMS(options = {}) {
   } catch (e) {
     debugWarn('[nimbi-cms] build navigation failed', e)
   }
-  await ui.renderByQuery()
   
   try {
     import('./version.js').then(({ getVersion }) => {

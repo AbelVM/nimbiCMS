@@ -529,7 +529,7 @@
 
 .nimbi-mount {
     position: relative;
-    overflow-x: hidden;
+    overflow-x: hidden !important;
     scrollbar-width: thin;
     scrollbar-color: var(--bulma-scrollbar-thumb-color) transparent;
 }

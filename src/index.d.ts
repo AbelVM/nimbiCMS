@@ -195,6 +195,7 @@ export function getVersion(): Promise<string>
 
 
 // --- from src/slugManager.js
+export function watchForColdHashRoute(parsed: {type:string,page:string,anchor?:string,params?:string}): any
 export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
 export function getLanguages(): string[]

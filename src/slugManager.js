@@ -23,6 +23,97 @@
  */
 export const slugToMd = new Map()
 
+// Watchers for cold cosmetic hash route requests.
+// Map: slug -> Array<string> of original cosmetic tokens (e.g. "#/slug#anchor?params")
+const _coldRouteWatchers = new Map()
+
+/**
+ * Register interest in a cold cosmetic hash route request so the runtime
+ * will print a console message the moment the corresponding slug is
+ * added to the slug->md map.
+ * @param {{type:string,page:string,anchor?:string,params?:string}} parsed - result from parseHrefToRoute
+ */
+export function watchForColdHashRoute(parsed) {
+  try {
+    if (!parsed) return
+    let key = HOME_SLUG
+    let full = ''
+    if (parsed.type === 'cosmetic') {
+      const hasPage = (parsed.page != null && String(parsed.page).trim() !== '')
+      key = hasPage ? String(parsed.page) : HOME_SLUG
+      full = '#/' + (hasPage ? String(parsed.page) : '')
+      if (parsed.anchor) full += '#' + String(parsed.anchor)
+      if (parsed.params) full += '?' + String(parsed.params)
+    } else if (parsed.type === 'path') {
+      const hasPage = (parsed.page != null && String(parsed.page).trim() !== '')
+      key = hasPage ? String(parsed.page) : HOME_SLUG
+      full = '/' + (hasPage ? String(parsed.page) : '')
+      if (parsed.anchor) full += '#' + String(parsed.anchor)
+      if (parsed.params) full += '?' + String(parsed.params)
+    } else if (parsed.type === 'canonical') {
+      if (parsed.page) {
+        key = parsed.page
+        full = '?page=' + encodeURIComponent(parsed.page)
+        if (parsed.anchor) full += '#' + String(parsed.anchor)
+        if (parsed.params) full += '?' + String(parsed.params)
+      } else {
+        key = HOME_SLUG
+        try {
+          full = (typeof location !== 'undefined' && location && location.pathname) ? String(location.pathname) : '/'
+          if (typeof location !== 'undefined' && location.search) full += String(location.search)
+          if (typeof location !== 'undefined' && location.hash) full += String(location.hash)
+        } catch (_) { full = '/' }
+      }
+    } else {
+      return
+    }
+    const existing = _coldRouteWatchers.get(key) || []
+    existing.push(full)
+    _coldRouteWatchers.set(key, existing)
+  } catch (_) {}
+}
+
+function _notifyColdRouteWatchers(slug, rel) {
+  try {
+    const key = String(slug || '')
+    const arr = _coldRouteWatchers.get(key)
+    if (!arr || !arr.length) return
+    try {
+      const gh = (typeof globalThis !== 'undefined') ? globalThis : null
+      if (gh) {
+        try {
+          if (!gh.__nimbiColdRouteResolved) gh.__nimbiColdRouteResolved = []
+        } catch (_) {}
+        for (const tok of arr) {
+          try {
+            // console.info(`[slugManager] resolved cold route "${tok}" to "${rel}" (slug: "${key}")`)
+            const rec = { slug: key, token: tok, rel: String(rel || '') }
+            try { gh.__nimbiColdRouteResolved.push(rec) } catch (_) {}
+            try { if (gh && typeof gh.dispatchEvent === 'function') gh.dispatchEvent(new CustomEvent('nimbi.coldRouteResolved', { detail: rec })) } catch (_) {}
+            try { if (gh && gh.__nimbiUI && typeof gh.__nimbiUI.renderByQuery === 'function') gh.__nimbiUI.renderByQuery().catch(() => {}) } catch (_) {}
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    _coldRouteWatchers.delete(key)
+  } catch (_) {}
+}
+
+// Override the instance `set` method to notify any cold-route watchers
+// when a new slug key is added. Use the Map prototype methods to avoid
+// recursive calls and preserve `instanceof Map` behavior for consumers.
+try {
+  const _origSet = slugToMd.set
+  slugToMd.set = function(k, v) {
+    const existed = Map.prototype.has.call(this, k)
+    const res = Map.prototype.set.call(this, k, v)
+    try {
+      if (!existed) _notifyColdRouteWatchers(k, v)
+    } catch (_) {}
+    return res
+  }
+} catch (_) {}
+
 /**
  * Result returned from `fetchMarkdown`.
  * @typedef {{raw:string,isHtml?:boolean,status?:number}} FetchResult
@@ -316,6 +407,12 @@ export function setHomePage(p) {
     return
   }
   homePage = String(p || '')
+  try {
+    // Notify any cold-route watchers that were waiting for the site root
+    // (cases where the cosmetic hash contained no slug and the host
+    // intends the home page to be shown).
+    try { _notifyColdRouteWatchers(HOME_SLUG, homePage) } catch (_) {}
+  } catch (_) {}
 }
 
 /**

@@ -5,6 +5,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 ## Unreleased
 
 - ...
+- **[FEAT]** Override the indexing to provide early rendering for cold URLs
 
 ## v1.0.7
 

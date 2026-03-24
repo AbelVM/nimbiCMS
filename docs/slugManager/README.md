@@ -75,4 +75,5 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [setSkipRootReadme](functions/setSkipRootReadme.md)
 - [unescapeMarkdown](functions/unescapeMarkdown.md)
 - [uniqueSlug](functions/uniqueSlug.md)
+- [watchForColdHashRoute](functions/watchForColdHashRoute.md)
 - [whenSearchIndexReady](functions/whenSearchIndexReady.md)
