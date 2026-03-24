@@ -6,7 +6,7 @@
  *
  * @module router
  */
-import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath, notFoundPage } from './slugManager.js'
+import { slugToMd, slugify, fetchMarkdown, ensureSlug, resolveSlugPath, notFoundPage, homePage } from './slugManager.js'
 import * as l10n from './l10nManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
@@ -369,6 +369,16 @@ export async function fetchPageData(raw, contentBase) {
     }
   }
   let resolved = raw || ''
+  // If the incoming raw page token is empty, prefer the configured
+  // `homePage` when available so navigating to the brand/home link
+  // (which may emit `?page=`) resolves to the intended landing page
+  // instead of attempting to fetch an empty candidate and falling
+  // through to index heuristics that can return the site shell.
+  try {
+    if ((!resolved || String(resolved).trim() === '') && typeof homePage === 'string' && homePage) {
+      resolved = String(homePage)
+    }
+  } catch (e) { /* ignore */ }
   let anchor = null
 
   // Whether the original request explicitly referenced a .md or .html

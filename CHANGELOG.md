@@ -6,6 +6,10 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 - ...
 
+## v1.0.7
+
+- **[FIX]** Hot fix for a path regression when deployed
+
 ## v1.0.6 Need for Speed
 
 - **[FIX]** Slug dedupe regression

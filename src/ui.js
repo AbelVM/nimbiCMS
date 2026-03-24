@@ -170,6 +170,23 @@ export function createUI(opts) {
       try { incrementCounter('renderByQuery') } catch (_) {}
       try { syncLegacyCounter('renderByQuery') } catch (_) {}
       let parsed = parseHrefToRoute(location.href)
+      // If the path-style URL equals the site's content base (repo subpath)
+      // treat it as the site root so the configured `homePage` is used
+      // instead of attempting to resolve a page with the same name as
+      // the repo folder (which produces duplicated subpath probes).
+      try {
+        if (parsed && parsed.type === 'path' && parsed.page && contentBase) {
+          try {
+            const cb = (typeof contentBase === 'string') ? new URL(contentBase, location.href).pathname : ''
+            const cbNorm = String(cb || '').replace(/^\/+|\/+$/g, '')
+            const parsedNorm = String(parsed.page || '').replace(/^\/+|\/+$/g, '')
+            if (cbNorm && parsedNorm === cbNorm) {
+              // Null out the parsed page so later logic falls back to `homePage`
+              parsed.page = null
+            }
+          } catch (_e) {}
+        }
+      } catch (_e) {}
       // If a path-style URL was used (e.g. /slug) convert it to the
       // canonical `?page=slug[...]` form so the rest of the pipeline only
       // sees the approved patterns. Use replaceState so we don't reload.

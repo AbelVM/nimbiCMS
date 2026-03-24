@@ -749,6 +749,37 @@ export let fetchMarkdown = async function(path, base, opts) {
       }
     }
   } catch (err) { _debugLog('[slugManager] path sanitize failed', err) }
+  // If a content `base` was provided and the `path` accidentally
+  // includes the base's pathname (for example when links were authored
+  // as "nimbiCMS_pre/assets/..." or "/nimbiCMS_pre/...' in a site
+  // served under that subpath), strip the leading base pathname so
+  // subsequent resolution does not duplicate the pageDir.
+  try {
+    if (base) {
+      try {
+        const baseUrl = (/^[a-z][a-z0-9+.-]*:/i.test(String(base))) ? new URL(String(base)) : new URL(String(base), (typeof location !== 'undefined' ? location.origin : 'http://localhost'))
+        let bp = (baseUrl.pathname || '')
+        bp = bp.replace(/^\/+|\/+$/g, '') // trim slashes
+        if (bp) {
+          try {
+            const pRaw = String(path || '')
+            // If path is an absolute URL, don't modify it
+            if (!/^[a-z][a-z0-9+.-]*:/i.test(pRaw)) {
+              let p = pRaw.replace(/^\/+/, '')
+              if (p === bp) {
+                path = ''
+              } else if (p.startsWith(bp + '/')) {
+                path = p.slice(bp.length + 1)
+              } else {
+                path = p
+              }
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+
   const allowFetch = (opts && opts.force === true) || (typeof notFoundPage === 'string' && notFoundPage) || (slugToMd && slugToMd.size) || (allMarkdownPathsSet && allMarkdownPathsSet.size) || isDebug()
   if (!allowFetch) {
     throw new Error('failed to fetch md')
@@ -757,22 +788,25 @@ export let fetchMarkdown = async function(path, base, opts) {
   let url = ''
   try {
     const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
-    if (baseClean && baseClean.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
-      const rel = baseClean.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
-      const origin = (typeof location !== 'undefined' && location && location.origin) ? location.origin : 'http://localhost'
-      url = origin.replace(/\/$/, '') + rel
-    } else {
-      let baseForResolve = origin + '/'
-      if (baseClean) {
-        if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
-          baseForResolve = baseClean.replace(/\/$/, '') + '/'
-        } else if (baseClean.startsWith('/')) {
-          baseForResolve = origin + baseClean.replace(/\/$/, '') + '/'
-        } else {
-          baseForResolve = origin + '/' + baseClean.replace(/\/$/, '') + '/'
-        }
+    // Build a consistent absolute base URL to resolve the `path` against.
+    // Prefer `base` when it's an absolute URL; otherwise compose an
+    // absolute base using the current origin so `new URL()` can correctly
+    // handle absolute/relative `path` values without manual string ops.
+    let baseForResolve = origin.replace(/\/$/, '') + '/'
+    if (baseClean) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
+        baseForResolve = baseClean.replace(/\/$/, '') + '/'
+      } else if (baseClean.startsWith('/')) {
+        baseForResolve = origin.replace(/\/$/, '') + baseClean.replace(/\/$/, '') + '/'
+      } else {
+        baseForResolve = origin.replace(/\/$/, '') + '/' + baseClean.replace(/\/$/, '') + '/'
       }
+    }
+    try {
       url = new URL(path.replace(/^\//, ''), baseForResolve).toString()
+    } catch (err) {
+      // Fallback to a conservative concatenation if URL resolution fails.
+      url = origin.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
     }
   } catch (err) {
     url = (typeof location !== 'undefined' && location.origin ? location.origin : 'http://localhost') + '/' + path.replace(/^\//, '')

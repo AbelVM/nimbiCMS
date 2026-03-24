@@ -805,11 +805,11 @@ export async function initCMS(options = {}) {
                         const r = parseHrefToRoute(href)
                         try { debugWarn('[nimbi-cms] parsed nav first-link href', href, '->', r) } catch (_) {}
                         if (r && r.page) {
-                          // Only accept candidate home pages that look like a path
-                          // (contain an extension or a directory). Slugs (cosmetic)
-                          // are not used here because `homePage` is expected to be
-                          // a fetchable path relative to `contentBase`.
-                          if (r.type === 'path' || (r.type === 'canonical' && (r.page.includes('.') || r.page.includes('/')))) {
+                          // Only accept candidate home pages that look like a
+                          // fetchable path (contain an extension or a directory).
+                          // Reject cosmetic slug or site-root paths like
+                          // "/nimbiCMS_pre" which are not content pages.
+                          if ((r.type === 'path' || r.type === 'canonical') && (r.page.includes('.') || r.page.includes('/'))) {
                             homePage = r.page
                             try { debugWarn('[nimbi-cms] derived homePage from navigation', homePage) } catch (_) {}
                             break

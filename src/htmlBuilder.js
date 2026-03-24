@@ -94,6 +94,33 @@ function resolvePathWithBase(path, base) {
 }
 
 /**
+ * Remove any leading repetition of the content base pathname from a
+ * resolved path. This guards against authored links that accidentally
+ * include the site subpath (e.g. "nimbiCMS_pre/...") which would
+ * otherwise produce duplicated segments when combined with `contentBase`.
+ *
+ * @param {string} rel - path portion possibly prefixed with the base
+ * @param {string} contentBasePath - ensureTrailingSlash(pathname) form
+ * @returns {string}
+ */
+function stripContentBasePrefix(rel, contentBasePath) {
+  try {
+    if (!rel) return rel
+    if (!contentBasePath) return String(rel || '')
+    const baseTrim = String(contentBasePath || '').replace(/^\/+|\/+$/g, '')
+    if (!baseTrim) return String(rel || '')
+    let out = String(rel || '')
+    // Remove leading slash(es)
+    out = out.replace(/^\/+/, '')
+    // Collapse any repeated leading base segments: 'base/base/...' -> '...'
+    const prefix = baseTrim + '/'
+    while (out.startsWith(prefix)) out = out.slice(prefix.length)
+    if (out === baseTrim) return ''
+    return out
+  } catch (e) { return String(rel || '') }
+}
+
+/**
  * @typedef {{path:string,name:string,children?:NavItem[]}} NavItem
  * @typedef {{html:string,meta:Record<string, unknown>,toc:Array<{level:number,text:string,id?:string}>}} ParsedPage
  */
@@ -456,10 +483,11 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             mdPathRaw = dir + mdPathRaw
           }
           try {
-            const resolved = new URL(mdPathRaw, contentBase).pathname
-            let rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved
-            rel = normalizePath(rel)
-            anchorInfo.push({ node: a, mdPathRaw, frag, rel })
+              const resolved = new URL(mdPathRaw, contentBase).pathname
+              let rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved
+              rel = stripContentBasePrefix(rel, contentBasePath)
+              rel = normalizePath(rel)
+              anchorInfo.push({ node: a, mdPathRaw, frag, rel })
             if (!mdToSlug.has(rel)) pending.add(rel)
           } catch (err) { debugWarn('[htmlBuilder] resolve mdPath failed', err) }
           continue
@@ -478,6 +506,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           const p = full.pathname || ''
             if (p && p.indexOf(contentBasePath) !== -1) {
             let rel = p.startsWith(contentBasePath) ? p.slice(contentBasePath.length) : p
+            rel = stripContentBasePrefix(rel, contentBasePath)
             rel = normalizePath(rel)
             rel = trimTrailingSlash(rel)
             if (!rel) rel = HOME_SLUG
@@ -877,7 +906,8 @@ export async function preMapMdSlugs(linkEls, contentBase) {
               resolved = mdPathRaw
               debugWarn('[htmlBuilder] resolve mdPath URL failed', err)
             }
-          const rel = (resolved && contentBasePath && resolved.startsWith(contentBasePath)) ? resolved.slice(contentBasePath.length) : String(resolved || '').replace(/^\//, '')
+          let rel = (resolved && contentBasePath && resolved.startsWith(contentBasePath)) ? resolved.slice(contentBasePath.length) : String(resolved || '').replace(/^\//, '')
+          rel = stripContentBasePrefix(rel, contentBasePath)
           anchorInfo.push({ rel })
           if (!mdToSlug.has(rel)) pending.add(rel)
         } catch (err) { debugWarn('[htmlBuilder] rewriteAnchors failed', err) }

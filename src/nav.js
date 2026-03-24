@@ -684,6 +684,31 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           }
           if (!mappingTarget) continue
 
+          // If the nav link includes the site subpath (contentBase pathname)
+          // (for example authors added "nimbiCMS/assets/..."), strip that
+          // leading segment so later resolution uses the configured
+          // `contentBase` and we avoid duplicated pageDir in fetch URLs.
+          try {
+            if (contentBase && typeof contentBase === 'string') {
+              try {
+                const cbUrl = new URL(contentBase, (typeof location !== 'undefined' ? location.origin : 'http://localhost'))
+                let cbPath = cbUrl.pathname || ''
+                cbPath = cbPath.replace(/^\/+|\/+$/g, '')
+                if (cbPath) {
+                  let mt = String(mappingTarget || '')
+                  mt = mt.replace(/^\/+/, '')
+                  if (mt === cbPath) {
+                    mappingTarget = ''
+                  } else if (mt.startsWith(cbPath + '/')) {
+                    mappingTarget = mt.slice(cbPath.length + 1)
+                  } else {
+                    mappingTarget = mt
+                  }
+                }
+              } catch (_) {}
+            }
+          } catch (_) {}
+
           const norm = normalizePath(String(mappingTarget || ''))
           const base = norm.replace(/^.*\//, '')
           // if there's already a mapping, skip
