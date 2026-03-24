@@ -103,11 +103,13 @@ async function ensureBaseBulma() {
 
 function removeThemeAndOverrides() {
   try {
-    const themeLinks = Array.from(document.querySelectorAll('link[data-bulmaswatch-theme]'))
+    const scope = (typeof document !== 'undefined' && document.head) ? document.head : document
+    const themeLinks = Array.from(scope.querySelectorAll('link[data-bulmaswatch-theme]'))
     for (const tl of themeLinks) if (tl && tl.parentNode) tl.parentNode.removeChild(tl)
   } catch (e) { /* ignore */ }
   try {
-    const overrides = Array.from(document.querySelectorAll('style[data-bulma-override]'))
+    const scope2 = (typeof document !== 'undefined' && document.head) ? document.head : document
+    const overrides = Array.from(scope2.querySelectorAll('style[data-bulma-override]'))
     for (const s of overrides) if (s && s.parentNode) s.parentNode.removeChild(s)
   } catch (e) { /* ignore */ }
 }
@@ -148,18 +150,7 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
           else document.head.appendChild(l)
         }
     } catch (e) { /* ignore */ }
-    try {
-      const themeLinks = Array.from(document.querySelectorAll('link[data-bulmaswatch-theme]'))
-      for (const tl of themeLinks) {
-        if (tl && tl.parentNode) tl.parentNode.removeChild(tl)
-      }
-    } catch (e) { /* ignore */ }
-    try {
-      const overrides = Array.from(document.querySelectorAll('style[data-bulma-override]'))
-      for (const s of overrides) {
-        if (s && s.parentNode) s.parentNode.removeChild(s)
-      }
-    } catch (e) { /* ignore */ }
+    try { removeThemeAndOverrides() } catch (_) {}
     return
   }
 

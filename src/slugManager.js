@@ -641,6 +641,40 @@ export function setFetchNegativeCacheTTL(ms) {
   NEGATIVE_CACHE_TTL_MS = Number(ms) || 0
 }
 
+/**
+ * Adjust the fetch cache max size used by `fetchCache` (LRU entries).
+ * Useful for tuning memory vs. hit-rate in constrained environments.
+ * @param {number} n - Maximum number of entries to retain (>= 0)
+ */
+export function setFetchCacheMaxSize(n) {
+  try {
+    const v = Math.max(0, Number(n) || 0)
+    if (fetchCache && typeof fetchCache._maxSize !== 'undefined') fetchCache._maxSize = v
+  } catch (_) {}
+}
+
+/**
+ * Adjust the fetch cache TTL (ms) used by `fetchCache` if supported.
+ * @param {number} ms - Milliseconds to use as TTL for entries (>= 0)
+ */
+export function setFetchCacheTTL(ms) {
+  try {
+    const v = Math.max(0, Number(ms) || 0)
+    if (fetchCache && typeof fetchCache._ttlMs !== 'undefined') fetchCache._ttlMs = v
+  } catch (_) {}
+}
+
+/**
+ * Adjust the negative-fetch cache max size used by `negativeFetchCache`.
+ * @param {number} n - Maximum number of entries to retain (>= 0)
+ */
+export function setNegativeFetchCacheMaxSize(n) {
+  try {
+    const v = Math.max(0, Number(n) || 0)
+    if (negativeFetchCache && typeof negativeFetchCache._maxSize !== 'undefined') negativeFetchCache._maxSize = v
+  } catch (_) {}
+}
+
 // Configurable fetch concurrency used by index/crawl operations. Defaults
 // to a small value derived from the worker pool size to avoid unbounded
 // parallelism when crawling large sites.
@@ -1582,7 +1616,18 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
         }
         const text = await res.text()
         const doc = _crawlParser.parseFromString(text, 'text/html')
-        const links = doc.querySelectorAll(_crawlLinkSelector)
+        let links = []
+        try {
+          if (doc && typeof doc.getElementsByTagName === 'function') {
+            links = doc.getElementsByTagName('a')
+          } else if (doc && typeof doc.querySelectorAll === 'function') {
+            links = doc.querySelectorAll(_crawlLinkSelector)
+          } else {
+            links = []
+          }
+        } catch (err) {
+          try { links = doc.getElementsByTagName ? doc.getElementsByTagName('a') : [] } catch (_) { links = [] }
+        }
         const linkBase = url
         for (const a of links) {
           try {
@@ -1700,7 +1745,18 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
         }
         const text = await res.text()
         const doc = _crawlParser.parseFromString(text, 'text/html')
-        const links = doc.querySelectorAll(_crawlLinkSelector)
+        let links = []
+        try {
+          if (doc && typeof doc.getElementsByTagName === 'function') {
+            links = doc.getElementsByTagName('a')
+          } else if (doc && typeof doc.querySelectorAll === 'function') {
+            links = doc.querySelectorAll(_crawlLinkSelector)
+          } else {
+            links = []
+          }
+        } catch (err) {
+          try { links = doc.getElementsByTagName ? doc.getElementsByTagName('a') : [] } catch (_) { links = [] }
+        }
         const linkBase = url
         for (const a of links) {
           try {

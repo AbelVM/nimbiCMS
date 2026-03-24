@@ -23,7 +23,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Limit and tune concurrency
 - **[PERF]** Hot-regex & allocations
 - **[PERF]** Cache size / eviction policies
-- **[PERF]**
+- **[PERF]** Large DOM queries are now scoped
 - **[PERF]**
 - **[PERF]**
 - **[PERF]**

@@ -178,7 +178,23 @@ export { allMarkdownPaths, allMarkdownPathsSet } from './slugManager.js'
  */
 async function tryDiscoverFromIndex(decoded, contentBase) {
   const localCandidates = new Set(indexSet)
-  const anchorsForIndex = document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')
+  let anchorsForIndex = []
+  try {
+    if (typeof document !== 'undefined' && document.getElementsByClassName) {
+      const addFrom = (cls) => {
+        const nodes = document.getElementsByClassName(cls)
+        for (let i = 0; i < nodes.length; i++) {
+          const as = nodes[i].getElementsByTagName('a')
+          for (let j = 0; j < as.length; j++) anchorsForIndex.push(as[j])
+        }
+      }
+      addFrom('nimbi-site-navbar'); addFrom('navbar'); addFrom('nimbi-nav')
+    } else {
+      anchorsForIndex = Array.from(document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a'))
+    }
+  } catch (err) {
+    try { anchorsForIndex = Array.from(document.querySelectorAll('.nimbi-site-navbar a, .navbar a, .nimbi-nav a')) } catch (_) { anchorsForIndex = [] }
+  }
   for (const linkEl of Array.from(anchorsForIndex || [])) {
     const href = linkEl.getAttribute('href') || ''
     if (!href) continue

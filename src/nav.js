@@ -200,13 +200,15 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
    */
   function closeMobileMenu() {
     try {
-      const burgerEl = document.querySelector('.navbar-burger')
+      const burgerEl = (typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? navbar.querySelector('.navbar-burger') : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector('.navbar-burger') : (typeof document !== 'undefined' ? document.querySelector('.navbar-burger') : null))
       const targetId = burgerEl && burgerEl.dataset ? burgerEl.dataset.target : null
-      const target = targetId ? document.getElementById(targetId) : null
-      if (burgerEl && burgerEl.classList.contains('is-active')) {
-        burgerEl.classList.remove('is-active')
-        burgerEl.setAttribute('aria-expanded', 'false')
-        if (target) target.classList.remove('is-active')
+      const target = targetId ? ((typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? (navbar.querySelector(`#${targetId}`) || document.getElementById(targetId)) : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector(`#${targetId}`) : (typeof document !== 'undefined' ? document.getElementById(targetId) : null))) : null
+      if (burgerEl && burgerEl.classList && burgerEl.classList.contains('is-active')) {
+        try { burgerEl.classList.remove('is-active') } catch (e) {}
+        try { burgerEl.setAttribute('aria-expanded', 'false') } catch (e) {}
+        if (target && target.classList) {
+          try { target.classList.remove('is-active') } catch (e) {}
+        }
       }
     } catch (err) { debugWarn('[nimbi-cms] closeMobileMenu failed', err) }
   }
@@ -219,7 +221,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     * @returns {Promise<void>}
     */
     async function runRenderWithTransition() {
-    const contentEl = (typeof document !== 'undefined') ? document.querySelector('.nimbi-content') : null
+    const contentEl = (container && container instanceof HTMLElement) ? container : ((typeof document !== 'undefined') ? document.querySelector('.nimbi-content') : null)
     try { if (contentEl) contentEl.classList.add('is-inactive') } catch (e) {}
     try {
       const r = renderByQuery && renderByQuery()
@@ -428,7 +430,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const filteredNow = idx.filter(e => (e.title && e.title.toLowerCase().includes(qnow)) || (e.excerpt && e.excerpt.toLowerCase().includes(qnow)))
         // filteredNow computed above
         if (!filteredNow || !filteredNow.length) return
-        const resultsEl = document.getElementById('nimbi-search-results')
+        const resultsEl = (typeof dropdownContent !== 'undefined' && dropdownContent) ? dropdownContent : (typeof document !== 'undefined' ? document.getElementById('nimbi-search-results') : null)
         if (!resultsEl) return
         try {
           if (typeof resultsEl.replaceChildren === 'function') resultsEl.replaceChildren()
@@ -794,7 +796,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     burger.addEventListener('click', (ev) => {
       try {
         const targetId = burger.dataset && burger.dataset.target ? burger.dataset.target : null
-        const target = targetId ? document.getElementById(targetId) : null
+        const target = targetId ? ((navbar && navbar.querySelector) ? (navbar.querySelector(`#${targetId}`) || (navbarWrap && navbarWrap.querySelector ? navbarWrap.querySelector(`#${targetId}`) : document.getElementById(targetId))) : ((navbarWrap && navbarWrap.querySelector) ? (navbarWrap.querySelector(`#${targetId}`) || document.getElementById(targetId)) : (typeof document !== 'undefined' ? document.getElementById(targetId) : null))) : null
         const isActive = burger.classList.contains('is-active')
         if (isActive) {
           burger.classList.remove('is-active')
@@ -1048,8 +1050,8 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
 
     if (searchInput) {
       const handleInput = debounce(async () => {
-        const domInput = document.querySelector('input#nimbi-search')
-        const q = String(domInput && domInput.value || '').trim().toLowerCase()
+        const domInput = searchInput || ((typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? navbar.querySelector('input#nimbi-search') : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector('input#nimbi-search') : (typeof document !== 'undefined' ? document.querySelector('input#nimbi-search') : null)))
+          const q = String(domInput && domInput.value || '').trim().toLowerCase()
         // read current input value and proceed
         if (!q) { showResults([]); return }
         try {
@@ -1084,11 +1086,11 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         searchIndexPromise = Promise.resolve([])
       }
         searchIndexPromise.finally(() => {
-          const domInput = document.querySelector('input#nimbi-search')
-          if (domInput) {
-            try { domInput.removeAttribute('disabled') } catch (e) {}
-            try { searchControl && searchControl.classList.remove('is-loading') } catch (e) {}
-          }
+            const domInput = searchInput || ((typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? navbar.querySelector('input#nimbi-search') : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector('input#nimbi-search') : (typeof document !== 'undefined' ? document.querySelector('input#nimbi-search') : null)))
+            if (domInput) {
+              try { domInput.removeAttribute('disabled') } catch (e) {}
+              try { searchControl && searchControl.classList.remove('is-loading') } catch (e) {}
+            }
           ;(async () => {
             try {
               if (sitemapTriggered) return
@@ -1311,7 +1313,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   try {
     const outsideHandler = (ev) => {
       try {
-        const burgerEl = navbar && navbar.querySelector ? navbar.querySelector('.navbar-burger') : document.querySelector('.navbar-burger')
+        const burgerEl = (typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? navbar.querySelector('.navbar-burger') : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector('.navbar-burger') : (typeof document !== 'undefined' ? document.querySelector('.navbar-burger') : null))
         if (!burgerEl || !burgerEl.classList.contains('is-active')) return
         const navEl = (burgerEl && burgerEl.closest) ? burgerEl.closest('.navbar') : navbar
         if (navEl && navEl.contains(ev.target)) return
@@ -1339,9 +1341,9 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         }
       } catch (e) { debugWarn('[nimbi-cms] navbar click handler failed', e) }
         try {
-          const burgerEl = navbar && navbar.querySelector ? navbar.querySelector('.navbar-burger') : null
+          const burgerEl = (typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? navbar.querySelector('.navbar-burger') : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector('.navbar-burger') : null)
           const targetId = burgerEl && burgerEl.dataset ? burgerEl.dataset.target : null
-          const target = targetId ? document.getElementById(targetId) : null
+          const target = targetId ? ((navbar && navbar.querySelector) ? (navbar.querySelector(`#${targetId}`) || (navbarWrap && navbarWrap.querySelector ? navbarWrap.querySelector(`#${targetId}`) : document.getElementById(targetId))) : ((navbarWrap && navbarWrap.querySelector) ? (navbarWrap.querySelector(`#${targetId}`) || document.getElementById(targetId)) : (typeof document !== 'undefined' ? document.getElementById(targetId) : null))) : null
           if (burgerEl && burgerEl.classList.contains('is-active')) {
             burgerEl.classList.remove('is-active')
             burgerEl.setAttribute('aria-expanded', 'false')

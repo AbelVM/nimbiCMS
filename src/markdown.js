@@ -193,7 +193,8 @@ export async function parseMarkdownToHtml(md) {
 
         // ensure images have loading=lazy unless explicitly set or opted-out
         try {
-          doc.querySelectorAll('img').forEach(img => {
+          const imgs = (doc && typeof doc.getElementsByTagName === 'function') ? Array.from(doc.getElementsByTagName('img')) : (doc && typeof doc.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
+          imgs.forEach(img => {
             try {
               const attrs = img.getAttribute && img.getAttribute('loading')
               const want = img.getAttribute && img.getAttribute('data-want-lazy')
@@ -366,7 +367,7 @@ export async function parseMarkdownToHtml(md) {
         const parser = getSharedParser()
         if (parser) {
           const doc = parser.parseFromString(html, 'text/html')
-          const imgs = doc.querySelectorAll('img')
+          const imgs = (doc && typeof doc.getElementsByTagName === 'function') ? Array.from(doc.getElementsByTagName('img')) : (doc && typeof doc.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
           imgs.forEach(img => {
             try {
               const src = img.getAttribute('src') || ''

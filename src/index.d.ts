@@ -212,6 +212,9 @@ export function isExternalLinkWithBase(href: string, contentBase: string): boole
 export function unescapeMarkdown(s: string): string
 export const negativeFetchCache: any
 export function setFetchNegativeCacheTTL(ms: any): any
+export function setFetchCacheMaxSize(n: number): any
+export function setFetchCacheTTL(ms: number): any
+export function setNegativeFetchCacheMaxSize(n: number): any
 export function setFetchConcurrency(n: number): void
 export function getFetchConcurrency(): number
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): void

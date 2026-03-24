@@ -320,8 +320,31 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
     } catch (err) {
       try { baseForPage = new URL(pageDir || '.', location.href).toString() } catch (e) { baseForPage = pageDir || './' }
     }
-    const sel = el.querySelectorAll('*')
-    for (const node of Array.from(sel || [])) {
+    let sel = null
+    try {
+      sel = el.querySelectorAll('[src],[href],[srcset],[poster]')
+    } catch (errSel) {
+      // Some parsers/environments reject certain attribute selectors
+      // (notably namespaced attributes like xlink:href). Fall back to
+      // collecting common element/tag sets and `[srcset]` nodes.
+      const tmp = []
+      try { tmp.push(...Array.from(el.getElementsByTagName('img') || [])) } catch (_) {}
+      try { tmp.push(...Array.from(el.getElementsByTagName('link') || [])) } catch (_) {}
+      try { tmp.push(...Array.from(el.getElementsByTagName('video') || [])) } catch (_) {}
+      try { tmp.push(...Array.from(el.getElementsByTagName('use') || [])) } catch (_) {}
+      try { tmp.push(...Array.from(el.querySelectorAll('[srcset]') || [])) } catch (_) {}
+      sel = tmp
+    }
+    // Always include SVG <use> elements (they commonly use namespaced
+    // `xlink:href`) since attribute selectors for namespaced attributes
+    // may not match uniformly across environments.
+    let nodes = Array.from(sel || [])
+    try {
+      const uses = Array.from(el.getElementsByTagName('use') || [])
+      for (const u of uses) if (nodes.indexOf(u) === -1) nodes.push(u)
+    } catch (_) {}
+
+    for (const node of Array.from(nodes || [])) {
       try {
         const tag = node.tagName ? node.tagName.toLowerCase() : ''
         const rewriteAttr = (attr) => {
@@ -339,7 +362,7 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
         }
         if (node.hasAttribute && node.hasAttribute('xlink:href')) rewriteAttr('xlink:href')
         if (node.hasAttribute && node.hasAttribute('poster')) rewriteAttr('poster')
-        if (node.hasAttribute('srcset')) {
+        if (node.hasAttribute && node.hasAttribute('srcset')) {
           const rawSs = node.getAttribute('srcset') || ''
           const parts = rawSs.split(',').map(s => s.trim()).filter(Boolean)
           const mapped = parts.map(p => {

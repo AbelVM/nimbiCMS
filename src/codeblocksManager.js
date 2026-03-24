@@ -380,8 +380,10 @@ let __hlObserver = null
  * @param {ParentNode} [root=document] - Root node in which to observe code blocks.
  * @returns {void}
  */
-export function observeCodeBlocks(root = document) {
+export function observeCodeBlocks(root) {
   
+  const effectiveRoot = (root && root.querySelector) ? root : (typeof document !== 'undefined' ? document : null)
+
   if (!loadSupportedLanguagesPromise) {
     ;(async () => {
       try { await loadSupportedLanguages() } catch (_) { debugWarn('[codeblocksManager] loadSupportedLanguages (observer) failed', _) }
@@ -452,7 +454,7 @@ export function observeCodeBlocks(root = document) {
   }
 
   const obs = ensureObserver()
-  const blocks = (root && root.querySelectorAll) ? root.querySelectorAll('pre code') : []
+  const blocks = (effectiveRoot && effectiveRoot.querySelectorAll) ? effectiveRoot.querySelectorAll('pre code') : []
   if (!obs) {
     
     blocks.forEach(async (el) => {
@@ -489,7 +491,7 @@ export function observeCodeBlocks(root = document) {
  * @returns {void}
  */
 export function setHighlightTheme(theme, { useCdn = true } = {}) {
-  const existing = document.querySelector('link[data-hl-theme]')
+  const existing = (typeof document !== 'undefined' && document.head && document.head.querySelector) ? document.head.querySelector('link[data-hl-theme]') : (typeof document !== 'undefined' ? document.querySelector('link[data-hl-theme]') : null)
   const existingTheme = existing && existing.getAttribute ? existing.getAttribute('data-hl-theme') : null
 
   const requested = (theme === undefined || theme === null) ? 'default' : String(theme)
