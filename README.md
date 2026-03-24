@@ -27,8 +27,8 @@ The code lives at [https://github.com/AbelVM/nimbiCMS](https://github.com/AbelVM
 - Client-side rendering of [GitHub‑flavored Markdown](https://github.github.com/gfm/) via [marked.js](https://marked.js.org/), no need for site compilation
 - No Jekyll, no Hugo, no CI at all
 - Perfect for static servers (GitHub Pages, S3, etc.)
-- **FAST**: this site, the site of the project, contains more than 1200 Markdown documents and it's indexed and running in a couple of seconds!
-- Optional client-side search box built from headings and excerpts (enabled by default).
+- **FAST**: this site, the site of the project, contains more than 1200 Markdown documents (almost 3000 references) and it's indexed in a blink!
+- Client-side search box built from headings and excerpts (enabled by default).
 - Reading time estimation
 - Code is organized into small modules to ease maintenance and testing.
 - Sticky per-page, dynamically generated TOC.

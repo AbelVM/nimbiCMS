@@ -14,7 +14,6 @@ import { runImportWithCache, clearImportCache, setImportNegativeCacheTTL } from 
  * Expose the internal `hljs` (highlight.js core) instance for tests
  * and advanced usage (language registration, theming helpers).
  * This is a runtime reference to the imported highlight.js core.
- * @exports hljs
  */
 export { hljs }
 

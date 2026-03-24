@@ -6,7 +6,7 @@
 
 # Function: \_sendToRenderer()
 
-> **\_sendToRenderer**(`msg`): `Promise`\<`unknown`\>
+> **\_sendToRenderer**(`msg`, `timeout?`): `Promise`\<`unknown`\>
 
 Send a message to the renderer worker and await a response.
 
@@ -17,6 +17,12 @@ Send a message to the renderer worker and await a response.
 `Object`
 
 Message payload to send to the renderer.
+
+### timeout?
+
+`number` = `3000`
+
+Timeout in milliseconds (default: 3000).
 
 ## Returns
 

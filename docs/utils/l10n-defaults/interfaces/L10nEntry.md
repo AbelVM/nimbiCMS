@@ -76,6 +76,12 @@ Template using `{minutes}` placeholder.
 
 ***
 
+### searchNoResults
+
+> **searchNoResults**: `string`
+
+***
+
 ### searchPlaceholder
 
 > **searchPlaceholder**: `string`

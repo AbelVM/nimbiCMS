@@ -954,6 +954,37 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         } catch (e) {}
       }
 
+      try {
+        const qnow = String(searchInput && searchInput.value || '').trim()
+        if (!items || !items.length) {
+          if (!qnow) {
+            try { if (dropdown) dropdown.classList.remove('is-active') } catch (e) {}
+            try { document.documentElement.classList.remove('nimbi-search-open') } catch (e) {}
+            try { if (dropdownContent) { dropdownContent.style.display = 'none'; dropdownContent.classList.remove('is-open'); dropdownContent.removeAttribute('tabindex') } } catch (e) {}
+            try { if (dropdownContent) dropdownContent.removeEventListener('keydown', resultsKeydown) } catch (e) {}
+            return
+          }
+          // non-empty query but no items -> show localized 'No results' message
+          try {
+            const panel = document.createElement('div')
+            panel.className = 'panel nimbi-search-panel'
+            const p = document.createElement('p')
+            p.className = 'panel-block nimbi-search-no-results'
+            p.textContent = (t && typeof t === 'function') ? t('searchNoResults') : 'No results'
+            panel.appendChild(p)
+            scheduleDOMWrite(() => { try { dropdownContent.appendChild(panel) } catch (e) {} })
+          } catch (e) {}
+          if (dropdown) {
+            dropdown.classList.add('is-active')
+            try { document.documentElement.classList.add('nimbi-search-open') } catch (e) {}
+          }
+          try { dropdownContent.style.display = 'block' } catch (e) {}
+          try { dropdownContent.classList.add('is-open') } catch (e) {}
+          try { dropdownContent.setAttribute('tabindex', '0') } catch (e) {}
+          return
+        }
+      } catch (e) {}
+
         try {
           // Build the panel children in a fragment and append once to minimize reflows.
           const panel = document.createElement('div')
@@ -1048,7 +1079,12 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         const domInput = searchInput || ((typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? navbar.querySelector('input#nimbi-search') : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector('input#nimbi-search') : (typeof document !== 'undefined' ? document.querySelector('input#nimbi-search') : null)))
           const q = String(domInput && domInput.value || '').trim().toLowerCase()
         // read current input value and proceed
-        if (!q) { showResults([]); return }
+        if (!q) {
+          try { if (dropdown) dropdown.classList.remove('is-active') } catch (e) {}
+          try { document.documentElement.classList.remove('nimbi-search-open') } catch (e) {}
+          try { if (dropdownContent) { dropdownContent.style.display = 'none'; dropdownContent.classList.remove('is-open'); dropdownContent.removeAttribute('tabindex') } } catch (e) {}
+          return
+        }
         try {
           await ensureSearchIndex()
 

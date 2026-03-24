@@ -77,7 +77,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
  * @param {string} [titleOverride] - Optional title to use instead of `meta.title`.
  * @param {string} [imageOverride] - Optional image URL for Open Graph/Twitter.
  * @param {string} [descOverride] - Optional description override.
- * @param {string} [initialDocumentTitle] - Fallback site/document title.
+ * @param {string} [_initialDocumentTitle] - Fallback site/document title.
  * @returns {void}
  */
 export function setMetaTags(data, titleOverride, imageOverride, descOverride, _initialDocumentTitle = '') {

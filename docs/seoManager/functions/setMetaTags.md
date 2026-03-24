@@ -40,6 +40,8 @@ Optional description override.
 
 `string` = `''`
 
+Fallback site/document title.
+
 ## Returns
 
 `void`

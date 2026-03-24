@@ -8,6 +8,7 @@
  * @property {string} scrollToTop
  * @property {string} readingTime - Template using `{minutes}` placeholder.
  * @property {string} searchPlaceholder
+ * @property {string} searchNoResults
  * @property {string} imagePreviewTitle
  * @property {string} imagePreviewFit
  * @property {string} imagePreviewOriginal
@@ -25,6 +26,7 @@ export const DEFAULT_L10N = {
     scrollToTop: 'Scroll to top',
     readingTime: '{minutes} min read',
     searchPlaceholder: 'Search…',
+    searchNoResults: 'No results',
     imagePreviewTitle: 'Image preview',
     imagePreviewFit: 'Fit to screen',
     imagePreviewOriginal: 'Original size',
@@ -39,6 +41,7 @@ export const DEFAULT_L10N = {
     scrollToTop: 'Ir arriba',
     readingTime: '{minutes} min de lectura',
     searchPlaceholder: 'Buscar…',
+    searchNoResults: 'Sin resultados',
     imagePreviewTitle: 'Previsualización de imagen',
     imagePreviewFit: 'Ajustar a la pantalla',
     imagePreviewOriginal: 'Tamaño original',
@@ -54,6 +57,7 @@ export const DEFAULT_L10N = {
     scrollToTop: 'Nach oben',
     readingTime: '{minutes} min Lesezeit',
     searchPlaceholder: 'Suchen…',
+    searchNoResults: 'Keine Ergebnisse',
     imagePreviewTitle: 'Bildvorschau',
     imagePreviewFit: 'An Bildschirm anpassen',
     imagePreviewOriginal: 'Originalgröße',
@@ -68,6 +72,7 @@ export const DEFAULT_L10N = {
     scrollToTop: 'Aller en haut',
     readingTime: '{minutes} min de lecture',
     searchPlaceholder: 'Rechercher…',
+    searchNoResults: 'Aucun résultat',
     imagePreviewTitle: 'Aperçu de l’image',
     imagePreviewFit: 'Ajuster à l’écran',
     imagePreviewOriginal: 'Taille originale',
@@ -82,6 +87,7 @@ export const DEFAULT_L10N = {
     scrollToTop: 'Ir para o topo',
     readingTime: '{minutes} min de leitura',
     searchPlaceholder: 'Procurar…',
+    searchNoResults: 'Sem resultados',
     imagePreviewTitle: 'Visualização da imagem',
     imagePreviewFit: 'Ajustar à tela',
     imagePreviewOriginal: 'Tamanho original',

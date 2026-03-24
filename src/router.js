@@ -138,7 +138,7 @@ export function resolutionCacheGet(key) {
 /**
  * Store a resolution result in the runtime resolution cache and evict the
  * oldest entries when the cache exceeds `RESOLUTION_CACHE_MAX`.
- * @exports resolutionCacheSet
+ * 
  * @param {string} key - Cache key string.
  * @param {{resolved:string,anchor:string|null}} value - Resolution record to store.
  * @returns {void}
@@ -153,11 +153,6 @@ export function resolutionCacheSet(key, value) {
     if (oldest !== undefined) resolutionCache.delete(oldest)
   }
 }
-
-
-
- 
-
 /**
  * Remove expired entries from the `resolutionCache` according to `RESOLUTION_CACHE_TTL`.
  * This is a no-op when TTL is not configured or set to a non-positive value.

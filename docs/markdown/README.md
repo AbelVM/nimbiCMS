@@ -35,3 +35,4 @@ workers, and extracting table-of-contents data.
 - [initRendererWorker](functions/initRendererWorker.md)
 - [parseMarkdownToHtml](functions/parseMarkdownToHtml.md)
 - [setMarkdownExtensions](functions/setMarkdownExtensions.md)
+- [streamParseMarkdown](functions/streamParseMarkdown.md)

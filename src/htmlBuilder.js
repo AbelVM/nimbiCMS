@@ -1440,11 +1440,6 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
  * `_computeSlug(parsed, article, pagePath, anchor)` -> Compute article slug and update slug mappings.
  *
  * Note: these are thin aliases to the internal implementations above.
- *
- * @exports _parseHtml
- * @exports _parseMarkdown
- * @exports _ensureLanguages
- * @exports _computeSlug
  */
 /**
  * Parse raw HTML and return the normalized parsed page object.

@@ -30,7 +30,3 @@ chosen theme mode.
 ## Returns
 
 `void`
-
-## Exports
-
-setStyle

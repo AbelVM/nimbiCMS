@@ -10,4 +10,5 @@
 
 - [clearRendererImportCache](functions/clearRendererImportCache.md)
 - [handleWorkerMessage](functions/handleWorkerMessage.md)
+- [handleWorkerMessageStream](functions/handleWorkerMessageStream.md)
 - [setRendererImportNegativeCacheTTL](functions/setRendererImportNegativeCacheTTL.md)

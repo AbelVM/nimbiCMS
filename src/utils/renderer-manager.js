@@ -47,4 +47,4 @@ export function initRendererWorker() { return _rendererManager.get() }
  * @param {number} [timeout] - Timeout in milliseconds (default: 3000).
  * @returns {Promise<unknown>} Promise resolving with the worker's result.
  */
-export function _sendToRenderer(msg) { return _rendererManager.send(msg, 3000) }
+export function _sendToRenderer(msg, timeout = 3000) { return _rendererManager.send(msg, timeout) }

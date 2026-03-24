@@ -14,7 +14,7 @@ Observe and lazy-highlight `<pre><code>` blocks, registering languages as needed
 
 ### root?
 
-`ParentNode` = `document`
+`ParentNode`
 
 Root node in which to observe code blocks.
 
