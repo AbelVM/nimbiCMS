@@ -677,7 +677,36 @@ function computeSlug(parsed, article, pagePath, anchor) {
     if (!displayTitle && pagePath) displayTitle = String(pagePath)
     if (displayTitle) slugKey = slugify(displayTitle)
     if (!slugKey) slugKey = HOME_SLUG
-    try { if (pagePath) { try { storeSlugMapping(slugKey, pagePath) } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) } } } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
+    // Persist a slug mapping for this page. `storeSlugMapping` may
+    // choose a different (unique) slug when collisions occur; read
+    // back the effective slug from `mdToSlug` so the URL we write to
+    // history matches the actual mapping used by the runtime.
+    try {
+      if (pagePath) {
+        try {
+          storeSlugMapping(slugKey, pagePath)
+        } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
+        try {
+          const normPath = normalizePath(String(pagePath || ''))
+          if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(normPath)) {
+            slugKey = mdToSlug.get(normPath)
+          } else {
+            // Fallback: scan slugToMd for a key that maps to this path
+            try {
+              for (const [k, v] of slugToMd || []) {
+                try {
+                  const pathVal = (typeof v === 'string') ? v : (v && v.default ? v.default : null)
+                  if (pathVal && normalizePath(String(pathVal)) === normPath) {
+                    slugKey = k
+                    break
+                  }
+                } catch (_) {}
+              }
+            } catch (_) {}
+          }
+        } catch (err) { /* ignore readback errors */ }
+      }
+    } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
         try {
         // Prefer a normalized anchor extracted via `parseHrefToRoute`, but
         // avoid persisting an anchor from a different page when rendering a new page.

@@ -5,6 +5,8 @@ All notable changes to **nimbiCMS** will be documented in this file.
 ## Unreleased
 
 - ...
+- **[FIX]** Slug dedup regression
+- **[FIX]** Some resources were imported from CDN regardless being already bundled
 - **[FEAT]** Added cosmetic URLs (`website/#/slug[#anchor][?params]`) on top of canonical URLs (`website/?page=slug[#anchor][?params]`)
 - **[FEAT]** Improved SEO management
 - **[FEAT]** Added a dynamic sitemap

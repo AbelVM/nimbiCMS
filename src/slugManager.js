@@ -163,28 +163,60 @@ export function _storeSlugMapping(slug, rel) {
       // slug and store the mapping under that new key so distinct
       // pages do not collide on the same canonical slug.
       const existing = slugToMd.has(slug) ? slugToMd.get(slug) : undefined
-      if (existing) {
+      if (!existing) {
+        slugToMd.set(slug, relNorm)
+      } else {
         let existingPath = null
         try {
           if (typeof existing === 'string') existingPath = normalizePath(existing)
           else if (existing && typeof existing === 'object') existingPath = existing.default ? normalizePath(existing.default) : null
         } catch (_) { existingPath = null }
-        if (!existingPath || existingPath === relNorm) {
+        // If the existing mapping already points to the same normalized path,
+        // preserve the slug mapping as-is. Otherwise find a unique slug using
+        // a dynamic check against the live `slugToMd` map to avoid races.
+        if (existingPath === relNorm) {
           slugToMd.set(slug, relNorm)
         } else {
+          let candidate = null
+          let i = 2
+          while (true) {
+            candidate = `${slug}-${i}`
+            if (!slugToMd.has(candidate)) break
+            let candExisting = slugToMd.get(candidate)
+            let candPath = null
+            try {
+              if (typeof candExisting === 'string') candPath = normalizePath(candExisting)
+              else if (candExisting && typeof candExisting === 'object') candPath = candExisting.default ? normalizePath(candExisting.default) : null
+            } catch (_) { candPath = null }
+            if (candPath === relNorm) {
+              // Candidate already maps to the same path; reuse it
+              slug = candidate
+              break
+            }
+            i += 1
+            // Safety: prevent infinite loop in pathological cases
+            if (i > 10000) break
+          }
           try {
-            const taken = new Set()
-            for (const k of slugToMd.keys()) taken.add(k)
-            const newSlug = typeof uniqueSlug === 'function' ? uniqueSlug(slug, taken) : `${slug}-2`
-            slugToMd.set(newSlug, relNorm)
-            // Use the newly chosen slug for reverse mapping below
-            slug = newSlug
+            if (!slugToMd.has(candidate)) {
+              slugToMd.set(candidate, relNorm)
+              slug = candidate
+            } else {
+              // If candidate pre-exists but maps to our path, ensure slug is set
+              if (slugToMd.get(candidate) === relNorm) slug = candidate
+              else {
+                // Fallback to snapshot-based uniqueSlug to pick a free key
+                const taken = new Set()
+                for (const k of slugToMd.keys()) taken.add(k)
+                const newSlug = typeof uniqueSlug === 'function' ? uniqueSlug(slug, taken) : `${slug}-2`
+                slugToMd.set(newSlug, relNorm)
+                slug = newSlug
+              }
+            }
           } catch (_) {
-            // fallback: do not overwrite existing mapping
+            // Swallow errors: best-effort uniqueness only
           }
         }
-      } else {
-        slugToMd.set(slug, relNorm)
       }
     }
   } catch (_) {}
@@ -715,8 +747,22 @@ export let fetchMarkdown = async function(path, base, opts) {
     }
   } catch (e) {}
   try {
+    // Only attempt slug-based remapping when the incoming path is a
+    // bare filename (no directory segments) or when it was explicitly
+    // provided via a parsed `?page=` / `#/` token. This prevents
+    // rewriting full paths like `docs/nimbi-cms/readme.md` to another
+    // page that shares the base filename's slug.
     const o = (String(path || '').match(/([^\/]+)\.md(?:$|[?#])/) || [])[1]
-    if (o && slugToMd.has(o)) {
+    const isBare = typeof path === 'string' && String(path).indexOf('/') === -1
+    // If earlier we parsed a page token from an href (see above), prefer
+    // allowing remapping even when the token was a bare filename.
+    const wasPageToken = false
+    // NOTE: parseHrefToRoute above may have rewritten `path` already when
+    // the caller passed a `?page=` or `#/` token; in that case `path` now
+    // represents the parsed page and `isBare` will be true for bare
+    // slugs. Only proceed when `isBare` is true or the original value
+    // explicitly came from a page token.
+    if (o && (isBare || wasPageToken) && slugToMd.has(o)) {
       const mapped = resolveSlugPath(o) || slugToMd.get(o)
       if (mapped && mapped !== path) {
         path = mapped

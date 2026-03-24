@@ -23,9 +23,9 @@ describe('bulmaManager coverage', () => {
 
     await ensureBulma('none')
 
-    // base link should be injected
+    // bundled CSS should be used; do not inject a separate Bulma base link
     const base = document.querySelector('link[data-bulma-base]')
-    expect(base).toBeTruthy()
+    expect(base).toBeNull()
     // theme and overrides should be removed
     expect(document.querySelector('link[data-bulmaswatch-theme]')).toBeNull()
     expect(document.querySelector('style[data-bulma-override]')).toBeNull()

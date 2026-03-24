@@ -128,28 +128,9 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
   if (!bulmaCustomize) return
 
   if (bulmaCustomize === 'none') {
-    try {
-        const candidates = [
-          (location && location.protocol && location.protocol === 'file:') ? 'https://unpkg.com/bulma/css/bulma.min.css' : '//unpkg.com/bulma/css/bulma.min.css',
-          'https://unpkg.com/bulma/css/bulma.min.css'
-        ]
-        let injected = false
-        for (const href of candidates) {
-          try {
-            if (document.querySelector(`link[href="${href}"]`)) { injected = true; break }
-          } catch (_) {}
-        }
-        if (!injected) {
-          const href = candidates[0]
-          const l = document.createElement('link')
-          l.rel = 'stylesheet'
-          l.href = href
-          l.setAttribute('data-bulma-base', '1')
-          const ourCss = document.querySelector('link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]')
-          if (ourCss && ourCss.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
-          else document.head.appendChild(l)
-        }
-    } catch (e) { /* ignore */ }
+    // 'none' means use the bundled CSS (dist/nimbi-cms.css) — do not inject a
+    // separate Bulma CDN stylesheet. Remove any previously-applied Bulmaswatch
+    // theme links or overrides and return.
     try { removeThemeAndOverrides() } catch (_) {}
     return
   }

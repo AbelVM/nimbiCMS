@@ -27,7 +27,8 @@ describe('bulmaManager additional branches', () => {
 
     expect(document.querySelector('link[data-bulmaswatch-theme]')).toBeNull()
     expect(document.querySelector('style[data-bulma-override]')).toBeNull()
-    expect(document.querySelector('link[data-bulma-base]')).toBeTruthy()
+    // bundled CSS should be used; do not inject a separate Bulma base link
+    expect(document.querySelector('link[data-bulma-base]')).toBeNull()
   })
 
   it('ensureBulma local fetches and injects override style', async () => {
