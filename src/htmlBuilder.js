@@ -15,7 +15,7 @@ import { markNotFound } from './seoManager.js'
 import { debugWarn, debugInfo, isDebugLevel } from './utils/debug.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
 import { runWithConcurrency } from './utils/concurrency.js'
-import { rafThrottle } from './utils/events.js'
+import { rafThrottle, scheduleDOMWrite } from './utils/events.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
 /**
@@ -1055,7 +1055,8 @@ async function parseMarkdown(raw) {
  * @returns {Promise<ArticleResult>} - Promise resolving to the `ArticleResult` (article element, parsed data, toc, and slug info).
  */
 export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
-    let parsed = null
+  let parsed = null
+  let streamingArticle = null
     if (data.isHtml) {
       try {
         const parser = getSharedParser()
@@ -1070,33 +1071,79 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
         parsed = parseHtml(data.raw || '')
       }
     } else {
-      parsed = await parseMarkdown(data.raw || '')
+      // Prefer streaming parse for very large markdown documents to keep
+      // the main thread responsive. Falls back to the normal parse for
+      // small documents or when streaming isn't available.
+      const raw = data.raw || ''
+      const STREAM_THRESHOLD = 64 * 1024
+      if (raw && raw.length > STREAM_THRESHOLD && md.streamParseMarkdown) {
+        try { await ensureLanguages(raw) } catch (e) {}
+        streamingArticle = document.createElement('article')
+        streamingArticle.className = 'nimbi-article content'
+        const aggregatedToc = []
+        let parsedMeta = {}
+        try {
+          await md.streamParseMarkdown(raw, (htmlChunk, info) => {
+            try { if (info && info.meta) parsedMeta = Object.assign(parsedMeta, info.meta) } catch (e) {}
+            try { if (info && Array.isArray(info.toc) && info.toc.length) aggregatedToc.push(...info.toc) } catch (e) {}
+            try {
+              scheduleDOMWrite(() => {
+                try {
+                  const parser = getSharedParser()
+                  if (parser) {
+                    const doc = parser.parseFromString(String(htmlChunk || ''), 'text/html')
+                    const nodes = Array.from(doc.body.childNodes || [])
+                    if (nodes.length) streamingArticle.append(...nodes)
+                    else streamingArticle.insertAdjacentHTML('beforeend', htmlChunk || '')
+                  } else {
+                    const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
+                    if (range && typeof range.createContextualFragment === 'function') {
+                      const frag = range.createContextualFragment(String(htmlChunk || ''))
+                      streamingArticle.append(...Array.from(frag.childNodes))
+                    } else {
+                      streamingArticle.insertAdjacentHTML('beforeend', htmlChunk || '')
+                    }
+                  }
+                } catch (e) { try { streamingArticle.insertAdjacentHTML('beforeend', htmlChunk || '') } catch (e2) {} }
+              })
+            } catch (e) {}
+          }, { chunkSize: STREAM_THRESHOLD })
+        } catch (e) { debugWarn('[htmlBuilder] streamParseMarkdown failed, falling back', e) }
+        parsed = { html: streamingArticle.innerHTML, meta: parsedMeta || {}, toc: aggregatedToc }
+      } else {
+        parsed = await parseMarkdown(data.raw || '')
+      }
     }
 
-    const article = document.createElement('article')
-    article.className = 'nimbi-article content'
-    try {
-      const _parser = getSharedParser && getSharedParser()
-      if (_parser) {
-        const doc = _parser.parseFromString(String(parsed.html || ''), 'text/html')
-        const nodes = Array.from(doc.body.childNodes || [])
-        if (nodes.length) article.replaceChildren(...nodes)
-        else article.innerHTML = parsed.html
-      } else {
-        try {
-          const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
-          if (range && typeof range.createContextualFragment === 'function') {
-            const frag = range.createContextualFragment(String(parsed.html || ''))
-            article.replaceChildren(...Array.from(frag.childNodes))
-          } else {
+    let article
+    if (streamingArticle) {
+      article = streamingArticle
+    } else {
+      article = document.createElement('article')
+      article.className = 'nimbi-article content'
+      try {
+        const _parser = getSharedParser && getSharedParser()
+        if (_parser) {
+          const doc = _parser.parseFromString(String(parsed.html || ''), 'text/html')
+          const nodes = Array.from(doc.body.childNodes || [])
+          if (nodes.length) article.replaceChildren(...nodes)
+          else article.innerHTML = parsed.html
+        } else {
+          try {
+            const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
+            if (range && typeof range.createContextualFragment === 'function') {
+              const frag = range.createContextualFragment(String(parsed.html || ''))
+              article.replaceChildren(...Array.from(frag.childNodes))
+            } else {
+              article.innerHTML = parsed.html
+            }
+          } catch (e) {
             article.innerHTML = parsed.html
           }
-        } catch (e) {
-          article.innerHTML = parsed.html
         }
+      } catch (e) {
+        try { article.innerHTML = parsed.html } catch (err) { debugWarn('[htmlBuilder] set article html failed', err) }
       }
-    } catch (e) {
-      try { article.innerHTML = parsed.html } catch (err) { debugWarn('[htmlBuilder] set article html failed', err) }
     }
     try { rewriteRelativeAssets(article, pagePath, contentBase) } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle', err) }
     try { addHeadingIds(article) } catch (err) { debugWarn('[htmlBuilder] addHeadingIds failed', err) }

@@ -5,7 +5,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 ## Unreleased
 
 - ...
-- **[FIX]** Slug dedup regression
+- **[FIX]** Slug dedupe regression
 - **[FIX]** Some resources were imported from CDN regardless being already bundled
 - **[FIX]** Stalled fetches are now being managed
 - **[FEAT]** Added cosmetic URLs (`website/#/slug[#anchor][?params]`) on top of canonical URLs (`website/?page=slug[#anchor][?params]`)
@@ -28,7 +28,7 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[PERF]** Cache size / eviction policies
 - **[PERF]** Large DOM queries are now scoped
 - **[PERF]** Debounce/heavy-event throttling
-- **[PERF]**
+- **[PERF]** Streaming processing for big content
 - **[PERF]**
 - **[CHORE]** Improved JSDoc coverage and quality
 - **[CHORE]** Raised tests coverage

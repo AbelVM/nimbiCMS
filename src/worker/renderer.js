@@ -30,6 +30,42 @@ function decodeHtmlEntitiesLocal(s) {
 
 const marked = (_markedModule && (_markedModule.marked || _markedModule)) || undefined
 
+/**
+ * Split markdown content into sections, preferring heading boundaries.
+ * @param {string} content
+ * @param {number} chunkSize
+ * @returns {string[]}
+ */
+function _splitIntoSections(content, chunkSize) {
+  const txt = String(content || '')
+  if (!txt || txt.length <= chunkSize) return [txt]
+  const headingRe = /^#{1,6}\s.*$/gm
+  const positions = []
+  let m
+  while ((m = headingRe.exec(txt)) !== null) positions.push(m.index)
+  if (!positions.length || positions.length < 2) {
+    const out = []
+    for (let i = 0; i < txt.length; i += chunkSize) out.push(txt.slice(i, i + chunkSize))
+    return out
+  }
+  const sections = []
+  if (positions[0] > 0) sections.push(txt.slice(0, positions[0]))
+  for (let i = 0; i < positions.length; i++) {
+    const start = positions[i]
+    const end = (i + 1 < positions.length) ? positions[i + 1] : txt.length
+    sections.push(txt.slice(start, end))
+  }
+  const merged = []
+  let cur = ''
+  for (const s of sections) {
+    if (!cur && s.length >= chunkSize) { merged.push(s); continue }
+    if ((cur.length + s.length) <= chunkSize) cur += s
+    else { if (cur) merged.push(cur); cur = s }
+  }
+  if (cur) merged.push(cur)
+  return merged
+}
+
 // Hoisted regex and helpers to avoid reallocation per-message
 const FENCE_RE = /```\s*([a-zA-Z0-9_\-+]+)?/g
 const FALLBACK_KNOWN = new Set(['bash','sh','zsh','javascript','js','python','py','php','java','c','cpp','rust','go','ruby','perl','r','scala','swift','kotlin','cs','csharp','html','css','json','xml','yaml','yml','dockerfile','docker'])
@@ -173,6 +209,60 @@ onmessage = async (ev) => {
       return
     }
 
+    if (msg.type === 'stream') {
+      const id = msg.id
+      try {
+        const chunkSize = Number(msg.chunkSize) || (64 * 1024)
+        const { content, data } = parseFrontmatter(msg.md || '')
+        await ensureHljs().catch(() => {})
+        const sections = _splitIntoSections(content, chunkSize)
+        const idCounts = new Map()
+        const slugify = slugifyHeading
+        for (let i = 0; i < sections.length; i++) {
+          let section = sections[i]
+          let html = marked.parse(section)
+          const heads = []
+          html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
+            const level = Number(lvl)
+            let text = inner.replace(/<[^>]+>/g, '').trim()
+            try { text = decodeHtmlEntitiesLocal(text) } catch (e) {}
+            let existingId = null
+            const idMatch = (attrs || '').match(/\sid="([^"]+)"/)
+            if (idMatch) existingId = idMatch[1]
+            const base = existingId || slugify(text) || 'heading'
+            const prev = idCounts.get(base) || 0
+            const idx = prev + 1
+            idCounts.set(base, idx)
+            const candidate = idx === 1 ? base : base + '-' + idx
+            heads.push({ level, text, id: candidate })
+            const resp = {
+              1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
+              2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
+              3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
+              4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
+              5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
+              6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
+            }
+            const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
+            const classes = (resp[level] + ' ' + weight).trim()
+            const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
+            const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
+            return `<h${level} ${newAttrs}>${inner}</h${level}>`
+          })
+          html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
+            if (/\bloading=/.test(attrs)) return `<img${attrs}>`
+            if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`
+            return `<img${attrs} loading="lazy">`
+          })
+          postMessage({ id, type: 'chunk', html, toc: heads, index: i, isLast: i === (sections.length - 1) })
+        }
+        postMessage({ id, type: 'done', meta: (data || {}) })
+      } catch (e) {
+        postMessage({ id: msg.id, error: String(e) })
+      }
+      return
+    }
+
     const { id, md } = msg
     const { content, data } = parseFrontmatter(md || '')
     await ensureHljs().catch(() => {})
@@ -309,5 +399,75 @@ export async function handleWorkerMessage(msg) {
     return { id, result: { html, meta: data || {}, toc: heads } }
   } catch (e) {
     return { id: msg && msg.id, error: String(e) }
+  }
+}
+
+/**
+ * Inline shim: stream handler that calls `onChunk` for each chunk and
+ * returns a final response similar to `handleWorkerMessage`.
+ * @param {Object} msg
+ * @param {function(Object):void} onChunk
+ */
+export async function handleWorkerMessageStream(msg, onChunk) {
+  try {
+    if (!msg || msg.type !== 'stream') {
+      // not a stream request, fall back to normal handler
+      const out = await handleWorkerMessage(msg)
+      if (typeof onChunk === 'function') onChunk(out)
+      return out
+    }
+    const id = msg.id
+    const chunkSize = Number(msg.chunkSize) || (64 * 1024)
+    const { content, data } = parseFrontmatter(msg.md || '')
+    await ensureHljs().catch(() => {})
+    const sections = _splitIntoSections(content, chunkSize)
+    const idCounts = new Map()
+    const slugify = slugifyHeading
+    for (let i = 0; i < sections.length; i++) {
+      let section = sections[i]
+      let html = marked.parse(section)
+      const heads = []
+      html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
+        const level = Number(lvl)
+        let text = inner.replace(/<[^>]+>/g, '').trim()
+        try { text = decodeHtmlEntitiesLocal(text) } catch (e) {}
+        let existingId = null
+        const idMatch = (attrs || '').match(/\sid="([^"]+)"/)
+        if (idMatch) existingId = idMatch[1]
+        const base = existingId || slugify(text) || 'heading'
+        const prev = idCounts.get(base) || 0
+        const idx = prev + 1
+        idCounts.set(base, idx)
+        const candidate = idx === 1 ? base : base + '-' + idx
+        heads.push({ level, text, id: candidate })
+        const resp = {
+          1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
+          2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
+          3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
+          4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
+          5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
+          6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
+        }
+        const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
+        const classes = (resp[level] + ' ' + weight).trim()
+        const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
+        const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
+        return `<h${level} ${newAttrs}>${inner}</h${level}>`
+      })
+      html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
+        if (/\bloading=/.test(attrs)) return `<img${attrs}>`
+        if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`
+        return `<img${attrs} loading="lazy">`
+      })
+      const chunkMsg = { id, type: 'chunk', html, toc: heads, index: i, isLast: i === (sections.length - 1) }
+      if (typeof onChunk === 'function') onChunk(chunkMsg)
+    }
+    const done = { id, type: 'done', meta: (data || {}) }
+    if (typeof onChunk === 'function') onChunk(done)
+    return done
+  } catch (e) {
+    const err = { id: msg && msg.id, error: String(e) }
+    if (typeof onChunk === 'function') onChunk(err)
+    return err
   }
 }

@@ -40,9 +40,17 @@ const _rendererManager = WorkerManager.makeWorkerPool(() => {
     postMessage(msg) {
       setTimeout(async () => {
         try {
-          const out = await RendererModule.handleWorkerMessage(msg)
-          const ev = { data: out }
-          ;(listeners.message || []).forEach(fn => fn(ev))
+          if (RendererModule && typeof RendererModule.handleWorkerMessageStream === 'function' && msg && msg.type === 'stream') {
+            // Stream-aware inline shim: emit each chunk as the worker would
+            await RendererModule.handleWorkerMessageStream(msg, (chunk) => {
+              const ev = { data: chunk }
+              ;(listeners.message || []).forEach(fn => fn(ev))
+            })
+          } else {
+            const out = await RendererModule.handleWorkerMessage(msg)
+            const ev = { data: out }
+            ;(listeners.message || []).forEach(fn => fn(ev))
+          }
         } catch (e) {
           const ev = { data: { id: msg && msg.id, error: String(e) } }
           ;(listeners.message || []).forEach(fn => fn(ev))
@@ -140,6 +148,216 @@ export function setMarkdownExtensions(plugins) {
 import { parseFrontmatter } from './utils/frontmatter.js'
 import hljs from 'highlight.js/lib/core'
 import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
+
+// Small slugify helper reused by streaming logic to match parseMarkdownToHtml
+function _slugifyLocal(s) {
+  try {
+    return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
+  } catch (e) { return 'heading' }
+}
+
+/**
+ * Split a markdown `content` string into logical sections suitable for
+ * incremental parsing. Prefer splitting at heading boundaries, and fall
+ * back to fixed-size slices when headings are scarce.
+ * @param {string} content
+ * @param {number} chunkSize
+ * @returns {string[]}
+ */
+function _splitIntoSections(content, chunkSize) {
+  const txt = String(content || '')
+  if (!txt || txt.length <= chunkSize) return [txt]
+  const headingRe = /^#{1,6}\s.*$/gm
+  const positions = []
+  let m
+  while ((m = headingRe.exec(txt)) !== null) positions.push(m.index)
+  // If few or no headings, fallback to fixed-size slices
+  if (!positions.length || positions.length < 2) {
+    const out = []
+    for (let i = 0; i < txt.length; i += chunkSize) out.push(txt.slice(i, i + chunkSize))
+    return out
+  }
+  const sections = []
+  // leading intro (before first heading)
+  if (positions[0] > 0) sections.push(txt.slice(0, positions[0]))
+  for (let i = 0; i < positions.length; i++) {
+    const start = positions[i]
+    const end = (i + 1 < positions.length) ? positions[i + 1] : txt.length
+    sections.push(txt.slice(start, end))
+  }
+  // merge small sections until chunkSize is reasonably filled
+  const merged = []
+  let cur = ''
+  for (const s of sections) {
+    if (!cur && s.length >= chunkSize) {
+      merged.push(s)
+      continue
+    }
+    if ((cur.length + s.length) <= chunkSize) cur += s
+    else {
+      if (cur) merged.push(cur)
+      cur = s
+    }
+  }
+  if (cur) merged.push(cur)
+  return merged
+}
+
+/**
+ * Stream/parse markdown in chunks and call `onChunk` for each rendered
+ * partial HTML piece. This is a low-risk incremental renderer that uses
+ * the existing `parseMarkdownToHtml` logic per-chunk and normalizes
+ * heading ids so they are unique across chunks.
+ *
+ * @param {string} md - full markdown source
+ * @param {Function} onChunk - called as `onChunk(htmlChunk, {index,isLast,meta,toc})`
+ * @param {{chunkSize?:number}} opts - options
+ * @returns {Promise<void>}
+ */
+export async function streamParseMarkdown(md, onChunk, opts = {}) {
+  const chunkSize = (opts && opts.chunkSize) ? Number(opts.chunkSize) : 64 * 1024
+  const cb = typeof onChunk === 'function' ? onChunk : (() => {})
+  const { content, data } = parseFrontmatter(String(md || ''))
+  let body = content
+  try { body = String(body || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+  // If a renderer worker is available prefer worker-side streaming; this
+  // will post partial chunk messages from the worker and emulate the
+  // same events the inline shim/worker would emit.
+  // Obtain worker; in Vitest we import the module namespace so test spies
+  // can override `initRendererWorker`. Follow the same pattern as
+  // `parseMarkdownToHtml` to ensure test mocks are respected.
+  let w
+  if (typeof process !== 'undefined' && process.env && process.env.VITEST) {
+    try {
+      const ns = await import('./markdown.js')
+      w = ns.initRendererWorker && ns.initRendererWorker()
+    } catch (e) {
+      w = initRendererWorker && initRendererWorker()
+    }
+  } else {
+    w = initRendererWorker && initRendererWorker()
+  }
+  // In Vitest environments prefer the deterministic, main-thread
+  // per-chunk fallback — some test environments don't emulate real
+  // worker event semantics reliably. Otherwise prefer worker streaming.
+  if (!(typeof process !== 'undefined' && process.env && process.env.VITEST) && w && typeof w.postMessage === 'function') {
+    return new Promise((resolve, reject) => {
+      const id = String(Math.random())
+      let timeoutId = null
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId)
+        try { w.removeEventListener && w.removeEventListener('message', handler) } catch (e) {}
+        try { w.removeEventListener && w.removeEventListener('error', errHandler) } catch (e) {}
+      }
+
+      const handler = (ev) => {
+        const data = ev && ev.data ? ev.data : {}
+        if (data.id !== id) return
+        if (data.error) {
+          cleanup()
+          return reject(new Error(data.error))
+        }
+        if (data.type === 'chunk') {
+          try { cb(String(data.html || ''), { index: data.index, isLast: !!data.isLast, meta: {}, toc: data.toc || [] }) } catch (e) {}
+          return
+        }
+        if (data.type === 'done') {
+          cleanup()
+          try { cb('', { index: -1, isLast: true, meta: (data.meta || {}) }) } catch (e) {}
+          return resolve()
+        }
+        // Backwards compatibility: full result object
+        if (data.result) {
+          cleanup()
+          try { cb(String((data.result && data.result.html) || ''), { index: 0, isLast: true, meta: (data.result.meta || {}), toc: data.result.toc || [] }) } catch (e) {}
+          return resolve()
+        }
+      }
+
+      const errHandler = (ev) => {
+        cleanup()
+        reject(new Error(ev && ev.message || 'worker error'))
+      }
+
+      timeoutId = setTimeout(() => {
+        cleanup()
+        reject(new Error('worker timeout'))
+      }, (opts && opts.timeout) ? Number(opts.timeout) : 10000)
+
+      try {
+        w.addEventListener && w.addEventListener('message', handler)
+        w.addEventListener && w.addEventListener('error', errHandler)
+        w.postMessage({ type: 'stream', id, md: body, chunkSize })
+      } catch (e) { cleanup(); reject(e) }
+    })
+  }
+
+  // Fallback: parse per-chunk on main thread and emit as before.
+  const sections = _splitIntoSections(body, chunkSize)
+  const parser = getSharedParser()
+  const idCounts = new Map()
+
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i]
+    // Use the existing high-level parser for each chunk so we keep behavior
+    // consistent with single-pass parsing (plugins, highlighting, etc).
+    const parsed = await parseMarkdownToHtml(section)
+    let htmlOut = String((parsed && parsed.html) || '')
+    let docToc = []
+    if (parser) {
+      try {
+        const doc = parser.parseFromString(htmlOut, 'text/html')
+        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
+        heads.forEach(h => {
+          try {
+            const level = Number(h.tagName.substring(1))
+            const text = (h.textContent || '').trim()
+            const base = _slugifyLocal(text)
+            const prev = idCounts.get(base) || 0
+            const idx = prev + 1
+            idCounts.set(base, idx)
+            const candidate = (idx === 1) ? base : base + '-' + idx
+            h.id = candidate
+            docToc.push({ level, text, id: candidate })
+          } catch (e) {}
+        })
+        try {
+          if (typeof XMLSerializer !== 'undefined') {
+            const ser = new XMLSerializer()
+            htmlOut = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
+          } else {
+            const nodes = Array.from(doc.body.childNodes || [])
+            htmlOut = nodes.map(n => (n && typeof n.outerHTML === 'string') ? n.outerHTML : (n && typeof n.textContent === 'string' ? n.textContent : '')).join('')
+          }
+        } catch (e) {}
+      } catch (e) {
+        // fall back to raw htmlOut when parsing fails
+      }
+    } else {
+      // Without a DOM parser try a regex-based heading scan (best-effort)
+      try {
+        const heads = []
+        htmlOut = htmlOut.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
+          const level = Number(lvl)
+          const text = inner.replace(/<[^>]+>/g, '').trim()
+          const base = _slugifyLocal(text)
+          const prev = idCounts.get(base) || 0
+          const idx = prev + 1
+          idCounts.set(base, idx)
+          const candidate = (idx === 1) ? base : base + '-' + idx
+          heads.push({ level, text, id: candidate })
+          const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
+          return `<h${level} ${cleanAttrs} id="${candidate}">${inner}</h${level}>`
+        })
+        docToc = heads
+      } catch (e) {}
+    }
+
+    const info = { index: i, isLast: i === (sections.length - 1), meta: (i === 0 ? (data || {}) : {}), toc: docToc }
+    try { cb(htmlOut, info) } catch (e) {}
+  }
+}
+
 
 /**
  * Convert markdown string to HTML and extract a table-of-contents list.

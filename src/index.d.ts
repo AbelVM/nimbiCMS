@@ -292,6 +292,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
 
 // --- from src/markdown.js
 export const _sendToRenderer: any
+export function streamParseMarkdown(opts: {chunkSize?:number}): Promise<void>
 export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<string,string>): Promise<Set<string>>
 
 
@@ -377,6 +378,7 @@ export function handleSlugWorkerMessage(msg: object): Promise<object>
 export function clearRendererImportCache(): any
 export function setRendererImportNegativeCacheTTL(ms: any): any
 export function handleWorkerMessage(msg: object): Promise<object>
+export function handleWorkerMessageStream(msg: object, onChunk: {function(object):void}): any
 
 // --- from src/worker/anchorWorker.js
 export function handleAnchorWorkerMessage(msg: object): Promise<object>
