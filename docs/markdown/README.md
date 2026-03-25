@@ -29,6 +29,8 @@ workers, and extracting table-of-contents data.
 ## Functions
 
 - [\_sendToRenderer](functions/sendToRenderer.md)
+- [\_slugifyLocal](functions/slugifyLocal.md)
+- [\_splitIntoSections](functions/splitIntoSections.md)
 - [addMarkdownExtension](functions/addMarkdownExtension.md)
 - [detectFenceLanguages](functions/detectFenceLanguages.md)
 - [detectFenceLanguagesAsync](functions/detectFenceLanguagesAsync.md)

@@ -45,6 +45,7 @@ tmp/
 temp/
 a11y-report.json
 vitest-coverage.txt
+vitest-coverage.json
 tools/audit/*.json
 dot/
 bundle-analysis.html

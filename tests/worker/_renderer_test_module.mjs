@@ -471,3 +471,6 @@ export async function handleWorkerMessageStream(msg, onChunk) {
     return err
   }
 }
+
+// Export internal helpers for unit testing of edge branches
+export { _splitIntoSections, decodeHtmlEntitiesLocal, slugifyHeading, importModuleWithCache, ensureHljs }

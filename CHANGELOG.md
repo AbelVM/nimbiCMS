@@ -5,11 +5,16 @@ All notable changes to **nimbiCMS** will be documented in this file.
 ## Unreleased
 
 - ...
-- **[FEAT]** Override the indexing to provide early rendering for cold URLs
+
+## v1.0.8
+- **[FIX]** Minor CSS tweaks
+- **[PERF]** Override the indexing to provide early rendering for cold URLs
 
 ## v1.0.7
 
 - **[FIX]** Hot fix for a path regression when deployed
+- **[FIX]** Minor documentation issue
+- **[CHORE]** Raised tests coverage
 
 ## v1.0.6 Need for Speed
 

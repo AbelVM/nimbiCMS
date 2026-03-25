@@ -1446,3 +1446,8 @@ try {
   }, true)
   
 } catch (e) {}
+
+// Export internals for unit testing
+export { normalizeSearchIndexEntries, safeGet, storeSlugMapping }
+// `seedNavSlugMappings` is defined inside `buildNav` (not a module-level binding)
+// and cannot be exported without refactoring. Tests use `buildNav` instead.

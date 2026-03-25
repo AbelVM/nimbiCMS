@@ -706,3 +706,6 @@ export async function detectFenceLanguagesAsync(mdText, supportedMap) {
   }
   return detectFenceLanguages(mdText || '', supportedMap)
 }
+
+// Export internals for unit testing
+export { _splitIntoSections as _splitIntoSections, _slugifyLocal as _slugifyLocal }

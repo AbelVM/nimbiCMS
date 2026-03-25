@@ -22,3 +22,6 @@ navigation callbacks into the site header.
 
 - [buildNav](functions/buildNav.md)
 - [createSiteNav](functions/createSiteNav.md)
+- [normalizeSearchIndexEntries](functions/normalizeSearchIndexEntries.md)
+- [safeGet](functions/safeGet.md)
+- [storeSlugMapping](functions/storeSlugMapping.md)

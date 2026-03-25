@@ -888,11 +888,56 @@ export async function fetchPageData(raw, contentBase) {
                     }
                   } catch (e) { /* parsing failed, fall back */ }
                   let rawWithBase = raw
-                  if (!/<base\s+[^>]*>/i.test(raw)) {
-                    if (/<head[^>]*>/i.test(raw)) {
-                      rawWithBase = raw.replace(/(<head[^>]*>)/i, `$1<base href="${baseHref}">`)
+                  try {
+                    let modified = String(raw || '')
+                    // Rewrite srcset attributes to absolute URLs when possible
+                    modified = modified.replace(/srcset\s*=\s*"([^"]*)"/gi, (m, ss) => {
+                      const parts = String(ss || '').split(',').map(s => s.trim()).filter(Boolean)
+                      const mapped = parts.map(p => {
+                        const [urlPart, size] = p.split(/\s+/, 2)
+                        if (!urlPart) return p
+                        if (/^(https?:)?\/\//i.test(urlPart) || urlPart.startsWith('/') || urlPart.startsWith('#')) return p
+                        try { const r = new URL(urlPart, absUrl).toString(); return size ? `${r} ${size}` : r } catch (err) { return p }
+                      }).join(', ')
+                      return `srcset="${mapped}"`
+                    })
+
+                    // Rewrite href in non-anchor tags (e.g., <link>)
+                    modified = modified.replace(/<(?!a\b)([^>]*?)\bhref\s*=\s*"([^"]*)"/gi, (full, before, url) => {
+                      if (!url) return full
+                      if (/^(https?:)?\/\//i.test(url) || url.startsWith('/') || url.startsWith('#')) return full
+                      try {
+                        const resolved = new URL(url, absUrl).toString()
+                        return full.replace(`href="${url}"`, `href="${resolved}"`)
+                      } catch (err) { return full }
+                    })
+
+                    // Rewrite src, xlink:href, and poster attributes
+                    modified = modified.replace(/\bsrc\s*=\s*"([^"]*)"/gi, (m, url) => {
+                      if (!url) return m
+                      if (/^(https?:)?\/\//i.test(url) || url.startsWith('/') || url.startsWith('#')) return m
+                      try { const r = new URL(url, absUrl).toString(); return `src="${r}"` } catch (err) { return m }
+                    })
+                    modified = modified.replace(/\bxlink:href\s*=\s*"([^"]*)"/gi, (m, url) => {
+                      if (!url) return m
+                      if (/^(https?:)?\/\//i.test(url) || url.startsWith('/') || url.startsWith('#')) return m
+                      try { const r = new URL(url, absUrl).toString(); return `xlink:href="${r}"` } catch (err) { return m }
+                    })
+                    modified = modified.replace(/\bposter\s*=\s*"([^"]*)"/gi, (m, url) => {
+                      if (!url) return m
+                      if (/^(https?:)?\/\//i.test(url) || url.startsWith('/') || url.startsWith('#')) return m
+                      try { const r = new URL(url, absUrl).toString(); return `poster="${r}"` } catch (err) { return m }
+                    })
+
+                    rawWithBase = modified
+                  } catch (_) {
+                    rawWithBase = raw
+                  }
+                  if (!/<base\s+[^>]*>/i.test(rawWithBase)) {
+                    if (/<head[^>]*>/i.test(rawWithBase)) {
+                      rawWithBase = rawWithBase.replace(/(<head[^>]*>)/i, `$1<base href="${baseHref}">`)
                     } else {
-                      rawWithBase = `<base href="${baseHref}">` + raw
+                      rawWithBase = `<base href="${baseHref}">` + rawWithBase
                     }
                   }
                   return { data: { raw: rawWithBase, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
