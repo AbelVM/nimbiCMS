@@ -2,7 +2,7 @@ import { it, expect, vi } from 'vitest'
 
 it('parseMarkdownToHtml falls back when worker emits error event', async () => {
   vi.resetModules()
-  vi.mock('../src/worker/renderer.js?worker&inline', () => ({
+  vi.mock('../src/worker/renderer.entry.js?worker&inline', () => ({
     default: class FakeWorker {
       constructor() { this._listeners = { message: [], error: [] } }
       addEventListener(ev, h) { if (this._listeners[ev]) this._listeners[ev].push(h) }
@@ -17,7 +17,7 @@ it('parseMarkdownToHtml falls back when worker emits error event', async () => {
 
 it('parseMarkdownToHtml falls back when worker returns data.error', async () => {
   vi.resetModules()
-  vi.mock('../src/worker/renderer.js?worker&inline', () => ({
+  vi.mock('../src/worker/renderer.entry.js?worker&inline', () => ({
     default: class FakeWorker {
       constructor() { this._listeners = { message: [], error: [] } }
       addEventListener(ev, h) { if (this._listeners[ev]) this._listeners[ev].push(h) }
@@ -32,7 +32,7 @@ it('parseMarkdownToHtml falls back when worker returns data.error', async () => 
 
 it('parseMarkdownToHtml falls back on worker timeout', async () => {
   vi.resetModules()
-  vi.mock('../src/worker/renderer.js?worker&inline', () => ({
+  vi.mock('../src/worker/renderer.entry.js?worker&inline', () => ({
     default: class FakeWorker {
       constructor() { this._listeners = { message: [], error: [] } }
       addEventListener(ev, h) { if (this._listeners[ev]) this._listeners[ev].push(h) }

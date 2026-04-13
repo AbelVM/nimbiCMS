@@ -467,18 +467,18 @@ describe('slugManager module', () => {
     spy.mockRestore()
   })
 
-  it('worker wrappers communicate with real worker when available', async () => {
+  it('buildSearchIndex and crawlForSlug work correctly', async () => {
     // ensure Worker exists and stub network for slugManager
     slugMgr.clearFetchCache()
     global.fetch = vi.fn(async (u) => {
       if (String(u).endsWith('nav.md')) return { ok: true, text: () => Promise.resolve('# Nav') }
       return { ok: false, status: 404, text: () => Promise.resolve('') }
     })
-    // call buildSearchIndexWorker - should not throw
-    const idx = await slugMgr.buildSearchIndexWorker('/base/')
+    // call buildSearchIndex directly (pool-agnostic)
+    const idx = await slugMgr.buildSearchIndex('/base/')
     expect(Array.isArray(idx)).toBe(true)
-    // call crawlForSlugWorker on nonexistent slug
-    const crawl = await slugMgr.crawlForSlugWorker('nothing', '/base/')
+    // call crawlForSlug on nonexistent slug
+    const crawl = await slugMgr.crawlForSlug('nothing', '/base/')
     expect(crawl).toBeNull()
   })
 

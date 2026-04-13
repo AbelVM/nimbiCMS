@@ -33,9 +33,8 @@ function fullCosmetic(page, anchor = null) {
   }
 }
 import { registerThemedElement } from './bulmaManager.js'
-import { makeWorkerManagerFromRaw } from './worker-manager.js'
-import anchorWorkerCode from './worker/anchorWorker.js?raw'
-import * as AnchorModule from './worker/anchorWorker.js'
+import AnchorWorker from './worker/anchorWorker.js?worker&inline'
+import { PowerPool } from 'performance-helpers/powerPool'
 
 function _hbWarn(...args) { try { debugWarn(...args) } catch (e) {} }
 function _hbShouldProbe(contentBase) {
@@ -1415,14 +1414,119 @@ export function renderNotFound(contentWrap, t, e) {
   }
 
  
-const _anchorManager = makeWorkerManagerFromRaw(anchorWorkerCode, AnchorModule && AnchorModule.handleAnchorWorkerMessage, 'anchor')
+const _anchorPool = new PowerPool(AnchorWorker, { size: 1, minSize: 1, autoScale: true })
+
+function _resolveSlugForWorkerPath(candidate) {
+  if (!candidate) return null
+  try {
+    if (mdToSlug && mdToSlug.has && mdToSlug.has(candidate)) return mdToSlug.get(candidate)
+  } catch (_) {}
+  try {
+    const baseName = String(candidate).replace(/^.*\//, '')
+    if (baseName && mdToSlug && mdToSlug.has && mdToSlug.has(baseName)) return mdToSlug.get(baseName)
+  } catch (_) {}
+  try {
+    for (const [slug, mapped] of slugToMd || []) {
+      if (mapped === candidate) return slug
+      const baseName = String(candidate).replace(/^.*\//, '')
+      if (mapped === baseName) return slug
+      if (mapped && typeof mapped === 'object') {
+        if (mapped.default === candidate || mapped.default === baseName) return slug
+        const langs = mapped.langs && typeof mapped.langs === 'object' ? Object.values(mapped.langs) : []
+        if (langs.includes(candidate) || langs.includes(baseName)) return slug
+      }
+    }
+  } catch (_) {}
+  return null
+}
+
+function _buildAnchorWorkerSnapshot(article, contentBase, pagePath) {
+  const candidates = new Set()
+  let contentBasePath = '/'
+  try {
+    const contentBaseUrl = new URL(contentBase, location.href)
+    contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
+  } catch (_) {}
+
+  try {
+    const anchors = article && article.querySelectorAll ? Array.from(article.querySelectorAll('a')) : []
+    for (const anchor of anchors) {
+      try {
+        try { if (anchor.closest && anchor.closest('h1,h2,h3,h4,h5,h6')) continue } catch (_) {}
+        const href = anchor.getAttribute('href') || ''
+        if (!href || isExternalLink(href)) continue
+        if (href.startsWith('/') && !href.endsWith('.md')) continue
+
+        const mdMatch = href.match(/^([^#?]+\.md)(?:[#](.+))?$/)
+        if (mdMatch) {
+          let mdPathRaw = mdMatch[1]
+          if (!mdPathRaw.startsWith('/') && pagePath) {
+            const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+            mdPathRaw = dir + mdPathRaw
+          }
+          const resolved = new URL(mdPathRaw, contentBase).pathname
+          let rel = resolved.startsWith(contentBasePath) ? resolved.slice(contentBasePath.length) : resolved
+          rel = normalizePath(stripContentBasePrefix(rel, contentBasePath))
+          candidates.add(rel)
+          candidates.add(String(rel).replace(/^.*\//, ''))
+          continue
+        }
+
+        let toResolve = href
+        if (!href.startsWith('/') && pagePath) {
+          if (href.startsWith('#')) toResolve = pagePath + href
+          else {
+            const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+            toResolve = dir + href
+          }
+        }
+        const full = new URL(toResolve, contentBase)
+        const pathname = full.pathname || ''
+        if (!pathname || pathname.indexOf(contentBasePath) === -1) continue
+        let rel = pathname.startsWith(contentBasePath) ? pathname.slice(contentBasePath.length) : pathname
+        rel = normalizePath(stripContentBasePrefix(rel, contentBasePath))
+        rel = trimTrailingSlash(rel)
+        if (!rel) rel = HOME_SLUG
+        candidates.add(rel)
+        candidates.add(String(rel).replace(/^.*\//, ''))
+        if (!/\.[^/]+$/.test(String(rel || ''))) {
+          candidates.add(rel + '.html')
+          candidates.add((rel + '.html').replace(/^.*\//, ''))
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  const pathToSlug = {}
+  for (const candidate of candidates) {
+    const slug = _resolveSlugForWorkerPath(candidate)
+    if (slug) pathToSlug[candidate] = slug
+  }
+
+  return {
+    allowProbe: _hbShouldProbe(contentBase),
+    homeSlug: HOME_SLUG,
+    pathToSlug
+  }
+}
 
 /**
  * @returns {Worker|null}
  */
-export function initAnchorWorker() { return _anchorManager.get() }
+export function initAnchorWorker() { return _anchorPool.workers?.[0]?.worker?._underlying ?? null }
 
-function _sendToAnchorWorker(msg) { return _anchorManager.send(msg, 2000) }
+function _sendToAnchorWorker(msg) {
+  return _anchorPool.postMessage(msg, undefined, { awaitResponse: true, timeout: 2000 })
+    .then(result => {
+      if (result && typeof result === 'object' && result.error) throw new Error(result.error)
+      return result
+    })
+    .catch(e => {
+      const m = e?.message || ''
+      if (m.includes('postMessage response timeout')) throw new Error('worker timeout')
+      throw e
+    })
+}
 
 /**
  * Rewrite anchors using the dedicated anchor worker. Enforce worker usage —
@@ -1434,26 +1538,35 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   if (!w) throw new Error('anchor worker unavailable')
   if (!article || typeof article.innerHTML !== 'string') throw new Error('invalid article element')
   const html = String(article.innerHTML)
-  const res = await _sendToAnchorWorker({ type: 'rewriteAnchors', html, contentBase, pagePath })
-  if (res && typeof res === 'string') {
+  const snapshot = _buildAnchorWorkerSnapshot(article, contentBase, pagePath)
+  const res = await _sendToAnchorWorker({ type: 'rewriteAnchors', html, contentBase, pagePath, snapshot })
+  const rewrittenHtml = (res && typeof res === 'object' && typeof res.html === 'string') ? res.html : res
+  if (res && typeof res === 'object' && Array.isArray(res.mappings)) {
+    for (const mapping of res.mappings) {
+      try {
+        if (mapping && mapping.slug && mapping.path) storeSlugMapping(mapping.slug, mapping.path)
+      } catch (e) { debugWarn('[htmlBuilder] storing worker anchor mapping failed', e) }
+    }
+  }
+  if (typeof rewrittenHtml === 'string') {
     try {
       const _parser2 = getSharedParser && getSharedParser()
       if (_parser2) {
-        const doc = _parser2.parseFromString(String(res || ''), 'text/html')
+        const doc = _parser2.parseFromString(String(rewrittenHtml || ''), 'text/html')
         const nodes = Array.from(doc.body.childNodes || [])
         if (nodes.length) article.replaceChildren(...nodes)
-        else article.innerHTML = res
+        else article.innerHTML = rewrittenHtml
       } else {
         try {
           const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
           if (range && typeof range.createContextualFragment === 'function') {
-            const frag = range.createContextualFragment(String(res || ''))
+            const frag = range.createContextualFragment(String(rewrittenHtml || ''))
             article.replaceChildren(...Array.from(frag.childNodes))
           } else {
-            article.innerHTML = res
+            article.innerHTML = rewrittenHtml
           }
         } catch (e) {
-          article.innerHTML = res
+          article.innerHTML = rewrittenHtml
         }
       }
     } catch (e) { debugWarn('[htmlBuilder] applying rewritten anchors failed', e) }

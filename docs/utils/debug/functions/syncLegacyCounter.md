@@ -8,9 +8,8 @@
 
 > **syncLegacyCounter**(`name`): `void`
 
-Compatibility helper: increment legacy global counters on `globalThis.__nimbiCMSDebug`
-when present. This centralizes the remaining legacy-global touchpoints so
-callers don't need to reference `__nimbiCMSDebug` directly.
+Compatibility helper: sync a counter into the legacy `__nimbiCMSDebug` global
+when present.
 
 ## Parameters
 

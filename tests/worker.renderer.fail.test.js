@@ -2,12 +2,34 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
+import { u82o } from '../node_modules/performance-helpers/src/helpers/powerBuffer.js'
+
+const rendererFailMockState = vi.hoisted(() => ({ noCore: false }))
+
+vi.mock('highlight.js/lib/core', () => {
+  if (rendererFailMockState.noCore) return { default: null }
+  return {
+    default: {
+      registerLanguage: () => {},
+      getLanguage: () => false,
+      highlight: (code) => ({ value: String(code) })
+    }
+  }
+})
+
+function decodePosted(m) {
+  if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
+    try { return u82o(m) } catch (_) {}
+  }
+  return m
+}
 
 describe('renderer worker register failure when hljs core missing', () => {
   let posted = []
   beforeEach(() => {
     posted = []
-    globalThis.postMessage = (m) => posted.push(m)
+    rendererFailMockState.noCore = false
+    globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
     vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s||'')}</p>` , setOptions: () => {} }, default: { parse: (s) => `<p>${String(s||'')}</p>` , setOptions: () => {} } }))
     vi.mock('../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
@@ -37,10 +59,9 @@ describe('renderer worker register failure when hljs core missing', () => {
     vi.unmock('marked')
   })
 
-  it('posts register-error when hljs core import fails even if language module exists', async () => {
-    // mock CDN core import to throw/fail
-    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => { throw new Error('no core') }, { virtual: true })
-    const mod = await import(pathToFileURL(globalThis._rendererFail).href)
+  it('posts register-error when hljs core is unavailable even if language module exists', async () => {
+    rendererFailMockState.noCore = true
+    await import(pathToFileURL(globalThis._rendererFail).href)
     const langUrl = pathToFileURL(globalThis._langOk).href
     await globalThis.onmessage({ data: { type: 'register', name: 'xlang', url: langUrl } })
     const last = posted[posted.length - 1]

@@ -17,16 +17,12 @@ describe('anchor worker API (direct invocation)', () => {
     const promise = new Promise(r => { global.postMessage = (msg) => r(msg) })
     // simple HTML with one markdown link that should be rewritten to ?page=foo
     const html = '<a href="foo.md">x</a>'
-    // ensure slug maps so rewriteAnchors can act
-    const { slugToMd, mdToSlug } = await import('../src/slugManager.js')
-    slugToMd.set('foo', 'foo.md')
-    mdToSlug.set('foo.md', 'foo')
-    handler({ data: { type: 'rewriteAnchors', id: '1', html, contentBase: 'http://base/', pagePath: '' } })
+    handler({ data: { type: 'rewriteAnchors', id: '1', html, contentBase: 'http://base/', pagePath: '', snapshot: { allowProbe: false, homeSlug: '_home', pathToSlug: { 'foo.md': 'foo' } } } })
     const res = await promise
     expect(res.id).toBe('1')
     // worker should not return an error
     expect(res.error).toBeUndefined()
-    expect(typeof res.result).toBe('string')
-    expect(res.result).toContain('?page=foo')
+    expect(res.result && typeof res.result).toBe('object')
+    expect(res.result.html).toContain('?page=foo')
   })
 })

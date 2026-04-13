@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
+import { u82o } from '../../node_modules/performance-helpers/src/helpers/powerBuffer.js'
+
+function decodePosted(m) {
+  if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
+    try { return u82o(m) } catch (_) {}
+  }
+  return m
+}
 
 // We'll import the worker module after mocking dependencies, then drive
 // `globalThis.onmessage` and capture `globalThis.postMessage` calls.
@@ -10,7 +18,7 @@ describe('renderer worker (unit)', () => {
   let posted = []
   beforeEach(() => {
     posted = []
-    globalThis.postMessage = (m) => posted.push(m)
+    globalThis.postMessage = (m) => posted.push(decodePosted(m))
     // mock marked and frontmatter parser
     vi.resetModules()
     vi.mock('marked', () => ({
@@ -50,7 +58,7 @@ describe('renderer worker (unit)', () => {
       expect(out.error).toBeTruthy()
     } else {
       expect(out.result).toBeTruthy()
-      expect(out.result.toc).toEqual([{ level: 1, text: 'Hello' }])
+      expect(out.result.toc).toEqual([{ level: 1, text: 'Hello', id: 'hello' }])
     }
   })
 

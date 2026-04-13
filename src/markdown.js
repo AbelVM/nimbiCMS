@@ -7,59 +7,15 @@
  * @module markdown
  */
 import { marked } from 'marked'
-import rendererWorkerCode from './worker/renderer.js?raw'
-import RendererWorker from './worker/renderer.js?worker&inline'
-import * as RendererModule from './worker/renderer.js'
-import * as WorkerManager from './worker-manager.js'
+import RendererWorker from './worker/renderer.entry.js?worker&inline'
+import { PowerPool } from 'performance-helpers/powerPool'
 import emojimap from './utils/emojiMap.js'
 import { debugWarn } from './utils/debug.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
-/**
- * Create a renderer worker instance or an inline shim when Workers are
- * unavailable. The returned value implements a minimal Worker-like API
- * (`postMessage`, `addEventListener`, `removeEventListener`, `terminate`).
- * @returns {Worker|Object|null}
- */
-const _rendererManager = WorkerManager.makeWorkerPool(() => {
-  // Prefer bundler-provided worker class (test mocks target `?worker&inline`).
-  if (typeof Worker !== 'undefined') {
-    try { return new RendererWorker() } catch (e) { /* fallthrough to raw/inline */ }
-  }
-
-  // Try creating a worker from raw code if available.
-  try { if (WorkerManager.createWorkerFromRaw) return WorkerManager.createWorkerFromRaw(rendererWorkerCode) } catch (e) {}
-
-  // Inline shim: forward to module handler and emulate Worker message events.
-  const listeners = { message: [], error: [] }
-  return {
-    addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
-    removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
-    postMessage(msg) {
-      setTimeout(async () => {
-        try {
-          if (RendererModule && typeof RendererModule.handleWorkerMessageStream === 'function' && msg && msg.type === 'stream') {
-            // Stream-aware inline shim: emit each chunk as the worker would
-            await RendererModule.handleWorkerMessageStream(msg, (chunk) => {
-              const ev = { data: chunk }
-              ;(listeners.message || []).forEach(fn => fn(ev))
-            })
-          } else {
-            const out = await RendererModule.handleWorkerMessage(msg)
-            const ev = { data: out }
-            ;(listeners.message || []).forEach(fn => fn(ev))
-          }
-        } catch (e) {
-          const ev = { data: { id: msg && msg.id, error: String(e) } }
-          ;(listeners.message || []).forEach(fn => fn(ev))
-        }
-      }, 0)
-    },
-    terminate() { Object.keys(listeners).forEach(k => listeners[k].length = 0) }
-  }
-}, 'markdown', poolSize)
+const _rendererPool = new PowerPool(RendererWorker, { size: poolSize, minSize: 1, autoScale: true })
 
 // use shared DOMParser helper (see src/utils/sharedDomParser.js)
 
@@ -102,7 +58,7 @@ const _rendererManager = WorkerManager.makeWorkerPool(() => {
  * Lazily return or create a renderer worker instance (may return null).
  * @returns {Worker|null} - A Worker instance or null if workers are unavailable.
  */
-export const initRendererWorker = () => _rendererManager.get()
+export const initRendererWorker = () => _rendererPool.workers?.[0]?.worker?._underlying ?? null
 
 /**
  * Send a message to the renderer worker and await a response.
@@ -111,7 +67,16 @@ export const initRendererWorker = () => _rendererManager.get()
  * @returns {Promise<RendererResult>} Promise resolving with the renderer result.
  */
 export const _sendToRenderer = (msg, timeout = 3000) => {
-  return _rendererManager.send(msg, timeout)
+  return _rendererPool.postMessage(msg, undefined, { awaitResponse: true, timeout })
+    .then(result => {
+      if (result && typeof result === 'object' && result.error) throw new Error(result.error)
+      return result
+    })
+    .catch(e => {
+      const m = e?.message || ''
+      if (m.includes('postMessage response timeout')) throw new Error('worker timeout')
+      throw e
+    })
 }
 
 /** Registered marked plugins. */
@@ -458,6 +423,52 @@ export async function parseMarkdownToHtml(md) {
 
   
 
+  try { md = String(md || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+  // Fast path: avoid worker startup/roundtrip for markdown without fenced
+  // code blocks; this tends to improve first-render latency on cold loads.
+  try {
+    const rawMd = String(md || '')
+    const isVitest = !!(typeof process !== 'undefined' && process.env && process.env.VITEST)
+    if (!isVitest && !/```/.test(rawMd) && rawMd.length <= 200000) {
+      let { content, data } = parseFrontmatter(rawMd)
+      try { content = String(content || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+      marked.setOptions({ gfm: true, headerIds: true, mangle: false })
+      let html = marked.parse(content)
+      const heads = []
+      const used = new Set()
+      const slugifyLocal = (s) => { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+      html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
+        const level = Number(lvl)
+        const text = inner.replace(/<[^>]+>/g, '').trim()
+        let base = slugifyLocal(text) || 'heading'
+        let candidate = base
+        let i = 2
+        while (used.has(candidate)) { candidate = base + '-' + i; i += 1 }
+        used.add(candidate)
+        heads.push({ level, text, id: candidate })
+        const resp = {
+          1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
+          2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
+          3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
+          4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
+          5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
+          6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
+        }
+        const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
+        const classes = (resp[level] + ' ' + weight).trim()
+        const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
+        const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
+        return `<h${level} ${newAttrs}>${inner}</h${level}>`
+      })
+      html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
+        if (/\bloading=/.test(attrs)) return `<img${attrs}>`
+        if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`
+        return `<img${attrs} loading="lazy">`
+      })
+      return { html, meta: data || {}, toc: heads }
+    }
+  } catch (e) { /* fall through to existing paths */ }
+
   // Obtain worker; in Vitest we import the module namespace so test spies
   // can override `initRendererWorker`. Outside tests avoid self-import.
   let w
@@ -471,7 +482,6 @@ export async function parseMarkdownToHtml(md) {
   } else {
     w = initRendererWorker && initRendererWorker()
   }
-  try { md = String(md || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
   try {
     if (typeof hljs !== 'undefined' && hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
       if (/```\s*\n/.test(String(md || ''))) {
@@ -698,7 +708,7 @@ export async function detectFenceLanguagesAsync(mdText, supportedMap) {
   if (w) {
     try {
       const arr = supportedMap && supportedMap.size ? Array.from(supportedMap.keys()) : []
-      const res = await _sendToRenderer({ type: 'detect', md: String(mdText || ''), supported: arr })
+      const res = await _sendToRenderer({ type: 'detect', md: String(mdText || ''), supported: arr }, 200)
       if (Array.isArray(res)) return new Set(res)
     } catch (e) {
       debugWarn('[markdown] detectFenceLanguagesAsync worker failed', e)

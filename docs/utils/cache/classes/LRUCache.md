@@ -6,11 +6,9 @@
 
 # Class: LRUCache
 
-Lightweight LRU cache with optional TTL and eviction callback.
-Designed to be a drop-in replacement for simple Map-based caches where
-bounded size or TTL-based eviction is desirable.
+LRU cache with optional TTL and eviction callback, backed by PowerCache.
 
-Methods: get, set, has, delete, clear and property `size`.
+## Param
 
 ## Constructors
 
@@ -18,23 +16,9 @@ Methods: get, set, has, delete, clear and property `size`.
 
 > **new LRUCache**(`opts?`): `LRUCache`
 
-Create an LRU cache.
-
 #### Parameters
 
 ##### opts?
-
-###### maxSize?
-
-`number`
-
-###### onEvict?
-
-`Function`
-
-###### ttlMs?
-
-`number`
 
 #### Returns
 
@@ -42,27 +26,9 @@ Create an LRU cache.
 
 ## Properties
 
-### \_map
+### \_cache
 
-> **\_map**: `Map`\<`any`, `any`\>
-
-***
-
-### \_maxSize
-
-> **\_maxSize**: `number`
-
-***
-
-### \_onEvict
-
-> **\_onEvict**: `Function` \| `null`
-
-***
-
-### \_ttlMs
-
-> **\_ttlMs**: `number`
+> **\_cache**: `any`
 
 ## Accessors
 
@@ -70,39 +36,17 @@ Create an LRU cache.
 
 #### Get Signature
 
-> **get** **size**(): `number`
+> **get** **size**(): `any`
 
 ##### Returns
 
-`number`
+`any`
 
 ## Methods
-
-### \_evictKey()
-
-> **\_evictKey**(`key`, `entry`): `void`
-
-#### Parameters
-
-##### key
-
-`any`
-
-##### entry
-
-`any`
-
-#### Returns
-
-`void`
-
-***
 
 ### clear()
 
 > **clear**(): `void`
-
-Clear the cache and call eviction callback for each entry.
 
 #### Returns
 
@@ -112,9 +56,7 @@ Clear the cache and call eviction callback for each entry.
 
 ### delete()
 
-> **delete**(`key`): `boolean`
-
-Delete key from cache.
+> **delete**(`key`): `any`
 
 #### Parameters
 
@@ -124,15 +66,13 @@ Delete key from cache.
 
 #### Returns
 
-`boolean`
+`any`
 
 ***
 
 ### get()
 
 > **get**(`key`): `any`
-
-Get value for key or undefined if missing/expired.
 
 #### Parameters
 
@@ -148,9 +88,7 @@ Get value for key or undefined if missing/expired.
 
 ### has()
 
-> **has**(`key`): `boolean`
-
-Check if key exists and is not expired.
+> **has**(`key`): `any`
 
 #### Parameters
 
@@ -160,15 +98,13 @@ Check if key exists and is not expired.
 
 #### Returns
 
-`boolean`
+`any`
 
 ***
 
 ### set()
 
 > **set**(`key`, `value`): `LRUCache`
-
-Set a key/value pair and enforce maxSize eviction.
 
 #### Parameters
 

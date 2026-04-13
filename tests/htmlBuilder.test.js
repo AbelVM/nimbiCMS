@@ -440,18 +440,7 @@ describe('htmlBuilder utilities', () => {
   })
 
   // additional tests for worker support and coverage
-  it('rewriteAnchorsWorker falls back when worker unavailable', async () => {
-    const htmlBuilder = await import('../src/htmlBuilder.js')
-    const spy = vi.spyOn(htmlBuilder, 'initAnchorWorker').mockReturnValue(null)
-    const article = document.createElement('article')
-    article.innerHTML = '<a href="foo.md">x</a>'
-    const { slugToMd, mdToSlug } = await import('../src/slugManager.js')
-    slugToMd.set('foo', 'foo.md')
-    mdToSlug.set('foo.md', 'foo')
-    await htmlBuilder.rewriteAnchorsWorker(article, 'http://base/', '')
-    expect(article.querySelector('a').href).toContain('?page=foo')
-    spy.mockRestore()
-  })
+
 
   it('rewriteAnchorsWorker uses actual worker when available', async () => {
     // allow real worker creation and stub fetch

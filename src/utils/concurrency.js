@@ -1,7 +1,8 @@
 /**
- * Simple concurrency runner for async tasks.
+ * Bounded concurrency runner backed by PowerSemaphore from performance-helpers.
  * @module utils/concurrency
  */
+import { PowerSemaphore } from 'performance-helpers/powerSemaphore'
 
 /**
  * Run items through an async worker function with limited concurrency.
@@ -13,24 +14,6 @@
  */
 export async function runWithConcurrency(items, worker, concurrency = 4) {
   if (!Array.isArray(items) || items.length === 0) return []
-  const results = new Array(items.length)
-  let i = 0
-  const runners = []
-  const limit = Math.max(1, Number(concurrency) || 1)
-
-  async function runner() {
-    while (true) {
-      const idx = i++
-      if (idx >= items.length) return
-      try {
-        results[idx] = await worker(items[idx], idx)
-      } catch (err) {
-        results[idx] = undefined
-      }
-    }
-  }
-
-  for (let j = 0; j < Math.min(limit, items.length); j++) runners.push(runner())
-  await Promise.all(runners)
-  return results
+  const sem = new PowerSemaphore(Math.max(1, Number(concurrency) || 1))
+  return Promise.all(items.map((item, idx) => sem.run(() => worker(item, idx))))
 }

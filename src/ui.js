@@ -63,6 +63,8 @@ export function createUI(opts) {
 
   let currentPagePath = null
   const siteNav = createNavTree(t, [{ path: homePage, name: t('home'), isIndex: true, children: [] }])
+  const _preparedPageCache = new Map()
+  const _preparedPageCacheMax = 12
   // Serialize renders to avoid concurrent duplicate rendering when multiple
   // navigation events fire in quick succession (e.g. popstate + script-driven calls).
   // `_isRendering` guards active render; `_queuedRender` signals a subsequent
@@ -79,6 +81,37 @@ export function createUI(opts) {
     } catch (e) {
       try { if (el) el.innerHTML = '' } catch (_) {}
     }
+  }
+
+  function _pageContentSignature(data) {
+    try {
+      const raw = String((data && data.raw) || '')
+      const len = raw.length
+      const head = raw.slice(0, 120)
+      const tail = raw.slice(Math.max(0, len - 120))
+      return `${len}:${head}:${tail}`
+    } catch (_) {
+      return '0::'
+    }
+  }
+
+  function _cacheGetPrepared(key) {
+    const v = _preparedPageCache.get(key)
+    if (!v) return null
+    _preparedPageCache.delete(key)
+    _preparedPageCache.set(key, v)
+    return v
+  }
+
+  function _cacheSetPrepared(key, value) {
+    try {
+      if (_preparedPageCache.has(key)) _preparedPageCache.delete(key)
+      _preparedPageCache.set(key, value)
+      while (_preparedPageCache.size > _preparedPageCacheMax) {
+        const oldest = _preparedPageCache.keys().next().value
+        _preparedPageCache.delete(oldest)
+      }
+    } catch (_) {}
   }
 
   /**
@@ -118,7 +151,27 @@ export function createUI(opts) {
     try { scrollToAnchorOrTop(null) } catch (_) { debugWarn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
     try { _clearElement(contentWrap) } catch (e) { try { contentWrap.innerHTML = '' } catch (_) {} }
 
-    const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
+    const preparedKey = `${String(pagePath || '')}|||${_pageContentSignature(data)}`
+    const preparedCached = _cacheGetPrepared(preparedKey)
+
+    let article, parsed, toc, topH1, h1Text, slugKey
+    if (preparedCached && preparedCached.articleTemplate) {
+      article = preparedCached.articleTemplate.cloneNode(true)
+      toc = preparedCached.tocTemplate ? preparedCached.tocTemplate.cloneNode(true) : null
+      topH1 = article.querySelector('h1')
+      h1Text = topH1 ? (topH1.textContent || '').trim() : (preparedCached.h1Text || '')
+      slugKey = preparedCached.slugKey || (topH1 ? (topH1.id || '') : '')
+      parsed = { meta: Object.assign({}, preparedCached.meta || {}) }
+    } else {
+      ({ article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase))
+      _cacheSetPrepared(preparedKey, {
+        articleTemplate: article.cloneNode(true),
+        tocTemplate: toc ? toc.cloneNode(true) : null,
+        meta: Object.assign({}, (parsed && parsed.meta) || {}),
+        h1Text: h1Text || '',
+        slugKey: slugKey || ''
+      })
+    }
 
     applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
 
@@ -216,6 +269,7 @@ export function createUI(opts) {
   }
 
   window.addEventListener('popstate', renderByQuery)
+  window.addEventListener('hashchange', renderByQuery)
 
   /**
    * Compute the sessionStorage key used to persist scroll position

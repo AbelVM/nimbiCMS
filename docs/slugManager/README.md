@@ -33,7 +33,6 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [notFoundPage](variables/notFoundPage.md)
 - [searchIndex](variables/searchIndex.md)
 - [skipRootReadme](variables/skipRootReadme.md)
-- [slugify](variables/slugify.md)
 - [slugResolvers](variables/slugResolvers.md)
 - [slugToMd](variables/slugToMd.md)
 
@@ -73,6 +72,7 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [setNegativeFetchCacheMaxSize](functions/setNegativeFetchCacheMaxSize.md)
 - [setNotFoundPage](functions/setNotFoundPage.md)
 - [setSkipRootReadme](functions/setSkipRootReadme.md)
+- [slugify](functions/slugify.md)
 - [unescapeMarkdown](functions/unescapeMarkdown.md)
 - [uniqueSlug](functions/uniqueSlug.md)
 - [watchForColdHashRoute](functions/watchForColdHashRoute.md)

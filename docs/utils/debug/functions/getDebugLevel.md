@@ -8,8 +8,6 @@
 
 > **getDebugLevel**(): `number`
 
-Get the current debug level.
-
 ## Returns
 
 `number`

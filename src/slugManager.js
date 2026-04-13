@@ -162,15 +162,15 @@ import { parseHrefToRoute } from './utils/urlHelper.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
 import { runWithConcurrency } from './utils/concurrency.js'
 
-import slugWorkerCode from './worker/slugWorker.js?raw'
+import SlugWorker from './worker/slugWorker.js?worker&inline'
 
 import { LRUCache } from './utils/cache.js'
-import { makeWorkerPool, createWorkerFromRaw } from './worker-manager.js'
+import { PowerPool } from 'performance-helpers/powerPool'
 import { debugLog, debugWarn, debugError, isDebug } from './utils/debug.js'
 import { yieldIfNeeded } from './utils/idle.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
-const _slugWorkerManager = makeWorkerPool(() => createWorkerFromRaw(slugWorkerCode), 'slugManager', poolSize)
+const _slugPool = new PowerPool(SlugWorker, { size: poolSize, minSize: 1, autoScale: true })
 
 function _slugShouldLog() {
   try { if (isDebug()) return true } catch (_e) {}
@@ -183,9 +183,20 @@ function _debugLog(...args) { try { debugLog(...args) } catch (_) {} }
  * Lazily return a worker instance used for slug-related background tasks.
  * @returns {Worker|null}
  */
-export function initSlugWorker() { return _slugWorkerManager.get() }
+export function initSlugWorker() { return _slugPool.workers?.[0]?.worker?._underlying ?? null }
 
-function _sendToWorker(msg) { return _slugWorkerManager.send(msg, 5000) }
+function _sendToWorker(msg) {
+  return _slugPool.postMessage(msg, undefined, { awaitResponse: true, timeout: 5000 })
+    .then(result => {
+      if (result && typeof result === 'object' && result.error) throw new Error(result.error)
+      return result
+    })
+    .catch(e => {
+      const m = e?.message || ''
+      if (m.includes('postMessage response timeout')) throw new Error('worker timeout')
+      throw e
+    })
+}
 
 /**
  * Build the search index using the slug worker when available.
@@ -194,8 +205,7 @@ function _sendToWorker(msg) { return _slugWorkerManager.send(msg, 5000) }
  */
 
 export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
-  const ns = await import('./slugManager.js')
-  const w = ns.initSlugWorker && ns.initSlugWorker()
+  const w = initSlugWorker && initSlugWorker()
   if (!w) throw new Error('slug worker required but unavailable')
   return await _sendToWorker({ type: 'buildSearchIndex', contentBase, indexDepth, noIndexing })
 }
@@ -211,8 +221,7 @@ export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noInde
  * @returns {Promise<string|null>} - Resolved markdown path or `null` if not found.
  */
 export async function crawlForSlugWorker(slug, base, maxQueue) {
-  const ns = await import('./slugManager.js')
-  const w = ns.initSlugWorker && ns.initSlugWorker()
+  const w = initSlugWorker && initSlugWorker()
   if (!w) throw new Error('slug worker required but unavailable')
   return _sendToWorker({ type: 'crawlForSlug', slug, base, maxQueue })
 }
@@ -482,14 +491,14 @@ function _deriveCommonPrefix(paths) {
 
 import { refreshIndexPaths } from './indexManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
-import { memoize } from './utils/memoize.js'
+import { PowerMemoizer } from 'performance-helpers/powerCache'
 
 /**
  * Generate a URL-friendly slug from a text string (memoized LRU).
  * @param {string} s - Text to generate a URL-friendly slug from.
  * @returns {string}
  */
-export const slugify = memoize(function(s) {
+const _slugifyMemo = new PowerMemoizer(function(s) {
   const MAX_SLUG_LENGTH = 80 // reasonable default to avoid extremely long URLs
   let slug = String(s || '')
     .toLowerCase()
@@ -502,7 +511,9 @@ export const slugify = memoize(function(s) {
     slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, '')
   }
   return slug
-}, 2000)
+}, { keyResolver: (s) => s === undefined ? '__undefined' : String(s), cacheOptions: { maxEntries: 2000 } })
+
+export const slugify = (s) => _slugifyMemo.run(s)
 
 /**
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
@@ -514,6 +525,8 @@ export function setContentBase(contentBase) {
   slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
   try { allMarkdownPathsSet.clear() } catch (e) {}
   availableLanguages = availableLanguages || []
+  const isLocalized = !!(availableLanguages && availableLanguages.length)
+  const takenSlugs = new Set()
 
   const keys = Object.keys(_allMd || {})
   if (!keys.length) return
@@ -546,7 +559,6 @@ export function setContentBase(contentBase) {
     }
     allMarkdownPaths.push(rel)
     try { allMarkdownPathsSet.add(rel) } catch (e) {}
-    try { refreshIndexPaths() } catch (err) { _debugLog('[slugManager] refreshIndexPaths failed', err) }
 
     const val = _allMd[fullPath]
     if (typeof val === 'string') {
@@ -556,11 +568,11 @@ export function setContentBase(contentBase) {
         if (slug) {
           try {
             let slugKey = slug
-            if (!availableLanguages || !availableLanguages.length) {
-              slugKey = uniqueSlug(slugKey, new Set(slugToMd.keys()))
+            if (!isLocalized) {
+              slugKey = uniqueSlug(slugKey, takenSlugs)
             }
 
-            if (availableLanguages && availableLanguages.length) {
+            if (isLocalized) {
               const parts = rel.split('/')
               const firstSeg = parts[0]
               const isLang = availableLanguages.includes(firstSeg)
@@ -576,6 +588,7 @@ export function setContentBase(contentBase) {
               slugToMd.set(slugKey, entry)
             } else {
               slugToMd.set(slugKey, rel)
+              takenSlugs.add(slugKey)
             }
             mdToSlug.set(rel, slugKey)
           } catch (_e) { _debugLog('[slugManager] set slug mapping failed', _e) }
@@ -583,6 +596,8 @@ export function setContentBase(contentBase) {
       }
     }
   }
+
+  try { refreshIndexPaths() } catch (err) { _debugLog('[slugManager] refreshIndexPaths failed', err) }
 }
 
 try { setContentBase() } catch (err) { _debugLog('[slugManager] initial setContentBase failed', err) }
@@ -1912,6 +1927,18 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   }
 
   if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
+    // Fast path: resolve slug from known file names before doing expensive
+    // markdown fetches, index builds, or crawls.
+    for (const p of allMarkdownPaths) {
+      try {
+        const name = String(p || '').replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
+        if (name && slugify(name) === decoded) {
+          _storeSlugMapping(decoded, p)
+          return p
+        }
+      } catch (err) { _debugLog('[slugManager] filename fast-path match failed', err) }
+    }
+
     if (listSlugCache.has(decoded)) {
       const p = listSlugCache.get(decoded)
       _storeSlugMapping(decoded, p)
@@ -1938,6 +1965,19 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
     try { crawlBatchYieldCount++; await yieldIfNeeded(crawlBatchYieldCount, 8) } catch (_) {}
   }
 
+  // Fast direct probe: when the route looks like a filename slug, try the
+  // two most likely concrete paths before expensive index/crawl work.
+  const candidates = [`${decoded}.html`, `${decoded}.md`]
+  for (const cand of candidates) {
+    try {
+      const res = await fetchMarkdown(cand, contentBase)
+      if (res && res.raw) {
+        _storeSlugMapping(decoded, cand)
+        return cand
+      }
+    } catch (err) { _debugLog('[slugManager] candidate fetch failed', err) }
+  }
+
   try {
     const idx = await buildSearchIndex(contentBase)
     if (idx && idx.length) {
@@ -1956,17 +1996,6 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       return foundCrawl
     }
   } catch (err) { _debugLog('[slugManager] crawlForSlug lookup failed', err) }
-
-  const candidates = [`${decoded}.html`, `${decoded}.md`]
-  for (const cand of candidates) {
-    try {
-      const res = await fetchMarkdown(cand, contentBase)
-        if (res && res.raw) {
-        _storeSlugMapping(decoded, cand)
-        return cand
-      }
-    } catch (err) { _debugLog('[slugManager] candidate fetch failed', err) }
-  }
 
   if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
     for (const p of allMarkdownPaths) {

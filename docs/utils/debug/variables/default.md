@@ -14,15 +14,11 @@
 
 > **debugError**: (...`args`) => `void`
 
-Log an error-level message when debug level is >= 1.
-
 #### Parameters
 
 ##### args
 
 ...`any`[]
-
-Arguments forwarded to console.error
 
 #### Returns
 
@@ -32,15 +28,11 @@ Arguments forwarded to console.error
 
 > **debugInfo**: (...`args`) => `void`
 
-Log an info-level message when debug level is >= 3.
-
 #### Parameters
 
 ##### args
 
 ...`any`[]
-
-Arguments forwarded to console.info
 
 #### Returns
 
@@ -50,15 +42,11 @@ Arguments forwarded to console.info
 
 > **debugLog**: (...`args`) => `void`
 
-Log a verbose message when debug level is >= 3.
-
 #### Parameters
 
 ##### args
 
 ...`any`[]
-
-Arguments forwarded to console.log
 
 #### Returns
 
@@ -68,15 +56,11 @@ Arguments forwarded to console.log
 
 > **debugWarn**: (...`args`) => `void`
 
-Log a warning-level message when debug level is >= 2.
-
 #### Parameters
 
 ##### args
 
 ...`any`[]
-
-Arguments forwarded to console.warn
 
 #### Returns
 
@@ -86,8 +70,6 @@ Arguments forwarded to console.warn
 
 > **getDebugCounters**: () => `Record`\<`string`, `number`\>
 
-Read counters as a plain object snapshot.
-
 #### Returns
 
 `Record`\<`string`, `number`\>
@@ -96,8 +78,6 @@ Read counters as a plain object snapshot.
 
 > **getDebugLevel**: () => `number`
 
-Get the current debug level.
-
 #### Returns
 
 `number`
@@ -105,9 +85,6 @@ Get the current debug level.
 ### incrementCounter()
 
 > **incrementCounter**: (`name`) => `void`
-
-Increment a named debug counter (useful for tests). No-op when debug
-level is 0 to avoid unnecessary work.
 
 #### Parameters
 
@@ -123,8 +100,6 @@ level is 0 to avoid unnecessary work.
 
 > **isDebug**: () => `boolean`
 
-Convenience: whether any debug is enabled (level > 0).
-
 #### Returns
 
 `boolean`
@@ -132,8 +107,6 @@ Convenience: whether any debug is enabled (level > 0).
 ### isDebugLevel()
 
 > **isDebugLevel**: (`level?`) => `boolean`
-
-Returns true when the configured debug level is >= `level`.
 
 #### Parameters
 
@@ -149,7 +122,7 @@ Returns true when the configured debug level is >= `level`.
 
 > **resetDebugCounters**: () => `void`
 
-Reset counters (test helper).
+Reset all counters.
 
 #### Returns
 
@@ -159,15 +132,11 @@ Reset counters (test helper).
 
 > **setDebugLevel**: (`level`) => `void`
 
-Set the global debug level.
-
 #### Parameters
 
 ##### level
 
 `number`
-
-0..3
 
 #### Returns
 

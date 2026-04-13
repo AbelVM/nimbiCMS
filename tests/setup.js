@@ -4,6 +4,7 @@
 import { marked } from 'marked'
 import { parseFrontmatter } from '../src/utils/frontmatter.js'
 import * as slugMgr from '../src/slugManager.js'
+import { u82o } from 'performance-helpers/powerBuffer'
 
 // Stub Worker so code that constructs a Worker doesn't throw ReferenceError
 if (typeof globalThis.Worker === 'undefined') {
@@ -23,24 +24,33 @@ if (typeof globalThis.Worker === 'undefined') {
       if (i >= 0) this._listeners[type].splice(i, 1)
     }
     postMessage(msg) {
-      // emulate the renderer worker for `render` messages so tests exercise
-      // the same parsing/TOC extraction as the real worker. Keep async
-      // semantics via setTimeout.
+      // Handles PowerPool binary protocol (Uint8Array via o2u8) as well as
+      // legacy plain-object messages. PowerPool sends binary; test utilities
+      // that construct FakeWorkers send plain objects.
       try {
         const handle = async () => {
-          const data = msg || {}
+          // Decode PowerPool binary payload when present
+          let data = msg || {}
+          if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+            try { data = u82o(data) } catch (_) { data = {} }
+          }
+          const { correlationId } = data
+
+          // Respond helper — PowerPool accepts plain {correlationId, response}
+          const sendResponse = (result) => {
+            const listeners = this._listeners.message.slice()
+            for (const cb of listeners) cb({ data: { correlationId, response: result } })
+          }
+
           if (data.type === 'render') {
-            const id = data.id
             const md = data.md || ''
             const { content, data: fm } = parseFrontmatter(md)
             let html = marked.parse(content)
-            // post-process similarly to inline parser: assign heading ids,
-            // lazy-load images, and clean language-undefined classes on code.
+            // post-process: heading ids, lazy images, clean language-undefined
             try {
               const parser = new DOMParser()
               const doc = parser.parseFromString(html, 'text/html')
               const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-              // simple slugify used by parser: keep consistent with tests
               const slugify = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\- ]/g, '').replace(/ /g, '-').replace(/(?:-?)(?:md|html)$/, '')
               heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
               const imgs = doc.querySelectorAll('img')
@@ -56,71 +66,93 @@ if (typeof globalThis.Worker === 'undefined') {
                     } else {
                       try { codeEl.removeAttribute && codeEl.removeAttribute('class') } catch (_) { codeEl.className = '' }
                     }
-                    const cls = cleanedCls
-                    const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
-                    if (!match || !match[1]) {
-                      // leave code unchanged; tests for highlight fallback expect this
-                    }
                   } catch (e) { /* ignore */ }
                 })
               } catch (e) { /* ignore */ }
               html = doc.body.innerHTML
-              const docToc = []
-              heads.forEach(h => { docToc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
-              const toc = docToc
-              const out = { id, result: { html, meta: fm || {}, toc } }
-              const listeners = this._listeners.message.slice()
-              for (const cb of listeners) cb({ data: out })
-              return
+              const toc = []
+              heads.forEach(h => { toc.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id }) })
+              sendResponse({ html, meta: fm || {}, toc })
             } catch (e) {
-              // fallback to simple toc extraction
+              // fallback: simple TOC extraction
               const lines = content.split('\n')
               const toc = []
               for (const line of lines) {
                 const m = line.match(/^(#{1,6})\s+(.*)$/)
                 if (m) toc.push({ level: m[1].length, text: m[2].trim() })
               }
-              const out = { id, result: { html, meta: fm || {}, toc } }
-              const listeners = this._listeners.message.slice()
-              for (const cb of listeners) cb({ data: out })
-              return
+              sendResponse({ html, meta: fm || {}, toc })
             }
-            const out = { id, result: { html, meta: fm || {}, toc } }
-            // notify listeners
-            const listeners = this._listeners.message.slice()
-            for (const cb of listeners) cb({ data: out })
             return
           }
-            if (data.type === 'register') {
-            const name = data.name
-            const out = { type: 'registered', name }
-            const listeners = this._listeners.message.slice()
-            for (const cb of listeners) cb({ data: { id: data.id, result: { registered: true } } })
+
+          if (data.type === 'register') {
+            sendResponse({ registered: true })
             return
+          }
+
+          if (data.type === 'buildSearchIndex') {
+            try {
+              const result = await slugMgr.buildSearchIndex(data.contentBase)
+              sendResponse(result)
+            } catch (e) {
+              sendResponse({ error: String(e) })
             }
-            // slugWorker message types: delegate to slugManager internals when possible
-            if (data.type === 'buildSearchIndex') {
-              try {
-                const result = await slugMgr.buildSearchIndex(data.contentBase)
-                const listeners = this._listeners.message.slice()
-                for (const cb of listeners) cb({ data: { id: data.id, result } })
-              } catch (e) {
-                const listeners = this._listeners.message.slice()
-                for (const cb of listeners) cb({ data: { id: data.id, error: String(e) } })
+            return
+          }
+
+          if (data.type === 'crawlForSlug') {
+            try {
+              const result = await slugMgr.crawlForSlug(data.slug, data.base, data.maxQueue)
+              sendResponse(result)
+            } catch (e) {
+              sendResponse({ error: String(e) })
+            }
+            return
+          }
+
+          if (data.type === 'rewriteAnchors') {
+            const { html, contentBase, pagePath } = data
+            try {
+              const parser = new DOMParser()
+              const doc = parser.parseFromString(html || '', 'text/html')
+              const dir = pagePath && pagePath.includes('/')
+                ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1)
+                : ''
+              for (const a of Array.from(doc.querySelectorAll('a'))) {
+                try {
+                  const href = a.getAttribute('href') || ''
+                  if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('//') || href.startsWith('?')) continue
+                  if (!href.endsWith('.md')) continue
+                  const resolved = dir ? dir + href : href
+                  let slug = slugMgr.mdToSlug.get(resolved) || slugMgr.mdToSlug.get(href)
+                  if (!slug) {
+                    // fetch the md file to discover its title/slug
+                    try {
+                      const url = new URL(resolved, contentBase).href
+                      const resp = await fetch(url)
+                      if (resp.ok) {
+                        const text = await resp.text()
+                        const titleMatch = text.match(/^#\s+(.+)$/m)
+                        if (titleMatch) {
+                          const title = titleMatch[1].trim()
+                          const newSlug = title.toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
+                          slugMgr.mdToSlug.set(resolved, newSlug)
+                          slugMgr.slugToMd.set(newSlug, resolved)
+                          slug = newSlug
+                        }
+                      }
+                    } catch (_) {}
+                  }
+                  if (slug) a.setAttribute('href', `?page=${slug}`)
+                } catch (_) {}
               }
-              return
+              sendResponse(doc.body.innerHTML)
+            } catch (e) {
+              sendResponse(html)
             }
-            if (data.type === 'crawlForSlug') {
-              try {
-                const result = await slugMgr.crawlForSlug(data.slug, data.base, data.maxQueue)
-                const listeners = this._listeners.message.slice()
-                for (const cb of listeners) cb({ data: { id: data.id, result } })
-              } catch (e) {
-                const listeners = this._listeners.message.slice()
-                for (const cb of listeners) cb({ data: { id: data.id, error: String(e) } })
-              }
-              return
-            }
+            return
+          }
         }
         setTimeout(() => { handle().catch(e => { const errListeners = this._listeners.error.slice(); for (const cb of errListeners) cb({ message: String(e) }) }) }, 0)
       } catch (e) {

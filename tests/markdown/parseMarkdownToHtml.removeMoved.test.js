@@ -2,8 +2,17 @@ import { describe, it, expect, vi } from 'vitest'
 
 // Top-level mocks so vitest hoisting is consistent.
 vi.mock('highlight.js/lib/core', () => ({ __esModule: true, default: { getLanguage: () => undefined } }))
-const sendMock = vi.fn().mockResolvedValue({ html: '<p><img src="/logo.png" alt="logo"></p><p>Keep me</p>', meta: {}, toc: [] })
-vi.mock('../../src/worker-manager.js', () => ({ __esModule: true, makeWorkerPool: (factory, name, size) => ({ get: () => ({}), send: sendMock, terminate: () => {} }) }))
+
+vi.mock('performance-helpers/powerPool', () => ({
+  PowerPool: class {
+    constructor(source, opts) {
+      this.workers = [{ worker: { _underlying: {} } }]
+    }
+    postMessage() {
+      return Promise.resolve({ html: '<p><img src="/logo.png" alt="logo"></p><p>Keep me</p>', meta: {}, toc: [] })
+    }
+  }
+}))
 
 describe('parseMarkdownToHtml moved logo removal', () => {
   it('removes images that match data-nimbi-logo-moved', async () => {

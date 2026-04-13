@@ -6,7 +6,27 @@
  * @module init
  */
 
-import { fetchMarkdown, setContentBase, setNotFoundPage, setLanguages, setHomePage, watchForColdHashRoute } from './slugManager.js'
+import {
+  fetchMarkdown,
+  setContentBase,
+  setNotFoundPage,
+  setLanguages,
+  setHomePage,
+  watchForColdHashRoute,
+  setSkipRootReadme,
+  setDefaultCrawlMaxQueue,
+  setFetchConcurrency,
+  setFetchNegativeCacheTTL,
+  _setAllMd,
+  slugify,
+  uniqueSlug,
+  _storeSlugMapping,
+  slugToMd,
+  mdToSlug,
+  allMarkdownPaths,
+  allMarkdownPathsSet,
+  searchIndex,
+} from './slugManager.js'
 import * as router from './router.js'
 import * as markdown from './markdown.js'
 import { buildNav } from './nav.js'
@@ -491,11 +511,7 @@ export async function initCMS(options = {}) {
 
   const effectiveSearchEnabled = !!searchEnabled
 
-  try {
-    import('./slugManager.js').then(m => {
-      try { if (m && typeof m.setSkipRootReadme === 'function') m.setSkipRootReadme(!!skipRootReadme) } catch (e2) { debugWarn('[nimbi-cms] setSkipRootReadme failed', e2) }
-    }).catch(e => { /* ignore dynamic import errors for tests */ })
-  } catch (e) { debugWarn('[nimbi-cms] setSkipRootReadme dynamic import failed', e) }
+  try { setSkipRootReadme(!!skipRootReadme) } catch (e) { debugWarn('[nimbi-cms] setSkipRootReadme failed', e) }
 
   try {
     
@@ -682,21 +698,15 @@ export async function initCMS(options = {}) {
 
   try {
     if (typeof crawlMaxQueue === 'number') {
-      import('./slugManager.js').then(({ setDefaultCrawlMaxQueue }) => {
-        try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
-      })
+      try { setDefaultCrawlMaxQueue(crawlMaxQueue) } catch (_) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue failed', _) }
     }
     if (typeof finalOptions.fetchConcurrency === 'number') {
-      import('./slugManager.js').then(({ setFetchConcurrency }) => {
-        try { setFetchConcurrency(finalOptions.fetchConcurrency) } catch (e) { debugWarn('[nimbi-cms] setFetchConcurrency failed', e) }
-      }).catch(() => {})
+      try { setFetchConcurrency(finalOptions.fetchConcurrency) } catch (e) { debugWarn('[nimbi-cms] setFetchConcurrency failed', e) }
     }
     if (typeof finalOptions.negativeFetchCacheTTL === 'number') {
-      import('./slugManager.js').then(({ setFetchNegativeCacheTTL }) => {
-        try { setFetchNegativeCacheTTL(finalOptions.negativeFetchCacheTTL) } catch (e) { debugWarn('[nimbi-cms] setFetchNegativeCacheTTL failed', e) }
-      }).catch(() => {})
+      try { setFetchNegativeCacheTTL(finalOptions.negativeFetchCacheTTL) } catch (e) { debugWarn('[nimbi-cms] setFetchNegativeCacheTTL failed', e) }
     }
-  } catch (err) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue import failed', err) }
+  } catch (err) { debugWarn('[nimbi-cms] setDefaultCrawlMaxQueue failed', err) }
 
   try {
     // If an authoritative content manifest was provided by the caller
@@ -711,11 +721,8 @@ export async function initCMS(options = {}) {
         (typeof window !== 'undefined' && window.__NIMBI_CMS_MANIFEST__) ? window.__NIMBI_CMS_MANIFEST__ : null
       if (manifest && typeof manifest === 'object') {
         try {
-          const sm = await import('./slugManager.js')
-          if (sm && typeof sm._setAllMd === 'function') {
-            sm._setAllMd(manifest)
-            try { debugInfo('[nimbi-cms diagnostic] applied content manifest', () => ({ manifestKeys: Object.keys(manifest).length })) } catch (e) {}
-          }
+          _setAllMd(manifest)
+          try { debugInfo('[nimbi-cms diagnostic] applied content manifest', () => ({ manifestKeys: Object.keys(manifest).length })) } catch (e) {}
         } catch (e) { debugWarn('[nimbi-cms] applying content manifest failed', e) }
       }
 
@@ -755,8 +762,8 @@ export async function initCMS(options = {}) {
       try {
         // Log current slug/index sizes after applying manifest + setContentBase
         try {
-          const sm2 = await import('./slugManager.js')
-            try {
+          const sm2 = slugManager
+          try {
             debugInfo('[nimbi-cms diagnostic] after setContentBase', () => ({
               manifestKeys: manifest && typeof manifest === 'object' ? Object.keys(manifest).length : 0,
               slugToMdSize: (sm2 && sm2.slugToMd && typeof sm2.slugToMd.size === 'number') ? sm2.slugToMd.size : undefined,
@@ -931,7 +938,6 @@ export async function initCMS(options = {}) {
       // Ensure nav link slugs are present in slugManager for mocked environments
       try {
           if (linkEls && linkEls.length) {
-          const sm = await import('./slugManager.js')
           for (const a of Array.from(linkEls || [])) {
             try {
               const href = (a && a.getAttribute) ? (a.getAttribute('href') || '') : ''
@@ -950,13 +956,13 @@ export async function initCMS(options = {}) {
                 // consistent slugs; avoid clobbering existing slug keys by
                 // generating a unique candidate when collisions would occur.
                 let candidate = null
-                try { if (sm && typeof sm.slugify === 'function') candidate = sm.slugify(baseName.replace(/\.(?:md|html?)$/i, '')) } catch (_) { candidate = String(baseName || '').replace(/\s+/g, '-').toLowerCase() }
+                try { candidate = slugify(baseName.replace(/\.(?:md|html?)$/i, '')) } catch (_) { candidate = String(baseName || '').replace(/\s+/g, '-').toLowerCase() }
                 if (!candidate) continue
                 let slugKeyFinal = candidate
                 try {
-                  if (sm && sm.slugToMd && typeof sm.slugToMd.has === 'function' && sm.slugToMd.has(candidate)) {
+                  if (slugToMd && typeof slugToMd.has === 'function' && slugToMd.has(candidate)) {
                     // If the existing mapping belongs to the same path, keep it.
-                    const existing = sm.slugToMd.get(candidate)
+                    const existing = slugToMd.get(candidate)
                     let belongs = false
                     try {
                       if (typeof existing === 'string') {
@@ -966,21 +972,17 @@ export async function initCMS(options = {}) {
                         for (const k of Object.keys(existing.langs || {})) { if (existing.langs[k] === path) { belongs = true; break } }
                       }
                     } catch (_) {}
-                    if (!belongs && typeof sm.uniqueSlug === 'function') {
-                      try { slugKeyFinal = sm.uniqueSlug(candidate, new Set(sm.slugToMd.keys())) } catch (_) { slugKeyFinal = candidate }
+                    if (!belongs) {
+                      try { slugKeyFinal = uniqueSlug(candidate, new Set(slugToMd.keys())) } catch (_) { slugKeyFinal = candidate }
                     }
                   }
                 } catch (_) {}
 
                 try {
-                  if (sm && typeof sm._storeSlugMapping === 'function') {
-                    try { sm._storeSlugMapping(slugKeyFinal, rel) } catch (_) {}
-                  } else if (sm && sm.slugToMd && typeof sm.slugToMd.set === 'function') {
-                    try { sm.slugToMd.set(slugKeyFinal, rel) } catch (_) {}
-                  }
-                  try { if (sm && sm.mdToSlug && typeof sm.mdToSlug.set === 'function') sm.mdToSlug.set(rel, slugKeyFinal) } catch (_) {}
-                  try { if (sm && Array.isArray(sm.allMarkdownPaths) && !sm.allMarkdownPaths.includes(rel)) sm.allMarkdownPaths.push(rel) } catch (_) {}
-                  try { if (sm && sm.allMarkdownPathsSet && typeof sm.allMarkdownPathsSet.add === 'function') sm.allMarkdownPathsSet.add(rel) } catch (_) {}
+                  try { _storeSlugMapping(slugKeyFinal, rel) } catch (_) {}
+                  try { if (mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slugKeyFinal) } catch (_) {}
+                  try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+                  try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
                 } catch (_) {}
               } catch (_) {}
             } catch (_) {}
@@ -1014,15 +1016,13 @@ export async function initCMS(options = {}) {
             // for the runtime index (worker-first) and avoid race
             // conditions where consumers observe a partial array.
             try {
-              const sm = await import('./slugManager.js')
-              if (sm && typeof sm.awaitSearchIndex === 'function') {
-                const seeds = []
-                if (homePage) seeds.push(homePage)
-                if (navigationPage) seeds.push(navigationPage)
-                try {
-                  await sm.awaitSearchIndex({ contentBase, indexDepth: Math.max(indexDepth || 1, 3), noIndexing, seedPaths: seeds.length ? seeds : undefined, startBuild: true, timeoutMs: Infinity })
-                } catch (_) { /* don't fail init if index build errors */ }
-              }
+              const slugSearchRuntime = await import('./slugSearchRuntime.js')
+              const seeds = []
+              if (homePage) seeds.push(homePage)
+              if (navigationPage) seeds.push(navigationPage)
+              try {
+                await slugSearchRuntime.awaitSearchIndex({ contentBase, indexDepth: Math.max(indexDepth || 1, 3), noIndexing, seedPaths: seeds.length ? seeds : undefined, startBuild: true, timeoutMs: Infinity })
+              } catch (_) { /* don't fail init if index build errors */ }
             } catch (_) {}
 
             const mod = await import('./runtimeSitemap.js')
@@ -1065,7 +1065,7 @@ export async function initCMS(options = {}) {
             try {
               // Diagnostic: log slug/index sizes after index refresh
               try {
-                const sm3 = await import('./slugManager.js')
+                const sm3 = slugManager
                 try { debugInfo('[nimbi-cms diagnostic] after refreshIndexPaths', () => ({ slugToMdSize: (sm3 && sm3.slugToMd && typeof sm3.slugToMd.size === 'number') ? sm3.slugToMd.size : undefined, allMarkdownPathsLength: (sm3 && Array.isArray(sm3.allMarkdownPaths)) ? sm3.allMarkdownPaths.length : undefined, allMarkdownPathsSetSize: (sm3 && sm3.allMarkdownPathsSet && typeof sm3.allMarkdownPathsSet.size === 'number') ? sm3.allMarkdownPathsSet.size : undefined })) } catch (e) {}
               } catch (e) {}
             } catch (e) {}
@@ -1073,7 +1073,7 @@ export async function initCMS(options = {}) {
               // the runtime sitemap / search index exposed on `window` to
               // populate slug->md mappings so direct URL loads can resolve.
                 try {
-                const sm4 = await import('./slugManager.js')
+                const sm4 = slugManager
                 const currentSize = (sm4 && sm4.slugToMd && typeof sm4.slugToMd.size === 'number') ? sm4.slugToMd.size : 0
                 // Decide whether to seed: prefer targeted seeding when the
                 // currently requested slug/path is missing, otherwise seed

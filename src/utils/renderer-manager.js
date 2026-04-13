@@ -1,45 +1,18 @@
 /**
  * @module utils/renderer-manager
  */
-import RendererWorker from '../worker/renderer.js?worker&inline'
-import * as RendererModule from '../worker/renderer.js'
-import { makeWorkerPool } from '../worker-manager.js'
+import RendererWorker from '../worker/renderer.entry.js?worker&inline'
+import { PowerPool } from 'performance-helpers/powerPool'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
-function _createRendererInstance() {
-  if (typeof Worker !== 'undefined') {
-    try { return new RendererWorker() } catch (e) { /* fallthrough to inline */ }
-  }
-
-  const listeners = { message: [], error: [] }
-  const w = {
-    addEventListener(type, fn) { if (!listeners[type]) listeners[type] = []; listeners[type].push(fn) },
-    removeEventListener(type, fn) { if (!listeners[type]) return; const i = listeners[type].indexOf(fn); if (i !== -1) listeners[type].splice(i,1) },
-    postMessage(msg) {
-      setTimeout(async () => {
-        try {
-          const out = await RendererModule.handleWorkerMessage(msg)
-          const ev = { data: out }
-          (listeners.message || []).forEach(fn => fn(ev))
-        } catch (e) {
-          const ev = { data: { id: msg && msg.id, error: String(e) } }
-          (listeners.message || []).forEach(fn => fn(ev))
-        }
-      }, 0)
-    },
-    terminate() { Object.keys(listeners).forEach(k => listeners[k].length = 0) }
-  }
-  return w
-}
-
-const _rendererManager = makeWorkerPool(() => _createRendererInstance(), 'markdown', poolSize)
+const _rendererPool = new PowerPool(RendererWorker, { size: poolSize, minSize: 1, autoScale: true })
 
 /**
  * Return the underlying renderer worker instance, creating the pool lazily.
  * @returns {(Worker|null)} Worker instance or null when unavailable.
  */
-export function initRendererWorker() { return _rendererManager.get() }
+export function initRendererWorker() { return _rendererPool.workers?.[0]?.worker?._underlying ?? null }
 
 /**
  * Send a message to the renderer worker and await a response.
@@ -47,4 +20,15 @@ export function initRendererWorker() { return _rendererManager.get() }
  * @param {number} [timeout] - Timeout in milliseconds (default: 3000).
  * @returns {Promise<unknown>} Promise resolving with the worker's result.
  */
-export function _sendToRenderer(msg, timeout = 3000) { return _rendererManager.send(msg, timeout) }
+export function _sendToRenderer(msg, timeout = 3000) {
+  return _rendererPool.postMessage(msg, undefined, { awaitResponse: true, timeout })
+    .then(result => {
+      if (result && typeof result === 'object' && result.error) throw new Error(result.error)
+      return result
+    })
+    .catch(e => {
+      const m = e?.message || ''
+      if (m.includes('postMessage response timeout')) throw new Error('worker timeout')
+      throw e
+    })
+}

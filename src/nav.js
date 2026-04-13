@@ -11,7 +11,7 @@ import { t } from './l10nManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe } from './utils/helpers.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
-import { slugify, slugToMd, mdToSlug, _storeSlugMapping, fetchMarkdown, allMarkdownPaths, allMarkdownPathsSet, searchIndex } from './slugManager.js'
+import { slugify, slugToMd, mdToSlug, _storeSlugMapping, fetchMarkdown, allMarkdownPaths, allMarkdownPathsSet, searchIndex, _setSearchIndex } from './slugManager.js'
 import { debugLog, debugWarn } from './utils/debug.js'
 import { debounce, rafThrottle, scheduleDOMWrite } from './utils/events.js'
 
@@ -349,11 +349,11 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     if (searchIndexPromise) return searchIndexPromise
     searchIndexPromise = (async () => {
       try {
-        const fm = await import('./slugManager.js')
+        const slugSearchRuntime = await import('./slugSearchRuntime.js')
         const globalBuild = (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndex : undefined)
         const globalWorker = (typeof globalThis !== 'undefined' ? globalThis.buildSearchIndexWorker : undefined)
-        const moduleBuild = safeGet(fm, 'buildSearchIndex')
-        const moduleWorker = safeGet(fm, 'buildSearchIndexWorker')
+        const moduleBuild = safeGet(slugSearchRuntime, 'buildSearchIndex')
+        const moduleWorker = safeGet(slugSearchRuntime, 'buildSearchIndexWorker')
         const buildFn = (typeof globalBuild === 'function') ? globalBuild : (moduleBuild || undefined)
         const workerFn = (typeof globalWorker === 'function') ? globalWorker : (moduleWorker || undefined)
         debugLog('[nimbi-cms test] ensureSearchIndex: buildFn=' + (typeof buildFn) + ' workerFn=' + (typeof workerFn) + ' (global preferred)')
@@ -365,9 +365,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             const r = await workerFn(contentBase, indexDepth, noIndexing, seeds.length ? seeds : undefined)
             if (r && r.length) {
               try {
-                if (fm && typeof fm._setSearchIndex === 'function') {
-                  try { fm._setSearchIndex(r) } catch (e) {}
-                }
+                try { _setSearchIndex(r) } catch (e) {}
               } catch (e) {}
               return r
             }
@@ -400,17 +398,16 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             try {
               ;(async () => {
                 try {
-                  const fmMod = await import('./slugManager.js')
                   try {
                     // Update slugManager's live searchIndex if available
-                    try { if (fmMod && typeof fmMod._setSearchIndex === 'function') fmMod._setSearchIndex(Array.isArray(idx) ? idx : []) } catch (_) {}
+                    try { _setSearchIndex(Array.isArray(idx) ? idx : []) } catch (_) {}
                     Object.defineProperty(window, '__nimbiResolvedIndex', {
-                      get() { return (fmMod && Array.isArray(fmMod.searchIndex)) ? fmMod.searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : []) },
+                      get() { return Array.isArray(searchIndex) ? searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : []) },
                       enumerable: true,
                       configurable: true
                     })
                     } catch (e2) {
-                    try { window.__nimbiResolvedIndex = (fmMod && Array.isArray(fmMod.searchIndex)) ? fmMod.searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : []) } catch (e3) {}
+                    try { window.__nimbiResolvedIndex = Array.isArray(searchIndex) ? searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : []) } catch (e3) {}
                   }
                 } catch (e) {
                   try { window.__nimbiResolvedIndex = (Array.isArray(searchIndex) ? searchIndex : (Array.isArray(resolvedIndexForSitemap) ? resolvedIndexForSitemap : [])) } catch (e4) {}
@@ -773,11 +770,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                 try { navHrefToSlug.set(cur.path.replace(/^.*\//, ''), h1Slug) } catch (_) {}
                 // Update live searchIndex entries if present
                 try {
-                  const sm = await import('./slugManager.js')
                   try {
-                    if (Array.isArray(sm.searchIndex)) {
+                    if (Array.isArray(searchIndex)) {
                       let changed = false
-                      for (const e of sm.searchIndex) {
+                      for (const e of searchIndex) {
                         try {
                           if (e && e.path === cur.path && e.slug) {
                             const parts = String(e.slug).split('::')
@@ -787,7 +783,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
                           }
                         } catch (_) {}
                       }
-                      try { if (changed && typeof sm._setSearchIndex === 'function') sm._setSearchIndex(sm.searchIndex) } catch (_) {}
+                      try { if (changed) _setSearchIndex(searchIndex) } catch (_) {}
                     }
                   } catch (_) {}
                 } catch (_) {}

@@ -8,8 +8,7 @@
 
 > **hasLegacyDebug**(): `boolean`
 
-Return whether a legacy `__nimbiCMSDebug` global is present. Used by
-initialization to preserve backward compatibility during migration.
+Return whether a legacy `__nimbiCMSDebug` global is present.
 
 ## Returns
 

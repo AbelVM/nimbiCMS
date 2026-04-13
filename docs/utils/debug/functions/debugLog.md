@@ -8,15 +8,11 @@
 
 > **debugLog**(...`args`): `void`
 
-Log a verbose message when debug level is >= 3.
-
 ## Parameters
 
 ### args
 
 ...`any`[]
-
-Arguments forwarded to console.log
 
 ## Returns
 

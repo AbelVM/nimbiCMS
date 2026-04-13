@@ -8,8 +8,6 @@
 
 > **getDebugCounters**(): `Record`\<`string`, `number`\>
 
-Read counters as a plain object snapshot.
-
 ## Returns
 
 `Record`\<`string`, `number`\>

@@ -182,16 +182,18 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 // --- from src/worker-manager.js
-export function makeWorkerPool(createWorker: any, name: any, size: any): any
-export function makeWorkerManagerFromRaw(code: string, handleFn: {function(object):Promise<object>}, name: string): ReturnType<typeof makeWorkerManager>
-export function makeWorkerPoolFromRaw(code: string, handleFn: {function(object):Promise<object>}, name: string, size: number): ReturnType<typeof makeWorkerPool>
-
 
 
 // --- from src/version.js
 export function getVersion(): Promise<string>
 
 // --- from src/ui.js
+
+
+// --- from src/slugSearchRuntime.js
+
+
+
 
 
 // --- from src/slugManager.js
@@ -224,8 +226,6 @@ export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:strin
 export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}): Promise<Array>
 export const CRAWL_MAX_QUEUE: number
 export const defaultCrawlMaxQueue: number
-
-
 
 
 
@@ -375,14 +375,29 @@ export function registerThemedElement(el: any): () => void
 // --- from src/worker/slugWorker.js
 export function handleSlugWorkerMessage(msg: object): Promise<object>
 
+// --- from src/worker/rendererRuntime.js
+
+
+
+
+
+
+
+
+
+
+
 // --- from src/worker/renderer.js
-export function clearRendererImportCache(): any
-export function setRendererImportNegativeCacheTTL(ms: any): any
-export function handleWorkerMessage(msg: object): Promise<object>
-export function handleWorkerMessageStream(msg: object, onChunk: {function(object):void}): any
+
+// --- from src/worker/renderer.entry.js
 
 // --- from src/worker/anchorWorker.js
-export function handleAnchorWorkerMessage(msg: object): Promise<object>
+
+// --- from src/worker/anchorRuntime.js
+
+
+// --- from src/worker/anchorRewriter.js
+
 
 // --- from src/utils/urlHelper.js
 export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): string
@@ -445,18 +460,19 @@ export function parseFrontmatter(md: string): {content:string, data: Record<stri
 
 // --- from src/utils/debug.js
 export function setDebugLevel(level: any): any
+export const _logger: any
 export function getDebugLevel(): number
 export function isDebugLevel(level: number): boolean
 export function isDebug(): boolean
-export function debugError(...args: any): void
-export function debugWarn(...args: any): void
-export function debugInfo(...args: any): void
-export function debugLog(...args: any): void
-export function incrementCounter(name: string): void
-export function syncLegacyCounter(name: string): void
+export function debugError(...args: any): any
+export function debugWarn(...args: any): any
+export function debugInfo(...args: any): any
+export function debugLog(...args: any): any
+export function incrementCounter(name: string): any
+export function syncLegacyCounter(name: string): any
 export function hasLegacyDebug(): boolean
 export function getDebugCounters(): Record<string,number>
-export function resetDebugCounters(): void
+export function resetDebugCounters(): any
 
 // --- from src/utils/concurrency.js
 export function runWithConcurrency(items: T[], worker: (item:T, index:number)=>Promise<U>, concurrency: number): Promise<Array<U>>

@@ -1,9 +1,6 @@
 /**
- * Centralized debug helper for nimbi-cms.
- *
- * Provides a runtime gate for console messages and an internal
- * counter store useful for lightweight instrumentation in tests.
- * Call `setDebugLevel(level)` during initialization to control verbosity.
+ * Centralized debug helper for nimbi-cms. Backed by PowerLogger from
+ * performance-helpers for level management and counter instrumentation.
  *
  * Debug levels:
  *  - 0: disabled
@@ -11,138 +8,76 @@
  *  - 2: errors and warnings
  *  - 3: all messages (info/log)
  *
- * Usage example:
- * ```js
- * import { setDebugLevel, debugWarn } from './utils/debug.js'
- * setDebugLevel(2)
- * debugWarn('something notable')
- * ```
- *
  * @module utils/debug
  * @see ./init.js
  */
-let _debugLevel = 0 // default: disabled
+import { PowerLogger } from 'performance-helpers/powerLogger'
+
+/** Shared logger instance (starts disabled at level 0). */
+export const _logger = new PowerLogger(0)
+
+/** @param {number} level */
+export function setDebugLevel(level) { _logger.setDebugLevel(level) }
+
+/** @returns {number} */
+export function getDebugLevel() { return _logger.getDebugLevel() }
 
 /**
- * Internal counters map used for lightweight instrumentation.
- * @type {Record<string,number>}
- */
-const _counters = Object.create(null)
-
-/**
- * Set the global debug level.
- * @param {number} level - 0..3
- */
-export function setDebugLevel(level) {
-  try {
-    const n = Number(level)
-    _debugLevel = (Number.isFinite(n) && n >= 0) ? Math.max(0, Math.min(3, Math.floor(n))) : 0
-  } catch (e) {
-    _debugLevel = 0
-  }
-}
-
-/**
- * Get the current debug level.
- * @returns {number}
- */
-export function getDebugLevel() {
-  return _debugLevel
-}
-
-/**
- * Returns true when the configured debug level is >= `level`.
  * @param {number} [level=1]
  * @returns {boolean}
  */
-export function isDebugLevel(level = 1) {
-  try { return Number(_debugLevel) >= Number(level || 1) } catch (e) { return false }
-}
+export function isDebugLevel(level = 1) { return _logger.isDebugLevel(level) }
 
-/**
- * Convenience: whether any debug is enabled (level > 0).
- * @returns {boolean}
- */
-export function isDebug() { return isDebugLevel(1) }
+/** @returns {boolean} */
+export function isDebug() { return _logger.isDebug() }
 
-/**
- * Log an error-level message when debug level is >= 1.
- * @param {...any} args - Arguments forwarded to console.error
- * @returns {void}
- */
+/** @param {...any} args */
 export function debugError(...args) {
   try {
-    if (!isDebugLevel(1) || !console || typeof console.error !== 'function') return
+    if (!_logger.isDebugLevel(1)) return
     const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    console.error(...resolved)
+    _logger.error(...resolved)
   } catch (e) {}
 }
 
-/**
- * Log a warning-level message when debug level is >= 2.
- * @param {...any} args - Arguments forwarded to console.warn
- * @returns {void}
- */
+/** @param {...any} args */
 export function debugWarn(...args) {
   try {
-    if (!isDebugLevel(2) || !console || typeof console.warn !== 'function') return
+    if (!_logger.isDebugLevel(2)) return
     const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    console.warn(...resolved)
+    _logger.warn(...resolved)
   } catch (e) {}
 }
 
-/**
- * Log an info-level message when debug level is >= 3.
- * @param {...any} args - Arguments forwarded to console.info
- * @returns {void}
- */
+/** @param {...any} args */
 export function debugInfo(...args) {
   try {
-    if (!isDebugLevel(3) || !console || typeof console.info !== 'function') return
+    if (!_logger.isDebugLevel(3)) return
     const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    console.info(...resolved)
+    _logger.info(...resolved)
   } catch (e) {}
 }
 
-/**
- * Log a verbose message when debug level is >= 3.
- * @param {...any} args - Arguments forwarded to console.log
- * @returns {void}
- */
+/** @param {...any} args */
 export function debugLog(...args) {
   try {
-    if (!isDebugLevel(3) || !console || typeof console.log !== 'function') return
+    if (!_logger.isDebugLevel(3)) return
     const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    console.log(...resolved)
+    _logger.log(...resolved)
   } catch (e) {}
 }
 
-/**
- * Increment a named debug counter (useful for tests). No-op when debug
- * level is 0 to avoid unnecessary work.
- * @param {string} name
- * @returns {void}
- */
-export function incrementCounter(name) {
-  try {
-    if (!isDebug()) return
-    const k = String(name || '')
-    if (!k) return
-    _counters[k] = (_counters[k] || 0) + 1
-  } catch (e) {}
-}
+/** @param {string} name */
+export function incrementCounter(name) { _logger.incrementCounter(name) }
 
 /**
- * Compatibility helper: increment legacy global counters on `globalThis.__nimbiCMSDebug`
- * when present. This centralizes the remaining legacy-global touchpoints so
- * callers don't need to reference `__nimbiCMSDebug` directly.
+ * Compatibility helper: sync a counter into the legacy `__nimbiCMSDebug` global
+ * when present.
  * @param {string} name
- * @returns {void}
  */
 export function syncLegacyCounter(name) {
   try {
-    if (typeof globalThis === 'undefined') return
-    if (!globalThis.__nimbiCMSDebug) return
+    if (typeof globalThis === 'undefined' || !globalThis.__nimbiCMSDebug) return
     const k = String(name || '')
     if (!k) return
     try { globalThis.__nimbiCMSDebug[k] = (globalThis.__nimbiCMSDebug[k] || 0) + 1 } catch (e) {}
@@ -150,8 +85,7 @@ export function syncLegacyCounter(name) {
 }
 
 /**
- * Return whether a legacy `__nimbiCMSDebug` global is present. Used by
- * initialization to preserve backward compatibility during migration.
+ * Return whether a legacy `__nimbiCMSDebug` global is present.
  * @returns {boolean}
  */
 export function hasLegacyDebug() {
@@ -159,34 +93,14 @@ export function hasLegacyDebug() {
   catch (e) { return false }
 }
 
-/**
- * Read counters as a plain object snapshot.
- * @returns {Record<string,number>}
- */
-export function getDebugCounters() {
-  try { return Object.assign({}, _counters) } catch (e) { return {} }
-}
+/** @returns {Record<string,number>} */
+export function getDebugCounters() { return _logger.getDebugCounters() }
 
-/**
- * Reset counters (test helper).
- * @returns {void}
- */
-export function resetDebugCounters() {
-  try {
-    Object.keys(_counters).forEach(k => { delete _counters[k] })
-  } catch (e) {}
-}
+/** Reset all counters. */
+export function resetDebugCounters() { _logger.resetDebugCounters() }
 
 export default {
-  setDebugLevel,
-  getDebugLevel,
-  isDebugLevel,
-  isDebug,
-  debugError,
-  debugWarn,
-  debugInfo,
-  debugLog,
-  incrementCounter,
-  getDebugCounters,
-  resetDebugCounters
+  setDebugLevel, getDebugLevel, isDebugLevel, isDebug,
+  debugError, debugWarn, debugInfo, debugLog,
+  incrementCounter, getDebugCounters, resetDebugCounters
 }

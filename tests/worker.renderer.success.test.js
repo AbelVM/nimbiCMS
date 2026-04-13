@@ -2,12 +2,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
+import { u82o } from '../node_modules/performance-helpers/src/helpers/powerBuffer.js'
+
+function decodePosted(m) {
+  if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
+    try { return u82o(m) } catch (_) {}
+  }
+  return m
+}
 
 describe('renderer worker register-success (idempotent)', () => {
   let posted = []
   beforeEach(() => {
     posted = []
-    globalThis.postMessage = (m) => posted.push(m)
+    globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
     // mock frontmatter and marked reasonably
     vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))

@@ -8,8 +8,6 @@
 
 > **isDebug**(): `boolean`
 
-Convenience: whether any debug is enabled (level > 0).
-
 ## Returns
 
 `boolean`

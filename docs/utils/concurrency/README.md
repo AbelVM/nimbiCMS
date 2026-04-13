@@ -6,7 +6,7 @@
 
 # utils/concurrency
 
-Simple concurrency runner for async tasks.
+Bounded concurrency runner backed by PowerSemaphore from performance-helpers.
 
 ## Functions
 

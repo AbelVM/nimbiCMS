@@ -1,43 +1,61 @@
 /**
  * @module worker/slugWorker
  */
-import { buildSearchIndex, crawlForSlug } from '../slugManager.js'
+import { u82o, o2u8 } from 'performance-helpers/powerBuffer'
+import { buildSearchIndex, crawlForSlug } from '../slugSearchRuntime.js'
 
-/**
- * Worker entrypoint for slug-related background tasks.
- */
+function _decodeMsg(data) {
+  try { return u82o(data) } catch (_) { return data || {} }
+}
 
 /**
  * Worker `onmessage` handler for slug-related background tasks.
- * @param {MessageEvent} ev - Message event; `ev.data` should be the request
- * (e.g. `{ type: 'buildSearchIndex', id, contentBase }` or `{ type: 'crawlForSlug', id, slug, base?, maxQueue? }`).
- * @returns {Promise<void>} Posts `{id, result}` or `{id, error}` back to the caller.
+ * Accepts both plain objects (legacy) and binary Uint8Array payloads (PowerPool protocol).
+ * @param {MessageEvent} ev - Message event; `ev.data` should be the request.
+ * @returns {Promise<void>} Posts `{correlationId, response}` (PowerPool) or `{id, result}` (legacy).
  */
 onmessage = async (ev) => {
-  const msg = ev.data || {}
+  const msg = _decodeMsg(ev.data)
+  const { correlationId } = msg
+  const _reply = (result) => {
+    if (correlationId != null) {
+      const u8 = o2u8({ correlationId, response: result })
+      postMessage(u8, [u8.buffer])
+    } else {
+      postMessage({ id: msg.id, result })
+    }
+  }
+  const _replyErr = (error) => {
+    if (correlationId != null) {
+      const u8 = o2u8({ correlationId, response: { error: String(error) } })
+      postMessage(u8, [u8.buffer])
+    } else {
+      postMessage({ id: msg.id, error: String(error) })
+    }
+  }
   try {
     if (msg.type === 'buildSearchIndex') {
-      const { id, contentBase, indexDepth, noIndexing } = msg
+      const { contentBase, indexDepth, noIndexing } = msg
       try {
         const res = await buildSearchIndex(contentBase, indexDepth, noIndexing)
-        postMessage({ id, result: res })
+        _reply(res)
       } catch (e) {
-        postMessage({ id, error: String(e) })
+        _replyErr(e)
       }
       return
     }
     if (msg.type === 'crawlForSlug') {
-      const { id, slug, base, maxQueue } = msg
+      const { slug, base, maxQueue } = msg
       try {
         const res = await crawlForSlug(slug, base, maxQueue)
-        postMessage({ id, result: res === undefined ? null : res })
+        _reply(res === undefined ? null : res)
       } catch (e) {
-        postMessage({ id, error: String(e) })
+        _replyErr(e)
       }
       return
     }
   } catch (e) {
-    postMessage({ id: msg.id, error: String(e) })
+    _replyErr(e)
   }
 }
 

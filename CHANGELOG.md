@@ -6,7 +6,15 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 - ...
 
+## V1.1.0 Brand new architecture
+
+Based on [performance-helpers](https://abelvm.github.io/performance-helpers).
+
+* Improved performance, both in cold start and in transitions
+* New architecture is far more robust and mantainable
+
 ## v1.0.8
+
 - **[FIX]** Minor CSS tweaks
 - **[PERF]** Override the indexing to provide early rendering for cold URLs
 
