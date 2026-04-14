@@ -82,7 +82,7 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
  */
 export function setMetaTags(data, titleOverride, imageOverride, descOverride, _initialDocumentTitle = '') {
   const meta = data.meta || {}
-  const existingHtmlDesc = (document && document.querySelector) ? (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '' : ''
+  const existingHtmlDesc = document?.querySelector ? (document.querySelector('meta[name="description"]')?.getAttribute('content') || '') : ''
   const finalDesc = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description && String(meta.description).trim()) ? meta.description : (existingHtmlDesc && String(existingHtmlDesc).trim()) ? existingHtmlDesc : ''
   if (finalDesc && String(finalDesc).trim()) setTag('description', finalDesc)
   setTag('robots', meta.robots || 'index,follow')
@@ -106,7 +106,7 @@ export function getSiteNameFromMeta() {
       const m = document.querySelector(sel)
       if (m) {
         const c = m.getAttribute('content') || ''
-        if (c && c.trim()) return c.trim()
+        if (c?.trim()) return c.trim()
       }
     }
   } catch (e) {
@@ -129,7 +129,7 @@ export function setStructuredData(data, pagePath, titleOverride, imageOverride, 
   try {
     const meta = data.meta || {}
     const title = (titleOverride && String(titleOverride).trim()) ? titleOverride : (meta.title || initialDocumentTitle || document.title)
-    const description = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description || (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '')
+    const description = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description || document.querySelector('meta[name="description"]')?.getAttribute('content') || '')
     const image = imageOverride || meta.image || null
     let canonical = ''
     try {
@@ -196,7 +196,7 @@ export function setSeoMap(map) {
 export function injectSeoForPage(page, initialDocumentTitle = '') {
   try {
     if (!page) return
-    const meta = (seoMap && seoMap[page]) ? seoMap[page] : (typeof window !== 'undefined' && window.__SEO_MAP && window.__SEO_MAP[page] ? window.__SEO_MAP[page] : null)
+    const meta = seoMap?.[page] ? seoMap[page] : ((typeof window !== 'undefined' && window.__SEO_MAP?.[page]) ? window.__SEO_MAP[page] : null)
     // Ensure canonical for the page
     try {
       const canonical = location.origin + location.pathname + '?page=' + encodeURIComponent(String(page ?? ''))
@@ -253,29 +253,29 @@ export function markNotFound(meta = {}, pagePath = '', titleOverride = undefined
  */
 export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
   try {
-    if (toc && toc.querySelector) {
+    if (toc?.querySelector) {
       const labelEl = toc.querySelector('.menu-label')
       if (labelEl) {
-        labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
+        labelEl.textContent = topH1?.textContent || t('onThisPage')
       }
     }
   } catch (e) { debugWarn('[seoManager] update toc label failed', e) }
 
   try {
-    const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
-    const firstImgEl = article.querySelector('img')
+      const metaTitle = parsed.meta?.title ? String(parsed.meta.title).trim() : ''
+    const firstImgEl = article?.querySelector?.('img') || null
     const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
     let descOverride = ''
     try {
       let found = ''
       try {
-        const h1El = topH1 || (article && article.querySelector ? article.querySelector('h1') : null)
+        const h1El = topH1 || article?.querySelector?.('h1') || null
         if (h1El) {
           let sib = h1El.nextElementSibling
           const parts = []
-          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
+              while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
             try {
-              if (sib.classList && sib.classList.contains('nimbi-article-subtitle')) { sib = sib.nextElementSibling; continue }
+              if (sib.classList?.contains('nimbi-article-subtitle')) { sib = sib.nextElementSibling; continue }
             } catch (_e) {}
             const txt = (sib.textContent || '').trim()
             if (txt) parts.push(txt)
@@ -296,12 +296,12 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
       if (metaTitle) displayTitle = metaTitle
     } catch (_e) { /* ignore */ }
     if (!displayTitle) {
-      try { if (topH1 && topH1.textContent) displayTitle = String(topH1.textContent).trim() } catch (_e) { /* ignore */ }
+      try { if (topH1?.textContent) displayTitle = String(topH1.textContent).trim() } catch (_e) { /* ignore */ }
     }
     if (!displayTitle) {
       try {
         const h2 = article.querySelector('h2')
-        if (h2 && h2.textContent) displayTitle = String(h2.textContent).trim()
+        if (h2?.textContent) displayTitle = String(h2.textContent).trim()
       } catch (_e) { /* ignore */ }
     }
     if (!displayTitle) displayTitle = pagePath || ''
@@ -320,11 +320,11 @@ export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pag
   } catch (e) { debugWarn('[seoManager] applyPageMeta failed', e) }
 
   try {
-    try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (_e) {}
+    try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs?.forEach(p => p.remove()) } catch (_e) {}
     if (h1Text) {
-      const metrics = getTextMetrics(data.raw || '')
-      const rt = metrics && metrics.readingTime ? metrics.readingTime : null
-      const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
+        const metrics = getTextMetrics(data?.raw || '')
+      const rt = metrics?.readingTime ? metrics.readingTime : null
+        const minutes = typeof rt?.minutes === 'number' ? Math.ceil(rt.minutes) : 0
       const rtText = minutes ? t('readingTime', { minutes }) : ''
       if (!rtText) return
       const topH1Elem = article.querySelector('h1')

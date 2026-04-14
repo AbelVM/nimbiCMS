@@ -25,7 +25,28 @@ const rendererAutoScaleOptions = {
   stepDown: 1
 }
 
-const _rendererPool = new PowerPool(RendererWorker, { size: poolSize, minSize: 2, autoScale: rendererAutoScaleOptions })
+const _rendererPool = (() => {
+  const poolOpts = { size: poolSize, minSize: 2, autoScale: rendererAutoScaleOptions }
+  // In test environments suppress noisy worker bootstrap logs from the
+  // PowerPool implementation so Vitest output isn't polluted with
+  // expected worker-unavailable warnings. Preserve normal logging in
+  // non-test environments.
+  try {
+    if (typeof process !== 'undefined' && process.env?.VITEST) {
+      poolOpts.debugLevel = 0
+    }
+  } catch (_e) {}
+  try {
+    return new PowerPool(RendererWorker, poolOpts)
+  } catch (e) {
+    // If construction throws for some reason, fall back to a minimal
+    // stub that preserves the runtime API used by this module.
+    return {
+      workers: [],
+      postMessage: async () => { throw new Error('renderer worker unavailable') }
+    }
+  }
+})()
 
 // use shared DOMParser helper (see src/utils/sharedDomParser.js)
 
@@ -79,7 +100,7 @@ export const initRendererWorker = () => _rendererPool.workers?.[0]?.worker?._und
 export const _sendToRenderer = (msg, timeout = 3000) => {
   return _rendererPool.postMessage(msg, undefined, { awaitResponse: true, timeout })
     .then(result => {
-      if (result && typeof result === 'object' && result.error) throw new Error(result.error)
+      if (result?.error) throw new Error(result.error)
       return result
     })
     .catch(e => {
@@ -190,7 +211,7 @@ function _splitIntoSections(content, chunkSize) {
  * @returns {Promise<void>}
  */
 export async function streamParseMarkdown(md, onChunk, opts = {}) {
-  const chunkSize = (opts && opts.chunkSize) ? Number(opts.chunkSize) : 64 * 1024
+  const chunkSize = opts?.chunkSize ? Number(opts.chunkSize) : 64 * 1024
   const cb = typeof onChunk === 'function' ? onChunk : (() => {})
   const { content, data } = parseFrontmatter(String(md ?? ''))
   let body = content
@@ -202,31 +223,31 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
   // can override `initRendererWorker`. Follow the same pattern as
   // `parseMarkdownToHtml` to ensure test mocks are respected.
   let w
-  if (typeof process !== 'undefined' && process.env && process.env.VITEST) {
+  if (typeof process !== 'undefined' && process.env?.VITEST) {
     try {
       const ns = await import('./markdown.js')
-      w = ns.initRendererWorker && ns.initRendererWorker()
+      w = ns.initRendererWorker?.()
     } catch (e) {
-      w = initRendererWorker && initRendererWorker()
+      w = initRendererWorker?.()
     }
   } else {
-    w = initRendererWorker && initRendererWorker()
+    w = initRendererWorker?.()
   }
   // In Vitest environments prefer the deterministic, main-thread
   // per-chunk fallback — some test environments don't emulate real
   // worker event semantics reliably. Otherwise prefer worker streaming.
-  if (!(typeof process !== 'undefined' && process.env && process.env.VITEST) && w && typeof w.postMessage === 'function') {
+  if (!(typeof process !== 'undefined' && process.env?.VITEST) && typeof w?.postMessage === 'function') {
     return new Promise((resolve, reject) => {
       const id = String(Math.random())
       let timeoutId = null
       const cleanup = () => {
         if (timeoutId) clearTimeout(timeoutId)
-        try { w.removeEventListener && w.removeEventListener('message', handler) } catch (e) {}
-        try { w.removeEventListener && w.removeEventListener('error', errHandler) } catch (e) {}
+        try { w?.removeEventListener?.('message', handler) } catch (e) {}
+        try { w?.removeEventListener?.('error', errHandler) } catch (e) {}
       }
 
       const handler = (ev) => {
-        const data = ev && ev.data ? ev.data : {}
+        const data = ev?.data ? ev.data : {}
         if (data.id !== id) return
         if (data.error) {
           cleanup()
@@ -244,24 +265,24 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
         // Backwards compatibility: full result object
         if (data.result) {
           cleanup()
-          try { cb(String((data.result && data.result.html) || ''), { index: 0, isLast: true, meta: (data.result.meta || {}), toc: data.result.toc || [] }) } catch (e) {}
+          try { cb(String(data.result?.html || ''), { index: 0, isLast: true, meta: data.result?.meta || {}, toc: data.result?.toc || [] }) } catch (e) {}
           return resolve()
         }
       }
 
       const errHandler = (ev) => {
         cleanup()
-        reject(new Error(ev && ev.message || 'worker error'))
+        reject(new Error(ev?.message || 'worker error'))
       }
 
       timeoutId = setTimeout(() => {
         cleanup()
         reject(new Error('worker timeout'))
-      }, (opts && opts.timeout) ? Number(opts.timeout) : 10000)
+      }, opts?.timeout ? Number(opts.timeout) : 10000)
 
       try {
-        w.addEventListener && w.addEventListener('message', handler)
-        w.addEventListener && w.addEventListener('error', errHandler)
+        w?.addEventListener?.('message', handler)
+        w?.addEventListener?.('error', errHandler)
         w.postMessage({ type: 'stream', id, md: body, chunkSize })
       } catch (e) { cleanup(); reject(e) }
     })
@@ -277,7 +298,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
     // Use the existing high-level parser for each chunk so we keep behavior
     // consistent with single-pass parsing (plugins, highlighting, etc).
     const parsed = await parseMarkdownToHtml(section)
-    let htmlOut = String((parsed && parsed.html) || '')
+    let htmlOut = String(parsed?.html || '')
     let docToc = []
     if (parser) {
       try {
@@ -302,7 +323,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
             htmlOut = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
           } else {
             const nodes = Array.from(doc.body.childNodes || [])
-            htmlOut = nodes.map(n => (n && typeof n.outerHTML === 'string') ? n.outerHTML : (n && typeof n.textContent === 'string' ? n.textContent : '')).join('')
+            htmlOut = nodes.map(n => (typeof n?.outerHTML === 'string') ? n.outerHTML : (typeof n?.textContent === 'string' ? n.textContent : '')).join('')
           }
         } catch (e) {}
       } catch (e) {
@@ -342,7 +363,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
  * @returns {Promise<ParseResult>} Promise resolving to the parsed HTML, metadata, and table-of-contents.
  */
 export async function parseMarkdownToHtml(md) {
-  if (markdownPlugins && markdownPlugins.length) {
+  if (markdownPlugins?.length) {
     let { content, data } = parseFrontmatter(md || '')
     try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
     marked.setOptions({ gfm: true, mangle: false, headerIds: false, headerPrefix: '' })
@@ -386,12 +407,12 @@ export async function parseMarkdownToHtml(md) {
 
         // ensure images have loading=lazy unless explicitly set or opted-out
         try {
-          const imgs = (doc && typeof doc.getElementsByTagName === 'function') ? Array.from(doc.getElementsByTagName('img')) : (doc && typeof doc.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
+          const imgs = (typeof doc?.getElementsByTagName === 'function') ? Array.from(doc.getElementsByTagName('img')) : (typeof doc?.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
           imgs.forEach(img => {
             try {
-              const attrs = img.getAttribute && img.getAttribute('loading')
-              const want = img.getAttribute && img.getAttribute('data-want-lazy')
-              if (!attrs && !want) img.setAttribute && img.setAttribute('loading', 'lazy')
+              const attrs = img.getAttribute?.('loading')
+              const want = img.getAttribute?.('data-want-lazy')
+              if (!attrs && !want) img.setAttribute?.('loading', 'lazy')
             } catch (e) {}
           })
         } catch (e) {}
@@ -400,12 +421,12 @@ export async function parseMarkdownToHtml(md) {
         try {
           doc.querySelectorAll('pre code, code[class]').forEach(el => {
             try {
-              const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
+              const raw = el.getAttribute?.('class') || el.className || ''
               const cleaned = String(raw ?? '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
               if (cleaned) {
-                try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned }
+                try { el.setAttribute?.('class', cleaned) } catch (err) { el.className = cleaned }
               } else {
-                try { el.removeAttribute && el.removeAttribute('class') } catch (err) { el.className = '' }
+                try { el.removeAttribute?.('class') } catch (err) { el.className = '' }
               }
             } catch (e) {}
           })
@@ -419,7 +440,7 @@ export async function parseMarkdownToHtml(md) {
               htmlOut = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
             } else {
               const nodes = Array.from(doc.body.childNodes || [])
-              htmlOut = nodes.map(n => (n && typeof n.outerHTML === 'string') ? n.outerHTML : (n && typeof n.textContent === 'string' ? n.textContent : '')).join('')
+              htmlOut = nodes.map(n => (typeof n?.outerHTML === 'string') ? n.outerHTML : (typeof n?.textContent === 'string' ? n.textContent : '')).join('')
             }
           } catch (err) {
             try { htmlOut = doc.body.innerHTML } catch (err2) { htmlOut = '' }
@@ -438,7 +459,7 @@ export async function parseMarkdownToHtml(md) {
   // code blocks; this tends to improve first-render latency on cold loads.
   try {
     const rawMd = String(md ?? '')
-    const isVitest = !!(typeof process !== 'undefined' && process.env && process.env.VITEST)
+    const isVitest = !!(typeof process !== 'undefined' && process.env?.VITEST)
     if (!isVitest && !/```/.test(rawMd) && rawMd.length <= 200000) {
       let { content, data } = parseFrontmatter(rawMd)
       try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
@@ -482,25 +503,25 @@ export async function parseMarkdownToHtml(md) {
   // Obtain worker; in Vitest we import the module namespace so test spies
   // can override `initRendererWorker`. Outside tests avoid self-import.
   let w
-  if (typeof process !== 'undefined' && process.env && process.env.VITEST) {
+  if (typeof process !== 'undefined' && process.env?.VITEST) {
     try {
       const ns = await import('./markdown.js')
-      w = ns.initRendererWorker && ns.initRendererWorker()
+      w = ns.initRendererWorker?.()
     } catch (e) {
-      w = initRendererWorker && initRendererWorker()
+      w = initRendererWorker?.()
     }
   } else {
-    w = initRendererWorker && initRendererWorker()
+    w = initRendererWorker?.()
   }
   try {
-    if (typeof hljs !== 'undefined' && hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+    if (hljs?.getLanguage?.('plaintext')) {
       if (/```\s*\n/.test(String(md ?? ''))) {
         let { content, data } = parseFrontmatter(md || '')
         try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
         marked.setOptions({ gfm: true, headerIds: true, mangle: false, highlighted: (code, lang) => {
-          try {
-            if (lang && hljs.getLanguage && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value
-            if (hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
+            try {
+            if (lang && hljs?.getLanguage?.(lang)) return hljs.highlight(code, { language: lang }).value
+            if (hljs?.getLanguage?.('plaintext')) {
               return hljs.highlight(code, { language: 'plaintext' }).value
             }
             return code
@@ -510,13 +531,13 @@ export async function parseMarkdownToHtml(md) {
         try {
           html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (full, code) => {
             try {
-              if (code && hljs && typeof hljs.highlight === 'function') {
+              if (code && typeof hljs?.highlight === 'function') {
                 try {
                   const out = hljs.highlight(code, { language: 'plaintext' })
-                  return `<pre><code>${out && out.value ? out.value : out}</code></pre>`
+                  return `<pre><code>${out?.value ? out.value : out}</code></pre>`
                 } catch (e) {
                   try {
-                    if (hljs && typeof hljs.highlightElement === 'function') {
+                    if (typeof hljs?.highlightElement === 'function') {
                       const el = { innerHTML: code }
                       hljs.highlightElement(el)
                       return `<pre><code>${el.innerHTML}</code></pre>`
@@ -599,16 +620,15 @@ export async function parseMarkdownToHtml(md) {
       return `<h${level} ${newAttrs}>${inner}</h${level}>`
     })
     try {
-      const moved = (typeof document !== 'undefined' && document.documentElement && document.documentElement.getAttribute)
-        ? document.documentElement.getAttribute('data-nimbi-logo-moved') || '' : ''
+      const moved = (typeof document !== 'undefined') ? (document.documentElement?.getAttribute?.('data-nimbi-logo-moved') || '') : ''
       if (moved) {
         const parser = getSharedParser()
         if (parser) {
           const doc = parser.parseFromString(html, 'text/html')
-          const imgs = (doc && typeof doc.getElementsByTagName === 'function') ? Array.from(doc.getElementsByTagName('img')) : (doc && typeof doc.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
+          const imgs = typeof doc?.getElementsByTagName === 'function' ? Array.from(doc.getElementsByTagName('img')) : (typeof doc?.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
           imgs.forEach(img => {
             try {
-              const src = img.getAttribute('src') || ''
+              const src = img?.getAttribute?.('src') || ''
               const abs = src ? new URL(src, location.href).toString() : ''
               if (abs === moved) img.remove()
             } catch (e) {}
@@ -619,7 +639,7 @@ export async function parseMarkdownToHtml(md) {
               html = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
             } else {
               const nodes = Array.from(doc.body.childNodes || [])
-              html = nodes.map(n => (n && typeof n.outerHTML === 'string') ? n.outerHTML : (n && typeof n.textContent === 'string' ? n.textContent : '')).join('')
+              html = nodes.map(n => (typeof n?.outerHTML === 'string') ? n.outerHTML : (typeof n?.textContent === 'string' ? n.textContent : '')).join('')
             }
           } catch (err) {
             try { html = doc.body.innerHTML } catch (err2) { /* leave html as-is */ }
@@ -676,15 +696,15 @@ export function detectFenceLanguages(md, supportedMap) {
       
       if (BAD_LANGUAGES.has(name)) continue
       
-      if (supportedMap && supportedMap.size && name.length < 3 && !supportedMap.has(name) && !(HLJS_ALIAS_MAP && HLJS_ALIAS_MAP[name] && supportedMap.has(HLJS_ALIAS_MAP[name]))) continue
-      if (supportedMap && supportedMap.size) {
+      if (supportedMap?.size && name.length < 3 && !supportedMap.has(name) && !supportedMap.has(HLJS_ALIAS_MAP?.[name])) continue
+      if (supportedMap?.size) {
         if (supportedMap.has(name)) {
           const canonical = supportedMap.get(name)
           if (canonical) set.add(canonical)
           continue
         }
         
-        if (HLJS_ALIAS_MAP && HLJS_ALIAS_MAP[name]) {
+        if (HLJS_ALIAS_MAP?.[name]) {
           const mapped = HLJS_ALIAS_MAP[name]
           if (supportedMap.has(mapped)) {
             const canonical = supportedMap.get(mapped) || mapped
@@ -712,12 +732,12 @@ export function detectFenceLanguages(md, supportedMap) {
  * @returns {Promise<Set<string>>} Promise resolving to a set of detected language identifiers.
  */
 export async function detectFenceLanguagesAsync(mdText, supportedMap) {
-  if (markdownPlugins && markdownPlugins.length) return detectFenceLanguages(mdText || '', supportedMap)
-  if (typeof process !== 'undefined' && process.env && process.env.VITEST) return detectFenceLanguages(mdText || '', supportedMap)
-  const w = initRendererWorker && initRendererWorker()
+  if (markdownPlugins?.length) return detectFenceLanguages(mdText || '', supportedMap)
+  if (typeof process !== 'undefined' && process.env?.VITEST) return detectFenceLanguages(mdText || '', supportedMap)
+  const w = initRendererWorker?.()
   if (w) {
     try {
-      const arr = supportedMap && supportedMap.size ? Array.from(supportedMap.keys()) : []
+      const arr = supportedMap?.size ? Array.from(supportedMap.keys()) : []
       const res = await _sendToRenderer({ type: 'detect', md: String(mdText ?? ''), supported: arr }, 200)
       if (Array.isArray(res)) return new Set(res)
     } catch (e) {

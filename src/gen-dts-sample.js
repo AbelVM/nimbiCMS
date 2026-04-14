@@ -33,7 +33,7 @@ export function recordExample() {
  * @returns {{sum:number}} - Object containing the computed sum.
  */
 export function sum(opts) {
-  return { sum: (opts && opts.a || 0) + (opts && opts.b || 0) }
+  return { sum: ((opts?.a) || 0) + ((opts?.b) || 0) }
 }
 
 /**

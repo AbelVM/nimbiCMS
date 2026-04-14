@@ -439,6 +439,7 @@ export function buildPageUrl(page: string, hash: string|null, baseSearch: string
 export function safe(fn: any): string
 export const encodeURL: any
 export const decodeHtmlEntities: any
+export const getWorkerPoolSize: any
 
 
 

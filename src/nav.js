@@ -53,10 +53,10 @@ function normalizeSearchIndexEntriesMut(entries) {
         const looksFiley = !!(raw && (raw.indexOf('.') !== -1 || raw.indexOf('/') !== -1))
         let canonical = ''
         try {
-          if (it.path && typeof it.path === 'string') {
+            if (it.path && typeof it.path === 'string') {
             const pn = normalizePath(String(it.path ?? ''))
             // prefer any existing mapping for this path
-            canonical = findSlugForPath(pn) || (mdToSlug && mdToSlug.has(pn) ? mdToSlug.get(pn) : '') || ''
+            canonical = findSlugForPath(pn) || (mdToSlug?.get(pn) || '') || ''
             if (!canonical) {
               // If the index entry included a title (H1), prefer that
               if (it.title && String(it.title).trim()) {
@@ -71,7 +71,7 @@ function normalizeSearchIndexEntriesMut(entries) {
             // no explicit path: strip extension and try to resolve by
             // basename or fall back to title if available
             const baseOnly = String(raw).replace(/\.(?:md|html?)$/i, '')
-            const found = findSlugForPath(baseOnly) || (mdToSlug && mdToSlug.has(baseOnly) ? mdToSlug.get(baseOnly) : '') || ''
+            const found = findSlugForPath(baseOnly) || (mdToSlug?.get(baseOnly) || '') || ''
             if (found) canonical = found
             else if (it.title && String(it.title).trim()) canonical = slugify(String(it.title).trim())
             else canonical = slugify(baseOnly)
@@ -180,12 +180,12 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   function closeMobileMenu() {
     try {
       const burgerEl = (typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? navbar.querySelector('.navbar-burger') : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector('.navbar-burger') : (typeof document !== 'undefined' ? document.querySelector('.navbar-burger') : null))
-      const targetId = burgerEl && burgerEl.dataset ? burgerEl.dataset.target : null
+      const targetId = burgerEl?.dataset?.target ?? null
       const target = targetId ? ((typeof navbar !== 'undefined' && navbar && navbar.querySelector) ? (navbar.querySelector(`#${targetId}`) || document.getElementById(targetId)) : ((navbarWrap && navbarWrap.querySelector) ? navbarWrap.querySelector(`#${targetId}`) : (typeof document !== 'undefined' ? document.getElementById(targetId) : null))) : null
-      if (burgerEl && burgerEl.classList && burgerEl.classList.contains('is-active')) {
+      if (burgerEl?.classList?.contains('is-active')) {
         try { burgerEl.classList.remove('is-active') } catch (e) {}
         try { burgerEl.setAttribute('aria-expanded', 'false') } catch (e) {}
-        if (target && target.classList) {
+        if (target?.classList) {
           try { target.classList.remove('is-active') } catch (e) {}
         }
       }
@@ -203,7 +203,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     const contentEl = (container && container instanceof HTMLElement) ? container : ((typeof document !== 'undefined') ? document.querySelector('.nimbi-content') : null)
     try { if (contentEl) contentEl.classList.add('is-inactive') } catch (e) {}
     try {
-      const r = renderByQuery && renderByQuery()
+      const r = renderByQuery?.()
       if (r && typeof r.then === 'function') await r
     } catch (e) {
       try { debugWarn('[nimbi-cms] renderByQuery failed', e) } catch (_) {}
@@ -250,7 +250,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
             if (navHrefToSlug && navHrefToSlug.has(base)) return { page: navHrefToSlug.get(base), hash }
           } catch (_) {}
           try {
-            if (mdToSlug && mdToSlug.has(pathNorm)) return { page: mdToSlug.get(pathNorm), hash }
+            if (mdToSlug?.has?.(pathNorm)) return { page: mdToSlug.get(pathNorm), hash }
           } catch (_) {}
           try {
             const found = findSlugForPath(pathNorm)
@@ -481,7 +481,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
   const brandItem = document.createElement('a')
   brandItem.className = 'navbar-item'
   if (firstLink) {
-    const rawHref = firstLink.getAttribute('href') || '#'
+    const rawHref = firstLink?.getAttribute?.('href') || '#'
     try {
       const u = new URL(rawHref, location.href)
       const p = u.searchParams.get('page')
@@ -519,7 +519,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
         try {
           const link = document.querySelector('link[rel~="icon"],link[rel="shortcut icon"]')
           if (!link) return null
-          const href = link.getAttribute('href') || ''
+          const href = link?.getAttribute?.('href') || ''
           if (!href) return null
           if (/\.png(?:\?|$)/i.test(href)) return new URL(href, location.href).toString()
           return null
@@ -533,7 +533,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           const d = p ? p.parseFromString(res.raw, 'text/html') : null
           const img = d ? d.querySelector('img') : null
           if (!img) return null
-          const src = img.getAttribute('src') || ''
+          const src = img?.getAttribute?.('src') || ''
           if (!src) return null
           const abs = new URL(src, location.href).toString()
           if (opt === 'move-first') {
@@ -597,10 +597,10 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
     try {
       if (!p) return null
       const norm = normalizePath(String(p ?? ''))
-      try { if (mdToSlug && mdToSlug.has(norm)) return mdToSlug.get(norm) } catch (e) {}
+      try { if (mdToSlug?.has?.(norm)) return mdToSlug.get(norm) } catch (e) {}
       // Try basename lookup
       const base = norm.replace(/^.*\//, '')
-      try { if (mdToSlug && mdToSlug.has(base)) return mdToSlug.get(base) } catch (e) {}
+      try { if (mdToSlug?.has?.(base)) return mdToSlug.get(base) } catch (e) {}
       // Scan slugToMd map for a matching value (handles localized entries)
       try {
         for (const [slug, entry] of slugToMd.entries()) {
@@ -691,7 +691,7 @@ export async function buildNav(navbarWrap, container, navHtml, contentBase, home
           // if there's already a mapping, skip
           let existing = null
           try { if (navHrefToSlug && navHrefToSlug.has(norm)) existing = navHrefToSlug.get(norm) } catch (_) {}
-          try { if (!existing && mdToSlug && mdToSlug.has(norm)) existing = mdToSlug.get(norm) } catch (_) {}
+          try { if (!existing && mdToSlug?.has?.(norm)) existing = mdToSlug.get(norm) } catch (_) {}
           if (existing) continue
 
           // Create a conservative candidate from nav label if present

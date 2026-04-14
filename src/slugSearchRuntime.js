@@ -208,13 +208,13 @@ export async function crawlForSlug(slug, base, maxQueue) {
   const idx = await buildSearchIndex(base)
   const hit = (Array.isArray(idx) ? idx : []).find((entry) => {
     try {
-      const key = String(entry && entry.slug ? entry.slug : '').split('::')[0]
+      const key = String(entry?.slug ?? '').split('::')[0]
       return key === normalized
     } catch (_) {
       return false
     }
   })
-  if (hit && hit.path) return hit.path
+  if (hit?.path) return hit.path
 
   const candidates = [`${normalized}.html`, `${normalized}.md`]
   for (const candidate of candidates) {

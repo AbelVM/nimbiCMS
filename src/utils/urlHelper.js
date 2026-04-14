@@ -55,13 +55,13 @@ export function buildCosmeticUrl(page, anchor = null, baseSearch = undefined) {
     let params = ''
     if (typeof baseSearch === 'string') {
       params = baseSearch
-    } else {
-      if (typeof location !== 'undefined' && location && location.search) {
+      } else {
+      if (typeof location !== 'undefined' && location?.search) {
         params = location.search
-      } else if (typeof location !== 'undefined' && location && location.hash) {
+      } else if (typeof location !== 'undefined' && location?.hash) {
         try {
           const parsed = parseHrefToRoute(location.href)
-          if (parsed && parsed.params) params = parsed.params
+          if (parsed?.params) params = parsed.params
         } catch (e) {
           // ignore
         }

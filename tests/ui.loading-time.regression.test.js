@@ -15,7 +15,8 @@ vi.mock('../src/htmlBuilder.js', () => ({
 }))
 
 vi.mock('../src/utils/helpers.js', () => ({
-  setEagerForAboveFoldImages: vi.fn()
+  setEagerForAboveFoldImages: vi.fn(),
+  getWorkerPoolSize: vi.fn(() => 2)
 }))
 
 vi.mock('../src/seoManager.js', () => ({

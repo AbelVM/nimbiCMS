@@ -1,4 +1,3 @@
-
 /**
  * Bulma and theming helpers.
  *
@@ -27,7 +26,7 @@ function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return
   const l = document.createElement('link')
   l.rel = 'stylesheet'
-  l.href = href 
+  l.href = href
   Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v))
   document.head.appendChild(l)
 
@@ -60,8 +59,9 @@ function injectLink(href, attrs = {}) {
         l.setAttribute('data-bulmaswatch-move-count', String(moveCount))
       } catch (e) { /* ignore */ }
       const parent = document.head
-      if (parent && parent.lastElementChild !== l) parent.appendChild(l)
+      if (parent?.lastElementChild !== l) parent?.appendChild(l)
     } catch (e) {
+      /* ignore */
     }
   }
 }
@@ -71,31 +71,32 @@ async function ensureBaseBulma() {
   for (const p of localCandidates) {
     try {
       const res = await fetch(p, { method: 'HEAD' })
-      if (res && res.ok) {
+      if (res?.ok) {
         if (!document.querySelector(`link[href="${p}"]`)) {
           const l = document.createElement('link')
           l.rel = 'stylesheet'
           l.href = p
           l.setAttribute('data-bulma-base', '1')
           const ourCss = document.querySelector('link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]')
-          if (ourCss && ourCss.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
+          if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
           else document.head.appendChild(l)
         }
         return
       }
     } catch (e) {
+      /* ignore */
     }
   }
 
   try {
-    const href = (location && location.protocol && location.protocol === 'file:') ? 'https://unpkg.com/bulma/css/bulma.min.css' : '//unpkg.com/bulma/css/bulma.min.css'
+    const href = (location?.protocol === 'file:') ? 'https://unpkg.com/bulma/css/bulma.min.css' : '//unpkg.com/bulma/css/bulma.min.css'
     if (!document.querySelector(`link[href="${href}"]`)) {
       const l = document.createElement('link')
       l.rel = 'stylesheet'
       l.href = href
       l.setAttribute('data-bulma-base', '1')
       const ourCss = document.querySelector('link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]')
-      if (ourCss && ourCss.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
+      if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
       else document.head.appendChild(l)
     }
   } catch (e) { /* ignore */ }
@@ -103,14 +104,14 @@ async function ensureBaseBulma() {
 
 function removeThemeAndOverrides() {
   try {
-    const scope = (typeof document !== 'undefined' && document.head) ? document.head : document
+    const scope = (typeof document !== 'undefined' && document?.head) ? document.head : document
     const themeLinks = Array.from(scope.querySelectorAll('link[data-bulmaswatch-theme]'))
-    for (const tl of themeLinks) if (tl && tl.parentNode) tl.parentNode.removeChild(tl)
+    for (const tl of themeLinks) tl?.parentNode?.removeChild(tl)
   } catch (e) { /* ignore */ }
   try {
-    const scope2 = (typeof document !== 'undefined' && document.head) ? document.head : document
+    const scope2 = (typeof document !== 'undefined' && document?.head) ? document.head : document
     const overrides = Array.from(scope2.querySelectorAll('style[data-bulma-override]'))
-    for (const s of overrides) if (s && s.parentNode) s.parentNode.removeChild(s)
+    for (const s of overrides) s?.parentNode?.removeChild(s)
   } catch (e) { /* ignore */ }
 }
 
@@ -170,8 +171,8 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
 /**
  * Toggle theme styling by setting `data-theme` on each `.nimbi-mount`
  * container. There are three recognized theme values:
- * - `light`: explicitly apply light theme (sets `data-theme="light"`).
- * - `dark`: explicitly apply dark theme (sets `data-theme="dark"`).
+ * - `light`: explicitly apply light theme (sets `data-theme="light").
+ * - `dark`: explicitly apply dark theme (sets `data-theme="dark").
  * - `system`: follow the system/OS preference; implementation removes any
  *   explicit `data-theme` attribute so user agent or CSS using
  *   `prefers-color-scheme` can take effect.
@@ -224,7 +225,7 @@ export function setThemeVars(vars) {
  */
 export function registerThemedElement(el) {
   if (!el || !(el instanceof HTMLElement)) return () => {}
-  const mount = (el.closest && el.closest('.nimbi-mount')) || null
+  const mount = el.closest?.('.nimbi-mount') || null
   try {
     if (mount) {
       if (currentStyle === 'dark') mount.setAttribute('data-theme', 'dark')

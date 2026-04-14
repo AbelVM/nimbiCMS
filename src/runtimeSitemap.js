@@ -32,7 +32,7 @@ import { yieldIfNeeded } from './utils/idle.js'
 
 function _getBase() {
   try {
-    if (typeof location !== 'undefined' && location && typeof location.pathname === 'string') {
+    if (typeof location?.pathname === 'string') {
       return String(location.origin + location.pathname.split('?')[0])
     }
   } catch {}
@@ -75,7 +75,7 @@ function _humanizeSlug(slug) {
  */
 function makeEntryFromIndexItem(baseNoQs, it) {
   try {
-    const slug = it && it.slug ? String(it.slug) : null
+    const slug = it?.slug ? String(it.slug) : null
     if (!slug) return null
     const loc = baseNoQs + '?page=' + encodeURIComponent(slug)
     const ent = { loc, slug }
@@ -116,8 +116,8 @@ export async function generateSitemapJson(opts = {}) {
   if (Array.isArray(providedIndex) && providedIndex.length && Array.isArray(searchIndex) && searchIndex.length) {
     const bySlug = new Map()
     try {
-      for (const it of providedIndex) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch {} }
-      for (const it of searchIndex) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch {} }
+      for (const it of providedIndex) { try { if (it?.slug) bySlug.set(String(it.slug), it) } catch {} }
+      for (const it of searchIndex) { try { if (it?.slug) bySlug.set(String(it.slug), it) } catch {} }
     } catch {}
     idx = Array.from(bySlug.values())
   }
@@ -136,12 +136,12 @@ export async function generateSitemapJson(opts = {}) {
     if (typeof notFoundPage === 'string' && notFoundPage.trim()) {
       const nfPath = normalizePath(String(notFoundPage))
       try {
-            if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(nfPath)) {
+            if (typeof mdToSlug?.has === 'function' && mdToSlug.has(nfPath)) {
               try { excludedSlugs.add(mdToSlug.get(nfPath)) } catch {}
             } else {
               try {
-                const nfRes = await fetchMarkdown(nfPath, opts && opts.contentBase ? opts.contentBase : undefined)
-                if (nfRes && nfRes.raw) {
+                const nfRes = await fetchMarkdown(nfPath, opts?.contentBase ? opts.contentBase : undefined)
+                if (nfRes?.raw) {
                   try {
                     let h = null
                     if (nfRes.isHtml) {
@@ -185,13 +185,13 @@ export async function generateSitemapJson(opts = {}) {
     try {
       if (!p || typeof p !== 'string') return false
       const np = normalizePath(String(p))
-      try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function' && allMarkdownPathsSet.has(np)) return true } catch {}
-      try { if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(np)) return true } catch {}
-      try { if (pathMap && pathMap.has(np)) return true } catch {}
+      try { if (typeof allMarkdownPathsSet?.has === 'function' && allMarkdownPathsSet.has(np)) return true } catch {}
+      try { if (typeof mdToSlug?.has === 'function' && mdToSlug.has(np)) return true } catch {}
+      try { if (pathMap?.has(np)) return true } catch {}
       try {
         // Prefer scanning mdToSlug keys (path -> slug) which is simpler and
         // avoids inspecting potentially complex slugToMd value objects.
-        if (mdToSlug && typeof mdToSlug.keys === 'function' && mdToSlug.size) {
+        if (typeof mdToSlug?.keys === 'function' && mdToSlug.size) {
           for (const k of mdToSlug.keys()) {
             try { if (normalizePath(String(k)) === np) return true } catch {}
           }
@@ -220,7 +220,7 @@ export async function generateSitemapJson(opts = {}) {
     for (const it of idx) {
       try { idxYieldCount++; await yieldIfNeeded(idxYieldCount, 64) } catch (_) {}
       try {
-        if (!it || !it.slug) continue
+        if (!it?.slug) continue
         const slugKey = String(it.slug)
         const slugBaseKey = String(slugKey).split('::')[0]
         if (excludedSlugs.has(slugBaseKey)) continue
@@ -236,8 +236,8 @@ export async function generateSitemapJson(opts = {}) {
         seenSlugs.add(ent.slug)
         if (titleMap.has(ent.slug)) {
           const t = titleMap.get(ent.slug)
-          if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
-          if (t && t.excerpt) ent.excerpt = t.excerpt
+          if (t?.title) { ent.title = t.title; ent._titleSource = 'index' }
+          if (t?.excerpt) ent.excerpt = t.excerpt
         }
         entries.push(ent)
       } catch { continue }
@@ -264,15 +264,15 @@ export async function generateSitemapJson(opts = {}) {
           const ent = { loc, slug }
           if (titleMap.has(slug)) {
             const t = titleMap.get(slug)
-            if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
-            if (t && t.excerpt) ent.excerpt = t.excerpt
+            if (t?.title) { ent.title = t.title; ent._titleSource = 'index' }
+            if (t?.excerpt) ent.excerpt = t.excerpt
           } else if (mappedPath) {
             // try path->title fallback
             const pm = pathMap.get(mappedPath)
-            if (pm && pm.title) {
+            if (pm?.title) {
               ent.title = pm.title
               ent._titleSource = 'path'
-              if (!ent.excerpt && pm.excerpt) ent.excerpt = pm.excerpt
+              if (!ent.excerpt && pm?.excerpt) ent.excerpt = pm.excerpt
             }
           }
           seenSlugs.add(slug)
@@ -293,15 +293,15 @@ export async function generateSitemapJson(opts = {}) {
         if (homePage && typeof homePage === 'string') {
           const hp = normalizePath(String(homePage))
           let hpSlug = null
-          try { if (mdToSlug && mdToSlug.has(hp)) hpSlug = mdToSlug.get(hp) } catch {}
+          try { if (typeof mdToSlug?.has === 'function' && mdToSlug.has(hp)) hpSlug = mdToSlug.get(hp) } catch {}
           if (!hpSlug) hpSlug = hp
           const hpBase = String(hpSlug).split('::')[0]
           if (!seenSlugs.has(hpSlug) && !excludedPaths.has(hp) && !excludedSlugs.has(hpBase)) {
             const ent = { loc: baseNoQs + '?page=' + encodeURIComponent(hpSlug), slug: hpSlug }
             if (titleMap.has(hpSlug)) {
               const t = titleMap.get(hpSlug)
-              if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
-              if (t && t.excerpt) ent.excerpt = t.excerpt
+              if (t?.title) { ent.title = t.title; ent._titleSource = 'index' }
+              if (t?.excerpt) ent.excerpt = t.excerpt
             }
             seenSlugs.add(hpSlug)
             entries.push(ent)
@@ -314,10 +314,10 @@ export async function generateSitemapJson(opts = {}) {
   // Expand sitemap by crawling linked pages found in indexed/source markdown
   try {
     const seenAdd = new Set()
-    const existingSlugs = new Set(entries.map(e => String(e && e.slug ? e.slug : '')))
+    const existingSlugs = new Set(entries.map(e => String(e?.slug ?? '')))
     const sourcePaths = new Set()
     for (const it of entries) {
-      try { if (it && it.sourcePath) sourcePaths.add(String(it.sourcePath)) } catch {}
+      try { if (it?.sourcePath) sourcePaths.add(String(it.sourcePath)) } catch {}
     }
     // Limit to a reasonable number to avoid blowing up runtime
     const MAX_SOURCE_FETCH = 30
@@ -332,7 +332,7 @@ export async function generateSitemapJson(opts = {}) {
         // index-derived paths before issuing a network request.
         if (!_isKnownPath(sp)) continue
         fetched += 1
-        const mdRes = await fetchMarkdown(sp, opts && opts.contentBase ? opts.contentBase : undefined)
+        const mdRes = await fetchMarkdown(sp, opts?.contentBase ? opts.contentBase : undefined)
         // Skip if empty or if server returned a 404 fallback page — we don't
         // want to parse the site's 404 HTML as real content.
         if (!mdRes || !mdRes.raw) continue
@@ -344,9 +344,9 @@ export async function generateSitemapJson(opts = {}) {
         const hrefs = []
         const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
         let m
-        while ((m = mdLinkRe.exec(clean))) { try { if (m && m[1]) hrefs.push(m[1]) } catch {} }
+        while ((m = mdLinkRe.exec(clean))) { try { if (m?.[1]) hrefs.push(m[1]) } catch {} }
         const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
-        while ((m = htmlLinkRe.exec(clean))) { try { if (m && m[1]) hrefs.push(m[1]) } catch {} }
+        while ((m = htmlLinkRe.exec(clean))) { try { if (m?.[1]) hrefs.push(m[1]) } catch {} }
 
         for (const href of hrefs) {
           try {
@@ -374,8 +374,8 @@ export async function generateSitemapJson(opts = {}) {
             if (!/\.(md|html?)$/i.test(candidate)) continue
             try {
               const norm = normalizePath(candidate)
-              if (mdToSlug && mdToSlug.has(norm)) {
-                const s = mdToSlug.get(norm)
+              if (mdToSlug?.has?.(norm)) {
+                const s = mdToSlug?.get?.(norm)
                 const sBase = String(s).split('::')[0]
                 if (s && !existingSlugs.has(s) && !seenAdd.has(s) && !excludedSlugs.has(sBase) && !excludedPaths.has(norm)) {
                   seenAdd.add(s)
@@ -387,7 +387,7 @@ export async function generateSitemapJson(opts = {}) {
               try {
                 // Check whether the target path is known before attempting fetch.
                 if (!_isKnownPath(norm)) continue
-                const target = await fetchMarkdown(norm, opts && opts.contentBase ? opts.contentBase : undefined)
+                const target = await fetchMarkdown(norm, opts?.contentBase ? opts.contentBase : undefined)
                 // Skip fallback 404 responses
                 if (target && typeof target.status === 'number' && target.status === 404) continue
                 if (target && target.raw) {
@@ -438,19 +438,19 @@ export async function generateSitemapJson(opts = {}) {
         if (titleMap.has(base)) {
           const t = titleMap.get(base)
           ent = { loc: baseNoQs + '?page=' + encodeURIComponent(base), slug: base }
-          if (t && t.title) { ent.title = t.title; ent._titleSource = 'index' }
-          if (t && t.excerpt) ent.excerpt = t.excerpt
-          if (t && t.path) ent.sourcePath = t.path
-        } else if (pathMap && slugToMd && slugToMd.has(base)) {
-          const mdVal = slugToMd.get(base)
+          if (t?.title) { ent.title = t.title; ent._titleSource = 'index' }
+          if (t?.excerpt) ent.excerpt = t.excerpt
+          if (t?.path) ent.sourcePath = t.path
+        } else if (pathMap && slugToMd?.has?.(base)) {
+          const mdVal = slugToMd?.get?.(base)
           let mappedPath = null
           if (typeof mdVal === 'string') mappedPath = normalizePath(String(mdVal))
           else if (mdVal && typeof mdVal === 'object') mappedPath = normalizePath(String(mdVal.default ?? ''))
           ent = { loc: baseNoQs + '?page=' + encodeURIComponent(base), slug: base }
           if (mappedPath && pathMap.has(mappedPath)) {
             const pm = pathMap.get(mappedPath)
-            if (pm && pm.title) { ent.title = pm.title; ent._titleSource = 'path' }
-            if (pm && pm.excerpt) ent.excerpt = pm.excerpt
+            if (pm?.title) { ent.title = pm.title; ent._titleSource = 'path' }
+            if (pm?.excerpt) ent.excerpt = pm.excerpt
             ent.sourcePath = mappedPath
           }
         }
@@ -510,8 +510,8 @@ export async function generateSitemapJson(opts = {}) {
           // Resolve a candidate path for this slug
           let candidatePath = null
           try {
-            if (slugToMd && slugToMd.has(e.slug)) {
-              const mv = slugToMd.get(e.slug)
+            if (slugToMd?.has?.(e.slug)) {
+              const mv = slugToMd?.get?.(e.slug)
               if (typeof mv === 'string') candidatePath = normalizePath(String(mv))
               else if (mv && typeof mv === 'object') candidatePath = normalizePath(String(mv.default ?? ''))
             }
@@ -521,7 +521,7 @@ export async function generateSitemapJson(opts = {}) {
           if (excludedPaths.has(candidatePath)) continue
           if (!_isKnownPath(candidatePath)) continue
           try {
-            const md = await fetchMarkdown(candidatePath, opts && opts.contentBase ? opts.contentBase : undefined)
+            const md = await fetchMarkdown(candidatePath, opts?.contentBase ? opts.contentBase : undefined)
             if (!md || !md.raw) continue
             if (md && typeof md.status === 'number' && md.status === 404) continue
             if (md && md.raw) {
@@ -548,7 +548,7 @@ export async function generateSitemapJson(opts = {}) {
  * @returns {string} XML sitemap string
  */
 export function generateSitemapXml(json) {
-  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
+  const entries = Array.isArray(json?.entries) ? json.entries : (Array.isArray(json) ? json : [])
 
   let s = '<?xml version="1.0" encoding="UTF-8"?>\n'
   s += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -569,7 +569,7 @@ export function generateSitemapXml(json) {
  * @returns {string} RSS XML string
  */
 export function generateRssXml(json) {
-  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
+  const entries = Array.isArray(json?.entries) ? json.entries : (Array.isArray(json) ? json : [])
   const base = _getBase().split('?')[0]
   let s = '<?xml version="1.0" encoding="UTF-8"?>\n'
   s += '<rss version="2.0">\n'
@@ -577,7 +577,7 @@ export function generateRssXml(json) {
   s += `<title>${_escapeXml('Sitemap RSS')}</title>\n`
   s += `<link>${_escapeXml(base)}</link>\n`
   s += `<description>${_escapeXml('RSS feed generated from site index')}</description>\n`
-  s += `<lastBuildDate>${_escapeXml((json && json.generatedAt) ? new Date(json.generatedAt).toUTCString() : new Date().toUTCString())}</lastBuildDate>\n`
+  s += `<lastBuildDate>${_escapeXml((json?.generatedAt) ? new Date(json.generatedAt).toUTCString() : new Date().toUTCString())}</lastBuildDate>\n`
   for (const e of entries) {
     try {
       const loc = String(e.loc ?? '')
@@ -600,9 +600,9 @@ export function generateRssXml(json) {
  * @returns {string} Atom XML string
  */
 export function generateAtomXml(json) {
-  const entries = (json && Array.isArray(json.entries)) ? json.entries : (Array.isArray(json) ? json : [])
+  const entries = Array.isArray(json?.entries) ? json.entries : (Array.isArray(json) ? json : [])
   const base = _getBase().split('?')[0]
-  const updated = (json && json.generatedAt) ? new Date(json.generatedAt).toISOString() : new Date().toISOString()
+  const updated = (json?.generatedAt) ? new Date(json.generatedAt).toISOString() : new Date().toISOString()
   let s = '<?xml version="1.0" encoding="utf-8"?>\n'
   s += '<feed xmlns="http://www.w3.org/2005/Atom">\n'
   s += `<title>${_escapeXml('Sitemap Atom')}</title>\n`
@@ -612,7 +612,7 @@ export function generateAtomXml(json) {
   for (const e of entries) {
     try {
       const loc = String(e.loc ?? '')
-      const entryUpdated = (e && e.lastmod) ? (new Date(e.lastmod).toISOString()) : updated
+      const entryUpdated = (e?.lastmod) ? (new Date(e.lastmod).toISOString()) : updated
       s += '<entry>\n'
       s += `<title>${_escapeXml(String(e.title || e.slug || (e.loc ?? '')))}</title>\n`
       if (e.excerpt) s += `<summary>${_escapeXml(String(e.excerpt))}</summary>\n`
@@ -663,7 +663,7 @@ function _writeXmlToDocument(xml, mimeType = 'application/xml') {
 // Generate a minimal HTML representation of the sitemap JSON.
 function _generateHtmlFromJson(finalJson) {
   try {
-    const entries = (finalJson && Array.isArray(finalJson.entries)) ? finalJson.entries : (Array.isArray(finalJson) ? finalJson : [])
+    const entries = Array.isArray(finalJson?.entries) ? finalJson.entries : (Array.isArray(finalJson) ? finalJson : [])
     let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>'
     html += '<h1>Sitemap</h1><ul>'
     for (const e of entries) {
@@ -699,7 +699,7 @@ function _scheduleSitemapWrite(finalJson, mimeType = 'application/xml') {
       return
     }
 
-    const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+    const newLen = Array.isArray(finalJson?.entries) ? finalJson.entries.length : 0
     try {
       const pending = window.__nimbiSitemapPendingWrite || null
       if (!pending || (typeof pending.len === 'number' && pending.len < newLen)) {
@@ -708,6 +708,7 @@ function _scheduleSitemapWrite(finalJson, mimeType = 'application/xml') {
       if (window.__nimbiSitemapWriteTimer) return
       window.__nimbiSitemapWriteTimer = setTimeout(() => {
         try {
+          if (typeof window === 'undefined') return
           const p = window.__nimbiSitemapPendingWrite
           if (!p) return
           let out = null
@@ -720,9 +721,8 @@ function _scheduleSitemapWrite(finalJson, mimeType = 'application/xml') {
           try { _writeXmlToDocument(out, p.mimeType) } catch (e) {}
           try { window.__nimbiSitemapRenderedAt = Date.now(); window.__nimbiSitemapJson = p.finalJson; window.__nimbiSitemapFinal = p.finalJson.entries || [] } catch {}
         } catch (e) {}
-        try { clearTimeout(window.__nimbiSitemapWriteTimer) } catch (_) {}
-        window.__nimbiSitemapWriteTimer = null
-        window.__nimbiSitemapPendingWrite = null
+        try { if (typeof window !== 'undefined') clearTimeout(window.__nimbiSitemapWriteTimer) } catch (_) {}
+        try { if (typeof window !== 'undefined') { window.__nimbiSitemapWriteTimer = null; window.__nimbiSitemapPendingWrite = null } } catch (_) {}
       }, 40)
     } catch (e) {}
   } catch (e) {}
@@ -784,14 +784,14 @@ export async function handleSitemapRequest(opts = {}) {
     try {
       if (typeof whenSearchIndexReady === 'function') {
         try {
-          const live = await whenSearchIndexReady({ timeoutMs: waitMs, contentBase: opts && opts.contentBase, indexDepth: opts && opts.indexDepth, noIndexing: opts && opts.noIndexing, startBuild: true })
+          const live = await whenSearchIndexReady({ timeoutMs: waitMs, contentBase: opts?.contentBase, indexDepth: opts?.indexDepth, noIndexing: opts?.noIndexing, startBuild: true })
           if (Array.isArray(live) && live.length) {
             // Merge provided snapshot with live index, preferring live entries
             if (Array.isArray(opts.index) && opts.index.length) {
               const bySlug = new Map()
               try {
-                for (const it of opts.index) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
-                for (const it of live) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+                  for (const it of opts.index) { try { if (it?.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+                  for (const it of live) { try { if (it?.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
               } catch (_) {}
               idx = Array.from(bySlug.values())
             } else {
@@ -845,8 +845,8 @@ export async function handleSitemapRequest(opts = {}) {
         const waitMs2 = (typeof opts.waitForIndexMs === 'number') ? opts.waitForIndexMs : Infinity
         let maybe = null
         try {
-          if (typeof whenSearchIndexReady === 'function') {
-            maybe = await whenSearchIndexReady({ timeoutMs: waitMs2, contentBase: opts && opts.contentBase, indexDepth: opts && opts.indexDepth, noIndexing: opts && opts.noIndexing, startBuild: true })
+            if (typeof whenSearchIndexReady === 'function') {
+            maybe = await whenSearchIndexReady({ timeoutMs: waitMs2, contentBase: opts?.contentBase, indexDepth: opts?.indexDepth, noIndexing: opts?.noIndexing, startBuild: true })
           }
         } catch (_) { maybe = null }
         if (Array.isArray(maybe) && maybe.length) {
@@ -855,9 +855,9 @@ export async function handleSitemapRequest(opts = {}) {
           const indexDepth = (typeof opts.indexDepth === 'number') ? opts.indexDepth : 3
           const noIndexing = Array.isArray(opts.noIndexing) ? opts.noIndexing : undefined
           const seeds = []
-          if (opts && opts.homePage) seeds.push(opts.homePage)
-          if (opts && opts.navigationPage) seeds.push(opts.navigationPage)
-          idx = await buildSearchIndex(opts && opts.contentBase ? opts.contentBase : undefined, indexDepth, noIndexing, seeds.length ? seeds : undefined)
+          if (opts?.homePage) seeds.push(opts.homePage)
+          if (opts?.navigationPage) seeds.push(opts.navigationPage)
+          idx = await buildSearchIndex(opts?.contentBase, indexDepth, noIndexing, seeds.length ? seeds : undefined)
         }
       } catch (e) {
         debugWarn('[runtimeSitemap] rebuild index failed', e)
@@ -879,28 +879,28 @@ export async function handleSitemapRequest(opts = {}) {
     // build first (if available) then fall back to `buildSearchIndex`.
     try {
       const rebuildSeeds = []
-      if (opts && opts.homePage) rebuildSeeds.push(opts.homePage)
-      if (opts && opts.navigationPage) rebuildSeeds.push(opts.navigationPage)
+      if (opts?.homePage) rebuildSeeds.push(opts.homePage)
+      if (opts?.navigationPage) rebuildSeeds.push(opts.navigationPage)
       const rebuildDepth = (typeof opts.indexDepth === 'number') ? opts.indexDepth : 3
       const rebuildNoIndexing = Array.isArray(opts.noIndexing) ? opts.noIndexing : undefined
       let rebuilt = null
       try {
         const workerFn = (typeof globalThis !== 'undefined' && typeof globalThis.buildSearchIndexWorker === 'function') ? globalThis.buildSearchIndexWorker : undefined
         if (typeof workerFn === 'function') {
-          try { rebuilt = await workerFn(opts && opts.contentBase ? opts.contentBase : undefined, rebuildDepth, rebuildNoIndexing) } catch (e) { rebuilt = null }
+          try { rebuilt = await workerFn(opts?.contentBase, rebuildDepth, rebuildNoIndexing) } catch (e) { rebuilt = null }
         }
       } catch (e) { rebuilt = null }
 
       if ((!rebuilt || !rebuilt.length) && typeof buildSearchIndex === 'function') {
-        try { rebuilt = await buildSearchIndex(opts && opts.contentBase ? opts.contentBase : undefined, rebuildDepth, rebuildNoIndexing, rebuildSeeds.length ? rebuildSeeds : undefined) } catch (e) { rebuilt = null }
+        try { rebuilt = await buildSearchIndex(opts?.contentBase, rebuildDepth, rebuildNoIndexing, rebuildSeeds.length ? rebuildSeeds : undefined) } catch (e) { rebuilt = null }
       }
 
       if (Array.isArray(rebuilt) && rebuilt.length) {
         // Merge rebuilt entries with any existing idx, preferring rebuilt
         const bySlug = new Map()
         try {
-          for (const it of idx) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
-          for (const it of rebuilt) { try { if (it && it.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+          for (const it of idx) { try { if (it?.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
+          for (const it of rebuilt) { try { if (it?.slug) bySlug.set(String(it.slug), it) } catch (_) {} }
         } catch (_) {}
         idx = Array.from(bySlug.values())
       }
@@ -922,7 +922,7 @@ export async function handleSitemapRequest(opts = {}) {
     let deduped = []
     try {
       const seen = new Set()
-      const entriesArr = Array.isArray(json && json.entries) ? json.entries : []
+      const entriesArr = Array.isArray(json?.entries) ? json.entries : []
       for (const e of entriesArr) {
         try {
           let slug = null
@@ -942,13 +942,13 @@ export async function handleSitemapRequest(opts = {}) {
       }
       try { debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase: ' + JSON.stringify(deduped, null, 2)) } catch (e) { debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase (count): ' + String(deduped.length)) }
     } catch (e) {
-      try { deduped = Array.isArray(json && json.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
+          try { deduped = Array.isArray(json?.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
     }
 
     // Construct a final JSON object that uses the deduped page-level
     // entries for all generators so ?sitemap, ?rss and ?atom are
     // consistent and use the same data set.
-    const finalJson = Object.assign({}, json || {}, { entries: Array.isArray(deduped) ? deduped : (Array.isArray(json && json.entries) ? json.entries : []) })
+    const finalJson = Object.assign({}, json || {}, { entries: Array.isArray(deduped) ? deduped : (Array.isArray(json?.entries) ? json.entries : []) })
 
     try {
       if (typeof window !== 'undefined') {
@@ -960,7 +960,7 @@ export async function handleSitemapRequest(opts = {}) {
     } catch {}
 
     if (wantRss) {
-      const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+      const newLen = Array.isArray(finalJson?.entries) ? finalJson.entries.length : 0
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
@@ -971,7 +971,7 @@ export async function handleSitemapRequest(opts = {}) {
       return true
     }
     if (wantAtom) {
-      const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+      const newLen = Array.isArray(finalJson?.entries) ? finalJson.entries.length : 0
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
@@ -982,7 +982,7 @@ export async function handleSitemapRequest(opts = {}) {
       return true
     }
     if (wantXml) {
-      const newLen = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries.length : 0
+      const newLen = Array.isArray(finalJson?.entries) ? finalJson.entries.length : 0
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
@@ -995,7 +995,7 @@ export async function handleSitemapRequest(opts = {}) {
 
     if (wantHtml) {
       try {
-        const entriesForHtml = Array.isArray(finalJson && finalJson.entries) ? finalJson.entries : []
+        const entriesForHtml = Array.isArray(finalJson?.entries) ? finalJson.entries : []
         const newLen = entriesForHtml.length
         let existingRenderedLen = -1
         try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
@@ -1033,7 +1033,7 @@ export async function exposeSitemapGlobals(opts = {}) {
     try {
       if (typeof whenSearchIndexReady === 'function') {
         try {
-          const live = await whenSearchIndexReady({ timeoutMs: waitMs, contentBase: opts && opts.contentBase, indexDepth: opts && opts.indexDepth, noIndexing: opts && opts.noIndexing, startBuild: true })
+          const live = await whenSearchIndexReady({ timeoutMs: waitMs, contentBase: opts?.contentBase, indexDepth: opts?.indexDepth, noIndexing: opts?.noIndexing, startBuild: true })
           if (Array.isArray(live) && live.length) idx = live
         } catch (_) {
           /* ignore */
@@ -1049,7 +1049,7 @@ export async function exposeSitemapGlobals(opts = {}) {
     let deduped = []
     try {
       const seen = new Set()
-      const entriesArr = Array.isArray(json && json.entries) ? json.entries : []
+      const entriesArr = Array.isArray(json?.entries) ? json.entries : []
       for (const e of entriesArr) {
         try {
           let slug = null
@@ -1068,11 +1068,11 @@ export async function exposeSitemapGlobals(opts = {}) {
         } catch (_) {}
       }
     } catch (e) {
-      try { deduped = Array.isArray(json && json.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
+      try { deduped = Array.isArray(json?.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
     }
 
     // Ensure the exposed JSON matches the deduped page-level entries
-    const finalJson = Object.assign({}, json || {}, { entries: Array.isArray(deduped) ? deduped : (Array.isArray(json && json.entries) ? json.entries : []) })
+    const finalJson = Object.assign({}, json || {}, { entries: Array.isArray(deduped) ? deduped : (Array.isArray(json?.entries) ? json.entries : []) })
     try {
       if (typeof window !== 'undefined') {
         try {

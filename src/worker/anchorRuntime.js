@@ -48,7 +48,7 @@ function createParser() {
   if (typeof DOMParser === 'undefined') return null
   const parser = getSharedParser()
   try {
-    if (parser && parser.constructor === DOMParser) return parser
+    if (parser?.constructor === DOMParser) return parser
   } catch (_) {}
   return new DOMParser()
 }
@@ -134,7 +134,7 @@ export async function rewriteAnchorsHtml(html, contentBase, pagePath, snapshot =
 
   for (const anchor of Array.from(anchors)) {
     try {
-      try { if (anchor.closest && anchor.closest('h1,h2,h3,h4,h5,h6')) continue } catch (_) {}
+        try { if (anchor?.closest?.('h1,h2,h3,h4,h5,h6')) continue } catch (_) {}
       const href = anchor.getAttribute('href') || ''
       if (!href || isExternalHref(href)) continue
 

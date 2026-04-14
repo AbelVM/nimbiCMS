@@ -46,8 +46,8 @@ function _hbWarn(...args) { try { debugWarn(...args) } catch (e) {} }
 function _hbShouldProbe(contentBase) {
   try { if (isDebugLevel(3)) return true } catch (e) {}
   try { if (typeof notFoundPage === 'string' && notFoundPage) return true } catch (e) {}
-  try { if (slugToMd && slugToMd.size) return true } catch (e) {}
-  try { if (allMarkdownPathsSet && allMarkdownPathsSet.size) return true } catch (e) {}
+  try { if (slugToMd?.size) return true } catch (e) {}
+  try { if (allMarkdownPathsSet?.size) return true } catch (e) {}
   return false
 }
 
@@ -110,7 +110,7 @@ function stripContentBasePrefix(rel, contentBasePath) {
 
 /**
  * @typedef {{article:HTMLElement,parsed:ParsedPage,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}} ArticleResult
- */
+*/
 
 /**
  * Build a navigation tree DOM element from a simple tree description.
@@ -138,13 +138,13 @@ export function createNavTree(t, tree) {
         try {
           a.setAttribute('href', buildPageUrl(p))
         } catch (e) {
-          if (p && p.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p))
+          if (p?.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p))
           else a.setAttribute('href', fullCosmetic(p))
         }
       } catch (e) { a.setAttribute('href', '#' + item.path) }
       a.textContent = item.name
       li.appendChild(a)
-      if (item.children && item.children.length) {
+      if (item.children?.length) {
         const subul = document.createElement('ul')
         item.children.forEach((c) => {
           const cli = document.createElement('li')
@@ -154,7 +154,7 @@ export function createNavTree(t, tree) {
             try {
               ca.setAttribute('href', buildPageUrl(cp))
             } catch (e) {
-              if (cp && cp.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp))
+              if (cp?.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp))
               else ca.setAttribute('href', fullCosmetic(cp))
             }
           } catch (e) { ca.setAttribute('href', '#' + c.path) }
@@ -175,18 +175,18 @@ export function createNavTree(t, tree) {
         const a = document.createElement('a')
         try {
           const p = String(item.path ?? '')
-          try { a.setAttribute('href', buildPageUrl(p)) } catch (e) { if (p && p.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p)); else a.setAttribute('href', fullCosmetic(p)) }
+          try { a.setAttribute('href', buildPageUrl(p)) } catch (e) { if (p?.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p)); else a.setAttribute('href', fullCosmetic(p)) }
         } catch (e) { a.setAttribute('href', '#' + item.path) }
         a.textContent = item.name
         li.appendChild(a)
-        if (item.children && item.children.length) {
+        if (item.children?.length) {
           const subul = document.createElement('ul')
           item.children.forEach((c) => {
             const cli = document.createElement('li')
             const ca = document.createElement('a')
             try {
               const cp = String(c.path ?? '')
-              try { ca.setAttribute('href', buildPageUrl(cp)) } catch (e) { if (cp && cp.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp)); else ca.setAttribute('href', fullCosmetic(cp)) }
+              try { ca.setAttribute('href', buildPageUrl(cp)) } catch (e) { if (cp?.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp)); else ca.setAttribute('href', fullCosmetic(cp)) }
             } catch (e) { ca.setAttribute('href', '#' + c.path) }
             ca.textContent = c.name
             cli.appendChild(ca)
@@ -232,12 +232,12 @@ export function buildTocElement(t, toc, pagePath = '') {
         const slug = item.id || slugify(text)
         a.textContent = text
         try {
-          const normPage = String(pagePath ?? '').replace(/^[\\.\\/]+/, '')
-          const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
-            if (display) a.href = buildPageUrl(display, slug)
-            else a.href = `#${encodeURIComponent(slug)}`
+          const normPage = String(pagePath ?? '').replace(/^[\.\/]+/, '')
+          const display = (normPage && mdToSlug?.has?.(normPage)) ? mdToSlug.get(normPage) : normPage
+          if (display) a.href = buildPageUrl(display, slug)
+          else a.href = `#${encodeURIComponent(slug)}`
         } catch (err) {
-            debugWarn('[htmlBuilder] buildTocElement href normalization failed', err)
+          debugWarn('[htmlBuilder] buildTocElement href normalization failed', err)
           a.href = `#${encodeURIComponent(slug)}`
         }
         li.appendChild(a)
@@ -296,9 +296,9 @@ function addHeadingIds(doc) {
  */
 function lazyLoadImages(el, pagePath, contentBase) {
   try {
-    const imgs = el.querySelectorAll('img')
-    if (imgs && imgs.length) {
-      const pageDirForImgs = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+    const imgs = el.querySelectorAll?.('img') || []
+    if (imgs?.length) {
+      const pageDirForImgs = pagePath?.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
       imgs.forEach((img) => {
         const src = img.getAttribute('src') || ''
         if (!src) return
@@ -323,7 +323,7 @@ function lazyLoadImages(el, pagePath, contentBase) {
  */
 function rewriteRelativeAssets(el, pagePath, contentBase) {
   try {
-    const pageDir = pagePath && pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
+    const pageDir = pagePath?.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
     let baseForPage = null
     try {
       const contentBaseUrl = new URL(contentBase, location.href)
@@ -367,13 +367,13 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
             try { node.setAttribute(attr, new URL(val, baseForPage).toString()) } catch (err) { debugWarn('[htmlBuilder] rewrite asset attribute failed', attr, val, err) }
           } catch (err) { debugWarn('[htmlBuilder] rewriteAttr failed', err) }
         }
-        if (node.hasAttribute && node.hasAttribute('src')) rewriteAttr('src')
-        if (node.hasAttribute && node.hasAttribute('href')) {
+        if (node.hasAttribute?.('src')) rewriteAttr('src')
+        if (node.hasAttribute?.('href')) {
           if (tag !== 'a') rewriteAttr('href')
         }
-        if (node.hasAttribute && node.hasAttribute('xlink:href')) rewriteAttr('xlink:href')
-        if (node.hasAttribute && node.hasAttribute('poster')) rewriteAttr('poster')
-        if (node.hasAttribute && node.hasAttribute('srcset')) {
+        if (node.hasAttribute?.('xlink:href')) rewriteAttr('xlink:href')
+        if (node.hasAttribute?.('poster')) rewriteAttr('poster')
+        if (node.hasAttribute?.('srcset')) {
           const rawSs = node.getAttribute('srcset') || ''
           const parts = rawSs.split(',').map(s => s.trim()).filter(Boolean)
           const mapped = parts.map(p => {
@@ -405,9 +405,9 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
   try {
     // default to canonical hrefs unless explicitly overridden
     opts = opts || {}
-    if (typeof opts.canonical === 'undefined') opts.canonical = true
-    const anchors = article.querySelectorAll('a')
-    if (!anchors || !anchors.length) return
+    opts.canonical = opts.canonical !== false
+    const anchors = article.querySelectorAll?.('a') || []
+    if (!anchors.length) return
 
     let contentBaseUrl, contentBasePath
     if (contentBase === _lastContentBase && _lastContentBaseUrl) {
@@ -435,8 +435,8 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
         // Don't rewrite anchors that live inside heading elements —
         // links in headings are often intended as part of the heading
         // and rewriting them can break slug/title extraction and TOC mapping.
-        try { if (a.closest && a.closest('h1,h2,h3,h4,h5,h6')) continue } catch (e) {}
-        const href = a.getAttribute('href') || ''
+        try { if (a?.closest?.('h1,h2,h3,h4,h5,h6')) continue } catch (e) {}
+        const href = a.getAttribute?.('href') || ''
         if (!href) continue
         if (isExternalLink(href)) continue
         try {
@@ -448,7 +448,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
                     const dir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : ''
                     if (dir) {
                       const newRel = normalizePath(dir + pageParam)
-                      const urlVal = opts && opts.canonical ? buildPageUrl(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null) : fullCosmetic(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null)
+                      const urlVal = opts?.canonical ? buildPageUrl(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null) : fullCosmetic(newRel, tmpUrl.hash ? tmpUrl.hash.replace(/^#/, '') : null)
                       a.setAttribute('href', urlVal)
                       continue
                     }
@@ -471,7 +471,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
               rel = stripContentBasePrefix(rel, contentBasePath)
               rel = normalizePath(rel)
               anchorInfo.push({ node: a, mdPathRaw, frag, rel })
-            if (!mdToSlug.has(rel)) pending.add(rel)
+                    if (!mdToSlug?.has?.(rel)) pending.add(rel)
           } catch (err) { debugWarn('[htmlBuilder] resolve mdPath failed', err) }
           continue
         }
@@ -495,13 +495,13 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             if (!rel) rel = HOME_SLUG
             if (!rel.endsWith('.md')) {
               let slugKey = null
-              try {
-                if (mdToSlug && mdToSlug.has && mdToSlug.has(rel)) {
-                  slugKey = mdToSlug.get(rel)
+                try {
+                if (mdToSlug?.has?.(rel)) {
+                  slugKey = mdToSlug?.get?.(rel)
                 } else {
                     try {
                       const baseName = String(rel ?? '').replace(/^.*\//, '')
-                      if (baseName && mdToSlug.has && mdToSlug.has(baseName)) slugKey = mdToSlug.get(baseName)
+                      if (baseName && mdToSlug?.has?.(baseName)) slugKey = mdToSlug?.get?.(baseName)
                     } catch (e) { debugWarn('[htmlBuilder] mdToSlug baseName check failed', e) }
                   }
                 } catch (err) { debugWarn('[htmlBuilder] mdToSlug access check failed', err) }
@@ -513,8 +513,8 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
                   }
                 } catch (err) { /* ignore iteration errors */ }
               }
-              if (slugKey) {
-                const urlVal = opts && opts.canonical ? buildPageUrl(slugKey, null) : fullCosmetic(slugKey)
+                if (slugKey) {
+                const urlVal = opts?.canonical ? buildPageUrl(slugKey, null) : fullCosmetic(slugKey)
                 a.setAttribute('href', urlVal)
               } else {
                 // If the resolved target has no file extension, try the
@@ -565,7 +565,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
                 const mapped = slugToMd.get(basename)
                 if (mapped) {
                   try {
-                    const pathVal = (typeof mapped === 'string') ? mapped : (mapped && mapped.default ? mapped.default : null)
+                    const pathVal = (typeof mapped === 'string') ? mapped : (mapped?.default ? mapped.default : null)
                     if (pathVal) storeSlugMapping(basename, pathVal)
                   } catch (err) { debugWarn('[htmlBuilder] _storeSlugMapping failed', err) }
                 }
@@ -575,7 +575,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           } catch (err) { debugWarn('[htmlBuilder] basename slug lookup failed', err) }
 
           const mdData = await fetchMarkdown(rel, contentBase)
-            if (mdData && mdData.raw) {
+            if (mdData?.raw) {
             const m2 = (mdData.raw || '').match(/^#\s+(.+)$/m)
             if (m2 && m2[1]) {
               const candidate = slugify(m2[1].trim())
@@ -634,27 +634,27 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
     for (const info of anchorInfo) {
       const { node: a, frag, rel } = info
       let slug = null
-      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { debugWarn('[htmlBuilder] mdToSlug access failed', err) }
+      try { if (mdToSlug?.has?.(rel)) slug = mdToSlug?.get?.(rel) } catch (err) { debugWarn('[htmlBuilder] mdToSlug access failed', err) }
       if (slug) {
-        const urlVal = opts && opts.canonical ? buildPageUrl(slug, frag) : fullCosmetic(slug, frag)
+        const urlVal = opts?.canonical ? buildPageUrl(slug, frag) : fullCosmetic(slug, frag)
         a.setAttribute('href', urlVal)
       } else {
-        const urlVal = opts && opts.canonical ? buildPageUrl(rel, frag) : fullCosmetic(rel, frag)
+        const urlVal = opts?.canonical ? buildPageUrl(rel, frag) : fullCosmetic(rel, frag)
         a.setAttribute('href', urlVal)
       }
     }
     for (const info of htmlAnchorInfo) {
       const { node: a, rel } = info
       let slug = null
-      try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { debugWarn('[htmlBuilder] mdToSlug access failed for htmlAnchorInfo', err) }
+      try { if (mdToSlug?.has?.(rel)) slug = mdToSlug?.get?.(rel) } catch (err) { debugWarn('[htmlBuilder] mdToSlug access failed for htmlAnchorInfo', err) }
       if (!slug) {
-        try { const baseName = String(rel ?? '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { debugWarn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
+        try { const baseName = String(rel ?? '').replace(/^.*\//, ''); if (mdToSlug?.has?.(baseName)) slug = mdToSlug?.get?.(baseName) } catch (err) { debugWarn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
       }
       if (slug) {
-        const urlVal = opts && opts.canonical ? buildPageUrl(slug, null) : fullCosmetic(slug)
+        const urlVal = opts?.canonical ? buildPageUrl(slug, null) : fullCosmetic(slug)
         a.setAttribute('href', urlVal)
       } else {
-        const urlVal = opts && opts.canonical ? buildPageUrl(rel, null) : fullCosmetic(rel)
+        const urlVal = opts?.canonical ? buildPageUrl(rel, null) : fullCosmetic(rel)
         a.setAttribute('href', urlVal)
       }
     }
@@ -699,24 +699,24 @@ function computeSlug(parsed, article, pagePath, anchor) {
         try {
           storeSlugMapping(slugKey, pagePath)
         } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
-        try {
-          const normPath = normalizePath(String(pagePath ?? ''))
-          if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(normPath)) {
-            slugKey = mdToSlug.get(normPath)
-          } else {
-            // Fallback: scan slugToMd for a key that maps to this path
-            try {
-              for (const [k, v] of slugToMd || []) {
-                try {
-                  const pathVal = (typeof v === 'string') ? v : (v && v.default ? v.default : null)
-                  if (pathVal && normalizePath(String(pathVal)) === normPath) {
-                    slugKey = k
-                    break
-                  }
-                } catch (_) {}
-              }
-            } catch (_) {}
-          }
+          try {
+            const normPath = normalizePath(String(pagePath ?? ''))
+            if (mdToSlug?.has?.(normPath)) {
+              slugKey = mdToSlug.get(normPath)
+            } else {
+              // Fallback: scan slugToMd for a key that maps to this path
+              try {
+                for (const [k, v] of slugToMd || []) {
+                  try {
+                    const pathVal = (typeof v === 'string') ? v : (v?.default ? v.default : null)
+                    if (pathVal && normalizePath(String(pathVal)) === normPath) {
+                      slugKey = k
+                      break
+                    }
+                  } catch (_) {}
+                }
+              } catch (_) {}
+            }
         } catch (err) { /* ignore readback errors */ }
       }
     } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
@@ -728,7 +728,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
           try {
             const parsedCurrent = parseHrefToRoute(typeof location !== 'undefined' ? location.href : '')
             // Only reuse the current anchor if it belongs to the same page slug.
-            if (parsedCurrent && parsedCurrent.anchor && parsedCurrent.page && String(parsedCurrent.page) === String(slugKey)) {
+            if (parsedCurrent?.anchor && parsedCurrent?.page && String(parsedCurrent.page) === String(slugKey)) {
               curHash = parsedCurrent.anchor
             } else {
               curHash = ''
@@ -743,7 +743,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
         } catch (err) { debugWarn('[htmlBuilder] computeSlug inner failed', err) }
       } catch (err) { debugWarn('[htmlBuilder] computeSlug failed', err) }
   try {
-    if (parsed && parsed.meta && parsed.meta.title && topH1) {
+    if (parsed?.meta?.title && topH1) {
       const metaTitle = String(parsed.meta.title).trim()
       if (metaTitle && metaTitle !== h1Text) {
         try {
@@ -796,7 +796,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
         if (!/\.html(?:$|[?#])/.test(path) && !path.toLowerCase().endsWith('.html')) continue
         const htmlPath = path
         try {
-          if (mdToSlug && mdToSlug.has && mdToSlug.has(htmlPath)) continue
+          if (mdToSlug?.has?.(htmlPath)) continue
         } catch (err) { debugWarn('[htmlBuilder] mdToSlug check failed', err) }
         try {
           let already = false
@@ -838,9 +838,9 @@ export async function preScanHtmlSlugs(linkEls, base) {
             const doc = parser.parseFromString(res.raw, 'text/html')
             const titleTag = doc.querySelector('title')
             const h1 = doc.querySelector('h1')
-            const titleText = (titleTag && titleTag.textContent && titleTag.textContent.trim())
-              ? titleTag.textContent.trim()
-              : (h1 && h1.textContent ? h1.textContent.trim() : null)
+             const titleText = (titleTag?.textContent && titleTag.textContent.trim())
+               ? titleTag.textContent.trim()
+               : (h1?.textContent ? h1.textContent.trim() : null)
             if (titleText) {
               const slugKey = slugify(titleText)
               if (slugKey) {
@@ -892,7 +892,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
           let rel = (resolved && contentBasePath && resolved.startsWith(contentBasePath)) ? resolved.slice(contentBasePath.length) : String(resolved ?? '').replace(/^\//, '')
           rel = stripContentBasePrefix(rel, contentBasePath)
           anchorInfo.push({ rel })
-          if (!mdToSlug.has(rel)) pending.add(rel)
+          if (!mdToSlug?.has?.(rel)) pending.add(rel)
         } catch (err) { debugWarn('[htmlBuilder] rewriteAnchors failed', err) }
         continue
       }
@@ -912,9 +912,9 @@ export async function preMapMdSlugs(linkEls, contentBase) {
               const mapped = slugToMd.get(basename)
               if (mapped) {
                 try {
-                  const pathVal = (typeof mapped === 'string') ? mapped : (mapped && mapped.default ? mapped.default : null)
-                  if (pathVal) storeSlugMapping(basename, pathVal)
-                } catch (err) { debugWarn('[htmlBuilder] _storeSlugMapping failed', err) }
+                    const pathVal = (typeof mapped === 'string') ? mapped : (mapped?.default ? mapped.default : null)
+                    if (pathVal) storeSlugMapping(basename, pathVal)
+                  } catch (err) { debugWarn('[htmlBuilder] _storeSlugMapping failed', err) }
               }
               } catch (err) { debugWarn('[htmlBuilder] preMapMdSlugs slug map access failed', err) }
           return
@@ -960,7 +960,7 @@ function parseHtml(raw) {
     const codes = doc.querySelectorAll('pre code, code[class]')
     codes.forEach(codeEl => {
       try {
-        const cls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
+        const cls = codeEl.getAttribute?.('class') || codeEl.className || ''
         const match = cls.match(/language-([a-zA-Z0-9_+-]+)/) || cls.match(/lang(?:uage)?-?([a-zA-Z0-9_+-]+)/)
         if (match && match[1]) {
           const l = (match[1] || '').toLowerCase()
@@ -1001,10 +1001,10 @@ function parseHtml(raw) {
       tocEntries.push({ level: Number(h.tagName.substring(1)), text: (h.textContent || '').trim(), id: h.id })
     })
     const metaObj = {}
-    try {
-      const titleTag = doc.querySelector('title')
-      if (titleTag && titleTag.textContent && String(titleTag.textContent).trim()) metaObj.title = String(titleTag.textContent).trim()
-    } catch (e) { /* ignore title extraction failures */ }
+      try {
+        const titleTag = doc.querySelector('title')
+        if (titleTag?.textContent && String(titleTag.textContent).trim()) metaObj.title = String(titleTag.textContent).trim()
+      } catch (e) { /* ignore title extraction failures */ }
     return { html: doc.body.innerHTML, meta: metaObj, toc: tocEntries }
   } catch (err) { debugWarn('[htmlBuilder] parseHtml failed', err); return { html: raw || '', meta: {}, toc: [] } }
 }
@@ -1076,7 +1076,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
         if (parser) {
           const doc = parser.parseFromString(data.raw || '', 'text/html')
           try { rewriteRelativeAssets(doc.body, pagePath, contentBase) } catch (err) { debugWarn('[htmlBuilder] rewriteRelativeAssets failed in prepareArticle (inner)', err) }
-          parsed = parseHtml(doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : data.raw || '')
+          parsed = parseHtml(doc.documentElement?.outerHTML ? doc.documentElement.outerHTML : data?.raw || '')
         } else {
           parsed = parseHtml(data.raw || '')
         }
@@ -1164,12 +1164,12 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       const codeEls = article.querySelectorAll('pre code, code[class]')
       codeEls.forEach(el => {
         try {
-          const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
+          const raw = el.getAttribute?.('class') || el.className || ''
           const cleaned = String(raw ?? '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
           if (cleaned) {
-            try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned; debugWarn('[htmlBuilder] set element class failed', err) }
+            try { el.setAttribute?.('class', cleaned) } catch (err) { el.className = cleaned; debugWarn('[htmlBuilder] set element class failed', err) }
           } else {
-            try { el.removeAttribute && el.removeAttribute('class') } catch (err) { el.className = ''; debugWarn('[htmlBuilder] remove element class failed', err) }
+            try { el.removeAttribute?.('class') } catch (err) { el.className = ''; debugWarn('[htmlBuilder] remove element class failed', err) }
           }
         } catch (err) { debugWarn('[htmlBuilder] code element cleanup failed', err) }
       })
@@ -1179,7 +1179,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     lazyLoadImages(article, pagePath, contentBase)
 
     try {
-      const imgs = article.querySelectorAll && article.querySelectorAll('img') || []
+      const imgs = article.querySelectorAll?.('img') || []
       imgs.forEach(img => {
         try {
           const parent = img.parentElement
@@ -1194,16 +1194,16 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     } catch (err) { debugWarn('[htmlBuilder] wrap images in Bulma image helper failed', err) }
 
     try {
-      const tables = article.querySelectorAll && article.querySelectorAll('table') || []
+      const tables = article.querySelectorAll?.('table') || []
       tables.forEach(tb => {
         try {
           if (tb.classList) {
             if (!tb.classList.contains('table')) tb.classList.add('table')
           } else {
-            const cur = tb.getAttribute && tb.getAttribute('class') ? tb.getAttribute('class') : ''
+            const cur = tb.getAttribute?.('class') || ''
             const classes = String(cur ?? '').split(/\s+/).filter(Boolean)
             if (classes.indexOf('table') === -1) classes.push('table')
-            try { tb.setAttribute && tb.setAttribute('class', classes.join(' ')) } catch (e) { tb.className = classes.join(' ') }
+            try { tb.setAttribute?.('class', classes.join(' ')) } catch (e) { tb.className = classes.join(' ') }
           }
         } catch (e) { /* ignore per-table failures */ }
       })
@@ -1212,8 +1212,8 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     const { topH1, h1Text, slugKey } = computeSlug(parsed, article, pagePath, anchor)
 
     try {
-      if (topH1 && parsed && parsed.meta && (parsed.meta.author || parsed.meta.date)) {
-        const existing = topH1.parentElement && topH1.parentElement.querySelector && topH1.parentElement.querySelector('.nimbi-article-subtitle')
+      if (topH1 && (parsed?.meta?.author || parsed?.meta?.date)) {
+        const existing = topH1.parentElement?.querySelector?.('.nimbi-article-subtitle')
         if (!existing) {
           const author = parsed.meta.author ? String(parsed.meta.author).trim() : ''
           const dateRaw = parsed.meta.date ? String(parsed.meta.date).trim() : ''
@@ -1293,7 +1293,7 @@ export function executeEmbeddedScripts(article) {
             executed = false
           }
           if (executed) {
-            s.parentNode && s.parentNode.removeChild(s)
+            s.parentNode?.removeChild(s)
             try { debugInfo('[htmlBuilder] executed inline script via Function') } catch (e) {}
             continue
           }
@@ -1302,9 +1302,9 @@ export function executeEmbeddedScripts(article) {
         }
         if (s.src) {
           try {
-            const exists = document.querySelector && document.querySelector(`script[src="${s.src}"]`)
+            const exists = document.querySelector?.(`script[src="${s.src}"]`)
             if (exists) {
-              s.parentNode && s.parentNode.removeChild(s)
+              s.parentNode?.removeChild(s)
               continue
             }
           } catch (e) { /* ignore query failures */ }
@@ -1326,7 +1326,7 @@ export function executeEmbeddedScripts(article) {
             try { debugWarn('[htmlBuilder] injected script append failed, skipping', { src: srcLabel, err: appendErr2 }) } catch (e) {}
           }
         }
-        s.parentNode && s.parentNode.removeChild(s)
+        s.parentNode?.removeChild(s)
         try { debugInfo('[htmlBuilder] executed injected script', srcLabel) } catch (e) {}
       } catch (e) { debugWarn('[htmlBuilder] execute injected script failed', e) }
     }
@@ -1355,7 +1355,7 @@ export function renderNotFound(contentWrap, t, e) {
     const h = document.createElement('h1')
     h.textContent = t ? t('notFound') || 'Page not found' : 'Page not found'
     const p = document.createElement('p')
-    p.textContent = e && e.message ? String(e.message) : 'Failed to resolve the requested page.'
+    p.textContent = e?.message ? String(e.message) : 'Failed to resolve the requested page.'
     notFound.appendChild(h)
     notFound.appendChild(p)
     if (contentWrap && contentWrap.appendChild) contentWrap.appendChild(notFound)
@@ -1406,16 +1406,28 @@ const anchorAutoScaleOptions = {
   stepUp: 1,
   stepDown: 1
 }
-const _anchorPool = new PowerPool(AnchorWorker, { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions })
+const _anchorPool = (() => {
+  const poolOpts = { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions }
+  try {
+    if (typeof process !== 'undefined' && process.env?.VITEST) {
+      poolOpts.debugLevel = 0
+    }
+  } catch (_e) {}
+  try {
+    return new PowerPool(AnchorWorker, poolOpts)
+  } catch (e) {
+    return { workers: [], postMessage: async () => { throw new Error('anchor worker unavailable') } }
+  }
+})()
 
 function _resolveSlugForWorkerPath(candidate) {
   if (!candidate) return null
   try {
-    if (mdToSlug && mdToSlug.has && mdToSlug.has(candidate)) return mdToSlug.get(candidate)
+    if (mdToSlug?.has?.(candidate)) return mdToSlug.get(candidate)
   } catch (_) {}
   try {
     const baseName = String(candidate).replace(/^.*\//, '')
-    if (baseName && mdToSlug && mdToSlug.has && mdToSlug.has(baseName)) return mdToSlug.get(baseName)
+    if (baseName && mdToSlug?.has?.(baseName)) return mdToSlug.get(baseName)
   } catch (_) {}
   try {
     for (const [slug, mapped] of slugToMd || []) {
@@ -1441,11 +1453,11 @@ function _buildAnchorWorkerSnapshot(article, contentBase, pagePath) {
   } catch (_) {}
 
   try {
-    const anchors = article && article.querySelectorAll ? Array.from(article.querySelectorAll('a')) : []
+    const anchors = Array.from(article?.querySelectorAll?.('a') || [])
     for (const anchor of anchors) {
       try {
-        try { if (anchor.closest && anchor.closest('h1,h2,h3,h4,h5,h6')) continue } catch (_) {}
-        const href = anchor.getAttribute('href') || ''
+        try { if (anchor?.closest?.('h1,h2,h3,h4,h5,h6')) continue } catch (_) {}
+        const href = anchor.getAttribute?.('href') || ''
         if (!href || isExternalLink(href)) continue
         if (href.startsWith('/') && !href.endsWith('.md')) continue
 
@@ -1638,20 +1650,20 @@ export { rewriteAnchorsWorker as _rewriteAnchorsWorker }
 export function attachTocClickHandler(toc) {
     try {
       toc.addEventListener('click', (ev) => {
-        const a = ev.target && ev.target.closest ? ev.target.closest('a') : null
+        const a = ev.target?.closest?.('a') || null
         if (!a) return
-        const href = a.getAttribute('href') || ''
+        const href = a.getAttribute?.('href') || ''
         try {
           // Use the central href parser so we correctly handle both canonical
           // and cosmetic forms (e.g. "?page=foo" and "#/foo#anchor?x=1").
           const parsedHref = parseHrefToRoute(href)
-          const pageParam = parsedHref && parsedHref.page ? parsedHref.page : null
-          const hash = parsedHref && parsedHref.anchor ? parsedHref.anchor : null
+          const pageParam = parsedHref?.page ?? null
+          const hash = parsedHref?.anchor ?? null
           if (!pageParam && !hash) return
           ev.preventDefault()
 
           let currentPage = null
-          try { if (history && history.state && history.state.page) currentPage = history.state.page } catch (err) { currentPage = null; debugWarn('[htmlBuilder] access history.state failed', err) }
+          try { if (history?.state?.page) currentPage = history.state.page } catch (err) { currentPage = null; debugWarn('[htmlBuilder] access history.state failed', err) }
           try { if (!currentPage) currentPage = (new URL(location.href)).searchParams.get('page') } catch (err) { debugWarn('[htmlBuilder] parse current location failed', err) }
 
           if ((!pageParam && hash) || (pageParam && currentPage && String(pageParam) === String(currentPage))) {
@@ -1777,7 +1789,7 @@ export function ensureScrollTopButton(article, topH1, { mountOverlay = null, con
       })
     }
 
-    const tocLabel = (navWrapEl && navWrapEl.querySelector) ? navWrapEl.querySelector('.menu-label') : null
+    const tocLabel = navWrapEl?.querySelector?.('.menu-label') || null
     if (!topH1) {
       btn.classList.remove('show')
       if (tocLabel) tocLabel.classList.remove('show')

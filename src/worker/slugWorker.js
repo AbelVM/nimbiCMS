@@ -80,8 +80,8 @@ export async function handleSlugWorkerMessage(msg) {
         return { id, result: res === undefined ? null : res }
       } catch (e) { return { id, error: String(e) } }
     }
-    return { id: msg && msg.id, error: 'unsupported message' }
+    return { id: msg?.id, error: 'unsupported message' }
   } catch (e) {
-    return { id: msg && msg.id, error: String(e) }
+    return { id: msg?.id, error: String(e) }
   }
 }

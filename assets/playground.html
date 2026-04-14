@@ -88,30 +88,28 @@ function hello(){
       const hl = hlSel.value;
 
       try {
-        if (api && typeof api.ensureBulma === 'function') {
+        if (typeof api?.ensureBulma === 'function') {
           if (bulma === 'none') {
-            try { const el = document.querySelector('link[data-bulmaswatch-theme]'); if (el && el.parentNode) el.parentNode.removeChild(el) } catch (e) { }
-            try { const s = document.querySelector('style[data-bulma-override]'); if (s && s.parentNode) s.parentNode.removeChild(s) } catch (e) { }
+            try { const el = document.querySelector('link[data-bulmaswatch-theme]'); el?.parentNode?.removeChild(el) } catch (e) { }
+            try { const s = document.querySelector('style[data-bulma-override]'); s?.parentNode?.removeChild(s) } catch (e) { }
           } else {
-            api.ensureBulma(bulma)
+            api?.ensureBulma?.(bulma)
           }
         }
       } catch (e) { console.warn(e) }
 
       try {
-        if (api && typeof api.setHighlightTheme === 'function') {
-          api.setHighlightTheme(hl, { useCdn: true })
-        }
+        api?.setHighlightTheme?.(hl, { useCdn: true })
       } catch (e) { console.warn(e) }
 
       try {
-        if (api && typeof api.observeCodeBlocks === 'function') {
-          api.observeCodeBlocks(preview)
-        } else if (window.hljs && typeof window.hljs.highlightElement === 'function') {
+        if (typeof api?.observeCodeBlocks === 'function') {
+          api?.observeCodeBlocks?.(preview)
+        } else if (typeof window.hljs?.highlightElement === 'function') {
           // let highlight.js re-scan preview area
           const els = preview.querySelectorAll('pre code')
           els.forEach(el => {
-            try { window.hljs.highlightElement(el) } catch (e) { /* ignore */ }
+            try { window.hljs?.highlightElement?.(el) } catch (e) { /* ignore */ }
           })
         }
       } catch (e) { console.warn(e) }
@@ -129,7 +127,7 @@ function hello(){
       const initCode = `// Minimal initialization example\nnimbiCMS.initCMS({\n  el: '#app',\n  defaultStyle: '${style}',\n  bulmaCustomize: ${bulmaVal},\n  highlightTheme: '${hl}',\n  useCdn: true\n});`
       els.forEach(el => {
         try { el.textContent = initCode } catch (e) { /* ignore */ }
-        try { if (window.hljs && typeof window.hljs.highlightElement === 'function') window.hljs.highlightElement(el) } catch (e) { /* ignore */ }
+        try { window.hljs?.highlightElement?.(el) } catch (e) { /* ignore */ }
       })
     }
 

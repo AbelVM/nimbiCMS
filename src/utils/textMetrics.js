@@ -72,7 +72,7 @@ function computeWordCount(text) {
 export function getReadingTime(text) {
   const key = makeKey(text)
   const cached = CACHE.get(key)
-  if (cached && cached.readingTime) return cached.readingTime
+  if (cached?.readingTime) return cached.readingTime
   const rt = readingTime(text || '')
   const entry = { readingTime: rt, wordCount: typeof rt.words === 'number' ? rt.words : computeWordCount(text) }
   setCacheEntry(key, entry)

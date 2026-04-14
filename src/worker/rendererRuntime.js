@@ -164,7 +164,7 @@ function detectLanguagesMessage(id, mdText, supported) {
     if (!name) continue
     if (name.length >= 5 && name.length <= 30 && /^[a-z][a-z0-9_\-+]*$/.test(name)) res.add(name)
     if (FALLBACK_KNOWN.has(name)) res.add(name)
-    if (supported && supported.length) {
+    if (supported?.length) {
       try {
         if (supported.indexOf(name) !== -1) res.add(name)
       } catch (_) {}
@@ -198,7 +198,7 @@ async function streamMarkdownResult(msg, onChunk) {
 
 function sendWorkerMessage(payload, transfer) {
   if (typeof postMessage !== 'function') return
-  if (transfer && transfer.length) postMessage(payload, transfer)
+  if (transfer?.length) postMessage(payload, transfer)
   else postMessage(payload)
 }
 
@@ -225,8 +225,8 @@ export function attachRendererWorker(target = globalThis) {
       }
     }
     try {
-      if (msg.type === 'register') {
-        const result = await registerLanguageMessage(msg.name, msg.url)
+      if (msg?.type === 'register') {
+        const result = await registerLanguageMessage(msg?.name, msg?.url)
         if (correlationId != null) reply(result)
         else {
           const u8 = o2u8(result)
@@ -234,15 +234,15 @@ export function attachRendererWorker(target = globalThis) {
         }
         return
       }
-      if (msg.type === 'detect') {
-        sendWorkerMessage(detectLanguagesMessage(msg.id, msg.md || '', msg.supported || []))
+      if (msg?.type === 'detect') {
+        sendWorkerMessage(detectLanguagesMessage(msg?.id, msg?.md || '', msg?.supported || []))
         return
       }
-      if (msg.type === 'stream') {
+      if (msg?.type === 'stream') {
         await streamMarkdownResult(msg, (payload) => sendWorkerMessage(payload))
         return
       }
-      const result = await renderMarkdownResult(msg && msg.md || '', new Map())
+      const result = await renderMarkdownResult(msg?.md || '', new Map())
       reply(result)
     } catch (e) {
       replyErr(e)
@@ -254,12 +254,12 @@ export function attachRendererWorker(target = globalThis) {
 
 export async function handleWorkerMessage(msg) {
   try {
-    if (msg && msg.type === 'register') return await registerLanguageMessage(msg.name, msg.url)
-    if (msg && msg.type === 'detect') return detectLanguagesMessage(msg.id, msg.md || '', msg.supported || [])
-    const result = await renderMarkdownResult(msg && msg.md || '', new Map())
-    return { id: msg && msg.id, result }
+    if (msg?.type === 'register') return await registerLanguageMessage(msg?.name, msg?.url)
+    if (msg?.type === 'detect') return detectLanguagesMessage(msg?.id || null, msg?.md || '', msg?.supported || [])
+    const result = await renderMarkdownResult(msg?.md || '', new Map())
+    return { id: msg?.id, result }
   } catch (e) {
-    return { id: msg && msg.id, error: String(e) }
+    return { id: msg?.id, error: String(e) }
   }
 }
 
@@ -274,7 +274,7 @@ export async function handleWorkerMessageStream(msg, onChunk) {
       if (typeof onChunk === 'function') onChunk(payload)
     })
   } catch (e) {
-    const err = { id: msg && msg.id, error: String(e) }
+    const err = { id: msg?.id, error: String(e) }
     if (typeof onChunk === 'function') onChunk(err)
     return err
   }

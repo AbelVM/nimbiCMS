@@ -11,7 +11,7 @@ vi.mock('../src/htmlBuilder.js', () => ({
   ensureScrollTopButton: vi.fn(),
   createNavTree: vi.fn((t, arr) => arr)
 }))
-vi.mock('../src/utils/helpers.js', () => ({ setEagerForAboveFoldImages: vi.fn() }))
+vi.mock('../src/utils/helpers.js', () => ({ setEagerForAboveFoldImages: vi.fn(), getWorkerPoolSize: vi.fn(() => 2) }))
 vi.mock('../src/seoManager.js', () => ({ applyPageMeta: vi.fn() }))
 vi.mock('../src/imagePreview.js', () => ({ attachImagePreview: vi.fn() }))
 

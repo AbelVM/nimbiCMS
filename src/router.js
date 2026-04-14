@@ -388,10 +388,10 @@ export async function fetchPageData(raw, contentBase) {
   let hashAnchor = null
   try {
     const parsedCurrent = parseHrefToRoute(typeof location !== 'undefined' ? location.href : '')
-    if (parsedCurrent && parsedCurrent.anchor) hashAnchor = parsedCurrent.anchor
+    if (parsedCurrent?.anchor) hashAnchor = parsedCurrent.anchor
   } catch (e) {
     try {
-      hashAnchor = location && location.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
+      hashAnchor = location?.hash ? decodeURIComponent(location.hash.replace(/^#/, '')) : null
     } catch (_e) {
       hashAnchor = null
     }
@@ -470,7 +470,7 @@ export async function fetchPageData(raw, contentBase) {
         const res = await fetch(abs, _fetchController ? { signal: _fetchController.signal } : undefined)
         if (res && res.ok) {
           const raw = await res.text()
-          const ct = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('content-type') || '') : ''
+          const ct = typeof res?.headers?.get === 'function' ? (res.headers.get('content-type') || '') : ''
           const rawLower = (raw || '').toLowerCase()
           const looksLikeHtml = (ct && ct.indexOf && ct.indexOf('text/html') !== -1) || rawLower.indexOf('<!doctype') !== -1 || rawLower.indexOf('<html') !== -1
           if (looksLikeHtml) {
@@ -486,7 +486,7 @@ export async function fetchPageData(raw, contentBase) {
                 const alt = relPath.replace(/\.html$/i, '.md')
                 try {
                   const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
-                  if (mdData && mdData.raw) {
+                  if (mdData?.raw) {
                     return { data: mdData, pagePath: alt, anchor }
                   }
                 } catch (_e) { /* ignore md probe failure */ }
@@ -523,7 +523,7 @@ export async function fetchPageData(raw, contentBase) {
                 const alt = relPath.replace(/\.html$/i, '.md')
                 try {
                   const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
-                  if (mdData && mdData.raw) {
+                  if (mdData?.raw) {
                     return { data: mdData, pagePath: alt, anchor }
                   }
                 } catch (_e) {
@@ -656,7 +656,7 @@ export async function fetchPageData(raw, contentBase) {
                     if (pageCandidates.includes(alt)) {
                       try {
                         const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
-                        if (mdData && mdData.raw) {
+                        if (mdData?.raw) {
                           data = mdData
                           pagePath = alt
                         } else {
@@ -746,7 +746,7 @@ export async function fetchPageData(raw, contentBase) {
                   let accepted = false
                   try {
                     const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
-                    if (mdData && mdData.raw) {
+                    if (mdData?.raw) {
                       data = mdData
                       pagePath = alt
                       accepted = true

@@ -87,7 +87,7 @@ export function createUI(opts) {
 
   function _pageContentSignature(data) {
     try {
-      const raw = String((data && data.raw) || '')
+      const raw = String(data?.raw || '')
       const len = raw.length
       const head = raw.slice(0, 120)
       const tail = raw.slice(Math.max(0, len - 120))
@@ -131,7 +131,7 @@ export function createUI(opts) {
       // consumer has elected to use the inline not-found fallback
       // (i.e. `notFoundPage` is unset). Preserve error-level logs for
       // unexpected failures.
-      const msg = e && e.message ? String(e.message) : ''
+      const msg = e?.message ? String(e.message) : ''
       const expectedMissing = (!notFoundPage || typeof notFoundPage !== 'string' || !notFoundPage) && /no page data/i.test(msg)
       try {
         if (expectedMissing) {
@@ -157,7 +157,7 @@ export function createUI(opts) {
     const preparedCached = _cacheGetPrepared(preparedKey)
 
     let article, parsed, toc, topH1, h1Text, slugKey
-    if (preparedCached && preparedCached.articleTemplate) {
+    if (preparedCached?.articleTemplate) {
       article = preparedCached.articleTemplate.cloneNode(true)
       toc = preparedCached.tocTemplate ? preparedCached.tocTemplate.cloneNode(true) : null
       topH1 = article.querySelector('h1')
@@ -169,7 +169,7 @@ export function createUI(opts) {
       _cacheSetPrepared(preparedKey, {
         articleTemplate: article.cloneNode(true),
         tocTemplate: toc ? toc.cloneNode(true) : null,
-        meta: Object.assign({}, (parsed && parsed.meta) || {}),
+        meta: Object.assign({}, parsed?.meta || {}),
         h1Text: h1Text || '',
         slugKey: slugKey || ''
       })
@@ -231,7 +231,7 @@ export function createUI(opts) {
       // instead of attempting to resolve a page with the same name as
       // the repo folder (which produces duplicated subpath probes).
       try {
-        if (parsed && parsed.type === 'path' && parsed.page && contentBase) {
+        if (parsed?.type === 'path' && parsed?.page && contentBase) {
           try {
             const cb = (typeof contentBase === 'string') ? new URL(contentBase, location.href).pathname : ''
             const cbNorm = String(cb ?? '').replace(/^\/+|\/+$/g, '')
@@ -246,7 +246,7 @@ export function createUI(opts) {
       // If a path-style URL was used (e.g. /slug) convert it to the
       // canonical `?page=slug[...]` form so the rest of the pipeline only
       // sees the approved patterns. Use replaceState so we don't reload.
-      if (parsed && parsed.type === 'path' && parsed.page) {
+      if (parsed?.type === 'path' && parsed?.page) {
         try {
           let out = '?page=' + encodeURIComponent(parsed.page || '')
           if (parsed.params) out += (out.includes('?') ? '&' : '?') + parsed.params
@@ -255,8 +255,8 @@ export function createUI(opts) {
           parsed = parseHrefToRoute(location.href)
         } catch (e) { /* ignore replace failures */ }
       }
-      const raw = (parsed && parsed.page) ? parsed.page : homePage
-      const hashAnchor = parsed && parsed.anchor ? parsed.anchor : null
+      const raw = parsed?.page ? parsed.page : homePage
+      const hashAnchor = parsed?.anchor ? parsed.anchor : null
       await renderPage(raw, hashAnchor)
     } catch (e) {
       debugWarn('[nimbi-cms] renderByQuery failed', e)
@@ -310,7 +310,7 @@ export function createUI(opts) {
       const stored = sessionStorage.getItem(scrollStoreKey())
       if (!stored) return
       const data = JSON.parse(stored)
-      if (data && typeof data.top === 'number') {
+      if (typeof data?.top === 'number') {
         containerEl.scrollTo({ top: data.top, left: (data.left || 0), behavior: 'auto' })
       }
     } catch (_e) {

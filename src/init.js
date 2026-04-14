@@ -521,22 +521,22 @@ export async function initCMS(options = {}) {
     
     // Configure SEO map and inject minimal SEO metadata early (library-level injection)
     try {
-      if (finalOptions && finalOptions.seoMap && typeof finalOptions.seoMap === 'object') setSeoMap(finalOptions.seoMap)
+      if (finalOptions?.seoMap && typeof finalOptions.seoMap === 'object') setSeoMap(finalOptions.seoMap)
     } catch (e) {}
     // Attach a lightweight runtime error/rejection logger for debugging render issues.
     try {
-      if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') {
         if (!window.__nimbiRenderingErrors__) window.__nimbiRenderingErrors__ = []
         window.addEventListener('error', function(ev) {
           try {
-            const rec = { type: 'error', message: ev && ev.message ? String(ev.message) : '', filename: ev && ev.filename ? String(ev.filename) : '', lineno: ev && ev.lineno ? ev.lineno : null, colno: ev && ev.colno ? ev.colno : null, stack: ev && ev.error && ev.error.stack ? ev.error.stack : null, time: Date.now() }
+            const rec = { type: 'error', message: ev?.message ? String(ev.message) : '', filename: ev?.filename ? String(ev.filename) : '', lineno: ev?.lineno ? ev.lineno : null, colno: ev?.colno ? ev.colno : null, stack: ev?.error?.stack ? ev.error.stack : null, time: Date.now() }
             try { debugWarn('[nimbi-cms] runtime error', rec.message) } catch (_) {}
             window.__nimbiRenderingErrors__.push(rec)
           } catch (_) {}
         })
         window.addEventListener('unhandledrejection', function(ev) {
           try {
-            const rec = { type: 'unhandledrejection', reason: ev && ev.reason ? String(ev.reason) : '', time: Date.now() }
+            const rec = { type: 'unhandledrejection', reason: ev?.reason ? String(ev.reason) : '', time: Date.now() }
             try { debugWarn('[nimbi-cms] unhandledrejection', rec.reason) } catch (_) {}
             window.__nimbiRenderingErrors__.push(rec)
           } catch (_) {}
@@ -545,7 +545,7 @@ export async function initCMS(options = {}) {
     } catch (e) {}
     try {
       const parsedForSeo = parseHrefToRoute(typeof window !== 'undefined' ? window.location.href : '')
-      const pageForSeo = (parsedForSeo && parsedForSeo.page) ? parsedForSeo.page : (homePage || undefined)
+      const pageForSeo = parsedForSeo?.page ? parsedForSeo.page : (homePage || undefined)
       try { if (pageForSeo) injectSeoForPage(pageForSeo, initialDocumentTitle || '') } catch (e) {}
     } catch (e) {}
 
@@ -623,7 +623,7 @@ export async function initCMS(options = {}) {
   try { initialDocumentTitle = document.title || '' } catch (e) { initialDocumentTitle = ''; debugWarn('[nimbi-cms] read initial document title failed', e) }
   let cp = contentPath
   const contentPathWasProvided = Object.prototype.hasOwnProperty.call(finalOptions, 'contentPath')
-  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+  const origin = (typeof location !== 'undefined' && location?.origin) ? location.origin : 'http://localhost'
   // pageRoot is the site-rooted folder for this page (origin + pageDir)
   const pageRoot = new URL(pageDir, origin).toString()
   // '.' and './' are page-relative (same as empty)
@@ -720,7 +720,7 @@ export async function initCMS(options = {}) {
     // (hard refreshes) can resolve pages that are not present in the
     // navigation file.
     try {
-      const manifest = (finalOptions && finalOptions.manifest) ? finalOptions.manifest :
+      const manifest = (finalOptions?.manifest) ? finalOptions.manifest :
         (typeof globalThis !== 'undefined' && globalThis.__NIMBI_CMS_MANIFEST__) ? globalThis.__NIMBI_CMS_MANIFEST__ :
         (typeof window !== 'undefined' && window.__NIMBI_CMS_MANIFEST__) ? window.__NIMBI_CMS_MANIFEST__ : null
       if (manifest && typeof manifest === 'object') {
@@ -745,8 +745,8 @@ export async function initCMS(options = {}) {
                 } else if (parsedCurrent.type === 'canonical') {
                   try { watchForColdHashRoute(parsedCurrent) } catch (_) {}
                 } else if (parsedCurrent.type === 'path') {
-                try {
-                  const locPath = (typeof location !== 'undefined' && location && location.pathname) ? String(location.pathname) : '/'
+                  try {
+                  const locPath = (typeof location !== 'undefined' && location?.pathname) ? String(location.pathname) : '/'
                   const normalizedLoc = locPath.replace(/\/\/+$/, '')
                   const normalizedPageDir = (pageDir || '').replace(/\/\/+$/, '')
                   let cbPath = ''
@@ -770,10 +770,10 @@ export async function initCMS(options = {}) {
           try {
             debugInfo('[nimbi-cms diagnostic] after setContentBase', () => ({
               manifestKeys: manifest && typeof manifest === 'object' ? Object.keys(manifest).length : 0,
-              slugToMdSize: (sm2 && sm2.slugToMd && typeof sm2.slugToMd.size === 'number') ? sm2.slugToMd.size : undefined,
-              allMarkdownPathsLength: (sm2 && Array.isArray(sm2.allMarkdownPaths)) ? sm2.allMarkdownPaths.length : undefined,
-              allMarkdownPathsSetSize: (sm2 && sm2.allMarkdownPathsSet && typeof sm2.allMarkdownPathsSet.size === 'number') ? sm2.allMarkdownPathsSet.size : undefined,
-              searchIndexLength: (sm2 && Array.isArray(sm2.searchIndex)) ? sm2.searchIndex.length : undefined
+              slugToMdSize: (typeof sm2?.slugToMd?.size === 'number') ? sm2?.slugToMd?.size : undefined,
+              allMarkdownPathsLength: (Array.isArray(sm2?.allMarkdownPaths)) ? sm2?.allMarkdownPaths.length : undefined,
+              allMarkdownPathsSetSize: (typeof sm2?.allMarkdownPathsSet?.size === 'number') ? sm2?.allMarkdownPathsSet?.size : undefined,
+              searchIndexLength: (Array.isArray(sm2?.searchIndex)) ? sm2?.searchIndex.length : undefined
             }))
           } catch (e) {}
         } catch (e) {}
@@ -841,10 +841,10 @@ export async function initCMS(options = {}) {
                     const a = doc.querySelector('a')
                     if (a) {
                       try {
-                        const href = a.getAttribute('href') || ''
+                        const href = a?.getAttribute?.('href') || ''
                         const r = parseHrefToRoute(href)
                         try { debugWarn('[nimbi-cms] parsed nav first-link href', href, '->', r) } catch (_) {}
-                        if (r && r.page) {
+                        if (r?.page) {
                           // Only accept candidate home pages that look like a
                           // fetchable path (contain an extension or a directory).
                           // Reject cosmetic slug or site-root paths like
@@ -942,9 +942,9 @@ export async function initCMS(options = {}) {
       // Ensure nav link slugs are present in slugManager for mocked environments
       try {
           if (linkEls && linkEls.length) {
-          for (const a of Array.from(linkEls || [])) {
+            for (const a of Array.from(linkEls || [])) {
             try {
-              const href = (a && a.getAttribute) ? (a.getAttribute('href') || '') : ''
+              const href = a?.getAttribute?.('href') || ''
               if (!href) continue
               let path = String(href ?? '').split(/::|#/, 1)[0]
               path = String(path ?? '').split('?')[0]
@@ -1078,7 +1078,7 @@ export async function initCMS(options = {}) {
               // Diagnostic: log slug/index sizes after index refresh
               try {
                 const sm3 = slugManager
-                try { debugInfo('[nimbi-cms diagnostic] after refreshIndexPaths', () => ({ slugToMdSize: (sm3 && sm3.slugToMd && typeof sm3.slugToMd.size === 'number') ? sm3.slugToMd.size : undefined, allMarkdownPathsLength: (sm3 && Array.isArray(sm3.allMarkdownPaths)) ? sm3.allMarkdownPaths.length : undefined, allMarkdownPathsSetSize: (sm3 && sm3.allMarkdownPathsSet && typeof sm3.allMarkdownPathsSet.size === 'number') ? sm3.allMarkdownPathsSet.size : undefined })) } catch (e) {}
+                try { debugInfo('[nimbi-cms diagnostic] after refreshIndexPaths', () => ({ slugToMdSize: (typeof sm3?.slugToMd?.size === 'number') ? sm3?.slugToMd?.size : undefined, allMarkdownPathsLength: (Array.isArray(sm3?.allMarkdownPaths)) ? sm3?.allMarkdownPaths.length : undefined, allMarkdownPathsSetSize: (typeof sm3?.allMarkdownPathsSet?.size === 'number') ? sm3?.allMarkdownPathsSet?.size : undefined })) } catch (e) {}
               } catch (e) {}
             } catch (e) {}
               // If no build-time manifest and slug maps are sparse, try using
@@ -1086,7 +1086,7 @@ export async function initCMS(options = {}) {
               // populate slug->md mappings so direct URL loads can resolve.
                 try {
                 const sm4 = slugManager
-                const currentSize = (sm4 && sm4.slugToMd && typeof sm4.slugToMd.size === 'number') ? sm4.slugToMd.size : 0
+                const currentSize = (typeof sm4?.slugToMd?.size === 'number') ? sm4?.slugToMd?.size : 0
                 // Decide whether to seed: prefer targeted seeding when the
                 // currently requested slug/path is missing, otherwise seed
                 // when maps appear sparse. This avoids noisy work on large
@@ -1103,7 +1103,7 @@ export async function initCMS(options = {}) {
                         } else if ((parsedCurrent.type === 'path' || parsedCurrent.type === 'canonical') && parsedCurrent.page) {
                           try {
                             const rp = normalizePath(parsedCurrent.page)
-                            if (!(sm4.mdToSlug && sm4.mdToSlug.has(rp)) && !(sm4.allMarkdownPathsSet && sm4.allMarkdownPathsSet.has(rp))) shouldSeed = true
+                            if (!(sm4.mdToSlug?.has?.(rp)) && !(sm4.allMarkdownPathsSet?.has?.(rp))) shouldSeed = true
                           } catch (_) {}
                         }
                       }
@@ -1162,7 +1162,7 @@ export async function initCMS(options = {}) {
                       } catch (_) {}
                     }
                     if (added) {
-                      try { debugInfo('[nimbi-cms diagnostic] populated slugToMd from sitemap/searchIndex', () => ({ added, total: (sm4 && sm4.slugToMd && typeof sm4.slugToMd.size === 'number') ? sm4.slugToMd.size : undefined })) } catch (_) {}
+                      try { debugInfo('[nimbi-cms diagnostic] populated slugToMd from sitemap/searchIndex', () => ({ added, total: (typeof sm4?.slugToMd?.size === 'number') ? sm4?.slugToMd?.size : undefined })) } catch (_) {}
                       try {
                         const im2 = await import('./indexManager.js')
                         if (im2 && typeof im2.refreshIndexPaths === 'function') im2.refreshIndexPaths(contentBase)
@@ -1176,12 +1176,12 @@ export async function initCMS(options = {}) {
       } catch (e) {}
 
       const computeAndSet = () => {
-        const navHeight = (navbarWrap && navbarWrap.getBoundingClientRect && Math.round(navbarWrap.getBoundingClientRect().height)) || (navbarWrap && navbarWrap.offsetHeight) || 0
+        const navHeight = (navbarWrap?.getBoundingClientRect && Math.round(navbarWrap.getBoundingClientRect().height)) || (navbarWrap?.offsetHeight) || 0
         if (navHeight > 0) {
           try { mountEl.style.setProperty('--nimbi-site-navbar-height', `${navHeight}px`) } catch (err) { debugWarn('[nimbi-cms] set CSS var failed', err) }
           try { container.style.paddingTop = '' } catch (err) { debugWarn('[nimbi-cms] set container paddingTop failed', err) }
           try {
-            const mountH = (mountEl && mountEl.getBoundingClientRect && Math.round(mountEl.getBoundingClientRect().height)) || (mountEl && mountEl.clientHeight) || 0
+            const mountH = (mountEl?.getBoundingClientRect && Math.round(mountEl.getBoundingClientRect().height)) || (mountEl?.clientHeight) || 0
             if (mountH > 0) {
               const explicit = Math.max(0, mountH - navHeight)
               try { container.style.setProperty('--nimbi-cms-height', `${explicit}px`) } catch (err) { debugWarn('[nimbi-cms] set --nimbi-cms-height failed', err) }

@@ -99,7 +99,7 @@ export const ensureTrailingSlash = (u) => _ensureTrailingSlashMemo.run(u)
  */
 export function setLazyload(img) {
   try {
-    if (img && img.getAttribute && !img.getAttribute('loading')) {
+    if (img?.getAttribute && !img.getAttribute('loading')) {
       img.setAttribute('loading', 'lazy')
     }
   } catch (err) { debugWarn('[helpers] setLazyload failed', err) }
@@ -153,7 +153,7 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
     if (!imgs.length) return
 
     const viewportEl = container
-    const viewportRect = viewportEl && viewportEl.getBoundingClientRect ? viewportEl.getBoundingClientRect() : null
+    const viewportRect = viewportEl?.getBoundingClientRect ? viewportEl.getBoundingClientRect() : null
 
     const winTop = 0
     const winBottom = (typeof window !== 'undefined') ? (window.innerHeight || document.documentElement.clientHeight || 0) : 0
@@ -172,8 +172,8 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
 
     let maxHeightRatio = 0.6
     try {
-      const css = viewportEl && window.getComputedStyle ? window.getComputedStyle(viewportEl) : null
-      const ratio = css && css.getPropertyValue('--nimbi-image-max-height-ratio')
+      const css = (viewportEl && window.getComputedStyle) ? window.getComputedStyle(viewportEl) : null
+      const ratio = css?.getPropertyValue ? css.getPropertyValue('--nimbi-image-max-height-ratio') : null
       const parsed = ratio ? parseFloat(ratio) : NaN
       if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 1) maxHeightRatio = parsed
     } catch (err) {
@@ -187,13 +187,13 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
 
     imgs.forEach(img => {
       try {
-        const beforeLoading = img.getAttribute ? img.getAttribute('loading') : undefined
+        const beforeLoading = img.getAttribute?.('loading')
         if (beforeLoading !== 'eager' && img.setAttribute) img.setAttribute('loading', 'lazy')
 
-        const rect = img.getBoundingClientRect ? img.getBoundingClientRect() : null
-        const src = img.src || (img.getAttribute && img.getAttribute('src'))
+        const rect = img?.getBoundingClientRect ? img.getBoundingClientRect() : null
+        const src = img.src || img.getAttribute?.('src')
 
-        const effectiveHeight = rect && rect.height > 1 ? rect.height : maxImageHeight
+        const effectiveHeight = rect?.height > 1 ? rect.height : maxImageHeight
         const effectiveTop = rect ? rect.top : 0
         const effectiveBottom = effectiveTop + effectiveHeight
 
@@ -217,7 +217,7 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
           foundAboveFold = true
         }
 
-        if (!firstVisibleImage && rect && rect.top <= visibleBottom) {
+        if (!firstVisibleImage && rect?.top <= visibleBottom) {
           firstVisibleImage = { img, src, rect, beforeLoading }
         }
 

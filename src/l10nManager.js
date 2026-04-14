@@ -21,7 +21,7 @@ const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))
 
 let detectedLang = 'en'
 if (typeof navigator !== 'undefined') {
-  const navLang = navigator.language || (navigator.languages && navigator.languages[0]) || 'en'
+  const navLang = navigator.language || navigator.languages?.[0] || 'en'
   detectedLang = String(navLang).split('-')[0].toLowerCase()
 }
 if (!DEFAULT_L10N[detectedLang]) detectedLang = 'en'
@@ -42,7 +42,7 @@ export let currentLang = detectedLang
  */
 export function t(key, replacements = {}) {
   const dict = L10N[currentLang] || L10N.en
-  let s = dict && dict[key] ? dict[key] : (L10N.en[key] || '')
+  let s = dict?.[key] || (L10N.en[key] || '')
   for (const k of Object.keys(replacements)) {
     s = s.replace(new RegExp(`\{${k}\}`, 'g'), String(replacements[k]))
   }

@@ -381,7 +381,7 @@ let __hlObserver = null
  */
 export function observeCodeBlocks(root) {
   
-  const effectiveRoot = (root && root.querySelector) ? root : (typeof document !== 'undefined' ? document : null)
+  const effectiveRoot = (root?.querySelector) ? root : (typeof document !== 'undefined' ? document : null)
 
   if (!loadSupportedLanguagesPromise) {
     ;(async () => {
@@ -413,7 +413,7 @@ export function observeCodeBlocks(root) {
                   const raw = el.textContent || el.innerText || ''
                   if (raw != null) el.textContent = raw
                 } catch (e) { /* ignore */ }
-                try { if (el && el.dataset && el.dataset.highlighted) delete el.dataset.highlighted } catch (_) {}
+                      try { if (el?.dataset?.highlighted) delete el.dataset.highlighted } catch (_) {}
                 hljs.highlightElement(el)
               } catch (err) { debugWarn('[codeblocksManager] hljs.highlightElement failed', err) }
             } else {
@@ -453,7 +453,7 @@ export function observeCodeBlocks(root) {
   }
 
   const obs = ensureObserver()
-  const blocks = (effectiveRoot && effectiveRoot.querySelectorAll) ? effectiveRoot.querySelectorAll('pre code') : []
+  const blocks = (effectiveRoot?.querySelectorAll) ? effectiveRoot.querySelectorAll('pre code') : []
   if (!obs) {
     
     blocks.forEach(async (el) => {
@@ -491,12 +491,12 @@ export function observeCodeBlocks(root) {
  */
 export function setHighlightTheme(theme, { useCdn = true } = {}) {
   const existing = (typeof document !== 'undefined' && document.head && document.head.querySelector) ? document.head.querySelector('link[data-hl-theme]') : (typeof document !== 'undefined' ? document.querySelector('link[data-hl-theme]') : null)
-  const existingTheme = existing && existing.getAttribute ? existing.getAttribute('data-hl-theme') : null
+    const existingTheme = existing?.getAttribute ? existing.getAttribute('data-hl-theme') : null
 
   const requested = (theme === undefined || theme === null) ? 'default' : String(theme)
   const requestedLower = (requested && String(requested).toLowerCase()) || ''
-  if (requestedLower === 'default' || requestedLower === 'monokai') {
-    try { if (existing && existing.parentNode) existing.parentNode.removeChild(existing) } catch (e) { /* ignore */ }
+    if (requestedLower === 'default' || requestedLower === 'monokai') {
+      try { if (existing?.parentNode) existing.parentNode.removeChild(existing) } catch (e) { /* ignore */ }
     return
   }
 
@@ -515,9 +515,9 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
   newLink.setAttribute('data-hl-theme', currentHighlightTheme)
 
   newLink.addEventListener('load', () => {
-    try {
-      if (existing && existing.parentNode) existing.parentNode.removeChild(existing)
-    } catch (e) { /* ignore */ }
+      try {
+        if (existing?.parentNode) existing.parentNode.removeChild(existing)
+      } catch (e) { /* ignore */ }
   })
   document.head.appendChild(newLink)
 }

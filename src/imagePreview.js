@@ -390,7 +390,7 @@ function _createModal() {
   if (wrapper) {
     wrapper.addEventListener('pointerdown', (event) => {
       startDrag(event.clientX, event.clientY, event.pointerId)
-      if (event && event.target && event.target.tagName === 'IMG') {
+      if (event?.target?.tagName === 'IMG') {
         try { event.target.classList.add('is-grabbing') } catch (e) {}
       }
     })
@@ -402,7 +402,7 @@ function _createModal() {
 
     wrapper.addEventListener('mousedown', (event) => {
       startDrag(event.clientX, event.clientY, 1)
-      if (event && event.target && event.target.tagName === 'IMG') {
+      if (event?.target?.tagName === 'IMG') {
         try { event.target.classList.add('is-grabbing') } catch (e) {}
       }
     })
@@ -593,7 +593,7 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     if (!img.src) return
 
     const anchor = img.closest('a')
-    if (anchor && anchor.getAttribute('href')) {
+    if (anchor?.getAttribute?.('href')) {
       return
     }
 
@@ -668,8 +668,8 @@ export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
     event.preventDefault()
 
     const target = /** @type {HTMLElement} */ (event.target)
-    const linkAncestor = target.closest && target.closest('a')
-    if (linkAncestor && linkAncestor.getAttribute && linkAncestor.getAttribute('href')) return
+    const linkAncestor = target?.closest?.('a')
+    if (linkAncestor?.getAttribute?.('href')) return
     const wrapper = target.closest('.nimbi-image-preview__image-wrapper')
     if (!wrapper) return
 
