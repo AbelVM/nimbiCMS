@@ -80,6 +80,47 @@ export const BAD_LANGUAGES = new Set(['magic', 'undefined'])
 
 let loadSupportedLanguagesPromise = null
 
+// Circuit breaker state for CDN hosts used when loading language modules.
+// If a host repeatedly fails to serve language modules, we open a short
+// circuit for that host to avoid spamming failing requests.
+const CDN_CIRCUIT_FAILURES = 3
+const CDN_CIRCUIT_RESET_MS = 5 * 60 * 1000 // 5 minutes
+const _cdnCircuitState = new Map() // host -> { failures, openUntil, warned }
+
+function _isCdnBlocked(host) {
+  try {
+    const st = _cdnCircuitState.get(host)
+    if (!st) return false
+    if (st.openUntil && Date.now() < st.openUntil) return true
+    // expired
+    if (st.openUntil && Date.now() >= st.openUntil) {
+      _cdnCircuitState.delete(host)
+      return false
+    }
+    return false
+  } catch (_) { return false }
+}
+
+function _noteCdnFailure(host) {
+  if (!host) return
+  try {
+    const st = _cdnCircuitState.get(host) || { failures: 0, openUntil: 0, warned: false }
+    st.failures = (st.failures || 0) + 1
+    if (st.failures >= CDN_CIRCUIT_FAILURES) {
+      st.openUntil = Date.now() + CDN_CIRCUIT_RESET_MS
+      if (!st.warned) {
+        try { debugWarn('[codeblocksManager] CDN circuit opened for ' + host + '; skipping CDN imports temporarily') } catch (_) {}
+        st.warned = true
+      }
+    }
+    _cdnCircuitState.set(host, st)
+  } catch (_) {}
+}
+
+function _noteCdnSuccess(host) {
+  try { if (host) _cdnCircuitState.delete(host) } catch (_) {}
+}
+
 /**
  * Note: language import attempts now use the shared `runImportWithCache`
  * helper (backed by a shared LRU). The local LRU was removed so multiple
@@ -314,15 +355,44 @@ export async function registerLanguage(name, modulePath) {
             try {
               try { return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`) } catch (_withExt) { return await import(/* @vite-ignore */ `highlight.js/lib/languages/${candidate}`) }
             } catch (_localErr) {
-              try {
-                const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
-                return await import(esmUrl)
-              } catch (_esmErr) {
                 try {
-                  const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
-                  return await import(moduleUrl)
-                } catch (_cdnErr) { return null }
-              }
+                  const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js/es/languages/${candidate}.js`
+                  let host = null
+                  try { host = (new URL(esmUrl)).host } catch (_) { host = null }
+                  if (_isCdnBlocked(host)) {
+                    // Circuit open for this CDN host — skip attempting network import
+                  } else {
+                    try {
+                      const m = await import(esmUrl)
+                      _noteCdnSuccess(host)
+                      return m
+                    } catch (err) {
+                      _noteCdnFailure(host)
+                    }
+                  }
+                  try {
+                    const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
+                    let host2 = null
+                    try { host2 = (new URL(moduleUrl)).host } catch (_) { host2 = null }
+                    if (_isCdnBlocked(host2)) {
+                      // skip
+                    } else {
+                      try {
+                        const m2 = await import(moduleUrl)
+                        _noteCdnSuccess(host2)
+                        return m2
+                      } catch (err2) {
+                        _noteCdnFailure(host2)
+                        return null
+                      }
+                    }
+                  } catch (_cdnErr) { return null }
+                } catch (_esmErr) {
+                  try {
+                    const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/${candidate}.js`
+                    return await import(moduleUrl)
+                  } catch (_cdnErr) { return null }
+                }
             }
           } catch (err) { return null }
         })

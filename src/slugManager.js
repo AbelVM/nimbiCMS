@@ -16,6 +16,7 @@ import SlugWorker from './worker/slugWorker.js?worker&inline'
 
 import { PowerCache, PowerMemoizer } from 'performance-helpers/powerCache'
 import { PowerDeadline } from 'performance-helpers/powerDeadline'
+import { PowerRetry } from 'performance-helpers/powerRetry'
 import { PowerPool } from 'performance-helpers/powerPool'
 import { PowerSemaphore } from 'performance-helpers/powerSemaphore'
 import { debugLog, debugWarn, debugError, isDebug } from './utils/debug.js'
@@ -958,18 +959,110 @@ export let fetchMarkdown = async function(path, base, opts) {
   }
   const signal = opts?.signal
   const fetchWithDeadline = async (targetUrl) => {
-    if (PowerDeadline && typeof PowerDeadline.run === 'function') {
-      return await PowerDeadline.run(
-        () => fetch(targetUrl, signal ? { signal } : undefined),
-        { attemptTimeout: 10_000, maxAttempts: 1, signal: signal || null }
-      )
-    }
+    const timeoutMs = (opts && typeof opts.timeoutMs === 'number') ? Math.max(0, Number(opts.timeoutMs) || 0) : 10_000
+
+    // Use an instance-based PowerDeadline per-request so we can merge the
+    // caller-provided signal with the deadline signal and ensure caller
+    // aborts cancel the underlying fetch. This keeps control local and
+    // avoids depending on a static `run` implementation.
+    try {
+      if (typeof PowerDeadline === 'function') {
+        const dl = new PowerDeadline({ timeout: timeoutMs })
+        let mergedSignal = dl.signal
+        try {
+          if (signal && typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
+            mergedSignal = AbortSignal.any([signal, dl.signal])
+          } else if (signal && typeof AbortSignal !== 'undefined') {
+            const acProxy = new AbortController()
+            try { signal.addEventListener('abort', () => acProxy.abort(), { once: true }) } catch (_) {}
+            try { dl.signal.addEventListener('abort', () => acProxy.abort(), { once: true }) } catch (_) {}
+            try { if (signal?.aborted || dl.signal?.aborted) acProxy.abort() } catch (_) {}
+            mergedSignal = acProxy.signal
+          }
+        } catch (_) {}
+
+        // Perform retries for transient network/server errors before
+        // failing and allowing the negative cache to record the URL.
+        // Prefer PowerRetry when available; otherwise fall back to a
+        // small manual retry loop with exponential backoff.
+        try {
+          return await dl.run(async () => {
+            const attempts = 3 // initial + 2 retries
+            // Helper that performs a single fetch attempt and treats
+            // 5xx responses as retryable failures.
+            const singleAttempt = async () => {
+              if (mergedSignal?.aborted) {
+                const ae = new Error('aborted')
+                ae.name = 'AbortError'
+                throw ae
+              }
+              return await fetch(targetUrl, mergedSignal ? { signal: mergedSignal } : undefined)
+            }
+
+            // Try using PowerRetry when it exists and has a run method.
+            if (typeof PowerRetry === 'function') {
+              try {
+                const retry = new PowerRetry({ attempts: attempts, factor: 2, minDelay: 50 })
+                if (typeof retry.run === 'function') {
+                  return await retry.run(async () => {
+                    const r = await singleAttempt()
+                    if (r && typeof r.status === 'number' && r.status >= 500) {
+                      const re = new Error('server error')
+                      re.status = r.status
+                      throw re
+                    }
+                    return r
+                  })
+                }
+              } catch (_) {
+                // fall through to manual retry below
+              }
+            }
+
+            // Manual retry loop (safe fallback).
+            let lastErr
+            for (let i = 0; i < attempts; i++) {
+              if (mergedSignal?.aborted) {
+                const ae = new Error('aborted')
+                ae.name = 'AbortError'
+                throw ae
+              }
+              try {
+                const r = await singleAttempt()
+                if (r && typeof r.status === 'number' && r.status >= 500) {
+                  lastErr = new Error('server error')
+                  lastErr.status = r.status
+                  if (i < attempts - 1) {
+                    const delay = Math.pow(2, i) * 50
+                    await new Promise((res) => setTimeout(res, delay))
+                    continue
+                  }
+                  throw lastErr
+                }
+                return r
+              } catch (err) {
+                if (err && err.name === 'AbortError') throw err
+                lastErr = err
+                if (i < attempts - 1) {
+                  const delay = Math.pow(2, i) * 50
+                  await new Promise((res) => setTimeout(res, delay))
+                  continue
+                }
+                throw lastErr
+              }
+            }
+          })
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Final fallback: use AbortSignal.timeout when available
     let mergedSignal = signal || null
     try {
       if (!mergedSignal && typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-        mergedSignal = AbortSignal.timeout(10_000)
+        mergedSignal = AbortSignal.timeout(timeoutMs)
       } else if (mergedSignal && typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' && typeof AbortSignal.any === 'function') {
-        mergedSignal = AbortSignal.any([mergedSignal, AbortSignal.timeout(10_000)])
+        mergedSignal = AbortSignal.any([mergedSignal, AbortSignal.timeout(timeoutMs)])
       }
     } catch (_) {}
     return await fetch(targetUrl, mergedSignal ? { signal: mergedSignal } : undefined)
@@ -1049,7 +1142,33 @@ export let fetchMarkdown = async function(path, base, opts) {
     return isHtml ? { raw, isHtml: true } : { raw }
   })()
 
-  const tracked = promise.catch(err => {
+  // If the caller supplied an AbortSignal, race the network promise
+  // against the signal so the returned promise rejects promptly when
+  // the caller aborts (ensures fetchCache/negativeFetchCache cleanup).
+  let returned = promise
+  try {
+    if (signal && typeof signal === 'object') {
+      const abortRace = new Promise((_, reject) => {
+        try {
+          if (signal.aborted) {
+            const ae = new Error('aborted')
+            ae.name = 'AbortError'
+            return reject(ae)
+          }
+        } catch (_) {}
+        const onAbort = () => {
+          const ae = new Error('aborted')
+          ae.name = 'AbortError'
+          try { signal.removeEventListener && signal.removeEventListener('abort', onAbort) } catch (_) {}
+          reject(ae)
+        }
+        try { signal.addEventListener && signal.addEventListener('abort', onAbort) } catch (_) {}
+      })
+      returned = Promise.race([promise, abortRace])
+    }
+  } catch (_) {}
+
+  const tracked = returned.catch(err => {
     if (err && (err.name === 'AbortError' || err.code === 'EABORT' || err.code === 'EDEADLINE')) {
       try { fetchCache.delete(url) } catch (_) {}
       throw err
