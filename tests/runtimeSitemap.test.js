@@ -67,8 +67,8 @@ describe('runtimeSitemap', () => {
     expect(json).toBeTruthy()
     expect(Array.isArray(json.entries)).toBe(true)
     expect(json.entries.length).toBe(2)
-    expect(json.entries.some(e => String(e.loc || '').includes(encodeURIComponent('s1')))).toBe(true)
-    expect(json.entries.some(e => String(e.loc || '').includes(encodeURIComponent('s2')))).toBe(true)
+    expect(json.entries.some(e => String(e.loc ?? '').includes(encodeURIComponent('s1')))).toBe(true)
+    expect(json.entries.some(e => String(e.loc ?? '').includes(encodeURIComponent('s2')))).toBe(true)
   }, 20000)
 
   it('generateSitemapXml converts sitemap JSON into XML containing <urlset> and <loc>', async () => {
@@ -95,7 +95,7 @@ describe('runtimeSitemap', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
     const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
@@ -122,7 +122,7 @@ describe('runtimeSitemap', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
     const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
@@ -153,7 +153,7 @@ describe('runtimeSitemap', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
     const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
@@ -184,7 +184,7 @@ describe('runtimeSitemap', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
     const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true })
@@ -204,7 +204,7 @@ describe('runtimeSitemap', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
     // Generate JSON directly using the prebuilt index to avoid index-build timing

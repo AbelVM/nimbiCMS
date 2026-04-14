@@ -30,7 +30,7 @@ const MAX_ENTRIES = 200
  * @private
  */
 function makeKey(text) {
-  return String(text || '')
+  return String(text ?? '')
 }
 
 /**

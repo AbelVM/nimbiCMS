@@ -51,7 +51,7 @@ if (typeof globalThis.Worker === 'undefined') {
               const parser = new DOMParser()
               const doc = parser.parseFromString(html, 'text/html')
               const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-              const slugify = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\- ]/g, '').replace(/ /g, '-').replace(/(?:-?)(?:md|html)$/, '')
+              const slugify = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9\- ]/g, '').replace(/ /g, '-').replace(/(?:-?)(?:md|html)$/, '')
               heads.forEach(h => { if (!h.id) h.id = slugify(h.textContent || '') })
               const imgs = doc.querySelectorAll('img')
               imgs.forEach(img => { try { if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy') } catch (_) {} })
@@ -60,7 +60,7 @@ if (typeof globalThis.Worker === 'undefined') {
                 codes.forEach(codeEl => {
                   try {
                     const rawCls = (codeEl.getAttribute && codeEl.getAttribute('class')) || codeEl.className || ''
-                    const cleanedCls = String(rawCls || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+                    const cleanedCls = String(rawCls ?? '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
                     if (cleanedCls) {
                       try { codeEl.setAttribute && codeEl.setAttribute('class', cleanedCls) } catch (_) { codeEl.className = cleanedCls }
                     } else {

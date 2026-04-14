@@ -13,7 +13,8 @@ import { markNotFound } from './seoManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
 import { isDebugLevel, incrementCounter, debugError, debugWarn, debugLog } from './utils/debug.js'
-import { refreshIndexPaths, indexSet } from './indexManager.js'
+import { refreshIndexPaths, indexSet, isIndexPathsRefreshed, setIndexPathsRefreshed } from './indexManager.js'
+import { PowerCache } from 'performance-helpers/powerCache'
 export let RESOLUTION_CACHE_MAX = 100
 
 /**
@@ -23,6 +24,7 @@ export let RESOLUTION_CACHE_MAX = 100
  */
 export function setResolutionCacheMax(n) {
   RESOLUTION_CACHE_MAX = n
+  _enforceResolutionCacheMax()
 }
 
 // Gate router logs and optional probe behavior.
@@ -66,6 +68,9 @@ function _fetchMd(path, base, signal) {
  */
 export function setResolutionCacheTtl(ms) {
   RESOLUTION_CACHE_TTL = ms
+  try {
+    resolutionCache.defaultTTL = (RESOLUTION_CACHE_TTL > 0) ? RESOLUTION_CACHE_TTL : Infinity
+  } catch (_e) {}
 }
 
 /**
@@ -80,10 +85,30 @@ export function setResolutionCacheTtl(ms) {
 
 /**
  * Runtime cache for recent page-resolution results.
- * Maps cacheKey -> {@link ResolutionRecord}
- * @type {Map<string, ResolutionRecord>}
+ * Stores the resolved value directly and relies on PowerCache for TTL/LRU.
+ * Also accepts legacy `{ value, ts }` records written by older tests/helpers.
+ * @type {PowerCache}
  */
-export const resolutionCache = new Map()
+export const resolutionCache = new PowerCache({
+  maxEntries: RESOLUTION_CACHE_MAX,
+  defaultTTL: (RESOLUTION_CACHE_TTL > 0) ? RESOLUTION_CACHE_TTL : Infinity
+})
+
+function _isLegacyResolutionRecord(record) {
+  return !!record
+    && typeof record === 'object'
+    && Object.prototype.hasOwnProperty.call(record, 'value')
+    && Object.prototype.hasOwnProperty.call(record, 'ts')
+}
+
+function _enforceResolutionCacheMax() {
+  try { resolutionCache.maxEntries = RESOLUTION_CACHE_MAX } catch (_e) {}
+  while (resolutionCache.size > RESOLUTION_CACHE_MAX) {
+    const oldest = resolutionCache.keys('LRU').next().value
+    if (oldest === undefined) break
+    resolutionCache.delete(oldest)
+  }
+}
 
 
 
@@ -112,7 +137,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
  */
 export function _clearIndexCache() {
   indexSet.clear();
-  try { refreshIndexPaths._refreshed = false } catch (e) { debugWarn('[router] _clearIndexCache: refreshIndexPaths reset failed', e) }
+  try { setIndexPathsRefreshed(false) } catch (e) { debugWarn('[router] _clearIndexCache: refreshIndexPaths reset failed', e) }
 }
 
  
@@ -123,17 +148,19 @@ export function _clearIndexCache() {
  * @returns {{resolved:string,anchor:string|null}|undefined}
  */
 export function resolutionCacheGet(key) {
-  if (!resolutionCache.has(key)) return undefined
   const record = resolutionCache.get(key)
-  const now = Date.now()
-  if (record.ts + RESOLUTION_CACHE_TTL < now) {
-    resolutionCache.delete(key)
-    return undefined
+  if (record === undefined) return undefined
+
+  if (_isLegacyResolutionRecord(record)) {
+    const now = Date.now()
+    if (RESOLUTION_CACHE_TTL > 0 && record.ts + RESOLUTION_CACHE_TTL < now) {
+      resolutionCache.delete(key)
+      return undefined
+    }
+    return record.value
   }
-  
-  resolutionCache.delete(key)
-  resolutionCache.set(key, record)
-  return record.value
+
+  return record
 }
 /**
  * Store a resolution result in the runtime resolution cache and evict the
@@ -144,14 +171,10 @@ export function resolutionCacheGet(key) {
  * @returns {void}
  */
 export function resolutionCacheSet(key, value) {
-  _purgeExpiredEntries()
-  _purgeExpiredEntries()
-  resolutionCache.delete(key)
-  resolutionCache.set(key, {value, ts: Date.now()})
-  if (resolutionCache.size > RESOLUTION_CACHE_MAX) {
-    const oldest = resolutionCache.keys().next().value
-    if (oldest !== undefined) resolutionCache.delete(oldest)
-  }
+  resolutionCache.set(key, value, {
+    ttl: (RESOLUTION_CACHE_TTL > 0) ? RESOLUTION_CACHE_TTL : Infinity
+  })
+  _enforceResolutionCacheMax()
 }
 /**
  * Remove expired entries from the `resolutionCache` according to `RESOLUTION_CACHE_TTL`.
@@ -159,10 +182,16 @@ export function resolutionCacheSet(key, value) {
  * @returns {void}
  */
 export function _purgeExpiredEntries() {
+  // PowerCache handles TTL eagerly on read/get; this sweep keeps legacy
+  // `{ value, ts }` records compatible with older tests/helpers.
   if (!RESOLUTION_CACHE_TTL || RESOLUTION_CACHE_TTL <= 0) return
   const now = Date.now()
-  for (const [k, record] of resolutionCache.entries()) {
-    if (record.ts + RESOLUTION_CACHE_TTL < now) {
+  const keys = Array.from(resolutionCache.keys('LRU'))
+  for (const k of keys) {
+    // Touch with `has` so native PowerCache TTL expirations are removed.
+    resolutionCache.has(k)
+    const record = resolutionCache.peek(k)
+    if (_isLegacyResolutionRecord(record) && record.ts + RESOLUTION_CACHE_TTL < now) {
       resolutionCache.delete(k)
     }
   }
@@ -295,7 +324,7 @@ export function buildPageCandidates(resolved) {
     }
   } else {
     try {
-      const dec = decodeURIComponent(String(resolved || ''))
+      const dec = decodeURIComponent(String(resolved ?? ''))
       if (slugToMd.has(dec)) {
         const val = resolveSlugPath(dec) || slugToMd.get(dec)
         if (val) {
@@ -382,7 +411,7 @@ export async function fetchPageData(raw, contentBase) {
 
   // Whether the original request explicitly referenced a .md or .html
   // resource. Used to avoid rejecting intentionally requested HTML pages.
-  const originalWasExplicitEarly = String(originalRaw || '').includes('.md') || String(originalRaw || '').includes('.html')
+  const originalWasExplicitEarly = String(originalRaw ?? '').includes('.md') || String(originalRaw ?? '').includes('.html')
 
   
   if (resolved && String(resolved).includes('::')) {
@@ -400,7 +429,7 @@ export async function fetchPageData(raw, contentBase) {
     anchor = cached.anchor || anchor
   } else {
     if (!String(resolved).includes('.md') && !String(resolved).includes('.html')) {
-      let decoded = decodeURIComponent(String(resolved || ''))
+      let decoded = decodeURIComponent(String(resolved ?? ''))
       
       if (decoded && typeof decoded === 'string') {
         decoded = normalizePath(decoded)
@@ -412,7 +441,7 @@ export async function fetchPageData(raw, contentBase) {
         let idx = await tryDiscoverFromIndex(decoded, contentBase, _fetchController ? _fetchController.signal : undefined)
         if (idx) {
           resolved = idx
-        } else if ((refreshIndexPaths._refreshed && indexSet && indexSet.size) || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))) {
+        } else if ((isIndexPathsRefreshed() && indexSet && indexSet.size) || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))) {
           const found = await ensureSlug(decoded, contentBase)
           if (found) resolved = found
         }
@@ -426,8 +455,8 @@ export async function fetchPageData(raw, contentBase) {
   // when the runtime intends to render an inline not-found fallback.
   let allowCandidateProbing = true
   try {
-    const explicitResolved = String(resolved || '').includes('.md') || String(resolved || '').includes('.html') || (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')))
-    allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(resolved) || (indexSet && indexSet.size) || refreshIndexPaths._refreshed || originalWasExplicitEarly || explicitResolved
+    const explicitResolved = String(resolved ?? '').includes('.md') || String(resolved ?? '').includes('.html') || (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')))
+    allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(resolved) || (indexSet && indexSet.size) || isIndexPathsRefreshed() || originalWasExplicitEarly || explicitResolved
   } catch (_e) {
     allowCandidateProbing = true
   }
@@ -453,7 +482,7 @@ export async function fetchPageData(raw, contentBase) {
             if (!originalWasExplicitEarly) {
               try {
                 let relPath = abs
-                try { relPath = new URL(abs).pathname.replace(/^\//, '') } catch (_) { relPath = String(abs || '').replace(/^\//, '') }
+                try { relPath = new URL(abs).pathname.replace(/^\//, '') } catch (_) { relPath = String(abs ?? '').replace(/^\//, '') }
                 const alt = relPath.replace(/\.html$/i, '.md')
                 try {
                   const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
@@ -490,7 +519,7 @@ export async function fetchPageData(raw, contentBase) {
             if (looksLikeSiteShell) {
               try {
                 let relPath = abs
-                try { relPath = new URL(abs).pathname.replace(/^\//, '') } catch (_) { relPath = String(abs || '').replace(/^\//, '') }
+                try { relPath = new URL(abs).pathname.replace(/^\//, '') } catch (_) { relPath = String(abs ?? '').replace(/^\//, '') }
                 const alt = relPath.replace(/\.html$/i, '.md')
                 try {
                   const mdData = await _fetchMd(alt, contentBase, _fetchController ? _fetchController.signal : undefined)
@@ -528,7 +557,7 @@ export async function fetchPageData(raw, contentBase) {
     }
   } catch (_e) {}
 
-  const originalWasExplicit = String(originalRaw || '').includes('.md') || String(originalRaw || '').includes('.html')
+  const originalWasExplicit = String(originalRaw ?? '').includes('.md') || String(originalRaw ?? '').includes('.html')
   // If the request was a bare slug (no .md/.html), capture a
   // normalized slug form to validate fetched pages against their H1
   // title. This helps avoid accepting an unrelated page (e.g. the
@@ -537,7 +566,7 @@ export async function fetchPageData(raw, contentBase) {
   let requestedSlug = null
   if (!originalWasExplicit) {
     try {
-      let dec = decodeURIComponent(String(originalRaw || ''))
+      let dec = decodeURIComponent(String(originalRaw ?? ''))
       dec = normalizePath(dec)
       dec = trimTrailingSlash(dec)
       if (dec && !/\.(md|html?)$/i.test(dec)) requestedSlug = dec
@@ -557,7 +586,7 @@ export async function fetchPageData(raw, contentBase) {
   if (
     pageCandidates.length === 1 &&
     /index\.html$/i.test(pageCandidates[0]) &&
-    (!originalWasExplicit && !slugToMd.has(resolved) && !slugToMd.has(decodeURIComponent(String(resolved || ''))) && !String(resolved || '').includes('/'))
+    (!originalWasExplicit && !slugToMd.has(resolved) && !slugToMd.has(decodeURIComponent(String(resolved ?? ''))) && !String(resolved ?? '').includes('/'))
   ) {
     throw new Error('Unknown slug: index.html fallback prevented')
   }
@@ -576,8 +605,8 @@ export async function fetchPageData(raw, contentBase) {
   try {
     // Re-evaluate the probe gate in case resolution changed; do not
     // enable probing simply because `contentBase` is absolute.
-    const explicitResolvedLater = String(resolved || '').includes('.md') || String(resolved || '').includes('.html') || (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')))
-    allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(resolved) || (indexSet && indexSet.size) || refreshIndexPaths._refreshed || originalWasExplicit || explicitResolvedLater
+    const explicitResolvedLater = String(resolved ?? '').includes('.md') || String(resolved ?? '').includes('.html') || (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')))
+    allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(resolved) || (indexSet && indexSet.size) || isIndexPathsRefreshed() || originalWasExplicit || explicitResolvedLater
   } catch (_e) {
     allowCandidateProbing = true
   }
@@ -793,9 +822,9 @@ export async function fetchPageData(raw, contentBase) {
                       } catch (_e) { /* ignore notFoundPage probe errors */ }
                     }
     try {
-      if (originalWasExplicit && String(originalRaw || '').toLowerCase().includes('.html')) {
+      if (originalWasExplicit && String(originalRaw ?? '').toLowerCase().includes('.html')) {
           try {
-          const abs = new URL(String(originalRaw || ''), location.href).toString()
+          const abs = new URL(String(originalRaw ?? ''), location.href).toString()
           if (_routerShouldLog()) debugWarn('[router] attempting absolute HTML fetch fallback', abs)
           const res = await fetch(abs, _fetchController ? { signal: _fetchController.signal } : undefined)
           if (res && res.ok) {
@@ -883,15 +912,15 @@ export async function fetchPageData(raw, contentBase) {
                       }
                       const modified = doc.documentElement && doc.documentElement.outerHTML ? doc.documentElement.outerHTML : raw
                       try { if (_routerShouldLog() && rewritten && rewritten.length) debugWarn('[router] rewritten asset refs', { abs, rewritten }) } catch (_e) {}
-                      return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
+                      return { data: { raw: modified, isHtml: true }, pagePath: String(originalRaw ?? ''), anchor }
                     }
                   } catch (e) { /* parsing failed, fall back */ }
                   let rawWithBase = raw
                   try {
-                    let modified = String(raw || '')
+                    let modified = String(raw ?? '')
                     // Rewrite srcset attributes to absolute URLs when possible
                     modified = modified.replace(/srcset\s*=\s*"([^"]*)"/gi, (m, ss) => {
-                      const parts = String(ss || '').split(',').map(s => s.trim()).filter(Boolean)
+                      const parts = String(ss ?? '').split(',').map(s => s.trim()).filter(Boolean)
                       const mapped = parts.map(p => {
                         const [urlPart, size] = p.split(/\s+/, 2)
                         if (!urlPart) return p
@@ -939,9 +968,9 @@ export async function fetchPageData(raw, contentBase) {
                       rawWithBase = `<base href="${baseHref}">` + rawWithBase
                     }
                   }
-                  return { data: { raw: rawWithBase, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
+                  return { data: { raw: rawWithBase, isHtml: true }, pagePath: String(originalRaw ?? ''), anchor }
                 } catch (e) {
-                  return { data: { raw, isHtml: true }, pagePath: String(originalRaw || ''), anchor }
+                  return { data: { raw, isHtml: true }, pagePath: String(originalRaw ?? ''), anchor }
                 }
               }
             }
@@ -953,7 +982,7 @@ export async function fetchPageData(raw, contentBase) {
     } catch (_) { /* ignore fallback errors */ }
 
     try {
-      const dec = decodeURIComponent(String(resolved || ''))
+      const dec = decodeURIComponent(String(resolved ?? ''))
       if (dec && !/\.(md|html?)$/i.test(dec)) {
         // Only probe the `/assets/...` fallbacks when a configured
         // `notFoundPage` exists (or debugging explicitly enabled). This

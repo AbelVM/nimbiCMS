@@ -26,7 +26,7 @@ function readPackageMetadata() {
 }
 
 function isCssSideEffect(id) {
-  return /\.css($|\?)/.test(String(id || ''))
+  return /\.css($|\?)/.test(String(id ?? ''))
 }
 
 function createAnalyzePlugins(shouldAnalyze) {

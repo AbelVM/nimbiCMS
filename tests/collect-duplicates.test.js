@@ -39,7 +39,7 @@ test('collect duplicate slug stats from docs', async () => {
 
   // Shim fetchMarkdown to resolve from manifest by matching trailing path
   setFetchMarkdown(async (p, base) => {
-    const normalized = String(p || '').replace(/^\/+/, '')
+    const normalized = String(p ?? '').replace(/^\/+/, '')
     // Try exact matches
     const keys = Object.keys(manifest)
     for (const k of keys) {

@@ -18,7 +18,7 @@ describe('initCMS homePage derivation from navigation', () => {
     const calls = []
     global.fetch = vi.fn(async (u) => {
       calls.push(String(u))
-      const s = String(u || '')
+      const s = String(u ?? '')
       if (s.includes('_navigation.md')) {
         return { ok: true, text: () => Promise.resolve('[Home](index.html)') }
       }

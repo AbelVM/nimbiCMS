@@ -31,7 +31,7 @@ describe('renderer worker register failure when hljs core missing', () => {
     rendererFailMockState.noCore = false
     globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
-    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s||'')}</p>` , setOptions: () => {} }, default: { parse: (s) => `<p>${String(s||'')}</p>` , setOptions: () => {} } }))
+    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>` , setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>` , setOptions: () => {} } }))
     vi.mock('../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
 
     // create a local language module that would succeed if hljs present

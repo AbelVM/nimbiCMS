@@ -37,7 +37,7 @@ describe('events utilities', () => {
     expect(spy).toHaveBeenLastCalledWith('c')
   })
 
-  it('rafThrottle calls immediately then suppresses until next frame', () => {
+  it('rafThrottle calls immediately and replays latest args on following frame', () => {
     originalRAF = globalThis.requestAnimationFrame
     const rafCallbacks = []
     globalThis.requestAnimationFrame = (cb) => { rafCallbacks.push(cb); return rafCallbacks.length }
@@ -50,13 +50,19 @@ describe('events utilities', () => {
     t('y')
     expect(spy).toHaveBeenCalledTimes(1)
 
-    // simulate RAF frame: this should reset throttle state
+    // simulate RAF frame: trailing call should replay with latest pending args
     rafCallbacks.shift()()
 
-    t('z')
     expect(spy).toHaveBeenCalledTimes(2)
     expect(spy.mock.calls[0][0]).toBe('x')
-    expect(spy.mock.calls[1][0]).toBe('z')
+    expect(spy.mock.calls[1][0]).toBe('y')
+
+    // a new call during the scheduled tail tick is queued and replayed
+    t('z')
+    expect(spy).toHaveBeenCalledTimes(2)
+    rafCallbacks.shift()()
+    expect(spy).toHaveBeenCalledTimes(3)
+    expect(spy.mock.calls[2][0]).toBe('z')
   })
 
   it('scheduleDOMWrite batches writes into one RAF callback', () => {

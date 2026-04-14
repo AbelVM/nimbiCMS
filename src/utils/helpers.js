@@ -11,7 +11,53 @@
  * @returns {boolean}
  */
 import { debugWarn } from './debug.js'
-import { memoize } from './memoize.js'
+import { PowerMemoizer } from 'performance-helpers/powerCache'
+
+const MEMO_KEY = (arg) => arg === undefined ? '__undefined' : String(arg)
+const _normalizePathMemo = new PowerMemoizer(function(p) {
+  return String(p ?? '').replace(/^[.\/]+/, '')
+}, { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } })
+
+const _trimTrailingSlashMemo = new PowerMemoizer(function(u) {
+  return String(u ?? '').replace(/\/+$/, '')
+}, { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } })
+
+const _ensureTrailingSlashMemo = new PowerMemoizer(function(u) {
+  return trimTrailingSlash(String(u ?? '')) + '/'
+}, { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } })
+
+const _encodeURLMemo = new PowerMemoizer(function(u) {
+  try {
+    const s = String(u ?? '')
+    if (s.includes('%')) return s
+    return encodeURI(s)
+  } catch (err) {
+    debugWarn('[helpers] encodeURL failed', err)
+    return String(u ?? '')
+  }
+}, { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } })
+
+const _decodeHtmlEntitiesMemo = new PowerMemoizer(function(s) {
+  try {
+    if (!s && s !== 0) return ''
+    const str = String(s)
+    const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
+    return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, g) => {
+      if (!g) return m
+      if (g[0] === '#') {
+        try {
+          if (g[1] === 'x' || g[1] === 'X') return String.fromCharCode(parseInt(g.slice(2), 16))
+          return String.fromCharCode(parseInt(g.slice(1), 10))
+        } catch (e) {
+          return m
+        }
+      }
+      return (named[g] !== undefined) ? named[g] : m
+    })
+  } catch (err) {
+    return String(s ?? '')
+  }
+}, { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } })
 
 export function isExternalLink(href) {
   if (!href || typeof href !== 'string') return false
@@ -25,9 +71,7 @@ export function isExternalLink(href) {
  * @param {string} p - input path to normalize (remove leading ./ or /)
  * @returns {string}
  */
-export const normalizePath = memoize(function(p) {
-  return String(p || '').replace(/^[.\/]+/, '')
-}, 2000)
+export const normalizePath = (p) => _normalizePathMemo.run(p)
 
 /**
  * Remove one or more trailing slashes from a URL or path.  This is handy
@@ -36,9 +80,7 @@ export const normalizePath = memoize(function(p) {
  * @param {string} u - input path or URL to trim trailing slashes from
  * @returns {string}
  */
-export const trimTrailingSlash = memoize(function(u) {
-  return String(u || '').replace(/\/+$/, '')
-}, 2000)
+export const trimTrailingSlash = (u) => _trimTrailingSlashMemo.run(u)
 
 /**
  * Ensure the given URL/path ends with a single slash.  This wraps
@@ -47,9 +89,7 @@ export const trimTrailingSlash = memoize(function(u) {
  * @param {string} u
  * @returns {string}
  */
-export const ensureTrailingSlash = memoize(function(u) {
-  return trimTrailingSlash(String(u || '')) + '/'
-}, 2000)
+export const ensureTrailingSlash = (u) => _ensureTrailingSlashMemo.run(u)
 
 /**
  * Apply the lazy-loading attribute to an <img> element if not already set.
@@ -217,14 +257,14 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
  */
 export function joinPaths(...parts) {
   if (!parts || parts.length === 0) return ''
-  const segs = parts.map(p => String(p || ''))
+  const segs = parts.map(p => String(p ?? ''))
     .filter(p => p !== '')
     .map((p, i) => {
       if (i === 0) return p.replace(/\/+$|(?<!^)\/+/g, '') // trim trailing but keep leading
       return p.replace(/^\/+|\/+$/g, '')
     })
   let joined = segs.join('/')
-  if (String(parts[0] || '').startsWith('/')) {
+  if (String(parts[0] ?? '').startsWith('/')) {
     if (!joined.startsWith('/')) joined = '/' + joined
   }
   return joined
@@ -248,7 +288,7 @@ export function buildPageUrl(page, hash = null, baseSearch) {
       : (typeof window !== 'undefined' && window.location ? window.location.search : '')
     const params = new URLSearchParams(rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch)
 
-    const pageVal = String(page || '')
+    const pageVal = String(page ?? '')
     params.delete('page')
     const merged = new URLSearchParams()
     merged.set('page', pageVal)
@@ -263,7 +303,7 @@ export function buildPageUrl(page, hash = null, baseSearch) {
     }
     return url || `?page=${encodeURIComponent(pageVal)}`
   } catch (err) {
-    const base = `?page=${encodeURIComponent(String(page || ''))}`
+    const base = `?page=${encodeURIComponent(String(page ?? ''))}`
     return hash ? `${base}#${encodeURIComponent(hash)}` : base
   }
 }
@@ -274,16 +314,7 @@ export function buildPageUrl(page, hash = null, baseSearch) {
  * @param {string} u - URL or component to encode safely
  * @returns {string}
  */
-export const encodeURL = memoize(function(u) {
-  try {
-    const s = String(u || '')
-    if (s.includes('%')) return s
-    return encodeURI(s)
-  } catch (err) {
-    debugWarn('[helpers] encodeURL failed', err)
-    return String(u || '')
-  }
-}, 2000)
+export const encodeURL = (u) => _encodeURLMemo.run(u)
 
 /**
  * Execute the given function and silently ignore any exceptions. Returns
@@ -319,24 +350,4 @@ try {
  * @param {string} s
  * @returns {string}
  */
-export const decodeHtmlEntities = memoize(function(s) {
-  try {
-    if (!s && s !== 0) return ''
-    const str = String(s)
-    const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
-    return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, g) => {
-      if (!g) return m
-      if (g[0] === '#') {
-        try {
-          if (g[1] === 'x' || g[1] === 'X') return String.fromCharCode(parseInt(g.slice(2), 16))
-          return String.fromCharCode(parseInt(g.slice(1), 10))
-        } catch (e) {
-          return m
-        }
-      }
-      return (named[g] !== undefined) ? named[g] : m
-    })
-  } catch (err) {
-    return String(s || '')
-  }
-}, 2000)
+export const decodeHtmlEntities = (s) => _decodeHtmlEntitiesMemo.run(s)

@@ -98,6 +98,7 @@ import { setDebugLevel, debugWarn, debugInfo } from './utils/debug.js'
  * @property {string|null} [notFoundPage]
  * @property {boolean} [skipRootReadme]
  * @property {boolean} [allowUrlPathOverrides]
+ * @property {boolean} [allowEmbeddedScripts]
  * @property {Object} [seoMap]
  * @property {Object} [manifest]
  * @property {boolean} [exposeSitemap]
@@ -271,6 +272,7 @@ export let initialDocumentTitle = ''
  *   allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via
  *   URL query parameters. This is disabled by default for security; enabling
  *   it should only be done by trusted host pages.
+ * @param {boolean} [options.allowEmbeddedScripts=false] - when `true`, executes embedded scripts from rendered markdown/html via `new Function(...)`. This is security-sensitive and should only be enabled for fully trusted content sources.
  * @param {string|Element} options.el - mount point selector or element
  * @param {string} [options.contentPath='/content'] - URL path to content
  * @param {number} [options.crawlMaxQueue=1000] - maximum directory queue length for slug crawling (see docs)
@@ -342,6 +344,7 @@ export async function initCMS(options = {}) {
     homePage = null,
     notFoundPage = null,
     navigationPage = '_navigation.md',
+    allowEmbeddedScripts = false,
     exposeSitemap = true
   } = finalOptions
 
@@ -366,20 +369,24 @@ export async function initCMS(options = {}) {
       const mount = document.querySelector(el)
       if (mount && mount instanceof Element) {
         try {
-          const container = document.createElement('div')
-          container.style.padding = '1rem'
-          try { container.style.fontFamily = 'system-ui, sans-serif' } catch (_) {}
-          container.style.color = '#b00'
-          container.style.background = '#fee'
-          container.style.border = '1px solid #b00'
-          const strong = document.createElement('strong')
-          strong.textContent = 'NimbiCMS failed to initialize:'
-          container.appendChild(strong)
-          try { container.appendChild(document.createElement('br')) } catch (_) {}
-          const pre = document.createElement('pre')
-          try { pre.style.whiteSpace = 'pre-wrap' } catch (_) {}
-          pre.textContent = String(err)
-          container.appendChild(pre)
+          const buildErrorContainer = () => {
+            const container = document.createElement('div')
+            container.style.padding = '1rem'
+            try { container.style.fontFamily = 'system-ui, sans-serif' } catch (_) {}
+            container.style.color = '#b00'
+            container.style.background = '#fee'
+            container.style.border = '1px solid #b00'
+            const strong = document.createElement('strong')
+            strong.textContent = 'NimbiCMS failed to initialize:'
+            container.appendChild(strong)
+            try { container.appendChild(document.createElement('br')) } catch (_) {}
+            const pre = document.createElement('pre')
+            try { pre.style.whiteSpace = 'pre-wrap' } catch (_) {}
+            pre.textContent = String(err)
+            container.appendChild(pre)
+            return container
+          }
+          const container = buildErrorContainer()
           try {
             if (typeof mount.replaceChildren === 'function') mount.replaceChildren(container)
             else {
@@ -387,7 +394,10 @@ export async function initCMS(options = {}) {
               mount.appendChild(container)
             }
           } catch (e) {
-            try { mount.innerHTML = '<div style="padding:1rem;font-family:system-ui, sans-serif;color:#b00;background:#fee;border:1px solid #b00;">' + '<strong>NimbiCMS failed to initialize:</strong><br><pre style="white-space:pre-wrap;">' + String(err) + '</pre></div>' } catch (_) {}
+            try {
+              while (mount.firstChild) mount.removeChild(mount.firstChild)
+              mount.appendChild(buildErrorContainer())
+            } catch (_) {}
           }
         } catch (err) {}
       }
@@ -481,6 +491,10 @@ export async function initCMS(options = {}) {
 
   if (skipRootReadme != null && typeof skipRootReadme !== 'boolean') {
     throw new TypeError('initCMS(options): "skipRootReadme" must be a boolean when provided')
+  }
+
+  if (allowEmbeddedScripts != null && typeof allowEmbeddedScripts !== 'boolean') {
+    throw new TypeError('initCMS(options): "allowEmbeddedScripts" must be a boolean when provided')
   }
 
   if (finalOptions.fetchConcurrency != null && (typeof finalOptions.fetchConcurrency !== 'number' || !Number.isInteger(finalOptions.fetchConcurrency) || finalOptions.fetchConcurrency < 1)) {
@@ -617,7 +631,7 @@ export async function initCMS(options = {}) {
 
   // Normalize cp into a page-relative segment without leading slash,
   // always ensuring a trailing slash when non-empty.
-  try { cp = String(cp || '').replace(/\\/g, '/') } catch (_e) { cp = String(cp || '') }
+  try { cp = String(cp ?? '').replace(/\\/g, '/') } catch (_e) { cp = String(cp ?? '') }
   if (cp.startsWith('/')) cp = cp.replace(/^\/+/, '')
   if (cp && !cp.endsWith('/')) cp = cp + '/'
 
@@ -793,7 +807,7 @@ export async function initCMS(options = {}) {
             if (navigationPage) candidates.push(String(navigationPage))
           } catch (_) {}
           try {
-            const stripped = String(navigationPage || '').replace(/^_/, '')
+            const stripped = String(navigationPage ?? '').replace(/^_/, '')
             if (stripped && stripped !== String(navigationPage)) candidates.push(stripped)
           } catch (_) {}
           try { candidates.push('navigation.md') } catch (_) {}
@@ -887,7 +901,7 @@ export async function initCMS(options = {}) {
 
   setStyle(defaultStyle)
   await ensureBulma(bulmaCustomize, pageDir)
-  const ui = createUI({ contentWrap, navWrap, container, mountOverlay, t, contentBase, homePage, initialDocumentTitle, runHooks })
+  const ui = createUI({ contentWrap, navWrap, container, mountOverlay, t, contentBase, homePage, initialDocumentTitle, runHooks, allowEmbeddedScripts })
   try {
     if (typeof window !== 'undefined') {
       try { window.__nimbiUI = ui } catch (_) {}
@@ -932,21 +946,21 @@ export async function initCMS(options = {}) {
             try {
               const href = (a && a.getAttribute) ? (a.getAttribute('href') || '') : ''
               if (!href) continue
-              let path = String(href || '').split(/::|#/, 1)[0]
-              path = String(path || '').split('?')[0]
+              let path = String(href ?? '').split(/::|#/, 1)[0]
+              path = String(path ?? '').split('?')[0]
               if (!path) continue
               if (!/\.(?:md|html?)$/.test(path)) path = path + '.html'
               // Normalize path to a content-base relative canonical form
               let rel = null
-              try { rel = normalizePath(String(path || '')) } catch (_) { rel = String(path || '') }
-              const baseName = String(rel || '').replace(/^.*\//, '').replace(/\?.*$/, '')
+              try { rel = normalizePath(String(path ?? '')) } catch (_) { rel = String(path ?? '') }
+              const baseName = String(rel ?? '').replace(/^.*\//, '').replace(/\?.*$/, '')
               if (!baseName) continue
               try {
                 // Prefer using slugManager.slugify when available to produce
                 // consistent slugs; avoid clobbering existing slug keys by
                 // generating a unique candidate when collisions would occur.
                 let candidate = null
-                try { candidate = slugify(baseName.replace(/\.(?:md|html?)$/i, '')) } catch (_) { candidate = String(baseName || '').replace(/\s+/g, '-').toLowerCase() }
+                try { candidate = slugify(baseName.replace(/\.(?:md|html?)$/i, '')) } catch (_) { candidate = String(baseName ?? '').replace(/\s+/g, '-').toLowerCase() }
                 if (!candidate) continue
                 let slugKeyFinal = candidate
                 try {
@@ -971,8 +985,16 @@ export async function initCMS(options = {}) {
                 try {
                   try { _storeSlugMapping(slugKeyFinal, rel) } catch (_) {}
                   try { if (mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slugKeyFinal) } catch (_) {}
-                  try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-                  try { if (allMarkdownPathsSet && typeof allMarkdownPathsSet.add === 'function') allMarkdownPathsSet.add(rel) } catch (_) {}
+                  try {
+                    if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
+                      if (!allMarkdownPathsSet.has(rel)) {
+                        try { allMarkdownPathsSet.add(rel) } catch (_) {}
+                        try { if (Array.isArray(allMarkdownPaths)) allMarkdownPaths.push(rel) } catch (_) {}
+                      }
+                    } else {
+                      try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
+                    }
+                  } catch (_) {}
                 } catch (_) {}
               } catch (_) {}
             } catch (_) {}

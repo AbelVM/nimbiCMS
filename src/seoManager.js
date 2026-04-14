@@ -199,7 +199,7 @@ export function injectSeoForPage(page, initialDocumentTitle = '') {
     const meta = (seoMap && seoMap[page]) ? seoMap[page] : (typeof window !== 'undefined' && window.__SEO_MAP && window.__SEO_MAP[page] ? window.__SEO_MAP[page] : null)
     // Ensure canonical for the page
     try {
-      const canonical = location.origin + location.pathname + '?page=' + encodeURIComponent(String(page || ''))
+      const canonical = location.origin + location.pathname + '?page=' + encodeURIComponent(String(page ?? ''))
       upsertLinkRel('canonical', canonical)
       try { upsertMeta('property', 'og:url', canonical) } catch (e) {}
     } catch (e) {}

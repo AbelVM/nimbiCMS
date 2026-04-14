@@ -5,7 +5,7 @@ vi.mock('../src/slugManager.js', () => {
   const slugToMd = new Map()
   const mdToSlug = new Map()
   return {
-    slugify: (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\- ]/g, '').replace(/ /g, '-'),
+    slugify: (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9\- ]/g, '').replace(/ /g, '-'),
     slugToMd,
     mdToSlug,
     fetchMarkdown: vi.fn()

@@ -19,7 +19,7 @@ describe('renderer worker register-success (idempotent)', () => {
     vi.resetModules()
     // mock frontmatter and marked reasonably
     vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
-    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s||'')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s||'')}</p>`, setOptions: () => {} } }))
+    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} } }))
 
     // prepare a local language module file
     const langPath = path.resolve('tests/worker/_lang_test_module2.mjs')

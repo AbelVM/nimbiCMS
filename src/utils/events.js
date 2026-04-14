@@ -21,24 +21,37 @@ export function debounce(fn, wait = 150, options = {}) {
 }
 
 export function rafThrottle(fn) {
-  // Throttle invocations to at most once per animation frame, but
-  // invoke the handler immediately on the first call so tests that
-  // expect synchronous behavior after dispatching events still pass.
   let scheduled = false
+  let pendingArgs = null
+  let pendingCtx = null
   return function throttled(...args) {
-    const ctx = this
-    if (!scheduled) {
-      try { fn.apply(ctx, args) } catch (e) {}
+    pendingArgs = args
+    pendingCtx = this
+    if (scheduled) return
+    scheduled = true
+    try { fn.apply(this, args) } catch (e) {}
+    pendingArgs = null
+    pendingCtx = null
+    const tick = () => {
+      scheduled = false
+      if (!pendingArgs) return
+      const nextArgs = pendingArgs
+      const nextCtx = pendingCtx
+      pendingArgs = null
+      pendingCtx = null
       scheduled = true
-      const reset = () => { scheduled = false }
+      try { fn.apply(nextCtx, nextArgs) } catch (e) {}
       if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(reset)
+        requestAnimationFrame(tick)
       } else {
-        setTimeout(reset, 16)
+        setTimeout(tick, 16)
       }
-      return
     }
-    // Drop additional calls until the frame has passed
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(tick)
+    } else {
+      setTimeout(tick, 16)
+    }
   }
 }
 

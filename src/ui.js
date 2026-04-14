@@ -30,6 +30,7 @@ import { notFoundPage } from './slugManager.js'
  * @property {string} homePage - Default home page path or slug
  * @property {string} initialDocumentTitle - Document title at initialization
  * @property {Function} runHooks - Hook runner function provided by `hookManager`
+ * @property {boolean} [allowEmbeddedScripts=false] - Opt-in to execute embedded scripts in rendered content. Enable only for trusted markdown sources.
  *
  * @typedef {Object} UIReturn
  * @property {() => Promise<void>} renderByQuery - Render current page based on URL query.
@@ -55,7 +56,8 @@ export function createUI(opts) {
     contentBase,
     homePage,
     initialDocumentTitle,
-    runHooks
+    runHooks,
+    allowEmbeddedScripts = false
   } = opts || {}
   if (!contentWrap || !(contentWrap instanceof HTMLElement)) {
     throw new TypeError('contentWrap must be an HTMLElement')
@@ -151,7 +153,7 @@ export function createUI(opts) {
     try { scrollToAnchorOrTop(null) } catch (_) { debugWarn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
     try { _clearElement(contentWrap) } catch (e) { try { contentWrap.innerHTML = '' } catch (_) {} }
 
-    const preparedKey = `${String(pagePath || '')}|||${_pageContentSignature(data)}`
+    const preparedKey = `${String(pagePath ?? '')}|||${_pageContentSignature(data)}`
     const preparedCached = _cacheGetPrepared(preparedKey)
 
     let article, parsed, toc, topH1, h1Text, slugKey
@@ -185,7 +187,9 @@ export function createUI(opts) {
 
     contentWrap.appendChild(article)
 
-    try { executeEmbeddedScripts(article) } catch (e) { debugWarn('[nimbi-cms] executeEmbeddedScripts failed', e) }
+    if (allowEmbeddedScripts) {
+      try { executeEmbeddedScripts(article) } catch (e) { debugWarn('[nimbi-cms] executeEmbeddedScripts failed', e) }
+    }
 
     try { attachImagePreview(article, { t }) } catch (e) { debugWarn('[nimbi-cms] attachImagePreview failed', e) }
 
@@ -230,8 +234,8 @@ export function createUI(opts) {
         if (parsed && parsed.type === 'path' && parsed.page && contentBase) {
           try {
             const cb = (typeof contentBase === 'string') ? new URL(contentBase, location.href).pathname : ''
-            const cbNorm = String(cb || '').replace(/^\/+|\/+$/g, '')
-            const parsedNorm = String(parsed.page || '').replace(/^\/+|\/+$/g, '')
+            const cbNorm = String(cb ?? '').replace(/^\/+|\/+$/g, '')
+            const parsedNorm = String(parsed.page ?? '').replace(/^\/+|\/+$/g, '')
             if (cbNorm && parsedNorm === cbNorm) {
               // Null out the parsed page so later logic falls back to `homePage`
               parsed.page = null

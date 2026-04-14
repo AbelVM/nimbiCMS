@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 vi.mock('../src/router.js', () => ({ fetchPageData: vi.fn() }))
 vi.mock('../src/htmlBuilder.js', () => ({
   prepareArticle: vi.fn(),
+  executeEmbeddedScripts: vi.fn(),
   renderNotFound: vi.fn(),
   attachTocClickHandler: vi.fn(),
   scrollToAnchorOrTop: vi.fn(),
@@ -68,6 +69,28 @@ describe('createUI focused branches', () => {
     expect(imgPrev.attachImagePreview).toHaveBeenCalled()
     expect(helpers.setEagerForAboveFoldImages).toHaveBeenCalled()
     expect(runHooks).toHaveBeenCalled()
+  })
+
+  it('does not execute embedded scripts by default', async () => {
+    router.fetchPageData.mockResolvedValue({ data: { raw: '#x' }, pagePath: 'p.md', anchor: null })
+    const articleEl = document.createElement('article')
+    htmlBuilder.prepareArticle.mockResolvedValue({ article: articleEl, parsed: {}, toc: null, topH1: false, h1Text: null, slugKey: null })
+
+    const ui = createUI({ contentWrap, navWrap, container, t: (s)=>s, contentBase: '/content/', homePage: 'home', initialDocumentTitle: 'T', runHooks })
+    await ui.renderByQuery()
+
+    expect(htmlBuilder.executeEmbeddedScripts).not.toHaveBeenCalled()
+  })
+
+  it('executes embedded scripts when allowEmbeddedScripts is true', async () => {
+    router.fetchPageData.mockResolvedValue({ data: { raw: '#x' }, pagePath: 'p.md', anchor: null })
+    const articleEl = document.createElement('article')
+    htmlBuilder.prepareArticle.mockResolvedValue({ article: articleEl, parsed: {}, toc: null, topH1: false, h1Text: null, slugKey: null })
+
+    const ui = createUI({ contentWrap, navWrap, container, t: (s)=>s, contentBase: '/content/', homePage: 'home', initialDocumentTitle: 'T', runHooks, allowEmbeddedScripts: true })
+    await ui.renderByQuery()
+
+    expect(htmlBuilder.executeEmbeddedScripts).toHaveBeenCalledTimes(1)
   })
 
   it('renderByQuery handles fetchPageData failure and calls renderNotFound', async () => {

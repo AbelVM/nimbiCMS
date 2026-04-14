@@ -107,7 +107,7 @@ import puppeteer from 'puppeteer';
           }
           // prefer non-anchor (no '::') entries over anchor entries
           const prev = map.get(base)
-          if (prev && String(prev.slug || '').indexOf('::') !== -1 && String(it.slug || '').indexOf('::') === -1) {
+          if (prev && String(prev.slug ?? '').indexOf('::') !== -1 && String(it.slug ?? '').indexOf('::') === -1) {
             map.set(base, it)
           }
         } catch (e) { /* ignore per-item errors */ }

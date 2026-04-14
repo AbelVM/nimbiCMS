@@ -189,7 +189,7 @@ export async function loadSupportedLanguages(url = DEFAULT_HLJS_SUPPORTED_URL) {
         try {
           const cleaned = []
         for (const a of aliasesList) {
-          const norm = String(a || '')
+          const norm = String(a ?? '')
             .replace(/^[:]+/, '')
             .replace(/[^a-z0-9_-]+/ig, '')
           if (norm && /[a-z0-9]/i.test(norm)) cleaned.push(norm)

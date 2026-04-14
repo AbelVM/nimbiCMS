@@ -202,7 +202,8 @@ export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
 export function getLanguages(): string[]
 export function _storeSlugMapping(slug: string, rel: string): void
-export const slugResolvers: Set<Function>
+export function storeSlugMapping(slug: string, rel: string): void
+export const slugResolvers: any
 export const allMarkdownPaths: string[]
 export const allMarkdownPathsSet: Set<string>
 export const homePage: string
@@ -272,7 +273,7 @@ export function handleSitemapRequest(opts: any): any
 export function exposeSitemapGlobals(opts: any): any
 
 // --- from src/router.js
-export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
+export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array|string[]|{values:()=>Iterable}): void
 
 
 
@@ -319,6 +320,8 @@ export const initialDocumentTitle: string
 
 // --- from src/indexManager.js
 export const indexSet: any
+export function isIndexPathsRefreshed(): any
+export function setIndexPathsRefreshed(value: boolean): void
 
 
 // --- from src/imagePreview.js
@@ -414,13 +417,6 @@ export function getSharedParser(): DOMParser|null
 export function setSharedParser(parser: DOMParser|null): void
 export function resetSharedParser(): void
 
-// --- from src/utils/renderer-manager.js
-
-
-
-// --- from src/utils/memoize.js
-
-
 // --- from src/utils/l10n-defaults.js
 export const DEFAULT_L10N: Record<string, L10nEntry>
 
@@ -440,8 +436,8 @@ export const trimTrailingSlash: any
 export const ensureTrailingSlash: any
 export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): void
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
+export function safe(fn: any): string
 export const encodeURL: any
-export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
 export const decodeHtmlEntities: any
 
 
@@ -471,12 +467,5 @@ export function debugLog(...args: any): any
 export function incrementCounter(name: string): any
 export function getDebugCounters(): Record<string,number>
 export function resetDebugCounters(): any
-
-// --- from src/utils/concurrency.js
-export function runWithConcurrency(items: T[], worker: (item:T, index:number)=>Promise<U>, concurrency: number): Promise<Array<U>>
-
-// --- from src/utils/cache.js
-export function createLRUCache(opts: any): any
-
 
 // --- from src/lib/index.js

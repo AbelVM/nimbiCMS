@@ -18,7 +18,7 @@ describe('renderer worker edges', () => {
     globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
     vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: { foo: 'bar' } }) }))
-    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s||'')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s||'')}</p>`, setOptions: () => {} } }))
+    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} } }))
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
     let rewritten = src.replace(/(^|\n)onmessage\s*=\s*/g, '$1globalThis.onmessage = ')
     rewritten = rewritten.replace("./rendererRuntime.js", "../../src/worker/rendererRuntime.js")

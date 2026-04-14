@@ -36,7 +36,7 @@ ${entries}
 const SHORTCODE_RE = /:([a-z0-9_+\\-]+):/gi
 
 export function replaceShortcodes(text) {
-  return String(text || '').replace(SHORTCODE_RE, (m, name) => EMOJI_MAP[name] || m)
+  return String(text ?? '').replace(SHORTCODE_RE, (m, name) => EMOJI_MAP[name] || m)
 }
 
 export default { EMOJI_MAP, replaceShortcodes }

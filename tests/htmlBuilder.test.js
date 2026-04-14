@@ -89,7 +89,7 @@ describe('htmlBuilder utilities', () => {
       'sub/bar.md': '# Another'
     }
     global.fetch = vi.fn(async (url) => {
-      const str = String(url || '')
+      const str = String(url ?? '')
       for (const k in responses) {
         if (str.includes(k)) return { ok: true, text: () => Promise.resolve(responses[k]) }
       }
@@ -165,7 +165,7 @@ describe('htmlBuilder utilities', () => {
     const fakeNavMd = { raw: '- [Home](_home.md)\n- [Foo](foo.md)' }
     // stub global.fetch so both navigation and individual pages resolve
     global.fetch = vi.fn(async (url) => {
-      const u = String(url || '')
+      const u = String(url ?? '')
       if (u.includes('_home.md')) return { ok: true, text: () => Promise.resolve('# Home') }
       if (u.includes('_navigation.md')) return { ok: true, text: () => Promise.resolve(fakeNavMd.raw) }
       if (u.includes('foo.md')) return { ok: true, text: () => Promise.resolve('# Foo\n\nbar') }

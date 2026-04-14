@@ -30,7 +30,7 @@ describe('router extra branches', () => {
     // stub fetch: fail for contentBase attempts, succeed for absolute URL (location.href + originalRaw)
     const abs = new URL(originalRaw, location.href).toString()
     global.fetch = async (url) => {
-      const su = String(url || '')
+      const su = String(url ?? '')
       if (su === abs) {
         return {
           ok: true,

@@ -6,7 +6,7 @@
  *
  * @module htmlBuilder
  */
-import { slugify, mdToSlug, slugToMd, _storeSlugMapping, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, allMarkdownPathsSet, HOME_SLUG, getFetchConcurrency } from './slugManager.js'
+import { slugify, mdToSlug, slugToMd, storeSlugMapping, fetchMarkdown, notFoundPage, homePage, allMarkdownPaths, allMarkdownPathsSet, HOME_SLUG, getFetchConcurrency } from './slugManager.js'
 import * as md from './markdown.js'
 import { hljs, SUPPORTED_HLJS_MAP, registerLanguage, observeCodeBlocks } from './codeblocksManager.js'
 import { buildPageUrl, isExternalLink, normalizePath, safe, ensureTrailingSlash, trimTrailingSlash, decodeHtmlEntities } from './utils/helpers.js'
@@ -14,7 +14,7 @@ import { buildCosmeticUrl, parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
 import { debugWarn, debugInfo, isDebugLevel } from './utils/debug.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
-import { runWithConcurrency } from './utils/concurrency.js'
+import { PowerSemaphore } from 'performance-helpers/powerSemaphore'
 import { rafThrottle, scheduleDOMWrite } from './utils/events.js'
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
@@ -36,6 +36,12 @@ import { registerThemedElement } from './bulmaManager.js'
 import AnchorWorker from './worker/anchorWorker.js?worker&inline'
 import { PowerPool } from 'performance-helpers/powerPool'
 
+async function runWithConcurrency(items, worker, concurrency = 4) {
+  if (!Array.isArray(items) || items.length === 0) return []
+  const sem = new PowerSemaphore(Math.max(1, Number(concurrency) || 1))
+  return Promise.all(items.map((item, idx) => sem.run(() => worker(item, idx))))
+}
+
 function _hbWarn(...args) { try { debugWarn(...args) } catch (e) {} }
 function _hbShouldProbe(contentBase) {
   try { if (isDebugLevel(3)) return true } catch (e) {}
@@ -43,28 +49,6 @@ function _hbShouldProbe(contentBase) {
   try { if (slugToMd && slugToMd.size) return true } catch (e) {}
   try { if (allMarkdownPathsSet && allMarkdownPathsSet.size) return true } catch (e) {}
   return false
-}
-
-// Helper to store slug mapping with a fallback for mocked slugManager
-function storeSlugMapping(slug, rel) {
-  try {
-    if (typeof _storeSlugMapping === 'function') {
-      try { _storeSlugMapping(slug, rel); return } catch (_) {}
-    }
-  } catch (_) {}
-  try { if (slug && rel && slugToMd && typeof slugToMd.set === 'function' && !slugToMd.has(slug)) slugToMd.set(slug, rel) } catch (_) {}
-  try { if (rel && mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slug) } catch (_) {}
-  try {
-    // Prefer fast Set membership checks when available to avoid O(n) array scans.
-    if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
-      if (!allMarkdownPathsSet.has(rel)) {
-        try { allMarkdownPathsSet.add(rel) } catch (_) {}
-        try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-      }
-    } else {
-      try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-    }
-  } catch (_) {}
 }
 
 /**
@@ -83,10 +67,10 @@ function resolvePathWithBase(path, base) {
       return u2.pathname
     } catch (err2) {
       try {
-        const joined = String((base || '')).replace(/\/$/, '') + '/' + String(path || '').replace(/^\//, '')
+        const joined = String((base ?? '')).replace(/\/$/, '') + '/' + String(path ?? '').replace(/^\//, '')
         return joined.replace(/\/\\+/g, '/')
       } catch (err3) {
-        return String(path || '')
+        return String(path ?? '')
       }
     }
   }
@@ -105,10 +89,10 @@ function resolvePathWithBase(path, base) {
 function stripContentBasePrefix(rel, contentBasePath) {
   try {
     if (!rel) return rel
-    if (!contentBasePath) return String(rel || '')
-    const baseTrim = String(contentBasePath || '').replace(/^\/+|\/+$/g, '')
-    if (!baseTrim) return String(rel || '')
-    let out = String(rel || '')
+    if (!contentBasePath) return String(rel ?? '')
+    const baseTrim = String(contentBasePath ?? '').replace(/^\/+|\/+$/g, '')
+    if (!baseTrim) return String(rel ?? '')
+    let out = String(rel ?? '')
     // Remove leading slash(es)
     out = out.replace(/^\/+/, '')
     // Collapse any repeated leading base segments: 'base/base/...' -> '...'
@@ -116,7 +100,7 @@ function stripContentBasePrefix(rel, contentBasePath) {
     while (out.startsWith(prefix)) out = out.slice(prefix.length)
     if (out === baseTrim) return ''
     return out
-  } catch (e) { return String(rel || '') }
+  } catch (e) { return String(rel ?? '') }
 }
 
 /**
@@ -150,7 +134,7 @@ export function createNavTree(t, tree) {
       const li = document.createElement('li')
       const a = document.createElement('a')
       try {
-        const p = String(item.path || '')
+        const p = String(item.path ?? '')
         try {
           a.setAttribute('href', buildPageUrl(p))
         } catch (e) {
@@ -166,7 +150,7 @@ export function createNavTree(t, tree) {
           const cli = document.createElement('li')
           const ca = document.createElement('a')
           try {
-            const cp = String(c.path || '')
+            const cp = String(c.path ?? '')
             try {
               ca.setAttribute('href', buildPageUrl(cp))
             } catch (e) {
@@ -190,7 +174,7 @@ export function createNavTree(t, tree) {
         const li = document.createElement('li')
         const a = document.createElement('a')
         try {
-          const p = String(item.path || '')
+          const p = String(item.path ?? '')
           try { a.setAttribute('href', buildPageUrl(p)) } catch (e) { if (p && p.indexOf('/') === -1) a.setAttribute('href', '#' + encodeURIComponent(p)); else a.setAttribute('href', fullCosmetic(p)) }
         } catch (e) { a.setAttribute('href', '#' + item.path) }
         a.textContent = item.name
@@ -201,7 +185,7 @@ export function createNavTree(t, tree) {
             const cli = document.createElement('li')
             const ca = document.createElement('a')
             try {
-              const cp = String(c.path || '')
+              const cp = String(c.path ?? '')
               try { ca.setAttribute('href', buildPageUrl(cp)) } catch (e) { if (cp && cp.indexOf('/') === -1) ca.setAttribute('href', '#' + encodeURIComponent(cp)); else ca.setAttribute('href', fullCosmetic(cp)) }
             } catch (e) { ca.setAttribute('href', '#' + c.path) }
             ca.textContent = c.name
@@ -248,7 +232,7 @@ export function buildTocElement(t, toc, pagePath = '') {
         const slug = item.id || slugify(text)
         a.textContent = text
         try {
-          const normPage = String(pagePath || '').replace(/^[\\.\\/]+/, '')
+          const normPage = String(pagePath ?? '').replace(/^[\\.\\/]+/, '')
           const display = (normPage && mdToSlug && mdToSlug.has && mdToSlug.has(normPage)) ? mdToSlug.get(normPage) : normPage
             if (display) a.href = buildPageUrl(display, slug)
             else a.href = `#${encodeURIComponent(slug)}`
@@ -516,14 +500,14 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
                   slugKey = mdToSlug.get(rel)
                 } else {
                     try {
-                      const baseName = String(rel || '').replace(/^.*\//, '')
+                      const baseName = String(rel ?? '').replace(/^.*\//, '')
                       if (baseName && mdToSlug.has && mdToSlug.has(baseName)) slugKey = mdToSlug.get(baseName)
                     } catch (e) { debugWarn('[htmlBuilder] mdToSlug baseName check failed', e) }
                   }
                 } catch (err) { debugWarn('[htmlBuilder] mdToSlug access check failed', err) }
               if (!slugKey) {
                 try {
-                  const baseName = String(rel || '').replace(/^.*\//, '')
+                  const baseName = String(rel ?? '').replace(/^.*\//, '')
                   for (const [k, v] of slugToMd || []) {
                     if (v === rel || v === baseName) { slugKey = k; break }
                   }
@@ -543,7 +527,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
                 // path form.
                 let htmlRel = rel
                 try {
-                  if (!/\.[^\/]+$/.test(String(rel || ''))) htmlRel = String(rel || '') + '.html'
+                  if (!/\.[^\/]+$/.test(String(rel ?? ''))) htmlRel = String(rel ?? '') + '.html'
                 } catch (err) { htmlRel = rel }
                 htmlPending.add(htmlRel)
                 htmlAnchorInfo.push({ node: a, rel: htmlRel })
@@ -664,7 +648,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
       let slug = null
       try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { debugWarn('[htmlBuilder] mdToSlug access failed for htmlAnchorInfo', err) }
       if (!slug) {
-        try { const baseName = String(rel || '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { debugWarn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
+        try { const baseName = String(rel ?? '').replace(/^.*\//, ''); if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName) } catch (err) { debugWarn('[htmlBuilder] mdToSlug baseName access failed for htmlAnchorInfo', err) }
       }
       if (slug) {
         const urlVal = opts && opts.canonical ? buildPageUrl(slug, null) : fullCosmetic(slug)
@@ -716,7 +700,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
           storeSlugMapping(slugKey, pagePath)
         } catch (err) { debugWarn('[htmlBuilder] computeSlug set slug mapping failed', err) }
         try {
-          const normPath = normalizePath(String(pagePath || ''))
+          const normPath = normalizePath(String(pagePath ?? ''))
           if (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(normPath)) {
             slugKey = mdToSlug.get(normPath)
           } else {
@@ -905,7 +889,7 @@ export async function preMapMdSlugs(linkEls, contentBase) {
               resolved = mdPathRaw
               debugWarn('[htmlBuilder] resolve mdPath URL failed', err)
             }
-          let rel = (resolved && contentBasePath && resolved.startsWith(contentBasePath)) ? resolved.slice(contentBasePath.length) : String(resolved || '').replace(/^\//, '')
+          let rel = (resolved && contentBasePath && resolved.startsWith(contentBasePath)) ? resolved.slice(contentBasePath.length) : String(resolved ?? '').replace(/^\//, '')
           rel = stripContentBasePrefix(rel, contentBasePath)
           anchorInfo.push({ rel })
           if (!mdToSlug.has(rel)) pending.add(rel)
@@ -1064,12 +1048,12 @@ async function parseMarkdown(raw) {
   await ensureLanguages(raw)
   if (md.parseMarkdownToHtml) {
     const parsed = await md.parseMarkdownToHtml(raw || '')
-    if (!parsed || typeof parsed !== 'object') return { html: String(raw || ''), meta: {}, toc: [] }
+    if (!parsed || typeof parsed !== 'object') return { html: String(raw ?? ''), meta: {}, toc: [] }
     if (!Array.isArray(parsed.toc)) parsed.toc = []
     if (!parsed.meta) parsed.meta = {}
     return parsed
   }
-  return { html: String(raw || ''), meta: {}, toc: [] }
+  return { html: String(raw ?? ''), meta: {}, toc: [] }
 }
 
 /**
@@ -1120,14 +1104,14 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
                 try {
                   const parser = getSharedParser()
                   if (parser) {
-                    const doc = parser.parseFromString(String(htmlChunk || ''), 'text/html')
+                    const doc = parser.parseFromString(String(htmlChunk ?? ''), 'text/html')
                     const nodes = Array.from(doc.body.childNodes || [])
                     if (nodes.length) streamingArticle.append(...nodes)
                     else streamingArticle.insertAdjacentHTML('beforeend', htmlChunk || '')
                   } else {
                     const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
                     if (range && typeof range.createContextualFragment === 'function') {
-                      const frag = range.createContextualFragment(String(htmlChunk || ''))
+                      const frag = range.createContextualFragment(String(htmlChunk ?? ''))
                       streamingArticle.append(...Array.from(frag.childNodes))
                     } else {
                       streamingArticle.insertAdjacentHTML('beforeend', htmlChunk || '')
@@ -1153,7 +1137,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       try {
         const _parser = getSharedParser && getSharedParser()
         if (_parser) {
-          const doc = _parser.parseFromString(String(parsed.html || ''), 'text/html')
+          const doc = _parser.parseFromString(String(parsed.html ?? ''), 'text/html')
           const nodes = Array.from(doc.body.childNodes || [])
           if (nodes.length) article.replaceChildren(...nodes)
           else article.innerHTML = parsed.html
@@ -1161,7 +1145,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           try {
             const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
             if (range && typeof range.createContextualFragment === 'function') {
-              const frag = range.createContextualFragment(String(parsed.html || ''))
+              const frag = range.createContextualFragment(String(parsed.html ?? ''))
               article.replaceChildren(...Array.from(frag.childNodes))
             } else {
               article.innerHTML = parsed.html
@@ -1181,7 +1165,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       codeEls.forEach(el => {
         try {
           const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
-          const cleaned = String(raw || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+          const cleaned = String(raw ?? '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
           if (cleaned) {
             try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned; debugWarn('[htmlBuilder] set element class failed', err) }
           } else {
@@ -1217,7 +1201,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
             if (!tb.classList.contains('table')) tb.classList.add('table')
           } else {
             const cur = tb.getAttribute && tb.getAttribute('class') ? tb.getAttribute('class') : ''
-            const classes = String(cur || '').split(/\s+/).filter(Boolean)
+            const classes = String(cur ?? '').split(/\s+/).filter(Boolean)
             if (classes.indexOf('table') === -1) classes.push('table')
             try { tb.setAttribute && tb.setAttribute('class', classes.join(' ')) } catch (e) { tb.className = classes.join(' ') }
           }
@@ -1295,7 +1279,7 @@ export function executeEmbeddedScripts(article) {
     for (const s of scripts) {
       try {
         const newScript = document.createElement('script')
-        for (const attr of Array.from(s.attributes || [])) {
+        for (const attr of s.attributes) {
           try { newScript.setAttribute(attr.name, attr.value) } catch (e) {}
         }
         if (!s.src) {
@@ -1414,7 +1398,15 @@ export function renderNotFound(contentWrap, t, e) {
   }
 
  
-const _anchorPool = new PowerPool(AnchorWorker, { size: 1, minSize: 1, autoScale: true })
+const anchorAutoScaleOptions = {
+  intervalMs: 500,
+  targetMs: 80,
+  hysteresis: 0.25,
+  cooldownMs: 600,
+  stepUp: 1,
+  stepDown: 1
+}
+const _anchorPool = new PowerPool(AnchorWorker, { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions })
 
 function _resolveSlugForWorkerPath(candidate) {
   if (!candidate) return null
@@ -1489,7 +1481,7 @@ function _buildAnchorWorkerSnapshot(article, contentBase, pagePath) {
         if (!rel) rel = HOME_SLUG
         candidates.add(rel)
         candidates.add(String(rel).replace(/^.*\//, ''))
-        if (!/\.[^/]+$/.test(String(rel || ''))) {
+        if (!/\.[^/]+$/.test(String(rel ?? ''))) {
           candidates.add(rel + '.html')
           candidates.add((rel + '.html').replace(/^.*\//, ''))
         }
@@ -1552,7 +1544,7 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
     try {
       const _parser2 = getSharedParser && getSharedParser()
       if (_parser2) {
-        const doc = _parser2.parseFromString(String(rewrittenHtml || ''), 'text/html')
+        const doc = _parser2.parseFromString(String(rewrittenHtml ?? ''), 'text/html')
         const nodes = Array.from(doc.body.childNodes || [])
         if (nodes.length) article.replaceChildren(...nodes)
         else article.innerHTML = rewrittenHtml
@@ -1560,7 +1552,7 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
         try {
           const range = (document && typeof document.createRange === 'function') ? document.createRange() : null
           if (range && typeof range.createContextualFragment === 'function') {
-            const frag = range.createContextualFragment(String(rewrittenHtml || ''))
+            const frag = range.createContextualFragment(String(rewrittenHtml ?? ''))
             article.replaceChildren(...Array.from(frag.childNodes))
           } else {
             article.innerHTML = rewrittenHtml

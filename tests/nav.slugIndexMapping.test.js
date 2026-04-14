@@ -71,8 +71,8 @@ describe('navigation-driven indexing and slug mapping', () => {
     // Register the in-memory manifest and provide a fetchMarkdown shim
     _setAllMd(manifest)
     setFetchMarkdown(async (path, base) => {
-      const rel = String(path || '').replace(/^\//, '')
-      const baseClean = String(base || '').replace(/^\//, '').replace(/\/$/, '')
+      const rel = String(path ?? '').replace(/^\//, '')
+      const baseClean = String(base ?? '').replace(/^\//, '').replace(/\/$/, '')
       const key = baseClean ? `/${baseClean}/${rel}` : `/${rel}`
       const raw = manifest[key]
       if (!raw) throw new Error('manifest missing: ' + key)

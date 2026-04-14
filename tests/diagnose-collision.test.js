@@ -15,8 +15,8 @@ test('diagnose duplicate docs README slug mapping', async () => {
 
   // shim fetchMarkdown to return manifest entries
   setFetchMarkdown(async (path, base) => {
-    const rel = String(path || '').replace(/^\//, '')
-    const baseClean = String(base || '').replace(/^\//, '').replace(/\/$/, '')
+    const rel = String(path ?? '').replace(/^\//, '')
+    const baseClean = String(base ?? '').replace(/^\//, '').replace(/\/$/, '')
     const key = baseClean ? `/${baseClean}/${rel}` : `/${rel}`
     const raw = manifest[key]
     if (!raw) throw new Error('manifest missing: ' + key)

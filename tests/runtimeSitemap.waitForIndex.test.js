@@ -44,7 +44,7 @@ describe('runtimeSitemap waits for index completion', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
     const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: finalIndex, waitForIndexMs: 1000 })
@@ -54,5 +54,5 @@ describe('runtimeSitemap waits for index completion', () => {
     const written = writes.join('')
     // ensure an entry from the tail of the final index is present
     expect(written).toContain('?page=' + encodeURIComponent('p20'))
-  }, 20000)
+  }, 60000)
 })

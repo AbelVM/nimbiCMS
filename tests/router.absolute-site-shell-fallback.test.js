@@ -17,7 +17,7 @@ describe('router: absolute URL site-shell fallback', () => {
   it('falls back to notFoundPage when absolute fetch returns site shell HTML', async () => {
     // Stub global fetch: simulate absolute fallback returning the SPA shell
     vi.stubGlobal('fetch', async (url, opts) => {
-      const s = String(url || '')
+      const s = String(url ?? '')
       // Simulate contentBase host returning 404 for candidate content fetches
       if (s.includes('localhost:3000')) {
         return { ok: false, status: 404, statusText: 'Not Found', text: async () => '' }
@@ -29,7 +29,7 @@ describe('router: absolute URL site-shell fallback', () => {
     // Stub fetchMarkdown to return configured notFoundPage when probed
     const orig = slugManager.fetchMarkdown
     slugManager.setFetchMarkdown(async (path, base) => {
-      if (String(path || '') === String(slugManager.notFoundPage)) {
+      if (String(path ?? '') === String(slugManager.notFoundPage)) {
         return { raw: '# Not Found', status: 404 }
       }
       throw new Error('not found')
@@ -37,6 +37,6 @@ describe('router: absolute URL site-shell fallback', () => {
 
     const res = await router.fetchPageData('/missing', 'http://localhost:3000/content/')
     expect(res.pagePath).toBe(slugManager.notFoundPage)
-    expect(res.data && String(res.data.raw || '').includes('Not Found')).toBe(true)
+    expect(res.data && String(res.data.raw ?? '').includes('Not Found')).toBe(true)
   })
 })

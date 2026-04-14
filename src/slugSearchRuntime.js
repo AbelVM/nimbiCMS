@@ -6,7 +6,7 @@ const DEFAULT_MAX_CRAWL_QUEUE = 1000
 const DEFAULT_CONCURRENCY = 4
 
 function _slugify(value) {
-  let slug = String(value || '')
+  let slug = String(value ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9\- ]/g, '')
     .replace(/ /g, '-')
@@ -18,11 +18,11 @@ function _slugify(value) {
 }
 
 function _sanitizePath(path) {
-  return String(path || '').replace(/^[./]+/, '')
+  return String(path ?? '').replace(/^[./]+/, '')
 }
 
 function _trimTrailingSlash(path) {
-  return String(path || '').replace(/\/+$/, '')
+  return String(path ?? '').replace(/\/+$/, '')
 }
 
 function _ensureTrailingSlash(path) {
@@ -47,7 +47,7 @@ function _isExternalHref(href, contentBase) {
 
 function _toAbsoluteBase(contentBase) {
   const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
-  const baseInput = String(contentBase || '')
+  const baseInput = String(contentBase ?? '')
   if (!baseInput) return origin + '/'
   if (/^[a-z][a-z0-9+.-]*:/i.test(baseInput)) return _ensureTrailingSlash(baseInput)
   if (baseInput.startsWith('/')) return origin + _ensureTrailingSlash(baseInput)
@@ -56,7 +56,7 @@ function _toAbsoluteBase(contentBase) {
 
 async function _fetchText(path, contentBase) {
   const base = _toAbsoluteBase(contentBase)
-  const url = new URL(String(path || '').replace(/^\//, ''), base).toString()
+  const url = new URL(String(path ?? '').replace(/^\//, ''), base).toString()
   const res = await fetch(url)
   if (!res || !res.ok) return null
   return await res.text()
@@ -88,7 +88,7 @@ async function _crawlAllMarkdown(contentBase, maxQueue = DEFAULT_MAX_CRAWL_QUEUE
     const dir = queue.shift()
     if (dir == null || seenDirs.has(dir)) continue
     seenDirs.add(dir)
-    const url = new URL(String(dir || ''), baseAbs).toString()
+    const url = new URL(String(dir ?? ''), baseAbs).toString()
     let html = null
     try {
       const res = await fetch(url)
@@ -132,7 +132,7 @@ async function _crawlAllMarkdown(contentBase, maxQueue = DEFAULT_MAX_CRAWL_QUEUE
 }
 
 function _extractTitleAndExcerpt(raw, isHtml) {
-  const text = String(raw || '')
+  const text = String(raw ?? '')
   if (isHtml) {
     const title = ((text.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || (text.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] || '')
       .replace(/<[^>]+>/g, '')
@@ -177,7 +177,7 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
           : /^##\s+(.+)$/gm
         let match = null
         while ((match = headingRegex.exec(raw))) {
-          const heading = String(match[1] || '').replace(/<[^>]+>/g, '').trim()
+          const heading = String(match[1] ?? '').replace(/<[^>]+>/g, '').trim()
           if (!heading) continue
           entries.push({
             slug: `${pageSlug}::${_slugify(heading)}`,
@@ -226,7 +226,7 @@ export async function crawlForSlug(slug, base, maxQueue) {
 
   const discovered = await _crawlAllMarkdown(base, maxQueue || DEFAULT_MAX_CRAWL_QUEUE)
   for (const path of discovered) {
-    const baseName = String(path || '').replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
+    const baseName = String(path ?? '').replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
     if (_slugify(baseName) === normalized) return path
   }
   return null

@@ -17,7 +17,7 @@ describe('router: bad-slug fallback for site shells with nimbi mount', () => {
   it('treats same-origin index HTML containing nimbi mount as site shell and falls back to notFoundPage', async () => {
     // Stub global fetch: simulate contentBase host returning 404 for candidate content fetches
     vi.stubGlobal('fetch', async (url, opts) => {
-      const s = String(url || '')
+      const s = String(url ?? '')
       if (s.includes('localhost:3000')) {
         return { ok: false, status: 404, statusText: 'Not Found', text: async () => '' }
       }
@@ -28,7 +28,7 @@ describe('router: bad-slug fallback for site shells with nimbi mount', () => {
     // Stub fetchMarkdown to return configured notFoundPage when probed
     const orig = slugManager.fetchMarkdown
     slugManager.setFetchMarkdown(async (path, base) => {
-      if (String(path || '') === String(slugManager.notFoundPage)) {
+      if (String(path ?? '') === String(slugManager.notFoundPage)) {
         return { raw: '# Not Found', status: 404 }
       }
       throw new Error('not found')
@@ -36,6 +36,6 @@ describe('router: bad-slug fallback for site shells with nimbi mount', () => {
 
     const res = await router.fetchPageData('/missing', 'http://localhost:3000/content/')
     expect(res.pagePath).toBe(slugManager.notFoundPage)
-    expect(res.data && String(res.data.raw || '').includes('Not Found')).toBe(true)
+    expect(res.data && String(res.data.raw ?? '').includes('Not Found')).toBe(true)
   })
 })

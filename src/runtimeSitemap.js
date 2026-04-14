@@ -11,10 +11,6 @@ import { getSharedParser } from './utils/sharedDomParser.js'
 import { debugLog, debugWarn } from './utils/debug.js'
 import { yieldIfNeeded } from './utils/idle.js'
 
-// Backwards-compatible underscore-prefixed aliases used in older code paths
-const _debugLog = debugLog
-const _debugWarn = debugWarn
-
 /**
  * Sitemap entry object.
  * @typedef {{
@@ -44,7 +40,7 @@ function _getBase() {
 }
 
 function _escapeXml(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 }
 
 /**
@@ -262,7 +258,7 @@ export async function generateSitemapJson(opts = {}) {
           // determine path for exclusion checks
           let mappedPath = null
           if (typeof mdVal === 'string') mappedPath = normalizePath(String(mdVal))
-          else if (mdVal && typeof mdVal === 'object') mappedPath = normalizePath(String(mdVal.default || ''))
+          else if (mdVal && typeof mdVal === 'object') mappedPath = normalizePath(String(mdVal.default ?? ''))
           if (mappedPath && excludedPaths.has(mappedPath)) continue
           const loc = baseNoQs + '?page=' + encodeURIComponent(slug)
           const ent = { loc, slug }
@@ -343,7 +339,7 @@ export async function generateSitemapJson(opts = {}) {
         if (mdRes && typeof mdRes.status === 'number' && mdRes.status === 404) continue
         const raw = mdRes.raw
         const clean = (function(r) {
-          try { return String(r || '') } catch { return '' }
+          try { return String(r ?? '') } catch { return '' }
         })(raw)
         const hrefs = []
         const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
@@ -449,7 +445,7 @@ export async function generateSitemapJson(opts = {}) {
           const mdVal = slugToMd.get(base)
           let mappedPath = null
           if (typeof mdVal === 'string') mappedPath = normalizePath(String(mdVal))
-          else if (mdVal && typeof mdVal === 'object') mappedPath = normalizePath(String(mdVal.default || ''))
+          else if (mdVal && typeof mdVal === 'object') mappedPath = normalizePath(String(mdVal.default ?? ''))
           ent = { loc: baseNoQs + '?page=' + encodeURIComponent(base), slug: base }
           if (mappedPath && pathMap.has(mappedPath)) {
             const pm = pathMap.get(mappedPath)
@@ -492,7 +488,7 @@ export async function generateSitemapJson(opts = {}) {
 
   try {
     try {
-      _debugLog(() => '[runtimeSitemap] generateSitemapJson finalEntries.titleSource: ' + JSON.stringify(final.map(e => ({ slug: e.slug, title: e.title, titleSource: e._titleSource || null })), null, 2))
+      debugLog(() => '[runtimeSitemap] generateSitemapJson finalEntries.titleSource: ' + JSON.stringify(final.map(e => ({ slug: e.slug, title: e.title, titleSource: e._titleSource || null })), null, 2))
     } catch (e) { /* avoid noisy stringify errors */ }
   } catch (_) {}
 
@@ -517,7 +513,7 @@ export async function generateSitemapJson(opts = {}) {
             if (slugToMd && slugToMd.has(e.slug)) {
               const mv = slugToMd.get(e.slug)
               if (typeof mv === 'string') candidatePath = normalizePath(String(mv))
-              else if (mv && typeof mv === 'object') candidatePath = normalizePath(String(mv.default || ''))
+              else if (mv && typeof mv === 'object') candidatePath = normalizePath(String(mv.default ?? ''))
             }
             if (!candidatePath && e.sourcePath) candidatePath = e.sourcePath
           } catch (_) { continue }
@@ -536,12 +532,12 @@ export async function generateSitemapJson(opts = {}) {
                 e._titleSource = 'fetched'
               }
             }
-          } catch (err) { _debugLog('[runtimeSitemap] fetch title failed for', candidatePath, err) }
-        } catch (err) { _debugLog('[runtimeSitemap] worker loop failure', err) }
+          } catch (err) { debugLog('[runtimeSitemap] fetch title failed for', candidatePath, err) }
+        } catch (err) { debugLog('[runtimeSitemap] worker loop failure', err) }
       }
     })
     await Promise.all(workers)
-  } catch (err) { _debugLog('[runtimeSitemap] title enrichment failed', err) }
+  } catch (err) { debugLog('[runtimeSitemap] title enrichment failed', err) }
 
   return { generatedAt: new Date().toISOString(), entries: final }
 }
@@ -559,7 +555,7 @@ export function generateSitemapXml(json) {
   for (const e of entries) {
     try {
       s += '  <url>\n'
-      s += `    <loc>${_escapeXml(String(e.loc || ''))}</loc>\n`
+      s += `    <loc>${_escapeXml(String(e.loc ?? ''))}</loc>\n`
       s += '  </url>\n'
     } catch (_) {}
   }
@@ -584,9 +580,9 @@ export function generateRssXml(json) {
   s += `<lastBuildDate>${_escapeXml((json && json.generatedAt) ? new Date(json.generatedAt).toUTCString() : new Date().toUTCString())}</lastBuildDate>\n`
   for (const e of entries) {
     try {
-      const loc = String(e.loc || '')
+      const loc = String(e.loc ?? '')
       s += '<item>\n'
-      s += `<title>${_escapeXml(String(e.title || e.slug || e.loc || ''))}</title>\n`
+      s += `<title>${_escapeXml(String(e.title || e.slug || (e.loc ?? '')))}</title>\n`
       if (e.excerpt) s += `<description>${_escapeXml(String(e.excerpt))}</description>\n`
       s += `<link>${_escapeXml(loc)}</link>\n`
       s += `<guid>${_escapeXml(loc)}</guid>\n`
@@ -615,10 +611,10 @@ export function generateAtomXml(json) {
   s += `<id>${_escapeXml(base)}</id>\n`
   for (const e of entries) {
     try {
-      const loc = String(e.loc || '')
+      const loc = String(e.loc ?? '')
       const entryUpdated = (e && e.lastmod) ? (new Date(e.lastmod).toISOString()) : updated
       s += '<entry>\n'
-      s += `<title>${_escapeXml(String(e.title || e.slug || e.loc || ''))}</title>\n`
+      s += `<title>${_escapeXml(String(e.title || e.slug || (e.loc ?? '')))}</title>\n`
       if (e.excerpt) s += `<summary>${_escapeXml(String(e.excerpt))}</summary>\n`
       s += `<link href="${_escapeXml(loc)}" />\n`
       s += `<id>${_escapeXml(loc)}</id>\n`
@@ -828,14 +824,14 @@ export async function handleSitemapRequest(opts = {}) {
               if (!map.has(base)) map.set(base, it)
               else {
                 const prev = map.get(base)
-                if (prev && String(prev.slug || '').indexOf('::') !== -1 && String(it.slug || '').indexOf('::') === -1) {
+                if (prev && String(prev.slug ?? '').indexOf('::') !== -1 && String(it.slug ?? '').indexOf('::') === -1) {
                   map.set(base, it)
                 }
               }
             } catch (_e) {}
           }
-          try { _debugLog(() => '[runtimeSitemap] providedIndex.dedupedByBase: ' + JSON.stringify(Array.from(map.values()), null, 2)) } catch (e) { _debugLog(() => '[runtimeSitemap] providedIndex.dedupedByBase (count): ' + String(map.size)) }
-        } catch (e) { _debugWarn('[runtimeSitemap] logging provided index failed', e) }
+          try { debugLog(() => '[runtimeSitemap] providedIndex.dedupedByBase: ' + JSON.stringify(Array.from(map.values()), null, 2)) } catch (e) { debugLog(() => '[runtimeSitemap] providedIndex.dedupedByBase (count): ' + String(map.size)) }
+        } catch (e) { debugWarn('[runtimeSitemap] logging provided index failed', e) }
       }
     } catch (e) {}
 
@@ -864,7 +860,7 @@ export async function handleSitemapRequest(opts = {}) {
           idx = await buildSearchIndex(opts && opts.contentBase ? opts.contentBase : undefined, indexDepth, noIndexing, seeds.length ? seeds : undefined)
         }
       } catch (e) {
-        _debugWarn('[runtimeSitemap] rebuild index failed', e)
+        debugWarn('[runtimeSitemap] rebuild index failed', e)
         idx = Array.isArray(searchIndex) && searchIndex.length ? searchIndex : []
       }
     }
@@ -873,8 +869,8 @@ export async function handleSitemapRequest(opts = {}) {
     // which pages/anchors are available at runtime.
     try {
       const len = Array.isArray(idx) ? idx.length : 0
-      try { _debugLog(() => '[runtimeSitemap] usedIndex.full.length (before rebuild): ' + String(len)) } catch (e) {}
-      try { _debugLog(() => '[runtimeSitemap] usedIndex.full (before rebuild): ' + JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+      try { debugLog(() => '[runtimeSitemap] usedIndex.full.length (before rebuild): ' + String(len)) } catch (e) {}
+      try { debugLog(() => '[runtimeSitemap] usedIndex.full (before rebuild): ' + JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
     } catch (e) {}
 
     // Rebuild the search index on-demand to ensure we include all pages
@@ -909,14 +905,14 @@ export async function handleSitemapRequest(opts = {}) {
         idx = Array.from(bySlug.values())
       }
     } catch (e) {
-      try { _debugWarn('[runtimeSitemap] rebuild index call failed', e) } catch (_) {}
+      try { debugWarn('[runtimeSitemap] rebuild index call failed', e) } catch (_) {}
     }
 
     // Debug: log the full index after optional rebuild
     try {
       const len2 = Array.isArray(idx) ? idx.length : 0
-        try { _debugLog(() => '[runtimeSitemap] usedIndex.full.length (after rebuild): ' + String(len2)) } catch (e) {}
-      try { _debugLog(() => '[runtimeSitemap] usedIndex.full (after rebuild): ' + JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
+        try { debugLog(() => '[runtimeSitemap] usedIndex.full.length (after rebuild): ' + String(len2)) } catch (e) {}
+      try { debugLog(() => '[runtimeSitemap] usedIndex.full (after rebuild): ' + JSON.stringify(idx, null, 2)) } catch (e) { /* ignore stringify errors */ }
     } catch (e) {}
 
     // Generate JSON using the gathered index
@@ -944,7 +940,7 @@ export async function handleSitemapRequest(opts = {}) {
           }
         } catch {}
       }
-      try { _debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase: ' + JSON.stringify(deduped, null, 2)) } catch (e) { _debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase (count): ' + String(deduped.length)) }
+      try { debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase: ' + JSON.stringify(deduped, null, 2)) } catch (e) { debugLog(() => '[runtimeSitemap] finalEntries.dedupedByBase (count): ' + String(deduped.length)) }
     } catch (e) {
       try { deduped = Array.isArray(json && json.entries) ? json.entries.slice(0) : [] } catch (_) { deduped = [] }
     }
@@ -968,7 +964,7 @@ export async function handleSitemapRequest(opts = {}) {
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
-        try { _debugLog('[runtimeSitemap] skip RSS write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        try { debugLog('[runtimeSitemap] skip RSS write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
         return true
       }
       _scheduleSitemapWrite(finalJson, 'application/rss+xml')
@@ -979,7 +975,7 @@ export async function handleSitemapRequest(opts = {}) {
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
-        try { _debugLog('[runtimeSitemap] skip Atom write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        try { debugLog('[runtimeSitemap] skip Atom write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
         return true
       }
       _scheduleSitemapWrite(finalJson, 'application/atom+xml')
@@ -990,7 +986,7 @@ export async function handleSitemapRequest(opts = {}) {
       let existingRenderedLen = -1
       try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
       if (existingRenderedLen > newLen) {
-        try { _debugLog('[runtimeSitemap] skip XML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+        try { debugLog('[runtimeSitemap] skip XML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
         return true
       }
       _scheduleSitemapWrite(finalJson, 'application/xml')
@@ -1004,17 +1000,17 @@ export async function handleSitemapRequest(opts = {}) {
         let existingRenderedLen = -1
         try { if (typeof window !== 'undefined' && Array.isArray(window.__nimbiSitemapFinal) && typeof window.__nimbiSitemapRenderedAt === 'number') existingRenderedLen = window.__nimbiSitemapFinal.length } catch {}
         if (existingRenderedLen > newLen) {
-          try { _debugLog('[runtimeSitemap] skip HTML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
+          try { debugLog('[runtimeSitemap] skip HTML write: existing rendered sitemap larger', existingRenderedLen, newLen) } catch {}
           return true
         }
         _scheduleSitemapWrite(finalJson, 'text/html')
         return true
-      } catch (e) { _debugWarn('[runtimeSitemap] render HTML failed', e); return false }
+      } catch (e) { debugWarn('[runtimeSitemap] render HTML failed', e); return false }
     }
 
     return false
   } catch (e) {
-    _debugWarn('[runtimeSitemap] handleSitemapRequest failed', e)
+    debugWarn('[runtimeSitemap] handleSitemapRequest failed', e)
     return false
   }
 }

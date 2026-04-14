@@ -15,7 +15,7 @@ describe('slugManager noIndexing', () => {
       'secret/hidden.md': '# Hidden\n\nTop secret'
     }
     global.fetch = async (url) => {
-      const s = String(url || '')
+      const s = String(url ?? '')
       for (const k of Object.keys(store)) {
         if (s.endsWith(k)) return { ok: true, status: 200, text: () => Promise.resolve(store[k]) }
       }

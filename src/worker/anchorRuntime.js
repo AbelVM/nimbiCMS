@@ -1,9 +1,11 @@
+import { getSharedParser } from '../utils/sharedDomParser.js'
+
 function normalizePath(path) {
-  return String(path || '').replace(/^[./]+/, '')
+  return String(path ?? '').replace(/^[./]+/, '')
 }
 
 function trimTrailingSlash(value) {
-  return String(value || '').replace(/\/+$/, '')
+  return String(value ?? '').replace(/\/+$/, '')
 }
 
 function ensureTrailingSlash(value) {
@@ -11,17 +13,17 @@ function ensureTrailingSlash(value) {
 }
 
 function isExternalHref(href) {
-  const value = String(href || '')
+  const value = String(href ?? '')
   return /^(https?:)?\/\//.test(value) || value.startsWith('mailto:') || value.startsWith('tel:')
 }
 
 function buildPageUrl(page, hash = null) {
-  const encodedPage = encodeURIComponent(String(page || ''))
+  const encodedPage = encodeURIComponent(String(page ?? ''))
   return hash ? `?page=${encodedPage}#${encodeURIComponent(String(hash))}` : `?page=${encodedPage}`
 }
 
 function slugifyTitle(value) {
-  return String(value || '')
+  return String(value ?? '')
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\-\s]+/g, '')
@@ -31,23 +33,28 @@ function slugifyTitle(value) {
 function stripContentBasePrefix(rel, contentBasePath) {
   try {
     if (!rel) return rel
-    const baseTrim = String(contentBasePath || '').replace(/^\/+|\/+$/g, '')
-    if (!baseTrim) return String(rel || '')
-    let out = String(rel || '').replace(/^\/+/, '')
+    const baseTrim = String(contentBasePath ?? '').replace(/^\/+|\/+$/g, '')
+    if (!baseTrim) return String(rel ?? '')
+    let out = String(rel ?? '').replace(/^\/+/, '')
     const prefix = baseTrim + '/'
     while (out.startsWith(prefix)) out = out.slice(prefix.length)
     return out === baseTrim ? '' : out
   } catch (_) {
-    return String(rel || '')
+    return String(rel ?? '')
   }
 }
 
 function createParser() {
-  return typeof DOMParser !== 'undefined' ? new DOMParser() : null
+  if (typeof DOMParser === 'undefined') return null
+  const parser = getSharedParser()
+  try {
+    if (parser && parser.constructor === DOMParser) return parser
+  } catch (_) {}
+  return new DOMParser()
 }
 
 function getBaseName(path) {
-  return String(path || '').replace(/^.*\//, '')
+  return String(path ?? '').replace(/^.*\//, '')
 }
 
 function getSnapshotMap(snapshot) {
@@ -55,15 +62,15 @@ function getSnapshotMap(snapshot) {
 }
 
 function rememberMapping(pathToSlug, learnedMappings, path, slug) {
-  const key = String(path || '')
-  const value = String(slug || '')
+  const key = String(path ?? '')
+  const value = String(slug ?? '')
   if (!key || !value || pathToSlug.has(key)) return
   pathToSlug.set(key, value)
   learnedMappings.push({ path: key, slug: value })
 }
 
 async function fetchText(path, contentBase) {
-  const url = new URL(String(path || ''), String(contentBase || (typeof location !== 'undefined' ? location.href : 'http://localhost/')))
+  const url = new URL(String(path ?? ''), String(contentBase || (typeof location !== 'undefined' ? location.href : 'http://localhost/')))
   const res = await fetch(url.toString())
   if (!res || !res.ok) return null
   return await res.text()
@@ -104,16 +111,16 @@ async function runWithConcurrency(items, limit, worker) {
 
 export async function rewriteAnchorsHtml(html, contentBase, pagePath, snapshot = {}) {
   const parser = createParser()
-  if (!parser) return { html: String(html || ''), mappings: [] }
+  if (!parser) return { html: String(html ?? ''), mappings: [] }
 
-  const doc = parser.parseFromString(String(html || ''), 'text/html')
+  const doc = parser.parseFromString(String(html ?? ''), 'text/html')
   const article = doc.body
   const anchors = article.querySelectorAll('a')
   if (!anchors || !anchors.length) return { html: doc.body.innerHTML, mappings: [] }
 
   let contentBasePath = '/'
   try {
-    const contentBaseUrl = new URL(String(contentBase || ''), typeof location !== 'undefined' ? location.href : 'http://localhost/')
+    const contentBaseUrl = new URL(String(contentBase ?? ''), typeof location !== 'undefined' ? location.href : 'http://localhost/')
     contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname)
   } catch (_) {}
 

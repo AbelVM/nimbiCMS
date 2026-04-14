@@ -36,12 +36,12 @@ export function decodeHtmlEntitiesLocal(s) {
       return named[g] !== undefined ? named[g] : m
     })
   } catch (_) {
-    return String(s || '')
+    return String(s ?? '')
   }
 }
 
 export function _splitIntoSections(content, chunkSize) {
-  const txt = String(content || '')
+  const txt = String(content ?? '')
   if (!txt || txt.length <= chunkSize) return [txt]
   const headingRe = /^#{1,6}\s.*$/gm
   const positions = []
@@ -78,7 +78,7 @@ export function _splitIntoSections(content, chunkSize) {
 
 export function slugifyHeading(s) {
   try {
-    return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
+    return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
   } catch (_) {
     return 'heading'
   }
@@ -113,7 +113,7 @@ function headingWeight(level) {
 
 function postProcessHtml(html, idCounts = new Map()) {
   const heads = []
-  let out = String(html || '')
+  let out = String(html ?? '')
   out = out.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
     const level = Number(lvl)
     let text = inner.replace(/<[^>]+>/g, '').trim()

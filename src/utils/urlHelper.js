@@ -28,12 +28,12 @@
  */
 function encodePathSegments(p) {
   try {
-    return String(p || '')
+    return String(p ?? '')
       .split('/')
       .map(s => encodeURIComponent(s))
       .join('/')
   } catch (e) {
-    return String(p || '')
+    return String(p ?? '')
   }
 }
 
@@ -48,7 +48,7 @@ function encodePathSegments(p) {
  * @returns {string} cosmetic URL string
  */
 export function buildCosmeticUrl(page, anchor = null, baseSearch = undefined) {
-  const seg = encodePathSegments(String(page || ''))
+  const seg = encodePathSegments(String(page ?? ''))
   let out = '#/' + seg
   if (anchor) out += '#' + encodeURIComponent(String(anchor))
   try {
@@ -75,7 +75,7 @@ export function buildCosmeticUrl(page, anchor = null, baseSearch = undefined) {
         const s = sp.toString()
         if (s) out += '?' + s
       } catch (e) {
-        const raw = String(qs || '').replace(/^page=[^&]*&?/, '')
+        const raw = String(qs ?? '').replace(/^page=[^&]*&?/, '')
         if (raw) out += '?' + raw
       }
     }
@@ -164,7 +164,7 @@ export function toCanonicalHref(href) {
       return out
     }
   } catch (e) {}
-  return String(href || '')
+  return String(href ?? '')
 }
 
  

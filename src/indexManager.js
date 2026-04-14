@@ -26,6 +26,24 @@ import { slugToMd, mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from './slu
  * @type {Set<string>}
  */
 export const indexSet = new Set();
+let _refreshed = false;
+
+/**
+ * Return whether index paths have been refreshed at least once.
+ * @returns {boolean}
+ */
+export function isIndexPathsRefreshed() {
+  return _refreshed;
+}
+
+/**
+ * Set the internal refresh flag for index paths.
+ * @param {boolean} value
+ * @returns {void}
+ */
+export function setIndexPathsRefreshed(value) {
+  _refreshed = !!value;
+}
 /**
  * Refresh the internal `indexSet` from available markdown paths and slug maps.
  * Useful when the content base or path list changes at runtime (tests/plugins).
@@ -49,8 +67,16 @@ export function refreshIndexPaths(contentBase) {
   }
   _augmentIndexWithMap(slugToMd);
   _augmentIndexWithMap(mdToSlug);
-  refreshIndexPaths._refreshed = true;
+  _refreshed = true;
 }
+
+try {
+  Object.defineProperty(refreshIndexPaths, '_refreshed', {
+    get() { return _refreshed; },
+    set(v) { _refreshed = !!v; },
+    configurable: true
+  });
+} catch (_) {}
 
 /**
  * Add all values from a Map-like object into the runtime `indexSet`.
@@ -74,7 +100,8 @@ function _trackMap(map) {
   if (!map || typeof map.set !== 'function') return;
   const orig = map.set;
   map.set = function(k, v) {
-    if (v) indexSet.add(v);
+    if (v && typeof v === 'string') indexSet.add(v);
+    else if (v?.default) indexSet.add(v.default);
     return orig.call(this, k, v);
   };
 }

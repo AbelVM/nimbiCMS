@@ -337,7 +337,7 @@ globSync('src/**/*.js').forEach(file => {
         const retTag = c.tags.find(t=>t.tag==='returns' || t.tag==='return')
         let retType = 'any'
         if (retTag) {
-          const raw = String(retTag.type || '')
+          const raw = String(retTag.type ?? '')
           // determine if there is a *top-level* union (pipe not nested inside
           // braces, parentheses, or generic angle brackets).
           function hasTopUnion(str) {
@@ -374,7 +374,7 @@ globSync('src/**/*.js').forEach(file => {
         }
         // helper to clean individual parameter type string
         function sanitizeParamType(typeStr) {
-          let ty = String(typeStr || '').trim()
+          let ty = String(typeStr ?? '').trim()
           // don't modify function types or types containing arrows
           if (ty.includes('=>')) return ty
           // wrap object-like annotations if not already braced

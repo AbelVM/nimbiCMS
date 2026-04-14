@@ -1,5 +1,5 @@
 import { createWorkerFromRaw } from '../src/worker-manager.js'
-import { LRUCache } from '../src/utils/cache.js'
+import { PowerCache } from 'performance-helpers/powerCache'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 describe('createWorkerFromRaw blob URL cache eviction', () => {
@@ -22,7 +22,7 @@ describe('createWorkerFromRaw blob URL cache eviction', () => {
 
   it('revokes the oldest blob URL when cache evicts', () => {
     // Use a tiny cache and ensure eviction calls URL.revokeObjectURL
-    createWorkerFromRaw._blobUrlCache = new LRUCache({ maxSize: 1, onEvict: (k, v) => URL.revokeObjectURL(v) })
+    createWorkerFromRaw._blobUrlCache = new PowerCache({ maxEntries: 1, onEvict: (k, v) => URL.revokeObjectURL(v) })
 
     createWorkerFromRaw('code1')
     createWorkerFromRaw('code2')

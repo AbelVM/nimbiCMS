@@ -215,6 +215,7 @@ This behavior is covered by the test-suite (see the canonical-link and URL handl
 | `el` | `string` \ `Element` | required | CSS selector or DOM element used as the mount target. |
 | `contentPath` | `string` | `/content` | URL path to the content folder serving `.md`/`.html` files; normalized to a relative path with trailing slash. |
 | `allowUrlPathOverrides` | `boolean` | `false` | Opt-in: when `true`, `contentPath`, `homePage`, `notFoundPage`, and `navigationPage` may be overridden using URL params. |
+| `allowEmbeddedScripts` | `boolean` | `false` | Security-sensitive opt-in. When `true`, embedded scripts in rendered markdown/html are executed. Enable only for fully trusted content because this requires eval-like execution (`new Function`) and may require CSP `unsafe-eval`. |
 | `debugLevel` | `0 \|1 \| 2 \| 3` | `0` | Initial logging verbosity: `0`=disabled, `1`=errors, `2`=errors+warnings, `3`=all messages. |
 
 ### Indexing and Search

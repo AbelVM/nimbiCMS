@@ -1,6 +1,6 @@
 {
   "name": "nimbi-cms",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AbelVM/nimbiCMS.git"
@@ -32,6 +32,7 @@
     "build:analyze": "ANALYZE=1 npm run build:lib && npm run build:umd",
     "preview": "vite preview",
     "test": "npx vitest run",
+    "test:coverage": "npx vitest run --coverage",
     "a11y:scan": "node scripts/a11y-runner.js",
     "gen-dts": "node scripts/gen-dts.js",
     "prepare": "npm run build && npm run gen-dts && npm run docs",

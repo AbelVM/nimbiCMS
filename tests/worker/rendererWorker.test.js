@@ -22,8 +22,8 @@ describe('renderer worker (unit)', () => {
     // mock marked and frontmatter parser
     vi.resetModules()
     vi.mock('marked', () => ({
-      marked: { parse: (s) => `<p>${String(s||'')}</p>`, setOptions: () => {} },
-      default: { parse: (s) => `<p>${String(s||'')}</p>`, setOptions: () => {} }
+      marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} },
+      default: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} }
     }))
     vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
     // copy and rewrite worker module to avoid top-level `onmessage =` strict-mode error

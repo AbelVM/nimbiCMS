@@ -7,6 +7,7 @@
  * @module l10nManager
  */
 import { DEFAULT_L10N } from './utils/l10n-defaults.js'
+import { PowerDeadline } from 'performance-helpers/powerDeadline'
 
 const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))
 
@@ -59,11 +60,26 @@ export function t(key, replacements = {}) {
 export async function loadL10nFile(path, pageDir) {
   if (!path) return
   let resolved = path
+  const fetchWithDeadline = async (targetUrl) => {
+    if (PowerDeadline && typeof PowerDeadline.run === 'function') {
+      return await PowerDeadline.run(
+        () => fetch(targetUrl),
+        { attemptTimeout: 10_000, maxAttempts: 1 }
+      )
+    }
+    let timeoutSignal = null
+    try {
+      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        timeoutSignal = AbortSignal.timeout(10_000)
+      }
+    } catch (_) {}
+    return await fetch(targetUrl, timeoutSignal ? { signal: timeoutSignal } : undefined)
+  }
   try {
     if (!/^https?:\/\//.test(path)) {
       resolved = new URL(path, location.origin + pageDir).toString()
     }
-    const res = await fetch(resolved)
+    const res = await fetchWithDeadline(resolved)
     if (!res.ok) return
     const json = await res.json()
     for (const lang of Object.keys(json || {})) {

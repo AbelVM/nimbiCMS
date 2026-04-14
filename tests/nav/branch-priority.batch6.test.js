@@ -17,7 +17,7 @@ describe('seedNavSlugMappings mixed href patterns', () => {
     try { slugToMd.set('existing-slug', 'existing.md') } catch (_) {}
 
     setFetchMarkdown(async (path, base) => {
-      const p = String(path || '')
+      const p = String(path ?? '')
       if (p.endsWith('child.md') || p.endsWith('child.html')) return { raw: '# Hello Child\n', isHtml: false }
       if (p.indexOf('page.md') !== -1) return { raw: '<!doctype html><html><body><h1>Page</h1></body></html>', isHtml: true }
       return { raw: '', isHtml: false }

@@ -2,9 +2,8 @@ import {
   slugify,
   mdToSlug,
   slugToMd,
-  _storeSlugMapping,
+  storeSlugMapping,
   fetchMarkdown,
-  notFoundPage,
   allMarkdownPaths,
   allMarkdownPathsSet,
   HOME_SLUG,
@@ -19,7 +18,13 @@ import {
 import { buildCosmeticUrl } from '../utils/urlHelper.js'
 import { debugWarn, isDebugLevel } from '../utils/debug.js'
 import { getSharedParser } from '../utils/sharedDomParser.js'
-import { runWithConcurrency } from '../utils/concurrency.js'
+import { PowerSemaphore } from 'performance-helpers/powerSemaphore'
+
+async function runWithConcurrency(items, worker, concurrency = 4) {
+  if (!Array.isArray(items) || items.length === 0) return []
+  const sem = new PowerSemaphore(Math.max(1, Number(concurrency) || 1))
+  return Promise.all(items.map((item, idx) => sem.run(() => worker(item, idx))))
+}
 
 function fullCosmetic(page, anchor = null) {
   try {
@@ -32,45 +37,24 @@ function fullCosmetic(page, anchor = null) {
 
 function _hbShouldProbe() {
   try { if (isDebugLevel(3)) return true } catch (e) {}
-  try { if (typeof notFoundPage === 'string' && notFoundPage) return true } catch (e) {}
   try { if (slugToMd && slugToMd.size) return true } catch (e) {}
   try { if (allMarkdownPathsSet && allMarkdownPathsSet.size) return true } catch (e) {}
   return false
 }
 
-function storeSlugMapping(slug, rel) {
-  try {
-    if (typeof _storeSlugMapping === 'function') {
-      try { _storeSlugMapping(slug, rel); return } catch (_) {}
-    }
-  } catch (_) {}
-  try { if (slug && rel && slugToMd && typeof slugToMd.set === 'function' && !slugToMd.has(slug)) slugToMd.set(slug, rel) } catch (_) {}
-  try { if (rel && mdToSlug && typeof mdToSlug.set === 'function') mdToSlug.set(rel, slug) } catch (_) {}
-  try {
-    if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
-      if (!allMarkdownPathsSet.has(rel)) {
-        try { allMarkdownPathsSet.add(rel) } catch (_) {}
-        try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-      }
-    } else {
-      try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel) } catch (_) {}
-    }
-  } catch (_) {}
-}
-
 function stripContentBasePrefix(rel, contentBasePath) {
   try {
     if (!rel) return rel
-    if (!contentBasePath) return String(rel || '')
-    const baseTrim = String(contentBasePath || '').replace(/^\/+|\/+$/g, '')
-    if (!baseTrim) return String(rel || '')
-    let out = String(rel || '')
+    if (!contentBasePath) return String(rel ?? '')
+    const baseTrim = String(contentBasePath ?? '').replace(/^\/+|\/+$/g, '')
+    if (!baseTrim) return String(rel ?? '')
+    let out = String(rel ?? '')
     out = out.replace(/^\/+/, '')
     const prefix = baseTrim + '/'
     while (out.startsWith(prefix)) out = out.slice(prefix.length)
     if (out === baseTrim) return ''
     return out
-  } catch (e) { return String(rel || '') }
+  } catch (e) { return String(rel ?? '') }
 }
 
 let _lastContentBase = ''
@@ -170,14 +154,14 @@ export async function rewriteAnchors(article, contentBase, pagePath, opts = {}) 
                 if (mdToSlug && mdToSlug.has && mdToSlug.has(rel)) slugKey = mdToSlug.get(rel)
                 else {
                   try {
-                    const baseName = String(rel || '').replace(/^.*\//, '')
+                    const baseName = String(rel ?? '').replace(/^.*\//, '')
                     if (baseName && mdToSlug.has && mdToSlug.has(baseName)) slugKey = mdToSlug.get(baseName)
                   } catch (e) { debugWarn('[anchorRewriter] mdToSlug baseName check failed', e) }
                 }
               } catch (err) { debugWarn('[anchorRewriter] mdToSlug access check failed', err) }
               if (!slugKey) {
                 try {
-                  const baseName = String(rel || '').replace(/^.*\//, '')
+                  const baseName = String(rel ?? '').replace(/^.*\//, '')
                   for (const [k, v] of slugToMd || []) {
                     if (v === rel || v === baseName) { slugKey = k; break }
                   }
@@ -189,7 +173,7 @@ export async function rewriteAnchors(article, contentBase, pagePath, opts = {}) 
               } else {
                 let htmlRel = rel
                 try {
-                  if (!/\.[^\/]+$/.test(String(rel || ''))) htmlRel = String(rel || '') + '.html'
+                  if (!/\.[^\/]+$/.test(String(rel ?? ''))) htmlRel = String(rel ?? '') + '.html'
                 } catch (err) { htmlRel = rel }
                 htmlPending.add(htmlRel)
                 htmlAnchorInfo.push({ node: a, rel: htmlRel })
@@ -291,7 +275,7 @@ export async function rewriteAnchors(article, contentBase, pagePath, opts = {}) 
       try { if (mdToSlug.has(rel)) slug = mdToSlug.get(rel) } catch (err) { debugWarn('[anchorRewriter] mdToSlug access failed for html anchor', err) }
       if (!slug) {
         try {
-          const baseName = String(rel || '').replace(/^.*\//, '')
+          const baseName = String(rel ?? '').replace(/^.*\//, '')
           if (mdToSlug.has(baseName)) slug = mdToSlug.get(baseName)
         } catch (err) { debugWarn('[anchorRewriter] mdToSlug baseName access failed for html anchor', err) }
       }

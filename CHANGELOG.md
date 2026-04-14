@@ -13,6 +13,9 @@ On top of [performance-helpers](https://abelvm.github.io/performance-helpers).
 - Improved performance, both in cold start and in transitions
 - The new architecture is much more robust and easier to maintain.
 - Leaner bundles
+- Less potential bugs
+
+- **[FEAT]** Gate the execution of external scripts in the pages with `executeEmbeddedScripts` option
 
 ## v1.0.8
 

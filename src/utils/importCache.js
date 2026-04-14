@@ -4,12 +4,17 @@
  * @module utils/importCache
  */
 import { PowerCache } from 'performance-helpers/powerCache'
+import { PowerTTLMap } from 'performance-helpers/powerTTLMap'
 
 const __importCache = new PowerCache({ maxEntries: 500 })
+const __negativeCache = new PowerTTLMap(0)
 let __IMPORT_NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
 
 /** Clear the shared import cache. */
-export function clearImportCache() { __importCache.clear() }
+export function clearImportCache() {
+  __importCache.clear()
+  __negativeCache.clear()
+}
 
 /** Adjust negative-cache TTL for shared import cache. */
 export function setImportNegativeCacheTTL(ms) { __IMPORT_NEGATIVE_CACHE_TTL_MS = Number(ms) || 0 }
@@ -23,37 +28,25 @@ export function setImportNegativeCacheTTL(ms) { __IMPORT_NEGATIVE_CACHE_TTL_MS =
 export async function runImportWithCache(key, loader) {
   try {
     if (!key) return null
-    const now = Date.now()
-    let cached = __importCache.get(key)
-    if (cached) {
-      if (cached.ok === false && (now - (cached.ts || 0) >= __IMPORT_NEGATIVE_CACHE_TTL_MS)) {
-        __importCache.delete(key)
-        cached = undefined
-      }
-    }
-    if (cached) {
-      if (cached.module) return cached.module
-      if (cached.promise) {
-        try { return await cached.promise } catch (err) { return null }
-      }
-    }
 
-    const entry = { promise: null, module: null, ok: null, ts: Date.now() }
-    __importCache.set(key, entry)
-    entry.promise = (async () => {
-      try { return await loader() } catch (err) { return null }
-    })()
+    if (__IMPORT_NEGATIVE_CACHE_TTL_MS > 0 && __negativeCache.has(key)) {
+      return null
+    }
 
     try {
-      const mod = await entry.promise
-      entry.module = mod
-      entry.ok = !!mod
-      entry.ts = Date.now()
+      const mod = await __importCache.getOrSetAsync(key, async () => {
+        const loaded = await loader()
+        if (loaded == null) throw new Error('importCache: loader returned null')
+        return loaded
+      })
+      __negativeCache.delete(key)
       return mod
     } catch (err) {
-      entry.module = null
-      entry.ok = false
-      entry.ts = Date.now()
+      if (__IMPORT_NEGATIVE_CACHE_TTL_MS > 0) {
+        __negativeCache.set(key, 1, __IMPORT_NEGATIVE_CACHE_TTL_MS)
+      } else {
+        __negativeCache.delete(key)
+      }
       return null
     }
   } catch (err) {

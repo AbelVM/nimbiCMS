@@ -58,10 +58,10 @@ describe('runtimeSitemap RSS/Atom', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000 })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)
@@ -84,10 +84,10 @@ describe('runtimeSitemap RSS/Atom', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000 })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)

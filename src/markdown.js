@@ -15,7 +15,16 @@ import { getSharedParser } from './utils/sharedDomParser.js'
 
 const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
 
-const _rendererPool = new PowerPool(RendererWorker, { size: poolSize, minSize: 1, autoScale: true })
+const rendererAutoScaleOptions = {
+  intervalMs: 500,
+  targetMs: 75,
+  hysteresis: 0.25,
+  cooldownMs: 500,
+  stepUp: 1,
+  stepDown: 1
+}
+
+const _rendererPool = new PowerPool(RendererWorker, { size: poolSize, minSize: 2, autoScale: rendererAutoScaleOptions })
 
 // use shared DOMParser helper (see src/utils/sharedDomParser.js)
 
@@ -117,7 +126,7 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
 // Small slugify helper reused by streaming logic to match parseMarkdownToHtml
 function _slugifyLocal(s) {
   try {
-    return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
+    return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
   } catch (e) { return 'heading' }
 }
 
@@ -130,7 +139,7 @@ function _slugifyLocal(s) {
  * @returns {string[]}
  */
 function _splitIntoSections(content, chunkSize) {
-  const txt = String(content || '')
+  const txt = String(content ?? '')
   if (!txt || txt.length <= chunkSize) return [txt]
   const headingRe = /^#{1,6}\s.*$/gm
   const positions = []
@@ -182,9 +191,9 @@ function _splitIntoSections(content, chunkSize) {
 export async function streamParseMarkdown(md, onChunk, opts = {}) {
   const chunkSize = (opts && opts.chunkSize) ? Number(opts.chunkSize) : 64 * 1024
   const cb = typeof onChunk === 'function' ? onChunk : (() => {})
-  const { content, data } = parseFrontmatter(String(md || ''))
+  const { content, data } = parseFrontmatter(String(md ?? ''))
   let body = content
-  try { body = String(body || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+  try { body = String(body ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
   // If a renderer worker is available prefer worker-side streaming; this
   // will post partial chunk messages from the worker and emulate the
   // same events the inline shim/worker would emit.
@@ -223,7 +232,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
           return reject(new Error(data.error))
         }
         if (data.type === 'chunk') {
-          try { cb(String(data.html || ''), { index: data.index, isLast: !!data.isLast, meta: {}, toc: data.toc || [] }) } catch (e) {}
+          try { cb(String(data.html ?? ''), { index: data.index, isLast: !!data.isLast, meta: {}, toc: data.toc || [] }) } catch (e) {}
           return
         }
         if (data.type === 'done') {
@@ -334,7 +343,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
 export async function parseMarkdownToHtml(md) {
   if (markdownPlugins && markdownPlugins.length) {
     let { content, data } = parseFrontmatter(md || '')
-    try { content = String(content || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+    try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
     marked.setOptions({ gfm: true, mangle: false, headerIds: false, headerPrefix: '' })
     try { markdownPlugins.forEach(p => marked.use(p)) } catch (e) { debugWarn('[markdown] apply plugins failed', e) }
     const html = marked.parse(content)
@@ -346,7 +355,7 @@ export async function parseMarkdownToHtml(md) {
         const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
         const docToc = []
         const used = new Set()
-        const slugifyLocal = (s) => { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+        const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
         const classesFor = (level) => {
           const resp = {
             1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
@@ -391,7 +400,7 @@ export async function parseMarkdownToHtml(md) {
           doc.querySelectorAll('pre code, code[class]').forEach(el => {
             try {
               const raw = (el.getAttribute && el.getAttribute('class')) || el.className || ''
-              const cleaned = String(raw || '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+              const cleaned = String(raw ?? '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
               if (cleaned) {
                 try { el.setAttribute && el.setAttribute('class', cleaned) } catch (err) { el.className = cleaned }
               } else {
@@ -423,20 +432,20 @@ export async function parseMarkdownToHtml(md) {
 
   
 
-  try { md = String(md || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+  try { md = String(md ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
   // Fast path: avoid worker startup/roundtrip for markdown without fenced
   // code blocks; this tends to improve first-render latency on cold loads.
   try {
-    const rawMd = String(md || '')
+    const rawMd = String(md ?? '')
     const isVitest = !!(typeof process !== 'undefined' && process.env && process.env.VITEST)
     if (!isVitest && !/```/.test(rawMd) && rawMd.length <= 200000) {
       let { content, data } = parseFrontmatter(rawMd)
-      try { content = String(content || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+      try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
       marked.setOptions({ gfm: true, headerIds: true, mangle: false })
       let html = marked.parse(content)
       const heads = []
       const used = new Set()
-      const slugifyLocal = (s) => { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+      const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
       html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
         const level = Number(lvl)
         const text = inner.replace(/<[^>]+>/g, '').trim()
@@ -484,9 +493,9 @@ export async function parseMarkdownToHtml(md) {
   }
   try {
     if (typeof hljs !== 'undefined' && hljs && typeof hljs.getLanguage === 'function' && hljs.getLanguage('plaintext')) {
-      if (/```\s*\n/.test(String(md || ''))) {
+      if (/```\s*\n/.test(String(md ?? ''))) {
         let { content, data } = parseFrontmatter(md || '')
-        try { content = String(content || '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+        try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
         marked.setOptions({ gfm: true, headerIds: true, mangle: false, highlighted: (code, lang) => {
           try {
             if (lang && hljs.getLanguage && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value
@@ -520,7 +529,7 @@ export async function parseMarkdownToHtml(md) {
         } catch (e) {}
         const heads = []
         const used = new Set()
-        const slugifyLocal = (s) => { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+        const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
         html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
           const level = Number(lvl)
           const text = inner.replace(/<[^>]+>/g, '').trim()
@@ -559,7 +568,7 @@ export async function parseMarkdownToHtml(md) {
   try {
     const idCounts = new Map()
     const toc = []
-    const slugifyLocal = (s) => { try { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+    const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
     const classesFor = (level) => {
       const resp = {
         1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
@@ -708,7 +717,7 @@ export async function detectFenceLanguagesAsync(mdText, supportedMap) {
   if (w) {
     try {
       const arr = supportedMap && supportedMap.size ? Array.from(supportedMap.keys()) : []
-      const res = await _sendToRenderer({ type: 'detect', md: String(mdText || ''), supported: arr }, 200)
+      const res = await _sendToRenderer({ type: 'detect', md: String(mdText ?? ''), supported: arr }, 200)
       if (Array.isArray(res)) return new Set(res)
     } catch (e) {
       debugWarn('[markdown] detectFenceLanguagesAsync worker failed', e)
