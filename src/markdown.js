@@ -12,8 +12,9 @@ import { PowerPool } from 'performance-helpers/powerPool'
 import emojimap from './utils/emojiMap.js'
 import { debugWarn } from './utils/debug.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
+import { getWorkerPoolSize } from './utils/helpers.js'
 
-const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
+const poolSize = getWorkerPoolSize()
 
 const rendererAutoScaleOptions = {
   intervalMs: 500,

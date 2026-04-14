@@ -10,7 +10,7 @@ import * as l10n from './l10nManager.js'
 import { refreshIndexPaths, indexSet, isIndexPathsRefreshed } from './indexManager.js'
 import { parseHrefToRoute } from './utils/urlHelper.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
-import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
+import { normalizePath, trimTrailingSlash, ensureTrailingSlash, getWorkerPoolSize } from './utils/helpers.js'
 
 import SlugWorker from './worker/slugWorker.js?worker&inline'
 
@@ -179,7 +179,7 @@ async function runWithConcurrency(items, worker, concurrency = 4) {
   return Promise.all(items.map((item, idx) => sem.run(() => worker(item, idx))))
 }
 
-const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
+const poolSize = getWorkerPoolSize()
 const slugAutoScaleOptions = {
   intervalMs: 750,
   targetMs: 120,

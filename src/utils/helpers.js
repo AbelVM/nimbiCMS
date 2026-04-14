@@ -351,3 +351,12 @@ try {
  * @returns {string}
  */
 export const decodeHtmlEntities = (s) => _decodeHtmlEntitiesMemo.run(s)
+
+/**
+ * Determine a reasonable worker pool size based on the platform's
+ * reported hardware concurrency. Used to size PowerPool instances.
+ * @returns {number}
+ */
+export const getWorkerPoolSize = () =>
+  (typeof navigator !== 'undefined' && navigator.hardwareConcurrency)
+    ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
