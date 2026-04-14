@@ -7,9 +7,7 @@ import {
   isDebug,
   incrementCounter,
   getDebugCounters,
-  resetDebugCounters,
-  syncLegacyCounter,
-  hasLegacyDebug
+  resetDebugCounters
 } from '../src/utils/debug.js'
 import { debugError, debugWarn, debugInfo, debugLog } from '../src/utils/debug.js'
 
@@ -32,18 +30,6 @@ describe('utils/debug helpers', () => {
     incrementCounter('x')
     expect(getDebugCounters().x).toBe(1)
     resetDebugCounters()
-  })
-
-  it('legacy counter sync and detection works', () => {
-    // ensure global legacy object
-    try { globalThis.__nimbiCMSDebug = {} } catch (e) {}
-    expect(hasLegacyDebug()).toBe(true)
-    syncLegacyCounter('legacy1')
-    try {
-      expect(globalThis.__nimbiCMSDebug.legacy1).toBe(1)
-    } finally {
-      try { delete globalThis.__nimbiCMSDebug } catch (e) {}
-    }
   })
 
   it('logging helpers call console when levels enabled', () => {

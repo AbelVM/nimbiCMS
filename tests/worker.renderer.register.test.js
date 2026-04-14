@@ -28,9 +28,7 @@ describe('renderer worker register-success', () => {
     // create rewritten worker module (assign to globalThis.onmessage)
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
       let rewritten = src.replace(/(^|\n)onmessage\s*=\s*/g, '$1globalThis.onmessage = ')
-      rewritten = rewritten.replace("../utils/frontmatter.js", "../../src/utils/frontmatter.js")
-      rewritten = rewritten.replace("../utils/cache.js", "../../src/utils/cache.js")
-      rewritten = rewritten.replace("../utils/importCache.js", "../../src/utils/importCache.js")
+      rewritten = rewritten.replace("./rendererRuntime.js", "../../src/worker/rendererRuntime.js")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_reg.mjs')
     fs.writeFileSync(tmpPath, rewritten, 'utf8')
     globalThis._rendererRegModule = tmpPath

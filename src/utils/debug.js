@@ -32,66 +32,19 @@ export function isDebugLevel(level = 1) { return _logger.isDebugLevel(level) }
 export function isDebug() { return _logger.isDebug() }
 
 /** @param {...any} args */
-export function debugError(...args) {
-  try {
-    if (!_logger.isDebugLevel(1)) return
-    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    _logger.error(...resolved)
-  } catch (e) {}
-}
+export function debugError(...args) { _logger.error(...args) }
 
 /** @param {...any} args */
-export function debugWarn(...args) {
-  try {
-    if (!_logger.isDebugLevel(2)) return
-    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    _logger.warn(...resolved)
-  } catch (e) {}
-}
+export function debugWarn(...args) { _logger.warn(...args) }
 
 /** @param {...any} args */
-export function debugInfo(...args) {
-  try {
-    if (!_logger.isDebugLevel(3)) return
-    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    _logger.info(...resolved)
-  } catch (e) {}
-}
+export function debugInfo(...args) { _logger.info(...args) }
 
 /** @param {...any} args */
-export function debugLog(...args) {
-  try {
-    if (!_logger.isDebugLevel(3)) return
-    const resolved = args.map(a => (typeof a === 'function') ? a() : a)
-    _logger.log(...resolved)
-  } catch (e) {}
-}
+export function debugLog(...args) { _logger.log(...args) }
 
 /** @param {string} name */
 export function incrementCounter(name) { _logger.incrementCounter(name) }
-
-/**
- * Compatibility helper: sync a counter into the legacy `__nimbiCMSDebug` global
- * when present.
- * @param {string} name
- */
-export function syncLegacyCounter(name) {
-  try {
-    if (typeof globalThis === 'undefined' || !globalThis.__nimbiCMSDebug) return
-    const k = String(name || '')
-    if (!k) return
-    try { globalThis.__nimbiCMSDebug[k] = (globalThis.__nimbiCMSDebug[k] || 0) + 1 } catch (e) {}
-  } catch (e) {}
-}
-
-/**
- * Return whether a legacy `__nimbiCMSDebug` global is present.
- * @returns {boolean}
- */
-export function hasLegacyDebug() {
-  try { return (typeof globalThis !== 'undefined' && Boolean(globalThis.__nimbiCMSDebug)) }
-  catch (e) { return false }
-}
 
 /** @returns {Record<string,number>} */
 export function getDebugCounters() { return _logger.getDebugCounters() }

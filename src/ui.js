@@ -13,7 +13,7 @@ import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickH
 import { setEagerForAboveFoldImages } from './utils/helpers.js'
 import { applyPageMeta } from './seoManager.js'
 import { attachImagePreview } from './imagePreview.js'
-import { debugWarn, debugError, incrementCounter, syncLegacyCounter } from './utils/debug.js'
+import { debugWarn, debugError, incrementCounter } from './utils/debug.js'
 import { notFoundPage } from './slugManager.js'
 
 
@@ -221,7 +221,6 @@ export function createUI(opts) {
     _isRendering = true
     try {
       try { incrementCounter('renderByQuery') } catch (_) {}
-      try { syncLegacyCounter('renderByQuery') } catch (_) {}
       let parsed = parseHrefToRoute(location.href)
       // If the path-style URL equals the site's content base (repo subpath)
       // treat it as the site root so the configured `homePage` is used

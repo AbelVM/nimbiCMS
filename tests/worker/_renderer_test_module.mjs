@@ -12,7 +12,7 @@ import {
   importModuleWithCache,
   setRendererImportNegativeCacheTTL,
   slugifyHeading,
-} from './rendererRuntime.js'
+} from '../../src/worker/rendererRuntime.js'
 
 attachRendererWorker(globalThis)
 

@@ -25,13 +25,11 @@ describe('renderer worker extra', () => {
     globalThis._fakeLangPath = pathToFileURL(langPath).href
     // create a modified copy of renderer.js with pre-seeded hljs and globalThis.onmessage
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
-    let rewritten = src.replace('let hljs = null', "let hljs = { registerLanguage: function(name, lang) { this[name]=lang }, getLanguage: function(n){ return !!this[n] }, highlight: function(c, o){ return c } }")
+    let rewritten = src.replace("from './rendererRuntime.js'", "from '../../src/worker/rendererRuntime.js'")
     rewritten = rewritten.replace(/(^|\n)onmessage\s*=/g, '$1globalThis.onmessage =')
-    rewritten = rewritten.replace("../utils/frontmatter.js", "../../src/utils/frontmatter.js")
-    rewritten = rewritten.replace("../utils/cache.js", "../../src/utils/cache.js")
-    rewritten = rewritten.replace("../utils/importCache.js", "../../src/utils/importCache.js")
+    let tryMock = rewritten.replace('let hljs = null', "let hljs = { registerLanguage: function(name, lang) { this[name]=lang }, getLanguage: function(n){ return !!this[n] }, highlight: function(c, o){ return c } }")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_extra.mjs')
-    fs.writeFileSync(tmpPath, rewritten, 'utf8')
+    fs.writeFileSync(tmpPath, tryMock, 'utf8')
     globalThis._rendererTestModuleExtra = tmpPath
   })
 

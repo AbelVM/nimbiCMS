@@ -12,7 +12,7 @@ import { parseHrefToRoute } from './utils/urlHelper.js'
 import { markNotFound } from './seoManager.js'
 import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
 import { getSharedParser } from './utils/sharedDomParser.js'
-import { isDebugLevel, incrementCounter, debugError, debugWarn, debugLog, syncLegacyCounter } from './utils/debug.js'
+import { isDebugLevel, incrementCounter, debugError, debugWarn, debugLog } from './utils/debug.js'
 import { refreshIndexPaths, indexSet } from './indexManager.js'
 export let RESOLUTION_CACHE_MAX = 100
 
@@ -344,7 +344,6 @@ export async function fetchPageData(raw, contentBase) {
   const originalRaw = raw || ''
   try {
     try { incrementCounter('fetchPageData') } catch (_) {}
-    try { syncLegacyCounter('fetchPageData') } catch (_) {}
   } catch (_) {}
   // Cancel any previous in-flight fetchPageData and create a fresh controller
   try {

@@ -469,8 +469,6 @@ export function debugWarn(...args: any): any
 export function debugInfo(...args: any): any
 export function debugLog(...args: any): any
 export function incrementCounter(name: string): any
-export function syncLegacyCounter(name: string): any
-export function hasLegacyDebug(): boolean
 export function getDebugCounters(): Record<string,number>
 export function resetDebugCounters(): any
 

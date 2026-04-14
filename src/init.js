@@ -316,16 +316,6 @@ export async function initCMS(options = {}) {
   try {
     if (Object.prototype.hasOwnProperty.call(finalOptions, 'debugLevel')) {
       setDebugLevel(finalOptions.debugLevel)
-    } else if (typeof globalThis !== 'undefined' && globalThis.__nimbiCMSDebug && typeof globalThis.__nimbiCMSDebug.debugLevel !== 'undefined') {
-      // Honor an explicit legacy debugLevel if present on the old global
-      // (e.g. `window.__nimbiCMSDebug = { debugLevel: 3 }`). Presence of the
-      // legacy counters object alone should not automatically enable
-      // verbose logging; to avoid unexpectedly noisy consoles we only
-      // respect a numeric `debugLevel` property when present.
-      try {
-        const lvl = Number(globalThis.__nimbiCMSDebug.debugLevel)
-        if (Number.isFinite(lvl)) setDebugLevel(Math.max(0, Math.min(3, Math.floor(lvl))))
-      } catch (e) {}
     }
   } catch (e) {}
   try { debugInfo('[nimbi-cms] initCMS called', () => ({ options: finalOptions })) } catch (e) {}
