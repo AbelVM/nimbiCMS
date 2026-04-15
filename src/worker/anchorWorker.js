@@ -1,8 +1,8 @@
 /**
  * @module worker/anchorWorker
  */
-import { rewriteAnchorsHtml } from './anchorRuntime.js'
-import { u82o, o2u8 } from 'performance-helpers/powerBuffer'
+import { rewriteAnchorsHtml } from "./anchorRuntime.js";
+import { u82o, o2u8 } from "performance-helpers/powerBuffer";
 
 /**
  * Worker entrypoint for rewriting anchor hrefs inside rendered HTML.
@@ -19,40 +19,45 @@ import { u82o, o2u8 } from 'performance-helpers/powerBuffer'
  * @returns {Promise<void>}
  */
 onmessage = async (ev) => {
-  let msg
-  try { msg = u82o(ev.data) } catch (_) {}
-  msg = msg || ev.data || {}
-  const { correlationId } = msg
+  let msg;
+  try {
+    msg = u82o(ev.data);
+  } catch (_) {}
+  msg = msg || ev.data || {};
+  const { correlationId } = msg;
   const _reply = (result) => {
     if (correlationId != null) {
-      const u8 = o2u8({ correlationId, response: result })
-      postMessage(u8, [u8.buffer])
+      const u8 = o2u8({ correlationId, response: result });
+      postMessage(u8, [u8.buffer]);
     } else {
-      postMessage({ id: msg.id, result })
+      postMessage({ id: msg.id, result });
     }
-  }
+  };
   const _replyErr = (error) => {
     if (correlationId != null) {
-      const u8 = o2u8({ correlationId, response: { error: String(error) } })
-      postMessage(u8, [u8.buffer])
+      const u8 = o2u8({ correlationId, response: { error: String(error) } });
+      postMessage(u8, [u8.buffer]);
     } else {
-      postMessage({ id: msg.id, error: String(error) })
+      postMessage({ id: msg.id, error: String(error) });
     }
-  }
+  };
   try {
-    if (msg.type === 'rewriteAnchors') {
-      const { html, contentBase, pagePath, snapshot } = msg
+    if (msg.type === "rewriteAnchors") {
+      const { html, contentBase, pagePath, snapshot } = msg;
       try {
-        const result = await rewriteAnchorsHtml(html, contentBase, pagePath, snapshot)
-        _reply(result)
+        const result = await rewriteAnchorsHtml(
+          html,
+          contentBase,
+          pagePath,
+          snapshot,
+        );
+        _reply(result);
       } catch (e) {
-        _replyErr(e)
+        _replyErr(e);
       }
-      return
+      return;
     }
   } catch (e) {
-    _replyErr(e)
+    _replyErr(e);
   }
-}
-
-
+};

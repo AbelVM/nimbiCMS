@@ -137,7 +137,9 @@ describe('markdown utilities', () => {
     vi.resetModules()
     const mdmod = await import('../src/markdown.js')
     const spy = vi.spyOn(mdmod, 'initRendererWorker').mockReturnValue(null)
-    await expect(mdmod.parseMarkdownToHtml('# foo')).rejects.toThrow()
+    const result = await mdmod.parseMarkdownToHtml('# foo')
+    expect(result).toHaveProperty('html')
+    expect(result.html).toContain('foo')
     spy.mockRestore()
   })
 

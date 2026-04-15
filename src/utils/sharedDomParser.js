@@ -2,19 +2,20 @@
  * Shared DOMParser helper.
  * Reuse a single DOMParser instance to avoid allocations in tight loops.
  */
-let SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+let SHARED_DOM_PARSER =
+  typeof DOMParser !== "undefined" ? new DOMParser() : null;
 
 /**
  * Return the shared DOMParser instance.
  * @returns {DOMParser|null} Shared DOMParser or null when unavailable.
  */
 export function getSharedParser() {
-  if (SHARED_DOM_PARSER) return SHARED_DOM_PARSER
-  if (typeof DOMParser !== 'undefined') {
-    SHARED_DOM_PARSER = new DOMParser()
-    return SHARED_DOM_PARSER
+  if (SHARED_DOM_PARSER) return SHARED_DOM_PARSER;
+  if (typeof DOMParser !== "undefined") {
+    SHARED_DOM_PARSER = new DOMParser();
+    return SHARED_DOM_PARSER;
   }
-  return null
+  return null;
 }
 
 /**
@@ -23,7 +24,7 @@ export function getSharedParser() {
  * @returns {void}
  */
 export function setSharedParser(parser) {
-  SHARED_DOM_PARSER = parser
+  SHARED_DOM_PARSER = parser;
 }
 
 /**
@@ -31,5 +32,5 @@ export function setSharedParser(parser) {
  * @returns {void}
  */
 export function resetSharedParser() {
-  SHARED_DOM_PARSER = typeof DOMParser !== 'undefined' ? new DOMParser() : null
+  SHARED_DOM_PARSER = typeof DOMParser !== "undefined" ? new DOMParser() : null;
 }

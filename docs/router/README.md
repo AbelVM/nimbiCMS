@@ -38,10 +38,10 @@ supporting SPA-style navigation within the runtime.
 
 ### allMarkdownPaths
 
-Re-exports [allMarkdownPaths](../slugManager/variables/allMarkdownPaths.md)
+Re-exports [allMarkdownPaths](../slugState/variables/allMarkdownPaths.md)
 
 ***
 
 ### allMarkdownPathsSet
 
-Re-exports [allMarkdownPathsSet](../slugManager/variables/allMarkdownPathsSet.md)
+Re-exports [allMarkdownPathsSet](../slugState/variables/allMarkdownPathsSet.md)

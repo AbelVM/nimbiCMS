@@ -11,12 +11,16 @@
  * @returns {Promise<void>}
  */
 export function yieldToEventLoop() {
-  if (typeof requestIdleCallback === 'function') {
+  if (typeof requestIdleCallback === "function") {
     return new Promise((resolve) => {
-      try { requestIdleCallback(resolve, { timeout: 50 }) } catch (e) { setTimeout(resolve, 0) }
-    })
+      try {
+        requestIdleCallback(resolve, { timeout: 50 });
+      } catch (e) {
+        setTimeout(resolve, 0);
+      }
+    });
   }
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /**
@@ -28,7 +32,9 @@ export function yieldToEventLoop() {
  */
 export async function yieldIfNeeded(iteration, threshold = 50) {
   try {
-    if (!iteration || !threshold) return
-    if ((iteration % threshold) === 0) await yieldToEventLoop()
-  } catch (_) { /* best effort */ }
+    if (!iteration || !threshold) return;
+    if (iteration % threshold === 0) await yieldToEventLoop();
+  } catch (_) {
+    /* best effort */
+  }
 }

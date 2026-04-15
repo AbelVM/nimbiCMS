@@ -1,8 +1,10 @@
-import { test, expect } from 'vitest'
+import { test, expect, vi } from 'vitest'
 import * as runtimeSitemap from '../src/runtimeSitemap.js'
 import * as slugManager from '../src/slugManager.js'
 
 test('handleSitemapRequest skips write when existing rendered sitemap larger', async () => {
+  // Mock whenSearchIndexReady to resolve immediately on slugManager
+  const spy = vi.spyOn(slugManager, 'whenSearchIndexReady').mockResolvedValue([]);
   const origWindow = globalThis.window
   const origDocument = globalThis.document
   const origLocation = globalThis.location
@@ -14,10 +16,12 @@ test('handleSitemapRequest skips write when existing rendered sitemap larger', a
   window.__nimbiSitemapFinal = new Array(10)
   slugManager._setSearchIndex([{ slug: 's', title: 'S', path: 's.md' }])
 
-  const handled = await runtimeSitemap.handleSitemapRequest({})
+  const handled = await runtimeSitemap.handleSitemapRequest({ waitForIndexMs: 0 })
   expect(handled).toBe(true)
 
   try { Object.defineProperty(globalThis, 'location', { value: origLocation, configurable: true }) } catch (e) {}
   try { Object.defineProperty(globalThis, 'document', { value: origDocument, configurable: true }) } catch (e) {}
   try { Object.defineProperty(globalThis, 'window', { value: origWindow, configurable: true }) } catch (e) {}
+  // Restore whenSearchIndexReady
+  spy.mockRestore();
 })

@@ -190,6 +190,13 @@ export function getVersion(): Promise<string>
 // --- from src/ui.js
 
 
+// --- from src/slugState.js
+export function setAllMarkdownPaths(arr: any): any
+export const allMarkdownPaths: string[]
+export const allMarkdownPathsSet: Set<string>
+
+
+
 // --- from src/slugSearchRuntime.js
 
 
@@ -201,11 +208,10 @@ export function watchForColdHashRoute(parsed: {type:string,page:string,anchor?:s
 export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
 export function getLanguages(): string[]
+export function teardownSlugWorkerPool(): void
 export function _storeSlugMapping(slug: string, rel: string): void
 export function storeSlugMapping(slug: string, rel: string): void
 export const slugResolvers: any
-export const allMarkdownPaths: string[]
-export const allMarkdownPathsSet: Set<string>
 export const homePage: string
 export const HOME_SLUG: string
 export function setHomePage(p: string): void
@@ -252,8 +258,6 @@ export const defaultCrawlMaxQueue: number
 
 
 
-
-
 // --- from src/seoManager.js
 export function getSiteNameFromMeta(): string
 export function setSeoMap(map: object): any
@@ -270,6 +274,7 @@ export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[
 export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function handleSitemapRequest(opts: any): any
+export function attachSitemapDownloadUI(opts: {filename?: string}): HTMLElement|null
 export function exposeSitemapGlobals(opts: any): any
 
 // --- from src/router.js
@@ -293,6 +298,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array|string[]|{value
 
 
 // --- from src/markdown.js
+export function teardownRendererWorkerPool(): void
 export const _sendToRenderer: any
 export function streamParseMarkdown(opts: {chunkSize?:number}): Promise<void>
 export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<string,string>): Promise<Set<string>>

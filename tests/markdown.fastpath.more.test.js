@@ -38,8 +38,7 @@ describe('markdown fast-path branches', () => {
     const oldWorker = globalThis.Worker
     try {
       delete globalThis.Worker
-      const out = await md.parseMarkdownToHtml('```js\nconsole.log(1)\n```')
-      expect(String(out.html)).toContain('<pre>')
+      await expect(md.parseMarkdownToHtml('```js\nconsole.log(1)\n```')).rejects.toThrow('renderer worker required but unavailable')
     } finally {
       globalThis.Worker = oldWorker
     }

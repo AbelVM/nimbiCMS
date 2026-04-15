@@ -6,6 +6,6 @@
 
 # Variable: initialDocumentTitle
 
-> **initialDocumentTitle**: `string` = `''`
+> **initialDocumentTitle**: `string` = `""`
 
 Document title at initialization time. Useful for restoring title on navigation.

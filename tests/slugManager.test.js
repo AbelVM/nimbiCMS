@@ -450,21 +450,18 @@ describe('slugManager module', () => {
   })
 
   // worker wrapper tests --------------------------------------------------
-  it('buildSearchIndexWorker delegates to local function when worker unavailable', async () => {
-    // enforce worker required: mock initSlugWorker to return null and expect rejection
-    const spy = vi.spyOn(slugMgr, 'initSlugWorker').mockReturnValue(null)
+  it('buildSearchIndexWorker works with lazy worker initialization', async () => {
     slugMgr.searchIndex.splice(0)
-    await expect(slugMgr.buildSearchIndexWorker('http://base/')).rejects.toThrow()
-    spy.mockRestore()
+    const res = await slugMgr.buildSearchIndexWorker('http://base/')
+    expect(Array.isArray(res)).toBe(true)
   })
 
-  it('crawlForSlugWorker falls back if worker creation fails', async () => {
-    const spy = vi.spyOn(slugMgr, 'initSlugWorker').mockReturnValue(null)
+  it('crawlForSlugWorker works with lazy worker initialization', async () => {
     slugMgr.crawlCache.clear && slugMgr.crawlCache.clear()
     // seed crawlCache with known value
     slugMgr.crawlCache.set('slug', 'foo.md')
-    await expect(slugMgr.crawlForSlugWorker('slug', 'http://base/')).rejects.toThrow()
-    spy.mockRestore()
+    const out = await slugMgr.crawlForSlugWorker('slug', 'http://base/')
+    expect(out).toBe('foo.md')
   })
 
   it('buildSearchIndex and crawlForSlug work correctly', async () => {

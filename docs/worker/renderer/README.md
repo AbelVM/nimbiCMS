@@ -6,14 +6,56 @@
 
 # worker/renderer
 
-## Functions
+## References
 
-- [\_splitIntoSections](functions/splitIntoSections.md)
-- [clearRendererImportCache](functions/clearRendererImportCache.md)
-- [decodeHtmlEntitiesLocal](functions/decodeHtmlEntitiesLocal.md)
-- [ensureHljs](functions/ensureHljs.md)
-- [handleWorkerMessage](functions/handleWorkerMessage.md)
-- [handleWorkerMessageStream](functions/handleWorkerMessageStream.md)
-- [importModuleWithCache](functions/importModuleWithCache.md)
-- [setRendererImportNegativeCacheTTL](functions/setRendererImportNegativeCacheTTL.md)
-- [slugifyHeading](functions/slugifyHeading.md)
+### \_splitIntoSections
+
+Re-exports [_splitIntoSections](../rendererRuntime/functions/splitIntoSections.md)
+
+***
+
+### clearRendererImportCache
+
+Re-exports [clearRendererImportCache](../rendererRuntime/functions/clearRendererImportCache.md)
+
+***
+
+### decodeHtmlEntitiesLocal
+
+Re-exports [decodeHtmlEntitiesLocal](../rendererRuntime/functions/decodeHtmlEntitiesLocal.md)
+
+***
+
+### ensureHljs
+
+Re-exports [ensureHljs](../rendererRuntime/functions/ensureHljs.md)
+
+***
+
+### handleWorkerMessage
+
+Re-exports [handleWorkerMessage](../rendererRuntime/functions/handleWorkerMessage.md)
+
+***
+
+### handleWorkerMessageStream
+
+Re-exports [handleWorkerMessageStream](../rendererRuntime/functions/handleWorkerMessageStream.md)
+
+***
+
+### importModuleWithCache
+
+Re-exports [importModuleWithCache](../rendererRuntime/functions/importModuleWithCache.md)
+
+***
+
+### setRendererImportNegativeCacheTTL
+
+Re-exports [setRendererImportNegativeCacheTTL](../rendererRuntime/functions/setRendererImportNegativeCacheTTL.md)
+
+***
+
+### slugifyHeading
+
+Re-exports [slugifyHeading](../rendererRuntime/functions/slugifyHeading.md)

@@ -25,7 +25,7 @@ describe('renderer worker extra', () => {
     globalThis._fakeLangPath = pathToFileURL(langPath).href
     // create a modified copy of renderer.js with pre-seeded hljs and globalThis.onmessage
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
-    let rewritten = src.replace("from './rendererRuntime.js'", "from '../../src/worker/rendererRuntime.js'")
+    let rewritten = src.replace('from "./rendererRuntime.js"', 'from "../../src/worker/rendererRuntime.js"')
     rewritten = rewritten.replace(/(^|\n)onmessage\s*=/g, '$1globalThis.onmessage =')
     let tryMock = rewritten.replace('let hljs = null', "let hljs = { registerLanguage: function(name, lang) { this[name]=lang }, getLanguage: function(n){ return !!this[n] }, highlight: function(c, o){ return c } }")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_extra.mjs')

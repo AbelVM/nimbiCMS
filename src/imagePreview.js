@@ -6,103 +6,106 @@
  * @module imagePreview
  */
 
-let _modal = null
-let _img = null
-let _zoom = 1
-let _label = (key, def) => def
-let _naturalWidth = 0
-let _naturalHeight = 0
-let _updateZoomLabel = () => {}
-let _zoomStep = 0.25
+let _modal = null;
+let _img = null;
+let _zoom = 1;
+let _label = (key, def) => def;
+let _naturalWidth = 0;
+let _naturalHeight = 0;
+let _updateZoomLabel = () => {};
+let _zoomStep = 0.25;
 
 function _createModal() {
-  if (_modal && document.contains(_modal)) return _modal
-  _modal = null
+  if (_modal && document.contains(_modal)) return _modal;
+  _modal = null;
 
-  const modal = document.createElement('dialog')
-  modal.className = 'nimbi-image-preview modal'
-  modal.setAttribute('role', 'dialog')
-  modal.setAttribute('aria-modal', 'true')
-  modal.setAttribute('aria-label', _label('imagePreviewTitle', 'Image preview'))
+  const modal = document.createElement("dialog");
+  modal.className = "nimbi-image-preview modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute(
+    "aria-label",
+    _label("imagePreviewTitle", "Image preview"),
+  );
   // Build modal content via DOM APIs to avoid large innerHTML assignments.
   try {
-    const bg = document.createElement('div')
-    bg.className = 'modal-background'
+    const bg = document.createElement("div");
+    bg.className = "modal-background";
 
-    const modalContent = document.createElement('div')
-    modalContent.className = 'modal-content'
+    const modalContent = document.createElement("div");
+    modalContent.className = "modal-content";
 
-    const contentBox = document.createElement('div')
-    contentBox.className = 'nimbi-image-preview__content box'
-    contentBox.setAttribute('role', 'document')
+    const contentBox = document.createElement("div");
+    contentBox.className = "nimbi-image-preview__content box";
+    contentBox.setAttribute("role", "document");
 
-    const closeButton = document.createElement('button')
-    closeButton.className = 'button is-small nimbi-image-preview__close'
-    closeButton.type = 'button'
-    closeButton.setAttribute('data-nimbi-preview-close', '')
-    closeButton.textContent = '✕'
+    const closeButton = document.createElement("button");
+    closeButton.className = "button is-small nimbi-image-preview__close";
+    closeButton.type = "button";
+    closeButton.setAttribute("data-nimbi-preview-close", "");
+    closeButton.textContent = "✕";
 
-    const wrapper = document.createElement('div')
-    wrapper.className = 'nimbi-image-preview__image-wrapper'
-    const imgEl = document.createElement('img')
-    imgEl.setAttribute('data-nimbi-preview-image', '')
-    imgEl.alt = ''
-    wrapper.appendChild(imgEl)
+    const wrapper = document.createElement("div");
+    wrapper.className = "nimbi-image-preview__image-wrapper";
+    const imgEl = document.createElement("img");
+    imgEl.setAttribute("data-nimbi-preview-image", "");
+    imgEl.alt = "";
+    wrapper.appendChild(imgEl);
 
-    const controls = document.createElement('div')
-    controls.className = 'nimbi-image-preview__controls'
+    const controls = document.createElement("div");
+    controls.className = "nimbi-image-preview__controls";
 
-    const group1 = document.createElement('div')
-    group1.className = 'nimbi-image-preview__group'
-    const fitBtn = document.createElement('button')
-    fitBtn.className = 'button is-small'
-    fitBtn.type = 'button'
-    fitBtn.setAttribute('data-nimbi-preview-fit', '')
-    fitBtn.textContent = '⤢'
-    const originalBtn = document.createElement('button')
-    originalBtn.className = 'button is-small'
-    originalBtn.type = 'button'
-    originalBtn.setAttribute('data-nimbi-preview-original', '')
-    originalBtn.textContent = '1:1'
-    const resetBtn = document.createElement('button')
-    resetBtn.className = 'button is-small'
-    resetBtn.type = 'button'
-    resetBtn.setAttribute('data-nimbi-preview-reset', '')
-    resetBtn.textContent = '⟲'
-    group1.appendChild(fitBtn)
-    group1.appendChild(originalBtn)
-    group1.appendChild(resetBtn)
+    const group1 = document.createElement("div");
+    group1.className = "nimbi-image-preview__group";
+    const fitBtn = document.createElement("button");
+    fitBtn.className = "button is-small";
+    fitBtn.type = "button";
+    fitBtn.setAttribute("data-nimbi-preview-fit", "");
+    fitBtn.textContent = "⤢";
+    const originalBtn = document.createElement("button");
+    originalBtn.className = "button is-small";
+    originalBtn.type = "button";
+    originalBtn.setAttribute("data-nimbi-preview-original", "");
+    originalBtn.textContent = "1:1";
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "button is-small";
+    resetBtn.type = "button";
+    resetBtn.setAttribute("data-nimbi-preview-reset", "");
+    resetBtn.textContent = "⟲";
+    group1.appendChild(fitBtn);
+    group1.appendChild(originalBtn);
+    group1.appendChild(resetBtn);
 
-    const group2 = document.createElement('div')
-    group2.className = 'nimbi-image-preview__group'
-    const zoomOut = document.createElement('button')
-    zoomOut.className = 'button is-small'
-    zoomOut.type = 'button'
-    zoomOut.setAttribute('data-nimbi-preview-zoom-out', '')
-    zoomOut.textContent = '−'
-    const zoomLabel = document.createElement('div')
-    zoomLabel.className = 'nimbi-image-preview__zoom'
-    zoomLabel.setAttribute('data-nimbi-preview-zoom-label', '')
-    zoomLabel.textContent = '100%'
-    const zoomIn = document.createElement('button')
-    zoomIn.className = 'button is-small'
-    zoomIn.type = 'button'
-    zoomIn.setAttribute('data-nimbi-preview-zoom-in', '')
-    zoomIn.textContent = '＋'
-    group2.appendChild(zoomOut)
-    group2.appendChild(zoomLabel)
-    group2.appendChild(zoomIn)
+    const group2 = document.createElement("div");
+    group2.className = "nimbi-image-preview__group";
+    const zoomOut = document.createElement("button");
+    zoomOut.className = "button is-small";
+    zoomOut.type = "button";
+    zoomOut.setAttribute("data-nimbi-preview-zoom-out", "");
+    zoomOut.textContent = "−";
+    const zoomLabel = document.createElement("div");
+    zoomLabel.className = "nimbi-image-preview__zoom";
+    zoomLabel.setAttribute("data-nimbi-preview-zoom-label", "");
+    zoomLabel.textContent = "100%";
+    const zoomIn = document.createElement("button");
+    zoomIn.className = "button is-small";
+    zoomIn.type = "button";
+    zoomIn.setAttribute("data-nimbi-preview-zoom-in", "");
+    zoomIn.textContent = "＋";
+    group2.appendChild(zoomOut);
+    group2.appendChild(zoomLabel);
+    group2.appendChild(zoomIn);
 
-    controls.appendChild(group1)
-    controls.appendChild(group2)
+    controls.appendChild(group1);
+    controls.appendChild(group2);
 
-    contentBox.appendChild(closeButton)
-    contentBox.appendChild(wrapper)
-    contentBox.appendChild(controls)
-    modalContent.appendChild(contentBox)
+    contentBox.appendChild(closeButton);
+    contentBox.appendChild(wrapper);
+    contentBox.appendChild(controls);
+    modalContent.appendChild(contentBox);
 
-    modal.appendChild(bg)
-    modal.appendChild(modalContent)
+    modal.appendChild(bg);
+    modal.appendChild(modalContent);
   } catch (e) {
     // Fallback: use the original string if DOM building fails
     modal.innerHTML = `
@@ -127,292 +130,327 @@ function _createModal() {
           </div>
         </div>
       </div>
-    `
+    `;
   }
 
-  modal.addEventListener('click', (event) => {
+  modal.addEventListener("click", (event) => {
     if (event.target === modal) {
-      closePreview()
+      closePreview();
     }
-  })
+  });
 
-  modal.addEventListener('wheel', (event) => {
-    if (!isModalOpen()) return
-    event.preventDefault()
-    const delta = event.deltaY < 0 ? _zoomStep : -_zoomStep
-    setZoom(_zoom + delta)
-    updateZoomLabel()
-    showZoomHud()
-  }, { passive: false })
+  modal.addEventListener(
+    "wheel",
+    (event) => {
+      if (!isModalOpen()) return;
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? _zoomStep : -_zoomStep;
+      setZoom(_zoom + delta);
+      updateZoomLabel();
+      showZoomHud();
+    },
+    { passive: false },
+  );
 
-  modal.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      closePreview()
-      return
+  modal.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closePreview();
+      return;
     }
 
     if (_zoom > 1) {
-      const wrapper = modal.querySelector('.nimbi-image-preview__image-wrapper')
-      if (!wrapper) return
+      const wrapper = modal.querySelector(
+        ".nimbi-image-preview__image-wrapper",
+      );
+      if (!wrapper) return;
 
-      const panAmount = 40
+      const panAmount = 40;
       switch (event.key) {
-        case 'ArrowUp':
-          wrapper.scrollTop -= panAmount
-          event.preventDefault()
-          break
-        case 'ArrowDown':
-          wrapper.scrollTop += panAmount
-          event.preventDefault()
-          break
-        case 'ArrowLeft':
-          wrapper.scrollLeft -= panAmount
-          event.preventDefault()
-          break
-        case 'ArrowRight':
-          wrapper.scrollLeft += panAmount
-          event.preventDefault()
-          break
+        case "ArrowUp":
+          wrapper.scrollTop -= panAmount;
+          event.preventDefault();
+          break;
+        case "ArrowDown":
+          wrapper.scrollTop += panAmount;
+          event.preventDefault();
+          break;
+        case "ArrowLeft":
+          wrapper.scrollLeft -= panAmount;
+          event.preventDefault();
+          break;
+        case "ArrowRight":
+          wrapper.scrollLeft += panAmount;
+          event.preventDefault();
+          break;
       }
     }
-  })
+  });
 
-  document.body.appendChild(modal)
+  document.body.appendChild(modal);
 
-  _modal = modal
-  _img = modal.querySelector('[data-nimbi-preview-image]')
+  _modal = modal;
+  _img = modal.querySelector("[data-nimbi-preview-image]");
 
-  const fitBtn = modal.querySelector('[data-nimbi-preview-fit]')
-  const originalBtn = modal.querySelector('[data-nimbi-preview-original]')
-  const zoomIn = modal.querySelector('[data-nimbi-preview-zoom-in]')
-  const zoomOut = modal.querySelector('[data-nimbi-preview-zoom-out]')
-  const resetBtn = modal.querySelector('[data-nimbi-preview-reset]')
-  const closeBtn = modal.querySelector('[data-nimbi-preview-close]')
-  const zoomLabel = modal.querySelector('[data-nimbi-preview-zoom-label]')
-  const zoomHud = modal.querySelector('[data-nimbi-preview-zoom-hud]')
+  const fitBtn = modal.querySelector("[data-nimbi-preview-fit]");
+  const originalBtn = modal.querySelector("[data-nimbi-preview-original]");
+  const zoomIn = modal.querySelector("[data-nimbi-preview-zoom-in]");
+  const zoomOut = modal.querySelector("[data-nimbi-preview-zoom-out]");
+  const resetBtn = modal.querySelector("[data-nimbi-preview-reset]");
+  const closeBtn = modal.querySelector("[data-nimbi-preview-close]");
+  const zoomLabel = modal.querySelector("[data-nimbi-preview-zoom-label]");
+  const zoomHud = modal.querySelector("[data-nimbi-preview-zoom-hud]");
 
   function updateZoomLabel() {
-    if (zoomLabel) zoomLabel.textContent = `${Math.round(_zoom * 100)}%`
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(_zoom * 100)}%`;
   }
 
   const showZoomHud = () => {
-    if (!zoomHud) return
-    zoomHud.textContent = `${Math.round(_zoom * 100)}%`
-    zoomHud.classList.add('visible')
-    clearTimeout(zoomHud._timeout)
-    zoomHud._timeout = setTimeout(() => zoomHud.classList.remove('visible'), 800)
-  }
+    if (!zoomHud) return;
+    zoomHud.textContent = `${Math.round(_zoom * 100)}%`;
+    zoomHud.classList.add("visible");
+    clearTimeout(zoomHud._timeout);
+    zoomHud._timeout = setTimeout(
+      () => zoomHud.classList.remove("visible"),
+      800,
+    );
+  };
 
-  _updateZoomLabel = updateZoomLabel
+  _updateZoomLabel = updateZoomLabel;
 
-  zoomIn.addEventListener('click', () => { setZoom(_zoom + _zoomStep); updateZoomLabel(); showZoomHud() })
-  zoomOut.addEventListener('click', () => { setZoom(_zoom - _zoomStep); updateZoomLabel(); showZoomHud() })
-  fitBtn.addEventListener('click', () => { fitToScreen(); updateZoomLabel(); showZoomHud() })
-  originalBtn.addEventListener('click', () => { setZoom(1); updateZoomLabel(); showZoomHud() })
-  resetBtn.addEventListener('click', () => { fitToScreen(); updateZoomLabel(); showZoomHud() })
-  closeBtn.addEventListener('click', closePreview)
+  zoomIn.addEventListener("click", () => {
+    setZoom(_zoom + _zoomStep);
+    updateZoomLabel();
+    showZoomHud();
+  });
+  zoomOut.addEventListener("click", () => {
+    setZoom(_zoom - _zoomStep);
+    updateZoomLabel();
+    showZoomHud();
+  });
+  fitBtn.addEventListener("click", () => {
+    fitToScreen();
+    updateZoomLabel();
+    showZoomHud();
+  });
+  originalBtn.addEventListener("click", () => {
+    setZoom(1);
+    updateZoomLabel();
+    showZoomHud();
+  });
+  resetBtn.addEventListener("click", () => {
+    fitToScreen();
+    updateZoomLabel();
+    showZoomHud();
+  });
+  closeBtn.addEventListener("click", closePreview);
 
-  fitBtn.title = _label('imagePreviewFit', 'Fit to screen')
-  originalBtn.title = _label('imagePreviewOriginal', 'Original size')
-  zoomOut.title = _label('imagePreviewZoomOut', 'Zoom out')
-  zoomIn.title = _label('imagePreviewZoomIn', 'Zoom in')
-  closeBtn.title = _label('imagePreviewClose', 'Close')
+  fitBtn.title = _label("imagePreviewFit", "Fit to screen");
+  originalBtn.title = _label("imagePreviewOriginal", "Original size");
+  zoomOut.title = _label("imagePreviewZoomOut", "Zoom out");
+  zoomIn.title = _label("imagePreviewZoomIn", "Zoom in");
+  closeBtn.title = _label("imagePreviewClose", "Close");
 
-  closeBtn.setAttribute('aria-label', _label('imagePreviewClose', 'Close'))
+  closeBtn.setAttribute("aria-label", _label("imagePreviewClose", "Close"));
 
-  let isDragging = false
-  let dragStartX = 0
-  let dragStartY = 0
-  let scrollStartX = 0
-  let scrollStartY = 0
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let scrollStartX = 0;
+  let scrollStartY = 0;
 
   /**
    * Active pointer coordinates used for drag/pinch handling.
    * Key: pointer identifier (number). Value: {x:number,y:number}.
    * @type {Map<number,{x:number,y:number}>}
    */
-  const pointers = new Map()
-  let initialPinchDistance = 0
-  let initialPinchZoom = 1
+  const pointers = new Map();
+  let initialPinchDistance = 0;
+  let initialPinchZoom = 1;
 
   const getDistance = (a, b) => {
-    const dx = a.x - b.x
-    const dy = a.y - b.y
-    return Math.hypot(dx, dy)
-  }
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.hypot(dx, dy);
+  };
 
   const endDrag = () => {
-    isDragging = false
-    pointers.clear()
-    initialPinchDistance = 0
+    isDragging = false;
+    pointers.clear();
+    initialPinchDistance = 0;
     if (_img) {
-      _img.classList.add('is-panning')
-      _img.classList.remove('is-grabbing')
+      _img.classList.add("is-panning");
+      _img.classList.remove("is-grabbing");
     }
-  }
+  };
 
-  let lastTapTime = 0
-  let lastTapX = 0
-  let lastTapY = 0
+  let lastTapTime = 0;
+  let lastTapX = 0;
+  let lastTapY = 0;
   const handleTap = (event) => {
-    const now = Date.now()
-    const dt = now - lastTapTime
-    const dx = event.clientX - lastTapX
-    const dy = event.clientY - lastTapY
-    lastTapTime = now
-    lastTapX = event.clientX
-    lastTapY = event.clientY
+    const now = Date.now();
+    const dt = now - lastTapTime;
+    const dx = event.clientX - lastTapX;
+    const dy = event.clientY - lastTapY;
+    lastTapTime = now;
+    lastTapX = event.clientX;
+    lastTapY = event.clientY;
 
     if (dt < 300 && Math.hypot(dx, dy) < 30) {
-      setZoom(_zoom > 1 ? 1 : 2)
-      updateZoomLabel()
-      event.preventDefault()
+      setZoom(_zoom > 1 ? 1 : 2);
+      updateZoomLabel();
+      event.preventDefault();
     }
-  }
+  };
 
   const handleDoubleClick = (event) => {
-    setZoom(_zoom > 1 ? 1 : 2)
-    updateZoomLabel()
-    event.preventDefault()
-  }
+    setZoom(_zoom > 1 ? 1 : 2);
+    updateZoomLabel();
+    event.preventDefault();
+  };
 
   const isModalOpen = () => {
-    if (!_modal) return false
-    if (typeof _modal.open === 'boolean') return _modal.open
-    return _modal.classList.contains('is-active')
-  }
+    if (!_modal) return false;
+    if (typeof _modal.open === "boolean") return _modal.open;
+    return _modal.classList.contains("is-active");
+  };
 
   const moveDrag = (clientX, clientY, id = 1) => {
     if (pointers.has(id)) {
-      pointers.set(id, { x: clientX, y: clientY })
+      pointers.set(id, { x: clientX, y: clientY });
     }
 
     if (pointers.size === 2) {
-      const coords = Array.from(pointers.values())
-      const dist = getDistance(coords[0], coords[1])
+      const coords = Array.from(pointers.values());
+      const dist = getDistance(coords[0], coords[1]);
       if (initialPinchDistance > 0) {
-        const ratio = dist / initialPinchDistance
-        setZoom(initialPinchZoom * ratio)
+        const ratio = dist / initialPinchDistance;
+        setZoom(initialPinchZoom * ratio);
       }
-      return
+      return;
     }
 
-    if (!isDragging) return
+    if (!isDragging) return;
 
-    const wrapper = _img.closest('.nimbi-image-preview__image-wrapper')
-    if (!wrapper) return
+    const wrapper = _img.closest(".nimbi-image-preview__image-wrapper");
+    if (!wrapper) return;
 
-    const dx = clientX - dragStartX
-    const dy = clientY - dragStartY
-    wrapper.scrollLeft = scrollStartX - dx
-    wrapper.scrollTop = scrollStartY - dy
-  }
+    const dx = clientX - dragStartX;
+    const dy = clientY - dragStartY;
+    wrapper.scrollLeft = scrollStartX - dx;
+    wrapper.scrollTop = scrollStartY - dy;
+  };
 
   const startDrag = (clientX, clientY, id = 1) => {
-    if (!isModalOpen()) return
+    if (!isModalOpen()) return;
 
-    pointers.set(id, { x: clientX, y: clientY })
+    pointers.set(id, { x: clientX, y: clientY });
 
     if (pointers.size === 2) {
-      const coords = Array.from(pointers.values())
-      initialPinchDistance = getDistance(coords[0], coords[1])
-      initialPinchZoom = _zoom
-      return
+      const coords = Array.from(pointers.values());
+      initialPinchDistance = getDistance(coords[0], coords[1]);
+      initialPinchZoom = _zoom;
+      return;
     }
 
-    const wrapper = _img.closest('.nimbi-image-preview__image-wrapper')
-    if (!wrapper) return
+    const wrapper = _img.closest(".nimbi-image-preview__image-wrapper");
+    if (!wrapper) return;
 
-    const canScroll = wrapper.scrollWidth > wrapper.clientWidth || wrapper.scrollHeight > wrapper.clientHeight
-    if (!canScroll) return
+    const canScroll =
+      wrapper.scrollWidth > wrapper.clientWidth ||
+      wrapper.scrollHeight > wrapper.clientHeight;
+    if (!canScroll) return;
 
-    isDragging = true
-    dragStartX = clientX
-    dragStartY = clientY
-    scrollStartX = wrapper.scrollLeft
-    scrollStartY = wrapper.scrollTop
-    _img.classList.add('is-panning')
-    _img.classList.remove('is-grabbing')
+    isDragging = true;
+    dragStartX = clientX;
+    dragStartY = clientY;
+    scrollStartX = wrapper.scrollLeft;
+    scrollStartY = wrapper.scrollTop;
+    _img.classList.add("is-panning");
+    _img.classList.remove("is-grabbing");
 
-    window.addEventListener('pointermove', windowPointerMove)
-    window.addEventListener('pointerup', windowPointerUp)
-    window.addEventListener('pointercancel', windowPointerUp)
-  }
+    window.addEventListener("pointermove", windowPointerMove);
+    window.addEventListener("pointerup", windowPointerUp);
+    window.addEventListener("pointercancel", windowPointerUp);
+  };
 
   const windowPointerMove = (event) => {
-    if (!isDragging) return
-    event.preventDefault()
-    moveDrag(event.clientX, event.clientY, event.pointerId)
-  }
+    if (!isDragging) return;
+    event.preventDefault();
+    moveDrag(event.clientX, event.clientY, event.pointerId);
+  };
 
   const windowPointerUp = () => {
-    endDrag()
-    window.removeEventListener('pointermove', windowPointerMove)
-    window.removeEventListener('pointerup', windowPointerUp)
-    window.removeEventListener('pointercancel', windowPointerUp)
-  }
+    endDrag();
+    window.removeEventListener("pointermove", windowPointerMove);
+    window.removeEventListener("pointerup", windowPointerUp);
+    window.removeEventListener("pointercancel", windowPointerUp);
+  };
 
-  _img.addEventListener('pointerdown', (event) => {
-    event.preventDefault()
-    startDrag(event.clientX, event.clientY, event.pointerId)
-  })
-  _img.addEventListener('pointermove', (event) => {
+  _img.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    startDrag(event.clientX, event.clientY, event.pointerId);
+  });
+  _img.addEventListener("pointermove", (event) => {
     if (isDragging || pointers.size === 2) {
-      event.preventDefault()
+      event.preventDefault();
     }
-    moveDrag(event.clientX, event.clientY, event.pointerId)
-  })
-  _img.addEventListener('pointerup', (event) => {
-    event.preventDefault()
-    if (event.pointerType === 'touch') {
-      handleTap(event)
+    moveDrag(event.clientX, event.clientY, event.pointerId);
+  });
+  _img.addEventListener("pointerup", (event) => {
+    event.preventDefault();
+    if (event.pointerType === "touch") {
+      handleTap(event);
     }
-    endDrag()
-  })
+    endDrag();
+  });
 
-  _img.addEventListener('dblclick', handleDoubleClick)
-  _img.addEventListener('pointercancel', endDrag)
+  _img.addEventListener("dblclick", handleDoubleClick);
+  _img.addEventListener("pointercancel", endDrag);
 
-  _img.addEventListener('mousedown', (event) => {
-    event.preventDefault()
-    startDrag(event.clientX, event.clientY, 1)
-  })
-  _img.addEventListener('mousemove', (event) => {
-    if (isDragging) event.preventDefault()
-    moveDrag(event.clientX, event.clientY, 1)
-  })
-  _img.addEventListener('mouseup', (event) => {
-    event.preventDefault()
-    endDrag()
-  })
+  _img.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    startDrag(event.clientX, event.clientY, 1);
+  });
+  _img.addEventListener("mousemove", (event) => {
+    if (isDragging) event.preventDefault();
+    moveDrag(event.clientX, event.clientY, 1);
+  });
+  _img.addEventListener("mouseup", (event) => {
+    event.preventDefault();
+    endDrag();
+  });
 
-  const wrapper = modal.querySelector('.nimbi-image-preview__image-wrapper')
+  const wrapper = modal.querySelector(".nimbi-image-preview__image-wrapper");
   if (wrapper) {
-    wrapper.addEventListener('pointerdown', (event) => {
-      startDrag(event.clientX, event.clientY, event.pointerId)
-      if (event?.target?.tagName === 'IMG') {
-        try { event.target.classList.add('is-grabbing') } catch (e) {}
+    wrapper.addEventListener("pointerdown", (event) => {
+      startDrag(event.clientX, event.clientY, event.pointerId);
+      if (event?.target?.tagName === "IMG") {
+        try {
+          event.target.classList.add("is-grabbing");
+        } catch (e) {}
       }
-    })
-    wrapper.addEventListener('pointermove', (event) => {
-      moveDrag(event.clientX, event.clientY, event.pointerId)
-    })
-    wrapper.addEventListener('pointerup', endDrag)
-    wrapper.addEventListener('pointercancel', endDrag)
+    });
+    wrapper.addEventListener("pointermove", (event) => {
+      moveDrag(event.clientX, event.clientY, event.pointerId);
+    });
+    wrapper.addEventListener("pointerup", endDrag);
+    wrapper.addEventListener("pointercancel", endDrag);
 
-    wrapper.addEventListener('mousedown', (event) => {
-      startDrag(event.clientX, event.clientY, 1)
-      if (event?.target?.tagName === 'IMG') {
-        try { event.target.classList.add('is-grabbing') } catch (e) {}
+    wrapper.addEventListener("mousedown", (event) => {
+      startDrag(event.clientX, event.clientY, 1);
+      if (event?.target?.tagName === "IMG") {
+        try {
+          event.target.classList.add("is-grabbing");
+        } catch (e) {}
       }
-    })
-    wrapper.addEventListener('mousemove', (event) => {
-      moveDrag(event.clientX, event.clientY, 1)
-    })
-    wrapper.addEventListener('mouseup', endDrag)
+    });
+    wrapper.addEventListener("mousemove", (event) => {
+      moveDrag(event.clientX, event.clientY, 1);
+    });
+    wrapper.addEventListener("mouseup", endDrag);
   }
 
-  return modal
+  return modal;
 }
 
 /**
@@ -422,39 +460,49 @@ function _createModal() {
  * @returns {void}
  */
 function setZoom(value) {
-  if (!_img) return
-  const num = Number(value)
-  const clamped = Number.isFinite(num) ? Math.max(0.1, Math.min(4, num)) : 1
-  _zoom = clamped
+  if (!_img) return;
+  const num = Number(value);
+  const clamped = Number.isFinite(num) ? Math.max(0.1, Math.min(4, num)) : 1;
+  _zoom = clamped;
 
-  const rect = _img.getBoundingClientRect()
-  const naturalWidth = _naturalWidth || _img.naturalWidth || _img.width || rect.width || 0
-  const naturalHeight = _naturalHeight || _img.naturalHeight || _img.height || rect.height || 0
+  const rect = _img.getBoundingClientRect();
+  const naturalWidth =
+    _naturalWidth || _img.naturalWidth || _img.width || rect.width || 0;
+  const naturalHeight =
+    _naturalHeight || _img.naturalHeight || _img.height || rect.height || 0;
 
   if (naturalWidth && naturalHeight) {
-    _img.style.setProperty('--nimbi-preview-img-max-width', 'none')
-    _img.style.setProperty('--nimbi-preview-img-max-height', 'none')
+    _img.style.setProperty("--nimbi-preview-img-max-width", "none");
+    _img.style.setProperty("--nimbi-preview-img-max-height", "none");
 
-    _img.style.setProperty('--nimbi-preview-img-width', `${naturalWidth * _zoom}px`)
-    _img.style.setProperty('--nimbi-preview-img-height', `${naturalHeight * _zoom}px`)
-    _img.style.setProperty('--nimbi-preview-img-transform', 'none')
+    _img.style.setProperty(
+      "--nimbi-preview-img-width",
+      `${naturalWidth * _zoom}px`,
+    );
+    _img.style.setProperty(
+      "--nimbi-preview-img-height",
+      `${naturalHeight * _zoom}px`,
+    );
+    _img.style.setProperty("--nimbi-preview-img-transform", "none");
     try {
-      _img.style.width = `${naturalWidth * _zoom}px`
-      _img.style.height = `${naturalHeight * _zoom}px`
-      _img.style.transform = 'none'
+      _img.style.width = `${naturalWidth * _zoom}px`;
+      _img.style.height = `${naturalHeight * _zoom}px`;
+      _img.style.transform = "none";
     } catch (e) {}
   } else {
-    _img.style.setProperty('--nimbi-preview-img-max-width', '')
-    _img.style.setProperty('--nimbi-preview-img-max-height', '')
-    _img.style.setProperty('--nimbi-preview-img-width', '')
-    _img.style.setProperty('--nimbi-preview-img-height', '')
-    _img.style.setProperty('--nimbi-preview-img-transform', `scale(${_zoom})`)
-    try { _img.style.transform = `scale(${_zoom})` } catch (e) {}
+    _img.style.setProperty("--nimbi-preview-img-max-width", "");
+    _img.style.setProperty("--nimbi-preview-img-max-height", "");
+    _img.style.setProperty("--nimbi-preview-img-width", "");
+    _img.style.setProperty("--nimbi-preview-img-height", "");
+    _img.style.setProperty("--nimbi-preview-img-transform", `scale(${_zoom})`);
+    try {
+      _img.style.transform = `scale(${_zoom})`;
+    } catch (e) {}
   }
 
   if (_img) {
-    _img.classList.add('is-panning')
-    _img.classList.remove('is-grabbing')
+    _img.classList.add("is-panning");
+    _img.classList.remove("is-grabbing");
   }
 }
 
@@ -465,21 +513,21 @@ function setZoom(value) {
  * @returns {void}
  */
 function fitToScreen() {
-  if (!_img) return
-  const wrapper = _img.closest('.nimbi-image-preview__image-wrapper')
-  if (!wrapper) return
+  if (!_img) return;
+  const wrapper = _img.closest(".nimbi-image-preview__image-wrapper");
+  if (!wrapper) return;
 
-  const rect = wrapper.getBoundingClientRect()
-  if (rect.width === 0 || rect.height === 0) return
+  const rect = wrapper.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
 
-  const naturalWidth = _naturalWidth || _img.naturalWidth || rect.width
-  const naturalHeight = _naturalHeight || _img.naturalHeight || rect.height
-  if (!naturalWidth || !naturalHeight) return
+  const naturalWidth = _naturalWidth || _img.naturalWidth || rect.width;
+  const naturalHeight = _naturalHeight || _img.naturalHeight || rect.height;
+  if (!naturalWidth || !naturalHeight) return;
 
-  const scaleX = rect.width / naturalWidth
-  const scaleY = rect.height / naturalHeight
-  const scale = Math.min(scaleX, scaleY, 1)
-  setZoom(Number.isFinite(scale) ? scale : 1)
+  const scaleX = rect.width / naturalWidth;
+  const scaleY = rect.height / naturalHeight;
+  const scale = Math.min(scaleX, scaleY, 1);
+  setZoom(Number.isFinite(scale) ? scale : 1);
 }
 
 /**
@@ -491,66 +539,69 @@ function fitToScreen() {
  * @param {number} [naturalHeight] Optional natural height of the image
  * @returns {void}
  */
-function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
-  const modal = _createModal()
-  _zoom = 1
-  _naturalWidth = naturalWidth || 0
-  _naturalHeight = naturalHeight || 0
-  _img.src = src
+function openPreview(src, alt = "", naturalWidth = 0, naturalHeight = 0) {
+  const modal = _createModal();
+  _zoom = 1;
+  _naturalWidth = naturalWidth || 0;
+  _naturalHeight = naturalHeight || 0;
+  _img.src = src;
   try {
     if (!alt) {
       try {
-        const u = new URL(src, typeof location !== 'undefined' ? location.href : '')
-        const p = u.pathname || ''
-        const fn = p.substring(p.lastIndexOf('/') + 1) || src
-        const label = fn.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ')
-        alt = _label('imagePreviewDefaultAlt', label || 'Image')
+        const u = new URL(
+          src,
+          typeof location !== "undefined" ? location.href : "",
+        );
+        const p = u.pathname || "";
+        const fn = p.substring(p.lastIndexOf("/") + 1) || src;
+        const label = fn.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ");
+        alt = _label("imagePreviewDefaultAlt", label || "Image");
       } catch (e) {
-        alt = _label('imagePreviewDefaultAlt', 'Image')
+        alt = _label("imagePreviewDefaultAlt", "Image");
       }
     }
   } catch (e) {}
-  _img.alt = alt
-  _img.style.transform = 'scale(1)'
+  _img.alt = alt;
+  _img.style.transform = "scale(1)";
 
   const captureNaturalSize = () => {
-    _naturalWidth = _img.naturalWidth || _img.width || 0
-    _naturalHeight = _img.naturalHeight || _img.height || 0
-  }
+    _naturalWidth = _img.naturalWidth || _img.width || 0;
+    _naturalHeight = _img.naturalHeight || _img.height || 0;
+  };
 
-  captureNaturalSize()
+  captureNaturalSize();
 
-  fitToScreen()
-  _updateZoomLabel()
+  fitToScreen();
+  _updateZoomLabel();
 
   requestAnimationFrame(() => {
-    fitToScreen()
-    _updateZoomLabel()
-  })
+    fitToScreen();
+    _updateZoomLabel();
+  });
 
   if (!_naturalWidth || !_naturalHeight) {
     const onLoad = () => {
-      captureNaturalSize()
+      captureNaturalSize();
       requestAnimationFrame(() => {
-        fitToScreen()
-        _updateZoomLabel()
-      })
-      _img.removeEventListener('load', onLoad)
-    }
-    _img.addEventListener('load', onLoad)
+        fitToScreen();
+        _updateZoomLabel();
+      });
+      _img.removeEventListener("load", onLoad);
+    };
+    _img.addEventListener("load", onLoad);
   }
 
-  if (typeof modal.showModal === 'function') {
-    if (!modal.open) modal.showModal()
+  if (typeof modal.showModal === "function") {
+    if (!modal.open) modal.showModal();
   }
 
-  modal.classList.add('is-active')
+  modal.classList.add("is-active");
 
   try {
-    document.documentElement.classList.add('nimbi-image-preview-open')
+    document.documentElement.classList.add("nimbi-image-preview-open");
   } catch (e) {}
 
-  modal.focus()
+  modal.focus();
 }
 
 /**
@@ -558,14 +609,14 @@ function openPreview(src, alt = '', naturalWidth = 0, naturalHeight = 0) {
  * @returns {void}
  */
 function closePreview() {
-  if (!_modal) return
-  if (typeof _modal.close === 'function' && _modal.open) {
-    _modal.close()
+  if (!_modal) return;
+  if (typeof _modal.close === "function" && _modal.open) {
+    _modal.close();
   }
-  _modal.classList.remove('is-active')
+  _modal.classList.remove("is-active");
 
   try {
-    document.documentElement.classList.remove('nimbi-image-preview-open')
+    document.documentElement.classList.remove("nimbi-image-preview-open");
   } catch (e) {}
 }
 
@@ -577,122 +628,128 @@ function closePreview() {
  * @returns {void}
  */
 export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
-  if (!root || !root.querySelectorAll) return
+  if (!root || !root.querySelectorAll) return;
 
   _label = (key, def) => {
-    const result = typeof t === 'function' ? t(key) : undefined
-    return result || def
-  }
+    const result = typeof t === "function" ? t(key) : undefined;
+    return result || def;
+  };
 
-  _zoomStep = zoomStep
+  _zoomStep = zoomStep;
 
-  root.addEventListener('click', (event) => {
-    const target = /** @type {HTMLElement} */ (event.target)
-    if (!target || target.tagName !== 'IMG') return
-    const img = /** @type {HTMLImageElement} */ (target)
-    if (!img.src) return
+  root.addEventListener("click", (event) => {
+    const target = /** @type {HTMLElement} */ (event.target);
+    if (!target || target.tagName !== "IMG") return;
+    const img = /** @type {HTMLImageElement} */ (target);
+    if (!img.src) return;
 
-    const anchor = img.closest('a')
-    if (anchor?.getAttribute?.('href')) {
-      return
+    const anchor = img.closest("a");
+    if (anchor?.getAttribute?.("href")) {
+      return;
     }
 
-    openPreview(img.src, img.alt || '', img.naturalWidth || 0, img.naturalHeight || 0)
-  })
+    openPreview(
+      img.src,
+      img.alt || "",
+      img.naturalWidth || 0,
+      img.naturalHeight || 0,
+    );
+  });
 
-  let isDragging = false
-  let dragStartX = 0
-  let dragStartY = 0
-  let scrollStartX = 0
-  let scrollStartY = 0
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let scrollStartX = 0;
+  let scrollStartY = 0;
 
-  const pointers = new Map()
-  let initialPinchDistance = 0
-  let initialPinchZoom = 1
+  const pointers = new Map();
+  let initialPinchDistance = 0;
+  let initialPinchZoom = 1;
 
   const getDistance = (a, b) => {
-    const dx = a.x - b.x
-    const dy = a.y - b.y
-    return Math.hypot(dx, dy)
-  }
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.hypot(dx, dy);
+  };
 
-  root.addEventListener('pointerdown', (event) => {
-    const target = /** @type {HTMLElement} */ (event.target)
-    if (!target || target.tagName !== 'IMG') return
-    const linkAncestor = target.closest('a')
-    if (linkAncestor && linkAncestor.getAttribute('href')) return
+  root.addEventListener("pointerdown", (event) => {
+    const target = /** @type {HTMLElement} */ (event.target);
+    if (!target || target.tagName !== "IMG") return;
+    const linkAncestor = target.closest("a");
+    if (linkAncestor && linkAncestor.getAttribute("href")) return;
 
-    if (!_modal || !_modal.open) return
+    if (!_modal || !_modal.open) return;
 
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
     if (pointers.size === 2) {
-      const coords = Array.from(pointers.values())
-      initialPinchDistance = getDistance(coords[0], coords[1])
-      initialPinchZoom = _zoom
-      return
+      const coords = Array.from(pointers.values());
+      initialPinchDistance = getDistance(coords[0], coords[1]);
+      initialPinchZoom = _zoom;
+      return;
     }
 
-    const wrapper = target.closest('.nimbi-image-preview__image-wrapper')
-    if (!wrapper) return
+    const wrapper = target.closest(".nimbi-image-preview__image-wrapper");
+    if (!wrapper) return;
 
-    if (_zoom <= 1) return
+    if (_zoom <= 1) return;
 
-    event.preventDefault()
-    isDragging = true
-    dragStartX = event.clientX
-    dragStartY = event.clientY
-    scrollStartX = wrapper.scrollLeft
-    scrollStartY = wrapper.scrollTop
-    target.setPointerCapture(event.pointerId)
-    try { target.classList.add('is-grabbing') } catch (e) {}
-  })
+    event.preventDefault();
+    isDragging = true;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    scrollStartX = wrapper.scrollLeft;
+    scrollStartY = wrapper.scrollTop;
+    target.setPointerCapture(event.pointerId);
+    try {
+      target.classList.add("is-grabbing");
+    } catch (e) {}
+  });
 
-  root.addEventListener('pointermove', (event) => {
+  root.addEventListener("pointermove", (event) => {
     if (pointers.has(event.pointerId)) {
-      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     }
 
     if (pointers.size === 2) {
-      event.preventDefault()
-      const coords = Array.from(pointers.values())
-      const dist = getDistance(coords[0], coords[1])
+      event.preventDefault();
+      const coords = Array.from(pointers.values());
+      const dist = getDistance(coords[0], coords[1]);
       if (initialPinchDistance > 0) {
-        const ratio = dist / initialPinchDistance
-        setZoom(initialPinchZoom * ratio)
+        const ratio = dist / initialPinchDistance;
+        setZoom(initialPinchZoom * ratio);
       }
-      return
+      return;
     }
 
-    if (!isDragging) return
-    event.preventDefault()
+    if (!isDragging) return;
+    event.preventDefault();
 
-    const target = /** @type {HTMLElement} */ (event.target)
-    const linkAncestor = target?.closest?.('a')
-    if (linkAncestor?.getAttribute?.('href')) return
-    const wrapper = target.closest('.nimbi-image-preview__image-wrapper')
-    if (!wrapper) return
+    const target = /** @type {HTMLElement} */ (event.target);
+    const linkAncestor = target?.closest?.("a");
+    if (linkAncestor?.getAttribute?.("href")) return;
+    const wrapper = target.closest(".nimbi-image-preview__image-wrapper");
+    if (!wrapper) return;
 
-    const dx = event.clientX - dragStartX
-    const dy = event.clientY - dragStartY
-    wrapper.scrollLeft = scrollStartX - dx
-    wrapper.scrollTop = scrollStartY - dy
-  })
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+    wrapper.scrollLeft = scrollStartX - dx;
+    wrapper.scrollTop = scrollStartY - dy;
+  });
 
   const endDrag = () => {
-    isDragging = false
-    pointers.clear()
-    initialPinchDistance = 0
+    isDragging = false;
+    pointers.clear();
+    initialPinchDistance = 0;
     try {
-      const preview = document.querySelector('[data-nimbi-preview-image]')
+      const preview = document.querySelector("[data-nimbi-preview-image]");
       if (preview) {
-        preview.classList.add('is-panning')
-        preview.classList.remove('is-grabbing')
+        preview.classList.add("is-panning");
+        preview.classList.remove("is-grabbing");
       }
     } catch (e) {}
-  }
+  };
 
-  root.addEventListener('pointerup', endDrag)
-  root.addEventListener('pointercancel', endDrag)
+  root.addEventListener("pointerup", endDrag);
+  root.addEventListener("pointercancel", endDrag);
 }
-

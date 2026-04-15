@@ -8,6 +8,12 @@
 
 ## Properties
 
+### allowEmbeddedScripts?
+
+> `optional` **allowEmbeddedScripts**: `boolean`
+
+***
+
 ### allowUrlPathOverrides?
 
 > `optional` **allowUrlPathOverrides**: `boolean`

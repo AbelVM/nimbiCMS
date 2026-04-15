@@ -11,21 +11,21 @@
  * @returns {Promise<Array<{foo:string}|{bar:number}>>}
  */
 export function complexExample(opts) {
-  return Promise.resolve([{foo:'x'}])
+  return Promise.resolve([{ foo: "x" }]);
 }
 
 /**
  * @returns {string|number} - A string or number selected by the function.
  */
 export function simpleUnion() {
-  return Math.random() < 0.5 ? 'foo' : 42
+  return Math.random() < 0.5 ? "foo" : 42;
 }
 
 /**
  * @returns {Record<string, number[]>} - A record mapping string keys to arrays of numbers.
  */
 export function recordExample() {
-  return { anyKey: [1, 2, 3] }
+  return { anyKey: [1, 2, 3] };
 }
 
 /**
@@ -33,7 +33,7 @@ export function recordExample() {
  * @returns {{sum:number}} - Object containing the computed sum.
  */
 export function sum(opts) {
-  return { sum: ((opts?.a) || 0) + ((opts?.b) || 0) }
+  return { sum: (opts?.a || 0) + (opts?.b || 0) };
 }
 
 /**
@@ -41,5 +41,5 @@ export function sum(opts) {
  * @returns {void} - No return value.
  */
 export function callIt(cb) {
-  cb()
+  cb();
 }

@@ -6,10 +6,10 @@
  *
  * @module l10nManager
  */
-import { DEFAULT_L10N } from './utils/l10n-defaults.js'
-import { PowerDeadline } from 'performance-helpers/powerDeadline'
+import { DEFAULT_L10N } from "./utils/l10n-defaults.js";
+import { PowerDeadline } from "performance-helpers/powerDeadline";
 
-const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))
+const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N));
 
 /**
  * @typedef {Object.<string,string>} LocaleDict
@@ -19,18 +19,18 @@ const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N))
  * @typedef {{[locale:string]: LocaleDict}} L10NMap
  */
 
-let detectedLang = 'en'
-if (typeof navigator !== 'undefined') {
-  const navLang = navigator.language || navigator.languages?.[0] || 'en'
-  detectedLang = String(navLang).split('-')[0].toLowerCase()
+let detectedLang = "en";
+if (typeof navigator !== "undefined") {
+  const navLang = navigator.language || navigator.languages?.[0] || "en";
+  detectedLang = String(navLang).split("-")[0].toLowerCase();
 }
-if (!DEFAULT_L10N[detectedLang]) detectedLang = 'en'
+if (!DEFAULT_L10N[detectedLang]) detectedLang = "en";
 
 /**
  * Currently selected UI language code (short form, e.g. 'en').
  * @type {string}
  */
-export let currentLang = detectedLang
+export let currentLang = detectedLang;
 
 /**
  * Translate a key using the current language. Replacement tokens of the
@@ -41,12 +41,12 @@ export let currentLang = detectedLang
  * @returns {string} - The translated string, or an empty string when not found.
  */
 export function t(key, replacements = {}) {
-  const dict = L10N[currentLang] || L10N.en
-  let s = dict?.[key] || (L10N.en[key] || '')
+  const dict = L10N[currentLang] || L10N.en;
+  let s = dict?.[key] || L10N.en[key] || "";
   for (const k of Object.keys(replacements)) {
-    s = s.replace(new RegExp(`\{${k}\}`, 'g'), String(replacements[k]))
+    s = s.replace(new RegExp(`\{${k}\}`, "g"), String(replacements[k]));
   }
-  return s
+  return s;
 }
 
 /**
@@ -58,35 +58,40 @@ export function t(key, replacements = {}) {
  * @returns {Promise<void>} - Resolves when the file has been fetched and merged.
  */
 export async function loadL10nFile(path, pageDir) {
-  if (!path) return
-  let resolved = path
+  if (!path) return;
+  let resolved = path;
   const fetchWithDeadline = async (targetUrl) => {
-    if (PowerDeadline && typeof PowerDeadline.run === 'function') {
-      return await PowerDeadline.run(
-        () => fetch(targetUrl),
-        { attemptTimeout: 10_000, maxAttempts: 1 }
-      )
+    if (PowerDeadline && typeof PowerDeadline.run === "function") {
+      return await PowerDeadline.run(() => fetch(targetUrl), {
+        attemptTimeout: 10_000,
+        maxAttempts: 1,
+      });
     }
-    let timeoutSignal = null
+    let timeoutSignal = null;
     try {
-      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-        timeoutSignal = AbortSignal.timeout(10_000)
+      if (
+        typeof AbortSignal !== "undefined" &&
+        typeof AbortSignal.timeout === "function"
+      ) {
+        timeoutSignal = AbortSignal.timeout(10_000);
       }
     } catch (_) {}
-    return await fetch(targetUrl, timeoutSignal ? { signal: timeoutSignal } : undefined)
-  }
+    return await fetch(
+      targetUrl,
+      timeoutSignal ? { signal: timeoutSignal } : undefined,
+    );
+  };
   try {
     if (!/^https?:\/\//.test(path)) {
-      resolved = new URL(path, location.origin + pageDir).toString()
+      resolved = new URL(path, location.origin + pageDir).toString();
     }
-    const res = await fetchWithDeadline(resolved)
-    if (!res.ok) return
-    const json = await res.json()
+    const res = await fetchWithDeadline(resolved);
+    if (!res.ok) return;
+    const json = await res.json();
     for (const lang of Object.keys(json || {})) {
-      L10N[lang] = Object.assign({}, L10N[lang] || {}, json[lang])
+      L10N[lang] = Object.assign({}, L10N[lang] || {}, json[lang]);
     }
-  } catch (e) {
-  }
+  } catch (e) {}
 }
 
 /**
@@ -96,8 +101,6 @@ export async function loadL10nFile(path, pageDir) {
  * @returns {void}
  */
 export function setLang(lang) {
-  const short = String(lang).split('-')[0].toLowerCase()
-  currentLang = L10N[short] ? short : 'en'
+  const short = String(lang).split("-")[0].toLowerCase();
+  currentLang = L10N[short] ? short : "en";
 }
-
-

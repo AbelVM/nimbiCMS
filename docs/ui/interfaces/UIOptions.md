@@ -8,6 +8,14 @@
 
 ## Properties
 
+### allowEmbeddedScripts?
+
+> `optional` **allowEmbeddedScripts**: `boolean`
+
+Opt-in to execute embedded scripts in rendered content. Enable only for trusted markdown sources.
+
+***
+
 ### container
 
 > **container**: `HTMLElement`

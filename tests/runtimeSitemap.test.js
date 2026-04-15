@@ -21,6 +21,7 @@ describe('runtimeSitemap', () => {
     // provide a predictable base used by _getBase()
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/' }, configurable: true })
     origFetch = globalThis.fetch
+    globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => '' })
 
     // clear any pending sitemap globals/timers from other tests
     try {

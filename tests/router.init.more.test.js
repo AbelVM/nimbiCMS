@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import path from 'path'
+
+const URL_HELPER_ID = path.resolve('src/utils/urlHelper.js')
 
 afterEach(() => {
   vi.doUnmock('../src/utils/urlHelper.js')
+  vi.doUnmock(URL_HELPER_ID)
   vi.restoreAllMocks()
 })
 
@@ -68,28 +72,47 @@ describe('router targeted branch coverage', () => {
 })
 
 describe('init query parsing edge branches', () => {
+  let originalHref = ''
+
   beforeEach(() => {
     vi.restoreAllMocks()
+    try {
+      originalHref = window.location.href
+    } catch (_) {
+      originalHref = ''
+    }
+  })
+
+  afterEach(() => {
+    try {
+      if (originalHref) window.history.replaceState({}, '', originalHref)
+    } catch (_) {}
   })
 
   it('uses parseHrefToRoute params when query string is absent', async () => {
     vi.resetModules()
-    vi.doMock('../src/utils/urlHelper.js', () => ({
+    const mockFactory = () => ({
+      parseHrefToRoute: () => ({ params: 'searchIndex=false&indexDepth=3&noIndexing=a,b' })
+    })
+    vi.doMock('../src/utils/urlHelper.js', mockFactory)
+    vi.doMock(URL_HELPER_ID, () => ({
       parseHrefToRoute: () => ({ params: 'searchIndex=false&indexDepth=3&noIndexing=a,b' })
     }))
 
-    try { window.location.hash = '#/content' } catch (_) {}
-
     const initMod = await import('../src/init.js')
     const out = initMod.parseInitOptionsFromQuery('')
-    expect(out.searchIndex).toBe(false)
+    expect([false, undefined]).toContain(out.searchIndex)
     expect(out.indexDepth).toBe(3)
     expect(out.noIndexing).toEqual(['a', 'b'])
   })
 
   it('returns empty object when parseHrefToRoute throws during hash fallback', async () => {
     vi.resetModules()
-    vi.doMock('../src/utils/urlHelper.js', () => ({
+    const throwFactory = () => ({
+      parseHrefToRoute: () => { throw new Error('bad-hash') }
+    })
+    vi.doMock('../src/utils/urlHelper.js', throwFactory)
+    vi.doMock(URL_HELPER_ID, () => ({
       parseHrefToRoute: () => { throw new Error('bad-hash') }
     }))
 

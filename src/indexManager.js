@@ -1,4 +1,3 @@
-
 /**
  * Index management helpers for content paths.
  *
@@ -7,7 +6,12 @@
  *
  * @module indexManager
  */
-import { slugToMd, mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from './slugManager.js';
+import {
+  slugToMd,
+  mdToSlug,
+  allMarkdownPaths,
+  allMarkdownPathsSet,
+} from "./slugState.js";
 
 /**
  * A Map-like interface used by index augmentation helpers.
@@ -71,10 +75,14 @@ export function refreshIndexPaths(contentBase) {
 }
 
 try {
-  Object.defineProperty(refreshIndexPaths, '_refreshed', {
-    get() { return _refreshed; },
-    set(v) { _refreshed = !!v; },
-    configurable: true
+  Object.defineProperty(refreshIndexPaths, "_refreshed", {
+    get() {
+      return _refreshed;
+    },
+    set(v) {
+      _refreshed = !!v;
+    },
+    configurable: true,
   });
 } catch (_) {}
 
@@ -85,7 +93,7 @@ try {
  * @returns {void}
  */
 function _augmentIndexWithMap(map) {
-  if (!map || typeof map.values !== 'function') return;
+  if (!map || typeof map.values !== "function") return;
   for (const v of map.values()) {
     if (v) indexSet.add(v);
   }
@@ -97,10 +105,10 @@ function _augmentIndexWithMap(map) {
  * @returns {void}
  */
 function _trackMap(map) {
-  if (!map || typeof map.set !== 'function') return;
+  if (!map || typeof map.set !== "function") return;
   const orig = map.set;
-  map.set = function(k, v) {
-    if (v && typeof v === 'string') indexSet.add(v);
+  map.set = function (k, v) {
+    if (v && typeof v === "string") indexSet.add(v);
     else if (v?.default) indexSet.add(v.default);
     return orig.call(this, k, v);
   };

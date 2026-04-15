@@ -1,5 +1,3 @@
-
-
 /**
  * Hook registration and runner utilities.
  *
@@ -9,12 +7,12 @@
  *
  * @module hookManager
  */
-import { debugWarn } from './utils/debug.js'
+import { debugWarn } from "./utils/debug.js";
 
 const hooks = {
   onPageLoad: [],
   onNavBuild: [],
-  transformHtml: []
+  transformHtml: [],
 };
 
 /**
@@ -49,8 +47,8 @@ export function addHook(name, fn) {
   if (!Object.prototype.hasOwnProperty.call(hooks, name)) {
     throw new Error('Unknown hook "' + name + '"');
   }
-  if (typeof fn !== 'function') {
-    throw new TypeError('hook callback must be a function');
+  if (typeof fn !== "function") {
+    throw new TypeError("hook callback must be a function");
   }
   hooks[name].push(fn);
 }
@@ -60,14 +58,18 @@ export function addHook(name, fn) {
  * @param {HookCallback} fn - Callback invoked with the render context.
  * @returns {void}
  */
-export function onPageLoad(fn) { addHook('onPageLoad', fn); }
+export function onPageLoad(fn) {
+  addHook("onPageLoad", fn);
+}
 
 /**
  * Register a callback once the navigation DOM has been built.
  * @param {HookCallback} fn - Callback invoked with the navigation context.
  * @returns {void}
  */
-export function onNavBuild(fn) { addHook('onNavBuild', fn); }
+export function onNavBuild(fn) {
+  addHook("onNavBuild", fn);
+}
 
 /**
  * Register a callback that can mutate the article element before it is
@@ -75,7 +77,9 @@ export function onNavBuild(fn) { addHook('onNavBuild', fn); }
  * @param {HookCallback} fn - Callback which can modify the render context or DOM.
  * @returns {void}
  */
-export function transformHtml(fn) { addHook('transformHtml', fn); }
+export function transformHtml(fn) {
+  addHook("transformHtml", fn);
+}
 
 /**
  * Invoke all registered hook callbacks for the given hook `name` with a
@@ -91,7 +95,9 @@ export async function runHooks(name, ctx) {
     try {
       await fn(ctx);
     } catch (e) {
-      try { debugWarn('[nimbi-cms] runHooks callback failed', e) } catch (err) {}
+      try {
+        debugWarn("[nimbi-cms] runHooks callback failed", e);
+      } catch (err) {}
     }
   }
 }
@@ -102,5 +108,7 @@ export async function runHooks(name, ctx) {
  * @returns {void}
  */
 export function _clearHooks() {
-  Object.keys(hooks).forEach(k => { hooks[k].length = 0 });
+  Object.keys(hooks).forEach((k) => {
+    hooks[k].length = 0;
+  });
 }

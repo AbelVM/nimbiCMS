@@ -80,7 +80,7 @@ Optional list of paths to exclude from indexing.
 
 ### logoOption?
 
-`string` = `'favicon'`
+`string` = `"favicon"`
 
 Navbar logo option.
 

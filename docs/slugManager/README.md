@@ -17,8 +17,6 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 
 ## Variables
 
-- [allMarkdownPaths](variables/allMarkdownPaths.md)
-- [allMarkdownPathsSet](variables/allMarkdownPathsSet.md)
 - [availableLanguages](variables/availableLanguages.md)
 - [CRAWL\_MAX\_QUEUE](variables/CRAWL_MAX_QUEUE.md)
 - [crawlCache](variables/crawlCache.md)
@@ -28,13 +26,11 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [homePage](variables/homePage.md)
 - [listPathsFetched](variables/listPathsFetched.md)
 - [listSlugCache](variables/listSlugCache.md)
-- [mdToSlug](variables/mdToSlug.md)
 - [negativeFetchCache](variables/negativeFetchCache.md)
 - [notFoundPage](variables/notFoundPage.md)
 - [searchIndex](variables/searchIndex.md)
 - [skipRootReadme](variables/skipRootReadme.md)
 - [slugResolvers](variables/slugResolvers.md)
-- [slugToMd](variables/slugToMd.md)
 
 ## Functions
 
@@ -73,7 +69,32 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [setNotFoundPage](functions/setNotFoundPage.md)
 - [setSkipRootReadme](functions/setSkipRootReadme.md)
 - [slugify](functions/slugify.md)
+- [storeSlugMapping](functions/storeSlugMapping-1.md)
 - [unescapeMarkdown](functions/unescapeMarkdown.md)
 - [uniqueSlug](functions/uniqueSlug.md)
 - [watchForColdHashRoute](functions/watchForColdHashRoute.md)
 - [whenSearchIndexReady](functions/whenSearchIndexReady.md)
+
+## References
+
+### allMarkdownPaths
+
+Re-exports [allMarkdownPaths](../slugState/variables/allMarkdownPaths.md)
+
+***
+
+### allMarkdownPathsSet
+
+Re-exports [allMarkdownPathsSet](../slugState/variables/allMarkdownPathsSet.md)
+
+***
+
+### mdToSlug
+
+Re-exports [mdToSlug](../slugState/variables/mdToSlug.md)
+
+***
+
+### slugToMd
+
+Re-exports [slugToMd](../slugState/variables/slugToMd.md)

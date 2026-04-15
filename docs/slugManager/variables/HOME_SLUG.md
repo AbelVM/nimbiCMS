@@ -6,7 +6,7 @@
 
 # Variable: HOME\_SLUG
 
-> `const` **HOME\_SLUG**: `string` = `'_home'`
+> `const` **HOME\_SLUG**: `string` = `"_home"`
 
 Sentinel slug used internally to represent the site root when a slug
 cannot be derived from a page title. Centralized here so callers avoid

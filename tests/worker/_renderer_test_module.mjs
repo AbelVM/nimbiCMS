@@ -12,9 +12,9 @@ import {
   importModuleWithCache,
   setRendererImportNegativeCacheTTL,
   slugifyHeading,
-} from '../../src/worker/rendererRuntime.js'
+} from "../../src/worker/rendererRuntime.js";
 
-attachRendererWorker(globalThis)
+attachRendererWorker(globalThis);
 
 export {
   _splitIntoSections,
@@ -26,4 +26,4 @@ export {
   importModuleWithCache,
   setRendererImportNegativeCacheTTL,
   slugifyHeading,
-}
+};

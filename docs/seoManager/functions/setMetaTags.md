@@ -38,7 +38,7 @@ Optional description override.
 
 ### \_initialDocumentTitle?
 
-`string` = `''`
+`string` = `""`
 
 Fallback site/document title.
 

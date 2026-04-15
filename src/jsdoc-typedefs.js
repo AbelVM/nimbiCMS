@@ -34,4 +34,4 @@
  * @typedef {{tokenizer?:Function,renderer?:Object,walkTokens?:Function,transform?:Function}} MarkdownPlugin
  */
 
-export default null
+export default null;

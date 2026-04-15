@@ -21,4 +21,6 @@ refresh and augment the index used by other modules.
 
 ## Functions
 
+- [isIndexPathsRefreshed](functions/isIndexPathsRefreshed.md)
 - [refreshIndexPaths](functions/refreshIndexPaths.md)
+- [setIndexPathsRefreshed](functions/setIndexPathsRefreshed.md)

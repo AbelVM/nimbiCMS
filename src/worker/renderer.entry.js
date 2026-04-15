@@ -1,3 +1,3 @@
-import { attachRendererWorker } from './rendererRuntime.js'
+import { attachRendererWorker } from "./rendererRuntime.js";
 
-attachRendererWorker(globalThis)
+attachRendererWorker(globalThis);

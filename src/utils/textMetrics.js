@@ -18,10 +18,10 @@
  * @property {ReadingTimeResult} readingTime - Result returned from `reading-time`.
  * @property {number} wordCount - Exact or best-effort word count.
  */
-import readingTime from 'reading-time/lib/reading-time'
+import readingTime from "reading-time/lib/reading-time";
 
-const CACHE = new Map()
-const MAX_ENTRIES = 200
+const CACHE = new Map();
+const MAX_ENTRIES = 200;
 
 /**
  * Normalize input text into a stable cache key.
@@ -30,7 +30,7 @@ const MAX_ENTRIES = 200
  * @private
  */
 function makeKey(text) {
-  return String(text ?? '')
+  return String(text ?? "");
 }
 
 /**
@@ -41,10 +41,10 @@ function makeKey(text) {
  * @private
  */
 function setCacheEntry(key, entry) {
-  CACHE.set(key, entry)
+  CACHE.set(key, entry);
   if (CACHE.size > MAX_ENTRIES) {
-    const firstKey = CACHE.keys().next().value
-    if (firstKey) CACHE.delete(firstKey)
+    const firstKey = CACHE.keys().next().value;
+    if (firstKey) CACHE.delete(firstKey);
   }
 }
 
@@ -56,8 +56,8 @@ function setCacheEntry(key, entry) {
  * @private
  */
 function computeWordCount(text) {
-  if (!text) return 0
-  return String(text).trim().split(/\s+/).filter(Boolean).length
+  if (!text) return 0;
+  return String(text).trim().split(/\s+/).filter(Boolean).length;
 }
 
 /**
@@ -70,13 +70,16 @@ function computeWordCount(text) {
  * @returns {ReadingTimeResult} Estimated reading time metadata.
  */
 export function getReadingTime(text) {
-  const key = makeKey(text)
-  const cached = CACHE.get(key)
-  if (cached?.readingTime) return cached.readingTime
-  const rt = readingTime(text || '')
-  const entry = { readingTime: rt, wordCount: typeof rt.words === 'number' ? rt.words : computeWordCount(text) }
-  setCacheEntry(key, entry)
-  return rt
+  const key = makeKey(text);
+  const cached = CACHE.get(key);
+  if (cached?.readingTime) return cached.readingTime;
+  const rt = readingTime(text || "");
+  const entry = {
+    readingTime: rt,
+    wordCount: typeof rt.words === "number" ? rt.words : computeWordCount(text),
+  };
+  setCacheEntry(key, entry);
+  return rt;
 }
 
 /**
@@ -93,14 +96,15 @@ export function getReadingTime(text) {
  * @returns {TextMetrics} Object containing `readingTime` and `wordCount`.
  */
 export function getTextMetrics(text) {
-  const key = makeKey(text)
-  const cached = CACHE.get(key)
-  if (cached) return Object.assign({}, cached)
-  const rt = readingTime(text || '')
-  const words = typeof rt.words === 'number' ? rt.words : computeWordCount(text)
-  const entry = { readingTime: rt, wordCount: words }
-  setCacheEntry(key, entry)
-  return Object.assign({}, entry)
+  const key = makeKey(text);
+  const cached = CACHE.get(key);
+  if (cached) return Object.assign({}, cached);
+  const rt = readingTime(text || "");
+  const words =
+    typeof rt.words === "number" ? rt.words : computeWordCount(text);
+  const entry = { readingTime: rt, wordCount: words };
+  setCacheEntry(key, entry);
+  return Object.assign({}, entry);
 }
 
 /**
@@ -109,5 +113,5 @@ export function getTextMetrics(text) {
  * @returns {void}
  */
 export function clearTextMetricsCache() {
-  CACHE.clear()
+  CACHE.clear();
 }

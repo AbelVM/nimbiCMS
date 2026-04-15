@@ -8,12 +8,15 @@ describe('runtimeSitemap RSS/Atom', () => {
   let origDocOpen
   let origDocWrite
   let origDocClose
+  let origFetch
 
   beforeEach(() => {
     origSlugEntries = Array.from(slugManager.slugToMd.entries())
     origLocation = globalThis.location
+    origFetch = globalThis.fetch
     slugManager.slugToMd.clear()
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', search: '?rss' }, configurable: true })
+    globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => '' })
 
     // clear any pending sitemap globals/timers from other tests
     try {
@@ -31,6 +34,7 @@ describe('runtimeSitemap RSS/Atom', () => {
     slugManager.slugToMd.clear()
     for (const [k, v] of origSlugEntries) slugManager.slugToMd.set(k, v)
     try { Object.defineProperty(globalThis, 'location', { value: origLocation, configurable: true }) } catch (e) {}
+    try { globalThis.fetch = origFetch } catch (e) {}
     if (origDocOpen !== undefined) document.open = origDocOpen
     if (origDocWrite !== undefined) document.write = origDocWrite
     if (origDocClose !== undefined) document.close = origDocClose

@@ -8,9 +8,9 @@
  */
 
 /** @type {'light'|'dark'|'system'} */
-let currentStyle = 'light'
+let currentStyle = "light";
 
-import { debugLog, debugWarn } from './utils/debug.js'
+import { debugLog, debugWarn } from "./utils/debug.js";
 
 /**
  * @typedef {Record<string,string>} ThemeVars
@@ -23,43 +23,53 @@ import { debugLog, debugWarn } from './utils/debug.js'
  * @returns {void}
  */
 function injectLink(href, attrs = {}) {
-  if (document.querySelector(`link[href="${href}"]`)) return
-  const l = document.createElement('link')
-  l.rel = 'stylesheet'
-  l.href = href
-  Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v))
-  document.head.appendChild(l)
+  if (document.querySelector(`link[href="${href}"]`)) return;
+  const l = document.createElement("link");
+  l.rel = "stylesheet";
+  l.href = href;
+  Object.entries(attrs).forEach(([k, v]) => l.setAttribute(k, v));
+  document.head.appendChild(l);
 
-  if (attrs['data-bulmaswatch-theme']) {
+  if (attrs["data-bulmaswatch-theme"]) {
     try {
-      if (l.getAttribute('data-bulmaswatch-observer')) return
-      let moveCount = Number(l.getAttribute('data-bulmaswatch-move-count') || 0)
-      let moving = false
+      if (l.getAttribute("data-bulmaswatch-observer")) return;
+      let moveCount = Number(
+        l.getAttribute("data-bulmaswatch-move-count") || 0,
+      );
+      let moving = false;
       const observer = new MutationObserver(() => {
         try {
-          if (moving) return
-          const parent = l.parentNode
-          if (!parent) return
-          const last = parent.lastElementChild
-          if (last === l) return
+          if (moving) return;
+          const parent = l.parentNode;
+          if (!parent) return;
+          const last = parent.lastElementChild;
+          if (last === l) return;
           if (moveCount >= 1000) {
-            l.setAttribute('data-bulmaswatch-move-stopped', '1')
-            return
+            l.setAttribute("data-bulmaswatch-move-stopped", "1");
+            return;
           }
-          moving = true
-          try { parent.appendChild(l) } catch (e) { /* ignore */ }
-          moveCount += 1
-          l.setAttribute('data-bulmaswatch-move-count', String(moveCount))
-          moving = false
-        } catch (e) { /* ignore */ }
-      })
+          moving = true;
+          try {
+            parent.appendChild(l);
+          } catch (e) {
+            /* ignore */
+          }
+          moveCount += 1;
+          l.setAttribute("data-bulmaswatch-move-count", String(moveCount));
+          moving = false;
+        } catch (e) {
+          /* ignore */
+        }
+      });
       try {
-        observer.observe(document.head, { childList: true })
-        l.setAttribute('data-bulmaswatch-observer', '1')
-        l.setAttribute('data-bulmaswatch-move-count', String(moveCount))
-      } catch (e) { /* ignore */ }
-      const parent = document.head
-      if (parent?.lastElementChild !== l) parent?.appendChild(l)
+        observer.observe(document.head, { childList: true });
+        l.setAttribute("data-bulmaswatch-observer", "1");
+        l.setAttribute("data-bulmaswatch-move-count", String(moveCount));
+      } catch (e) {
+        /* ignore */
+      }
+      const parent = document.head;
+      if (parent?.lastElementChild !== l) parent?.appendChild(l);
     } catch (e) {
       /* ignore */
     }
@@ -67,21 +77,27 @@ function injectLink(href, attrs = {}) {
 }
 
 async function ensureBaseBulma() {
-  const localCandidates = ['/dist/bulma.min.css', '/dist/bulma.css', '/bulma.css']
+  const localCandidates = [
+    "/dist/bulma.min.css",
+    "/dist/bulma.css",
+    "/bulma.css",
+  ];
   for (const p of localCandidates) {
     try {
-      const res = await fetch(p, { method: 'HEAD' })
+      const res = await fetch(p, { method: "HEAD" });
       if (res?.ok) {
         if (!document.querySelector(`link[href="${p}"]`)) {
-          const l = document.createElement('link')
-          l.rel = 'stylesheet'
-          l.href = p
-          l.setAttribute('data-bulma-base', '1')
-          const ourCss = document.querySelector('link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]')
-          if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
-          else document.head.appendChild(l)
+          const l = document.createElement("link");
+          l.rel = "stylesheet";
+          l.href = p;
+          l.setAttribute("data-bulma-base", "1");
+          const ourCss = document.querySelector(
+            'link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]',
+          );
+          if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss);
+          else document.head.appendChild(l);
         }
-        return
+        return;
       }
     } catch (e) {
       /* ignore */
@@ -89,30 +105,51 @@ async function ensureBaseBulma() {
   }
 
   try {
-    const href = (location?.protocol === 'file:') ? 'https://unpkg.com/bulma/css/bulma.min.css' : '//unpkg.com/bulma/css/bulma.min.css'
+    const href =
+      location?.protocol === "file:"
+        ? "https://unpkg.com/bulma/css/bulma.min.css"
+        : "//unpkg.com/bulma/css/bulma.min.css";
     if (!document.querySelector(`link[href="${href}"]`)) {
-      const l = document.createElement('link')
-      l.rel = 'stylesheet'
-      l.href = href
-      l.setAttribute('data-bulma-base', '1')
-      const ourCss = document.querySelector('link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]')
-      if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss)
-      else document.head.appendChild(l)
+      const l = document.createElement("link");
+      l.rel = "stylesheet";
+      l.href = href;
+      l.setAttribute("data-bulma-base", "1");
+      const ourCss = document.querySelector(
+        'link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]',
+      );
+      if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss);
+      else document.head.appendChild(l);
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 function removeThemeAndOverrides() {
   try {
-    const scope = (typeof document !== 'undefined' && document?.head) ? document.head : document
-    const themeLinks = Array.from(scope.querySelectorAll('link[data-bulmaswatch-theme]'))
-    for (const tl of themeLinks) tl?.parentNode?.removeChild(tl)
-  } catch (e) { /* ignore */ }
+    const scope =
+      typeof document !== "undefined" && document?.head
+        ? document.head
+        : document;
+    const themeLinks = Array.from(
+      scope.querySelectorAll("link[data-bulmaswatch-theme]"),
+    );
+    for (const tl of themeLinks) tl?.parentNode?.removeChild(tl);
+  } catch (e) {
+    /* ignore */
+  }
   try {
-    const scope2 = (typeof document !== 'undefined' && document?.head) ? document.head : document
-    const overrides = Array.from(scope2.querySelectorAll('style[data-bulma-override]'))
-    for (const s of overrides) s?.parentNode?.removeChild(s)
-  } catch (e) { /* ignore */ }
+    const scope2 =
+      typeof document !== "undefined" && document?.head
+        ? document.head
+        : document;
+    const overrides = Array.from(
+      scope2.querySelectorAll("style[data-bulma-override]"),
+    );
+    for (const s of overrides) s?.parentNode?.removeChild(s);
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 /**
@@ -123,49 +160,58 @@ function removeThemeAndOverrides() {
  * @param {string} pageDir - Directory to probe for a local `bulma.css` when using 'local'.
  * @returns {Promise<void>} - Resolves when theme loading completes.
  */
-export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
-  try { debugLog('[bulmaManager] ensureBulma called', { bulmaCustomize, pageDir }) } catch (_) {}
+export async function ensureBulma(bulmaCustomize = "none", pageDir = "/") {
+  try {
+    debugLog("[bulmaManager] ensureBulma called", { bulmaCustomize, pageDir });
+  } catch (_) {}
 
-  if (!bulmaCustomize) return
+  if (!bulmaCustomize) return;
 
-  if (bulmaCustomize === 'none') {
+  if (bulmaCustomize === "none") {
     // 'none' means use the bundled CSS (dist/nimbi-cms.css) — do not inject a
     // separate Bulma CDN stylesheet. Remove any previously-applied Bulmaswatch
     // theme links or overrides and return.
-    try { removeThemeAndOverrides() } catch (_) {}
-    return
+    try {
+      removeThemeAndOverrides();
+    } catch (_) {}
+    return;
   }
 
+  const rawLocalCandidates = [pageDir + "bulma.css", "/bulma.css"];
+  const localCandidates = Array.from(new Set(rawLocalCandidates));
 
-  const rawLocalCandidates = [pageDir + 'bulma.css', '/bulma.css']
-  const localCandidates = Array.from(new Set(rawLocalCandidates))
-
-  if (bulmaCustomize === 'local') {
-    removeThemeAndOverrides()
-    if (document.querySelector('style[data-bulma-override]')) return
+  if (bulmaCustomize === "local") {
+    removeThemeAndOverrides();
+    if (document.querySelector("style[data-bulma-override]")) return;
     for (const p of localCandidates) {
       try {
-        const res = await fetch(p, { method: 'GET' })
+        const res = await fetch(p, { method: "GET" });
         if (res.ok) {
-          const css = await res.text()
-          const s = document.createElement('style')
-          s.setAttribute('data-bulma-override', p)
-          s.appendChild(document.createTextNode(`\n/* bulma override: ${p} */\n` + css))
-          document.head.appendChild(s)
-          return
+          const css = await res.text();
+          const s = document.createElement("style");
+          s.setAttribute("data-bulma-override", p);
+          s.appendChild(
+            document.createTextNode(`\n/* bulma override: ${p} */\n` + css),
+          );
+          document.head.appendChild(s);
+          return;
         }
-      } catch (_) { debugWarn('[bulmaManager] fetch local bulma candidate failed', _) }
+      } catch (_) {
+        debugWarn("[bulmaManager] fetch local bulma candidate failed", _);
+      }
     }
-    return
+    return;
   }
 
   try {
-    const theme = String(bulmaCustomize).trim()
-    if (!theme) return
-    removeThemeAndOverrides()
-    const href = `https://unpkg.com/bulmaswatch/${encodeURIComponent(theme)}/bulmaswatch.min.css`
-    injectLink(href, { 'data-bulmaswatch-theme': theme })
-  } catch (_) { debugWarn('[bulmaManager] ensureBulma failed', _) }
+    const theme = String(bulmaCustomize).trim();
+    if (!theme) return;
+    removeThemeAndOverrides();
+    const href = `https://unpkg.com/bulmaswatch/${encodeURIComponent(theme)}/bulmaswatch.min.css`;
+    injectLink(href, { "data-bulmaswatch-theme": theme });
+  } catch (_) {
+    debugWarn("[bulmaManager] ensureBulma failed", _);
+  }
 }
 
 /**
@@ -184,22 +230,27 @@ export async function ensureBulma(bulmaCustomize = 'none', pageDir = '/') {
  * @returns {void}
  */
 export function setStyle(style) {
-  currentStyle = style === 'dark' ? 'dark' : style === 'system' ? 'system' : 'light'
+  currentStyle =
+    style === "dark" ? "dark" : style === "system" ? "system" : "light";
   try {
-    const mounts = Array.from(document.querySelectorAll('.nimbi-mount'))
+    const mounts = Array.from(document.querySelectorAll(".nimbi-mount"));
     if (mounts.length > 0) {
       for (const m of mounts) {
-        if (currentStyle === 'dark') m.setAttribute('data-theme', 'dark')
-        else if (currentStyle === 'light') m.setAttribute('data-theme', 'light')
-        else m.removeAttribute('data-theme')
+        if (currentStyle === "dark") m.setAttribute("data-theme", "dark");
+        else if (currentStyle === "light")
+          m.setAttribute("data-theme", "light");
+        else m.removeAttribute("data-theme");
       }
     } else {
-      const root = document.documentElement
-      if (currentStyle === 'dark') root.setAttribute('data-theme', 'dark')
-      else if (currentStyle === 'light') root.setAttribute('data-theme', 'light')
-      else root.removeAttribute('data-theme')
+      const root = document.documentElement;
+      if (currentStyle === "dark") root.setAttribute("data-theme", "dark");
+      else if (currentStyle === "light")
+        root.setAttribute("data-theme", "light");
+      else root.removeAttribute("data-theme");
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 /**
@@ -211,9 +262,13 @@ export function setStyle(style) {
  * @returns {void}
  */
 export function setThemeVars(vars) {
-  const root = document.documentElement
+  const root = document.documentElement;
   for (const [k, v] of Object.entries(vars || {})) {
-    try { root.style.setProperty(`--${k}`, v) } catch (_) { debugWarn('[bulmaManager] setThemeVars failed for', k, _ ) }
+    try {
+      root.style.setProperty(`--${k}`, v);
+    } catch (_) {
+      debugWarn("[bulmaManager] setThemeVars failed for", k, _);
+    }
   }
 }
 
@@ -224,14 +279,17 @@ export function setThemeVars(vars) {
  * @returns {() => void}
  */
 export function registerThemedElement(el) {
-  if (!el || !(el instanceof HTMLElement)) return () => {}
-  const mount = el.closest?.('.nimbi-mount') || null
+  if (!el || !(el instanceof HTMLElement)) return () => {};
+  const mount = el.closest?.(".nimbi-mount") || null;
   try {
     if (mount) {
-      if (currentStyle === 'dark') mount.setAttribute('data-theme', 'dark')
-      else if (currentStyle === 'light') mount.setAttribute('data-theme', 'light')
-      else mount.removeAttribute('data-theme')
+      if (currentStyle === "dark") mount.setAttribute("data-theme", "dark");
+      else if (currentStyle === "light")
+        mount.setAttribute("data-theme", "light");
+      else mount.removeAttribute("data-theme");
     }
-  } catch (_) { /* ignore */ }
-  return () => {}
+  } catch (_) {
+    /* ignore */
+  }
+  return () => {};
 }

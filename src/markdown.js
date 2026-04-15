@@ -6,15 +6,15 @@
  *
  * @module markdown
  */
-import { marked } from 'marked'
-import RendererWorker from './worker/renderer.entry.js?worker&inline'
-import { PowerPool } from 'performance-helpers/powerPool'
-import emojimap from './utils/emojiMap.js'
-import { debugWarn } from './utils/debug.js'
-import { getSharedParser } from './utils/sharedDomParser.js'
-import { getWorkerPoolSize } from './utils/helpers.js'
+import { marked } from "marked";
+import RendererWorker from "./worker/renderer.entry.js?worker&inline";
+import { PowerPool } from "performance-helpers/powerPool";
+import emojimap from "./utils/emojiMap.js";
+import { debugWarn } from "./utils/debug.js";
+import { getSharedParser } from "./utils/sharedDomParser.js";
+import { getWorkerPoolSize } from "./utils/helpers.js";
 
-const poolSize = getWorkerPoolSize()
+const poolSize = getWorkerPoolSize();
 
 const rendererAutoScaleOptions = {
   intervalMs: 500,
@@ -22,31 +22,74 @@ const rendererAutoScaleOptions = {
   hysteresis: 0.25,
   cooldownMs: 500,
   stepUp: 1,
-  stepDown: 1
-}
+  stepDown: 1,
+};
 
-const _rendererPool = (() => {
-  const poolOpts = { size: poolSize, minSize: 2, autoScale: rendererAutoScaleOptions }
+let _rendererPool = null;
+
+function _createRendererPool() {
+  const poolOpts = {
+    size: poolSize,
+    minSize: 2,
+    autoScale: rendererAutoScaleOptions,
+  };
   // In test environments suppress noisy worker bootstrap logs from the
   // PowerPool implementation so Vitest output isn't polluted with
   // expected worker-unavailable warnings. Preserve normal logging in
   // non-test environments.
   try {
-    if (typeof process !== 'undefined' && process.env?.VITEST) {
-      poolOpts.debugLevel = 0
+    if (typeof process !== "undefined" && process.env?.VITEST) {
+      poolOpts.debugLevel = 0;
     }
   } catch (_e) {}
   try {
-    return new PowerPool(RendererWorker, poolOpts)
+    return new PowerPool(RendererWorker, poolOpts);
   } catch (e) {
     // If construction throws for some reason, fall back to a minimal
     // stub that preserves the runtime API used by this module.
     return {
       workers: [],
-      postMessage: async () => { throw new Error('renderer worker unavailable') }
-    }
+      postMessage: async () => {
+        throw new Error("renderer worker unavailable");
+      },
+    };
   }
-})()
+}
+
+function _getRendererPool() {
+  if (!_rendererPool) _rendererPool = _createRendererPool();
+  return _rendererPool;
+}
+
+/**
+ * Explicitly terminate and clear the renderer worker pool.
+ * @returns {void}
+ */
+export function teardownRendererWorkerPool() {
+  const pool = _rendererPool;
+  _rendererPool = null;
+  if (!pool) return;
+  try {
+    const workers = Array.isArray(pool?.workers) ? pool.workers : [];
+    for (const entry of workers) {
+      try {
+        const underlying = entry?.worker?._underlying;
+        if (underlying && typeof underlying.terminate === "function") {
+          underlying.terminate();
+          continue;
+        }
+      } catch (_) {}
+      try {
+        const worker = entry?.worker;
+        if (worker && typeof worker.terminate === "function") {
+          worker.terminate();
+        }
+      } catch (_) {}
+    }
+  } catch (e) {
+    debugWarn("[markdown] teardownRendererWorkerPool failed", e);
+  }
+}
 
 // use shared DOMParser helper (see src/utils/sharedDomParser.js)
 
@@ -89,7 +132,8 @@ const _rendererPool = (() => {
  * Lazily return or create a renderer worker instance (may return null).
  * @returns {Worker|null} - A Worker instance or null if workers are unavailable.
  */
-export const initRendererWorker = () => _rendererPool.workers?.[0]?.worker?._underlying ?? null
+export const initRendererWorker = () =>
+  _getRendererPool().workers?.[0]?.worker?._underlying ?? null;
 
 /**
  * Send a message to the renderer worker and await a response.
@@ -98,21 +142,25 @@ export const initRendererWorker = () => _rendererPool.workers?.[0]?.worker?._und
  * @returns {Promise<RendererResult>} Promise resolving with the renderer result.
  */
 export const _sendToRenderer = (msg, timeout = 3000) => {
-  return _rendererPool.postMessage(msg, undefined, { awaitResponse: true, timeout })
-    .then(result => {
-      if (result?.error) throw new Error(result.error)
-      return result
+  const w = initRendererWorker?.();
+  if (!w) return Promise.reject(new Error("renderer worker unavailable"));
+  return _getRendererPool()
+    .postMessage(msg, undefined, { awaitResponse: true, timeout })
+    .then((result) => {
+      if (result?.error) throw new Error(result.error);
+      return result;
     })
-    .catch(e => {
-      const m = e?.message || ''
-      if (m.includes('postMessage response timeout')) throw new Error('worker timeout')
-      throw e
-    })
-}
+    .catch((e) => {
+      const m = e?.message || "";
+      if (m.includes("postMessage response timeout"))
+        throw new Error("worker timeout");
+      throw e;
+    });
+};
 
 /** Registered marked plugins. */
 /** @type {Array<MarkdownPlugin>} */
-export const markdownPlugins = []
+export const markdownPlugins = [];
 
 /**
  * Register a new marked plugin.  The object is passed directly to
@@ -121,9 +169,13 @@ export const markdownPlugins = []
  * @returns {void}
  */
 export function addMarkdownExtension(plugin) {
-  if (plugin && (typeof plugin === 'object' || typeof plugin === 'function')) {
-    markdownPlugins.push(plugin)
-    try { marked.use(plugin) } catch (e) { debugWarn('[markdown] failed to apply plugin', e) }
+  if (plugin && (typeof plugin === "object" || typeof plugin === "function")) {
+    markdownPlugins.push(plugin);
+    try {
+      marked.use(plugin);
+    } catch (e) {
+      debugWarn("[markdown] failed to apply plugin", e);
+    }
   }
 }
 
@@ -133,23 +185,31 @@ export function addMarkdownExtension(plugin) {
  * @returns {void}
  */
 export function setMarkdownExtensions(plugins) {
-  markdownPlugins.length = 0
+  markdownPlugins.length = 0;
   if (Array.isArray(plugins)) {
-    markdownPlugins.push(...plugins.filter(p=>p && typeof p === 'object'))
+    markdownPlugins.push(...plugins.filter((p) => p && typeof p === "object"));
   }
   try {
-    markdownPlugins.forEach(p => marked.use(p))
-  } catch (e) { debugWarn('[markdown] failed to apply markdown extensions', e) }
+    markdownPlugins.forEach((p) => marked.use(p));
+  } catch (e) {
+    debugWarn("[markdown] failed to apply markdown extensions", e);
+  }
 }
-import { parseFrontmatter } from './utils/frontmatter.js'
-import hljs from 'highlight.js/lib/core'
-import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from './codeblocksManager.js'
+import { parseFrontmatter } from "./utils/frontmatter.js";
+import hljs from "highlight.js/lib/core";
+import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from "./codeblocksManager.js";
 
 // Small slugify helper reused by streaming logic to match parseMarkdownToHtml
 function _slugifyLocal(s) {
   try {
-    return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
-  } catch (e) { return 'heading' }
+    return String(s ?? "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\-\s]+/g, "")
+      .replace(/\s+/g, "-");
+  } catch (e) {
+    return "heading";
+  }
 }
 
 /**
@@ -161,42 +221,43 @@ function _slugifyLocal(s) {
  * @returns {string[]}
  */
 function _splitIntoSections(content, chunkSize) {
-  const txt = String(content ?? '')
-  if (!txt || txt.length <= chunkSize) return [txt]
-  const headingRe = /^#{1,6}\s.*$/gm
-  const positions = []
-  let m
-  while ((m = headingRe.exec(txt)) !== null) positions.push(m.index)
+  const txt = String(content ?? "");
+  if (!txt || txt.length <= chunkSize) return [txt];
+  const headingRe = /^#{1,6}\s.*$/gm;
+  const positions = [];
+  let m;
+  while ((m = headingRe.exec(txt)) !== null) positions.push(m.index);
   // If few or no headings, fallback to fixed-size slices
   if (!positions.length || positions.length < 2) {
-    const out = []
-    for (let i = 0; i < txt.length; i += chunkSize) out.push(txt.slice(i, i + chunkSize))
-    return out
+    const out = [];
+    for (let i = 0; i < txt.length; i += chunkSize)
+      out.push(txt.slice(i, i + chunkSize));
+    return out;
   }
-  const sections = []
+  const sections = [];
   // leading intro (before first heading)
-  if (positions[0] > 0) sections.push(txt.slice(0, positions[0]))
+  if (positions[0] > 0) sections.push(txt.slice(0, positions[0]));
   for (let i = 0; i < positions.length; i++) {
-    const start = positions[i]
-    const end = (i + 1 < positions.length) ? positions[i + 1] : txt.length
-    sections.push(txt.slice(start, end))
+    const start = positions[i];
+    const end = i + 1 < positions.length ? positions[i + 1] : txt.length;
+    sections.push(txt.slice(start, end));
   }
   // merge small sections until chunkSize is reasonably filled
-  const merged = []
-  let cur = ''
+  const merged = [];
+  let cur = "";
   for (const s of sections) {
     if (!cur && s.length >= chunkSize) {
-      merged.push(s)
-      continue
+      merged.push(s);
+      continue;
     }
-    if ((cur.length + s.length) <= chunkSize) cur += s
+    if (cur.length + s.length <= chunkSize) cur += s;
     else {
-      if (cur) merged.push(cur)
-      cur = s
+      if (cur) merged.push(cur);
+      cur = s;
     }
   }
-  if (cur) merged.push(cur)
-  return merged
+  if (cur) merged.push(cur);
+  return merged;
 }
 
 /**
@@ -211,119 +272,153 @@ function _splitIntoSections(content, chunkSize) {
  * @returns {Promise<void>}
  */
 export async function streamParseMarkdown(md, onChunk, opts = {}) {
-  const chunkSize = opts?.chunkSize ? Number(opts.chunkSize) : 64 * 1024
-  const cb = typeof onChunk === 'function' ? onChunk : (() => {})
-  const { content, data } = parseFrontmatter(String(md ?? ''))
-  let body = content
-  try { body = String(body ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
+  const chunkSize = opts?.chunkSize ? Number(opts.chunkSize) : 64 * 1024;
+  const cb = typeof onChunk === "function" ? onChunk : () => {};
+  const { content, data } = parseFrontmatter(String(md ?? ""));
+  let body = content;
+  try {
+    body = String(body ?? "").replace(
+      /:([^:\s]+):/g,
+      (m, name) => emojimap[name] || m,
+    );
+  } catch (e) {}
   // If a renderer worker is available prefer worker-side streaming; this
   // will post partial chunk messages from the worker and emulate the
   // same events the inline shim/worker would emit.
-  // Obtain worker; in Vitest we import the module namespace so test spies
-  // can override `initRendererWorker`. Follow the same pattern as
-  // `parseMarkdownToHtml` to ensure test mocks are respected.
-  let w
-  if (typeof process !== 'undefined' && process.env?.VITEST) {
-    try {
-      const ns = await import('./markdown.js')
-      w = ns.initRendererWorker?.()
-    } catch (e) {
-      w = initRendererWorker?.()
-    }
-  } else {
-    w = initRendererWorker?.()
-  }
+  // Obtain worker; outside tests use the pool directly.
+  let w;
+  w = initRendererWorker?.();
   // In Vitest environments prefer the deterministic, main-thread
   // per-chunk fallback — some test environments don't emulate real
   // worker event semantics reliably. Otherwise prefer worker streaming.
-  if (!(typeof process !== 'undefined' && process.env?.VITEST) && typeof w?.postMessage === 'function') {
+  if (
+    !(typeof process !== "undefined" && process.env?.VITEST) &&
+    typeof w?.postMessage === "function"
+  ) {
     return new Promise((resolve, reject) => {
-      const id = String(Math.random())
-      let timeoutId = null
+      const id = String(Math.random());
+      let timeoutId = null;
       const cleanup = () => {
-        if (timeoutId) clearTimeout(timeoutId)
-        try { w?.removeEventListener?.('message', handler) } catch (e) {}
-        try { w?.removeEventListener?.('error', errHandler) } catch (e) {}
-      }
+        if (timeoutId) clearTimeout(timeoutId);
+        try {
+          w?.removeEventListener?.("message", handler);
+        } catch (e) {}
+        try {
+          w?.removeEventListener?.("error", errHandler);
+        } catch (e) {}
+      };
 
       const handler = (ev) => {
-        const data = ev?.data ? ev.data : {}
-        if (data.id !== id) return
+        const data = ev?.data ? ev.data : {};
+        if (data.id !== id) return;
         if (data.error) {
-          cleanup()
-          return reject(new Error(data.error))
+          cleanup();
+          return reject(new Error(data.error));
         }
-        if (data.type === 'chunk') {
-          try { cb(String(data.html ?? ''), { index: data.index, isLast: !!data.isLast, meta: {}, toc: data.toc || [] }) } catch (e) {}
-          return
+        if (data.type === "chunk") {
+          try {
+            cb(String(data.html ?? ""), {
+              index: data.index,
+              isLast: !!data.isLast,
+              meta: {},
+              toc: data.toc || [],
+            });
+          } catch (e) {}
+          return;
         }
-        if (data.type === 'done') {
-          cleanup()
-          try { cb('', { index: -1, isLast: true, meta: (data.meta || {}) }) } catch (e) {}
-          return resolve()
+        if (data.type === "done") {
+          cleanup();
+          try {
+            cb("", { index: -1, isLast: true, meta: data.meta || {} });
+          } catch (e) {}
+          return resolve();
         }
         // Backwards compatibility: full result object
         if (data.result) {
-          cleanup()
-          try { cb(String(data.result?.html || ''), { index: 0, isLast: true, meta: data.result?.meta || {}, toc: data.result?.toc || [] }) } catch (e) {}
-          return resolve()
+          cleanup();
+          try {
+            cb(String(data.result?.html || ""), {
+              index: 0,
+              isLast: true,
+              meta: data.result?.meta || {},
+              toc: data.result?.toc || [],
+            });
+          } catch (e) {}
+          return resolve();
         }
-      }
+      };
 
       const errHandler = (ev) => {
-        cleanup()
-        reject(new Error(ev?.message || 'worker error'))
-      }
+        cleanup();
+        reject(new Error(ev?.message || "worker error"));
+      };
 
-      timeoutId = setTimeout(() => {
-        cleanup()
-        reject(new Error('worker timeout'))
-      }, opts?.timeout ? Number(opts.timeout) : 10000)
+      timeoutId = setTimeout(
+        () => {
+          cleanup();
+          reject(new Error("worker timeout"));
+        },
+        opts?.timeout ? Number(opts.timeout) : 10000,
+      );
 
       try {
-        w?.addEventListener?.('message', handler)
-        w?.addEventListener?.('error', errHandler)
-        w.postMessage({ type: 'stream', id, md: body, chunkSize })
-      } catch (e) { cleanup(); reject(e) }
-    })
+        w?.addEventListener?.("message", handler);
+        w?.addEventListener?.("error", errHandler);
+        w.postMessage({ type: "stream", id, md: body, chunkSize });
+      } catch (e) {
+        cleanup();
+        reject(e);
+      }
+    });
   }
 
   // Fallback: parse per-chunk on main thread and emit as before.
-  const sections = _splitIntoSections(body, chunkSize)
-  const parser = getSharedParser()
-  const idCounts = new Map()
+  const sections = _splitIntoSections(body, chunkSize);
+  const parser = getSharedParser();
+  const idCounts = new Map();
 
   for (let i = 0; i < sections.length; i++) {
-    const section = sections[i]
+    const section = sections[i];
     // Use the existing high-level parser for each chunk so we keep behavior
     // consistent with single-pass parsing (plugins, highlighting, etc).
-    const parsed = await parseMarkdownToHtml(section)
-    let htmlOut = String(parsed?.html || '')
-    let docToc = []
+    const parsed = await parseMarkdownToHtml(section);
+    let htmlOut = String(parsed?.html || "");
+    let docToc = [];
     if (parser) {
       try {
-        const doc = parser.parseFromString(htmlOut, 'text/html')
-        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-        heads.forEach(h => {
+        const doc = parser.parseFromString(htmlOut, "text/html");
+        const heads = doc.querySelectorAll("h1,h2,h3,h4,h5,h6");
+        heads.forEach((h) => {
           try {
-            const level = Number(h.tagName.substring(1))
-            const text = (h.textContent || '').trim()
-            const base = _slugifyLocal(text)
-            const prev = idCounts.get(base) || 0
-            const idx = prev + 1
-            idCounts.set(base, idx)
-            const candidate = (idx === 1) ? base : base + '-' + idx
-            h.id = candidate
-            docToc.push({ level, text, id: candidate })
+            const level = Number(h.tagName.substring(1));
+            const text = (h.textContent || "").trim();
+            const base = _slugifyLocal(text);
+            const prev = idCounts.get(base) || 0;
+            const idx = prev + 1;
+            idCounts.set(base, idx);
+            const candidate = idx === 1 ? base : base + "-" + idx;
+            h.id = candidate;
+            docToc.push({ level, text, id: candidate });
           } catch (e) {}
-        })
+        });
         try {
-          if (typeof XMLSerializer !== 'undefined') {
-            const ser = new XMLSerializer()
-            htmlOut = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
+          if (typeof XMLSerializer !== "undefined") {
+            const ser = new XMLSerializer();
+            htmlOut = ser
+              .serializeToString(doc.body)
+              .replace(/^<body[^>]*>/i, "")
+              .replace(/<\/body>$/i, "");
           } else {
-            const nodes = Array.from(doc.body.childNodes || [])
-            htmlOut = nodes.map(n => (typeof n?.outerHTML === 'string') ? n.outerHTML : (typeof n?.textContent === 'string' ? n.textContent : '')).join('')
+            const nodes = Array.from(doc.body.childNodes || []);
+            htmlOut = nodes
+              .map((n) =>
+                typeof n?.outerHTML === "string"
+                  ? n.outerHTML
+                  : typeof n?.textContent === "string"
+                    ? n.textContent
+                    : "",
+              )
+              .join("");
           }
         } catch (e) {}
       } catch (e) {
@@ -332,28 +427,40 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
     } else {
       // Without a DOM parser try a regex-based heading scan (best-effort)
       try {
-        const heads = []
-        htmlOut = htmlOut.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
-          const level = Number(lvl)
-          const text = inner.replace(/<[^>]+>/g, '').trim()
-          const base = _slugifyLocal(text)
-          const prev = idCounts.get(base) || 0
-          const idx = prev + 1
-          idCounts.set(base, idx)
-          const candidate = (idx === 1) ? base : base + '-' + idx
-          heads.push({ level, text, id: candidate })
-          const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
-          return `<h${level} ${cleanAttrs} id="${candidate}">${inner}</h${level}>`
-        })
-        docToc = heads
+        const heads = [];
+        htmlOut = htmlOut.replace(
+          /<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g,
+          (full, lvl, attrs, inner) => {
+            const level = Number(lvl);
+            const text = inner.replace(/<[^>]+>/g, "").trim();
+            const base = _slugifyLocal(text);
+            const prev = idCounts.get(base) || 0;
+            const idx = prev + 1;
+            idCounts.set(base, idx);
+            const candidate = idx === 1 ? base : base + "-" + idx;
+            heads.push({ level, text, id: candidate });
+            const cleanAttrs = (attrs || "").replace(
+              /\s*(id|class)="[^"]*"/g,
+              "",
+            );
+            return `<h${level} ${cleanAttrs} id="${candidate}">${inner}</h${level}>`;
+          },
+        );
+        docToc = heads;
       } catch (e) {}
     }
 
-    const info = { index: i, isLast: i === (sections.length - 1), meta: (i === 0 ? (data || {}) : {}), toc: docToc }
-    try { cb(htmlOut, info) } catch (e) {}
+    const info = {
+      index: i,
+      isLast: i === sections.length - 1,
+      meta: i === 0 ? data || {} : {},
+      toc: docToc,
+    };
+    try {
+      cb(htmlOut, info);
+    } catch (e) {}
   }
 }
-
 
 /**
  * Convert markdown string to HTML and extract a table-of-contents list.
@@ -364,297 +471,481 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
  */
 export async function parseMarkdownToHtml(md) {
   if (markdownPlugins?.length) {
-    let { content, data } = parseFrontmatter(md || '')
-    try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
-    marked.setOptions({ gfm: true, mangle: false, headerIds: false, headerPrefix: '' })
-    try { markdownPlugins.forEach(p => marked.use(p)) } catch (e) { debugWarn('[markdown] apply plugins failed', e) }
-    const html = marked.parse(content)
+    let { content, data } = parseFrontmatter(md || "");
     try {
-      const parser = getSharedParser()
+      content = String(content ?? "").replace(
+        /:([^:\s]+):/g,
+        (m, name) => emojimap[name] || m,
+      );
+    } catch (e) {}
+    marked.setOptions({
+      gfm: true,
+      mangle: false,
+      headerIds: false,
+      headerPrefix: "",
+    });
+    try {
+      markdownPlugins.forEach((p) => marked.use(p));
+    } catch (e) {
+      debugWarn("[markdown] apply plugins failed", e);
+    }
+    const html = marked.parse(content);
+    try {
+      const parser = getSharedParser();
       if (parser) {
-        const doc = parser.parseFromString(html, 'text/html')
+        const doc = parser.parseFromString(html, "text/html");
         // add heading ids and build toc
-        const heads = doc.querySelectorAll('h1,h2,h3,h4,h5,h6')
-        const docToc = []
-        const used = new Set()
-        const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
+        const heads = doc.querySelectorAll("h1,h2,h3,h4,h5,h6");
+        const docToc = [];
+        const used = new Set();
+        const slugifyLocal = (s) => {
+          try {
+            return String(s ?? "")
+              .toLowerCase()
+              .trim()
+              .replace(/[^a-z0-9\-\s]+/g, "")
+              .replace(/\s+/g, "-");
+          } catch (e) {
+            return "heading";
+          }
+        };
         const classesFor = (level) => {
           const resp = {
-            1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
-            2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
-            3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
-            4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
-            5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
-            6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
-          }
-          const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
-          return (resp[level] + ' ' + weight).trim()
-        }
-        heads.forEach(h => {
+            1: "is-size-3-mobile is-size-2-tablet is-size-1-desktop",
+            2: "is-size-4-mobile is-size-3-tablet is-size-2-desktop",
+            3: "is-size-5-mobile is-size-4-tablet is-size-3-desktop",
+            4: "is-size-6-mobile is-size-5-tablet is-size-4-desktop",
+            5: "is-size-6-mobile is-size-6-tablet is-size-5-desktop",
+            6: "is-size-6-mobile is-size-6-tablet is-size-6-desktop",
+          };
+          const weight =
+            level <= 2
+              ? "has-text-weight-bold"
+              : level <= 4
+                ? "has-text-weight-semibold"
+                : "has-text-weight-normal";
+          return (resp[level] + " " + weight).trim();
+        };
+        heads.forEach((h) => {
           try {
-            const level = Number(h.tagName.substring(1))
-            const text = (h.textContent || '').trim()
-            let base = slugifyLocal(text) || 'heading'
-            let candidate = base
-            let i = 2
-            while (used.has(candidate)) { candidate = base + '-' + i; i += 1 }
-            used.add(candidate)
-            h.id = candidate
-            h.className = classesFor(level)
-            docToc.push({ level, text, id: candidate })
+            const level = Number(h.tagName.substring(1));
+            const text = (h.textContent || "").trim();
+            let base = slugifyLocal(text) || "heading";
+            let candidate = base;
+            let i = 2;
+            while (used.has(candidate)) {
+              candidate = base + "-" + i;
+              i += 1;
+            }
+            used.add(candidate);
+            h.id = candidate;
+            h.className = classesFor(level);
+            docToc.push({ level, text, id: candidate });
           } catch (e) {}
-        })
+        });
 
         // ensure images have loading=lazy unless explicitly set or opted-out
         try {
-          const imgs = (typeof doc?.getElementsByTagName === 'function') ? Array.from(doc.getElementsByTagName('img')) : (typeof doc?.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
-          imgs.forEach(img => {
+          const imgs =
+            typeof doc?.getElementsByTagName === "function"
+              ? Array.from(doc.getElementsByTagName("img"))
+              : typeof doc?.querySelectorAll === "function"
+                ? Array.from(doc.querySelectorAll("img"))
+                : [];
+          imgs.forEach((img) => {
             try {
-              const attrs = img.getAttribute?.('loading')
-              const want = img.getAttribute?.('data-want-lazy')
-              if (!attrs && !want) img.setAttribute?.('loading', 'lazy')
+              const attrs = img.getAttribute?.("loading");
+              const want = img.getAttribute?.("data-want-lazy");
+              if (!attrs && !want) img.setAttribute?.("loading", "lazy");
             } catch (e) {}
-          })
+          });
         } catch (e) {}
 
         // clean code element classes like language-undefined
         try {
-          doc.querySelectorAll('pre code, code[class]').forEach(el => {
+          doc.querySelectorAll("pre code, code[class]").forEach((el) => {
             try {
-              const raw = el.getAttribute?.('class') || el.className || ''
-              const cleaned = String(raw ?? '').replace(/\blanguage-undefined\b|\blang-undefined\b/g, '').trim()
+              const raw = el.getAttribute?.("class") || el.className || "";
+              const cleaned = String(raw ?? "")
+                .replace(/\blanguage-undefined\b|\blang-undefined\b/g, "")
+                .trim();
               if (cleaned) {
-                try { el.setAttribute?.('class', cleaned) } catch (err) { el.className = cleaned }
-              } else {
-                try { el.removeAttribute?.('class') } catch (err) { el.className = '' }
-              }
-            } catch (e) {}
-          })
-        } catch (e) {}
-
-        try {
-          let htmlOut = null
-          try {
-            if (typeof XMLSerializer !== 'undefined') {
-              const ser = new XMLSerializer()
-              htmlOut = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
-            } else {
-              const nodes = Array.from(doc.body.childNodes || [])
-              htmlOut = nodes.map(n => (typeof n?.outerHTML === 'string') ? n.outerHTML : (typeof n?.textContent === 'string' ? n.textContent : '')).join('')
-            }
-          } catch (err) {
-            try { htmlOut = doc.body.innerHTML } catch (err2) { htmlOut = '' }
-          }
-          return { html: htmlOut, meta: data || {}, toc: docToc }
-        } catch (e) { return { html: '', meta: data || {}, toc: docToc } }
-      }
-    } catch (e) { /* fall through to return raw html */ }
-    return { html, meta: data || {}, toc: [] }
-  }
-
-  
-
-  try { md = String(md ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
-  // Fast path: avoid worker startup/roundtrip for markdown without fenced
-  // code blocks; this tends to improve first-render latency on cold loads.
-  try {
-    const rawMd = String(md ?? '')
-    const isVitest = !!(typeof process !== 'undefined' && process.env?.VITEST)
-    if (!isVitest && !/```/.test(rawMd) && rawMd.length <= 200000) {
-      let { content, data } = parseFrontmatter(rawMd)
-      try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
-      marked.setOptions({ gfm: true, headerIds: true, mangle: false })
-      let html = marked.parse(content)
-      const heads = []
-      const used = new Set()
-      const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
-      html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
-        const level = Number(lvl)
-        const text = inner.replace(/<[^>]+>/g, '').trim()
-        let base = slugifyLocal(text) || 'heading'
-        let candidate = base
-        let i = 2
-        while (used.has(candidate)) { candidate = base + '-' + i; i += 1 }
-        used.add(candidate)
-        heads.push({ level, text, id: candidate })
-        const resp = {
-          1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
-          2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
-          3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
-          4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
-          5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
-          6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
-        }
-        const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
-        const classes = (resp[level] + ' ' + weight).trim()
-        const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
-        const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
-        return `<h${level} ${newAttrs}>${inner}</h${level}>`
-      })
-      html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
-        if (/\bloading=/.test(attrs)) return `<img${attrs}>`
-        if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`
-        return `<img${attrs} loading="lazy">`
-      })
-      return { html, meta: data || {}, toc: heads }
-    }
-  } catch (e) { /* fall through to existing paths */ }
-
-  // Obtain worker; in Vitest we import the module namespace so test spies
-  // can override `initRendererWorker`. Outside tests avoid self-import.
-  let w
-  if (typeof process !== 'undefined' && process.env?.VITEST) {
-    try {
-      const ns = await import('./markdown.js')
-      w = ns.initRendererWorker?.()
-    } catch (e) {
-      w = initRendererWorker?.()
-    }
-  } else {
-    w = initRendererWorker?.()
-  }
-  try {
-    if (hljs?.getLanguage?.('plaintext')) {
-      if (/```\s*\n/.test(String(md ?? ''))) {
-        let { content, data } = parseFrontmatter(md || '')
-        try { content = String(content ?? '').replace(/:([^:\s]+):/g, (m, name) => emojimap[name] || m) } catch (e) {}
-        marked.setOptions({ gfm: true, headerIds: true, mangle: false, highlighted: (code, lang) => {
-            try {
-            if (lang && hljs?.getLanguage?.(lang)) return hljs.highlight(code, { language: lang }).value
-            if (hljs?.getLanguage?.('plaintext')) {
-              return hljs.highlight(code, { language: 'plaintext' }).value
-            }
-            return code
-          } catch (e) { return code }
-        } })
-        let html = marked.parse(content)
-        try {
-          html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (full, code) => {
-            try {
-              if (code && typeof hljs?.highlight === 'function') {
                 try {
-                  const out = hljs.highlight(code, { language: 'plaintext' })
-                  return `<pre><code>${out?.value ? out.value : out}</code></pre>`
-                } catch (e) {
-                  try {
-                    if (typeof hljs?.highlightElement === 'function') {
-                      const el = { innerHTML: code }
-                      hljs.highlightElement(el)
-                      return `<pre><code>${el.innerHTML}</code></pre>`
-                    }
-                  } catch (ee) {}
+                  el.setAttribute?.("class", cleaned);
+                } catch (err) {
+                  el.className = cleaned;
+                }
+              } else {
+                try {
+                  el.removeAttribute?.("class");
+                } catch (err) {
+                  el.className = "";
                 }
               }
             } catch (e) {}
-            return full
-          })
+          });
         } catch (e) {}
-        const heads = []
-        const used = new Set()
-        const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
-        html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
-          const level = Number(lvl)
-          const text = inner.replace(/<[^>]+>/g, '').trim()
-          let base = slugifyLocal(text) || 'heading'
-          let candidate = base
-          let i = 2
-          while (used.has(candidate)) { candidate = base + '-' + i; i += 1 }
-          used.add(candidate)
-          heads.push({ level, text, id: candidate })
-          const resp = {
-            1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
-            2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
-            3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
-            4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
-            5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
-            6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
-          }
-          const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
-          const classes = (resp[level] + ' ' + weight).trim()
-          const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
-          const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
-          return `<h${level} ${newAttrs}>${inner}</h${level}>`
-        })
-        html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
-          if (/\bloading=/.test(attrs)) return `<img${attrs}>`
-          if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`
-          return `<img${attrs} loading="lazy">`
-        })
-        return { html, meta: data || {}, toc: heads }
-      }
-    }
-  } catch (e) { /* ignore and continue to worker path */ }
-  if (!w) throw new Error('renderer worker required but unavailable')
-  const res = await _sendToRenderer({ type: 'render', md })
-  if (!res || typeof res !== 'object' || res.html === undefined) throw new Error('renderer worker returned invalid response')
-  try {
-    const idCounts = new Map()
-    const toc = []
-    const slugifyLocal = (s) => { try { return String(s ?? '').toLowerCase().trim().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-') } catch (e) { return 'heading' } }
-    const classesFor = (level) => {
-      const resp = {
-        1: 'is-size-3-mobile is-size-2-tablet is-size-1-desktop',
-        2: 'is-size-4-mobile is-size-3-tablet is-size-2-desktop',
-        3: 'is-size-5-mobile is-size-4-tablet is-size-3-desktop',
-        4: 'is-size-6-mobile is-size-5-tablet is-size-4-desktop',
-        5: 'is-size-6-mobile is-size-6-tablet is-size-5-desktop',
-        6: 'is-size-6-mobile is-size-6-tablet is-size-6-desktop'
-      }
-      const weight = (level <= 2) ? 'has-text-weight-bold' : (level <= 4) ? 'has-text-weight-semibold' : 'has-text-weight-normal'
-      return (resp[level] + ' ' + weight).trim()
-    }
-    let html = res.html
-    html = html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (full, lvl, attrs, inner) => {
-      const level = Number(lvl)
-      const text = inner.replace(/<[^>]+>/g, '').trim()
-      const idMatch = (attrs || '').match(/\sid="([^"]+)"/)
-      const base = idMatch ? idMatch[1] : (slugifyLocal(text) || 'heading')
-      const prev = idCounts.get(base) || 0
-      const idx = prev + 1
-      idCounts.set(base, idx)
-      const candidate = idx === 1 ? base : base + '-' + idx
-      toc.push({ level, text, id: candidate })
-      const classes = classesFor(level)
-      const cleanAttrs = (attrs || '').replace(/\s*(id|class)="[^"]*"/g, '')
-      const newAttrs = (cleanAttrs + ` id="${candidate}" class="${classes}"`).trim()
-      return `<h${level} ${newAttrs}>${inner}</h${level}>`
-    })
-    try {
-      const moved = (typeof document !== 'undefined') ? (document.documentElement?.getAttribute?.('data-nimbi-logo-moved') || '') : ''
-      if (moved) {
-        const parser = getSharedParser()
-        if (parser) {
-          const doc = parser.parseFromString(html, 'text/html')
-          const imgs = typeof doc?.getElementsByTagName === 'function' ? Array.from(doc.getElementsByTagName('img')) : (typeof doc?.querySelectorAll === 'function' ? Array.from(doc.querySelectorAll('img')) : [])
-          imgs.forEach(img => {
-            try {
-              const src = img?.getAttribute?.('src') || ''
-              const abs = src ? new URL(src, location.href).toString() : ''
-              if (abs === moved) img.remove()
-            } catch (e) {}
-          })
+
+        try {
+          let htmlOut = null;
           try {
-            if (typeof XMLSerializer !== 'undefined') {
-              const ser = new XMLSerializer()
-              html = ser.serializeToString(doc.body).replace(/^<body[^>]*>/i, '').replace(/<\/body>$/i, '')
+            if (typeof XMLSerializer !== "undefined") {
+              const ser = new XMLSerializer();
+              htmlOut = ser
+                .serializeToString(doc.body)
+                .replace(/^<body[^>]*>/i, "")
+                .replace(/<\/body>$/i, "");
             } else {
-              const nodes = Array.from(doc.body.childNodes || [])
-              html = nodes.map(n => (typeof n?.outerHTML === 'string') ? n.outerHTML : (typeof n?.textContent === 'string' ? n.textContent : '')).join('')
+              const nodes = Array.from(doc.body.childNodes || []);
+              htmlOut = nodes
+                .map((n) =>
+                  typeof n?.outerHTML === "string"
+                    ? n.outerHTML
+                    : typeof n?.textContent === "string"
+                      ? n.textContent
+                      : "",
+                )
+                .join("");
             }
           } catch (err) {
-            try { html = doc.body.innerHTML } catch (err2) { /* leave html as-is */ }
+            try {
+              htmlOut = doc.body.innerHTML;
+            } catch (err2) {
+              htmlOut = "";
+            }
+          }
+          return { html: htmlOut, meta: data || {}, toc: docToc };
+        } catch (e) {
+          return { html: "", meta: data || {}, toc: docToc };
+        }
+      }
+    } catch (e) {
+      /* fall through to return raw html */
+    }
+    return { html, meta: data || {}, toc: [] };
+  }
+
+  try {
+    md = String(md ?? "").replace(
+      /:([^:\s]+):/g,
+      (m, name) => emojimap[name] || m,
+    );
+  } catch (e) {}
+  // Fast path: avoid worker startup/roundtrip for markdown without fenced
+  // code blocks; this tends to improve first-render latency on cold loads.
+  try {
+    const rawMd = String(md ?? "");
+    const isVitest = !!(typeof process !== "undefined" && process.env?.VITEST);
+    if (!isVitest && !/```/.test(rawMd) && rawMd.length <= 200000) {
+      let { content, data } = parseFrontmatter(rawMd);
+      try {
+        content = String(content ?? "").replace(
+          /:([^:\s]+):/g,
+          (m, name) => emojimap[name] || m,
+        );
+      } catch (e) {}
+      marked.setOptions({ gfm: true, headerIds: true, mangle: false });
+      let html = marked.parse(content);
+      const heads = [];
+      const used = new Set();
+      const slugifyLocal = (s) => {
+        try {
+          return String(s ?? "")
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9\-\s]+/g, "")
+            .replace(/\s+/g, "-");
+        } catch (e) {
+          return "heading";
+        }
+      };
+      html = html.replace(
+        /<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g,
+        (full, lvl, attrs, inner) => {
+          const level = Number(lvl);
+          const text = inner.replace(/<[^>]+>/g, "").trim();
+          let base = slugifyLocal(text) || "heading";
+          let candidate = base;
+          let i = 2;
+          while (used.has(candidate)) {
+            candidate = base + "-" + i;
+            i += 1;
+          }
+          used.add(candidate);
+          heads.push({ level, text, id: candidate });
+          const resp = {
+            1: "is-size-3-mobile is-size-2-tablet is-size-1-desktop",
+            2: "is-size-4-mobile is-size-3-tablet is-size-2-desktop",
+            3: "is-size-5-mobile is-size-4-tablet is-size-3-desktop",
+            4: "is-size-6-mobile is-size-5-tablet is-size-4-desktop",
+            5: "is-size-6-mobile is-size-6-tablet is-size-5-desktop",
+            6: "is-size-6-mobile is-size-6-tablet is-size-6-desktop",
+          };
+          const weight =
+            level <= 2
+              ? "has-text-weight-bold"
+              : level <= 4
+                ? "has-text-weight-semibold"
+                : "has-text-weight-normal";
+          const classes = (resp[level] + " " + weight).trim();
+          const cleanAttrs = (attrs || "").replace(
+            /\s*(id|class)="[^"]*"/g,
+            "",
+          );
+          const newAttrs = (
+            cleanAttrs + ` id="${candidate}" class="${classes}"`
+          ).trim();
+          return `<h${level} ${newAttrs}>${inner}</h${level}>`;
+        },
+      );
+      html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
+        if (/\bloading=/.test(attrs)) return `<img${attrs}>`;
+        if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`;
+        return `<img${attrs} loading="lazy">`;
+      });
+      return { html, meta: data || {}, toc: heads };
+    }
+  } catch (e) {
+    /* fall through to existing paths */
+  }
+
+  // Obtain worker; outside tests use the pool directly.
+  let w;
+  w = initRendererWorker?.();
+  try {
+    if (hljs?.getLanguage?.("plaintext")) {
+      if (/```\s*\n/.test(String(md ?? ""))) {
+        let { content, data } = parseFrontmatter(md || "");
+        try {
+          content = String(content ?? "").replace(
+            /:([^:\s]+):/g,
+            (m, name) => emojimap[name] || m,
+          );
+        } catch (e) {}
+        marked.setOptions({
+          gfm: true,
+          headerIds: true,
+          mangle: false,
+          highlighted: (code, lang) => {
+            try {
+              if (lang && hljs?.getLanguage?.(lang))
+                return hljs.highlight(code, { language: lang }).value;
+              if (hljs?.getLanguage?.("plaintext")) {
+                return hljs.highlight(code, { language: "plaintext" }).value;
+              }
+              return code;
+            } catch (e) {
+              return code;
+            }
+          },
+        });
+        let html = marked.parse(content);
+        try {
+          html = html.replace(
+            /<pre><code>([\s\S]*?)<\/code><\/pre>/g,
+            (full, code) => {
+              try {
+                if (code && typeof hljs?.highlight === "function") {
+                  try {
+                    const out = hljs.highlight(code, { language: "plaintext" });
+                    return `<pre><code>${out?.value ? out.value : out}</code></pre>`;
+                  } catch (e) {
+                    try {
+                      if (typeof hljs?.highlightElement === "function") {
+                        const el = { innerHTML: code };
+                        hljs.highlightElement(el);
+                        return `<pre><code>${el.innerHTML}</code></pre>`;
+                      }
+                    } catch (ee) {}
+                  }
+                }
+              } catch (e) {}
+              return full;
+            },
+          );
+        } catch (e) {}
+        const heads = [];
+        const used = new Set();
+        const slugifyLocal = (s) => {
+          try {
+            return String(s ?? "")
+              .toLowerCase()
+              .trim()
+              .replace(/[^a-z0-9\-\s]+/g, "")
+              .replace(/\s+/g, "-");
+          } catch (e) {
+            return "heading";
+          }
+        };
+        html = html.replace(
+          /<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g,
+          (full, lvl, attrs, inner) => {
+            const level = Number(lvl);
+            const text = inner.replace(/<[^>]+>/g, "").trim();
+            let base = slugifyLocal(text) || "heading";
+            let candidate = base;
+            let i = 2;
+            while (used.has(candidate)) {
+              candidate = base + "-" + i;
+              i += 1;
+            }
+            used.add(candidate);
+            heads.push({ level, text, id: candidate });
+            const resp = {
+              1: "is-size-3-mobile is-size-2-tablet is-size-1-desktop",
+              2: "is-size-4-mobile is-size-3-tablet is-size-2-desktop",
+              3: "is-size-5-mobile is-size-4-tablet is-size-3-desktop",
+              4: "is-size-6-mobile is-size-5-tablet is-size-4-desktop",
+              5: "is-size-6-mobile is-size-6-tablet is-size-5-desktop",
+              6: "is-size-6-mobile is-size-6-tablet is-size-6-desktop",
+            };
+            const weight =
+              level <= 2
+                ? "has-text-weight-bold"
+                : level <= 4
+                  ? "has-text-weight-semibold"
+                  : "has-text-weight-normal";
+            const classes = (resp[level] + " " + weight).trim();
+            const cleanAttrs = (attrs || "").replace(
+              /\s*(id|class)="[^"]*"/g,
+              "",
+            );
+            const newAttrs = (
+              cleanAttrs + ` id="${candidate}" class="${classes}"`
+            ).trim();
+            return `<h${level} ${newAttrs}>${inner}</h${level}>`;
+          },
+        );
+        html = html.replace(/<img([^>]*)>/g, (full, attrs) => {
+          if (/\bloading=/.test(attrs)) return `<img${attrs}>`;
+          if (/\bdata-want-lazy=/.test(attrs)) return `<img${attrs}>`;
+          return `<img${attrs} loading="lazy">`;
+        });
+        return { html, meta: data || {}, toc: heads };
+      }
+    }
+  } catch (e) {
+    /* ignore and continue to worker path */
+  }
+  if (!w) throw new Error("renderer worker required but unavailable");
+  const res = await _sendToRenderer({ type: "render", md });
+  if (!res || typeof res !== "object" || res.html === undefined)
+    throw new Error("renderer worker returned invalid response");
+  try {
+    const idCounts = new Map();
+    const toc = [];
+    const slugifyLocal = (s) => {
+      try {
+        return String(s ?? "")
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9\-\s]+/g, "")
+          .replace(/\s+/g, "-");
+      } catch (e) {
+        return "heading";
+      }
+    };
+    const classesFor = (level) => {
+      const resp = {
+        1: "is-size-3-mobile is-size-2-tablet is-size-1-desktop",
+        2: "is-size-4-mobile is-size-3-tablet is-size-2-desktop",
+        3: "is-size-5-mobile is-size-4-tablet is-size-3-desktop",
+        4: "is-size-6-mobile is-size-5-tablet is-size-4-desktop",
+        5: "is-size-6-mobile is-size-6-tablet is-size-5-desktop",
+        6: "is-size-6-mobile is-size-6-tablet is-size-6-desktop",
+      };
+      const weight =
+        level <= 2
+          ? "has-text-weight-bold"
+          : level <= 4
+            ? "has-text-weight-semibold"
+            : "has-text-weight-normal";
+      return (resp[level] + " " + weight).trim();
+    };
+    let html = res.html;
+    html = html.replace(
+      /<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g,
+      (full, lvl, attrs, inner) => {
+        const level = Number(lvl);
+        const text = inner.replace(/<[^>]+>/g, "").trim();
+        const idMatch = (attrs || "").match(/\sid="([^"]+)"/);
+        const base = idMatch ? idMatch[1] : slugifyLocal(text) || "heading";
+        const prev = idCounts.get(base) || 0;
+        const idx = prev + 1;
+        idCounts.set(base, idx);
+        const candidate = idx === 1 ? base : base + "-" + idx;
+        toc.push({ level, text, id: candidate });
+        const classes = classesFor(level);
+        const cleanAttrs = (attrs || "").replace(/\s*(id|class)="[^"]*"/g, "");
+        const newAttrs = (
+          cleanAttrs + ` id="${candidate}" class="${classes}"`
+        ).trim();
+        return `<h${level} ${newAttrs}>${inner}</h${level}>`;
+      },
+    );
+    try {
+      const moved =
+        typeof document !== "undefined"
+          ? document.documentElement?.getAttribute?.("data-nimbi-logo-moved") ||
+            ""
+          : "";
+      if (moved) {
+        const parser = getSharedParser();
+        if (parser) {
+          const doc = parser.parseFromString(html, "text/html");
+          const imgs =
+            typeof doc?.getElementsByTagName === "function"
+              ? Array.from(doc.getElementsByTagName("img"))
+              : typeof doc?.querySelectorAll === "function"
+                ? Array.from(doc.querySelectorAll("img"))
+                : [];
+          imgs.forEach((img) => {
+            try {
+              const src = img?.getAttribute?.("src") || "";
+              const abs = src ? new URL(src, location.href).toString() : "";
+              if (abs === moved) img.remove();
+            } catch (e) {}
+          });
+          try {
+            if (typeof XMLSerializer !== "undefined") {
+              const ser = new XMLSerializer();
+              html = ser
+                .serializeToString(doc.body)
+                .replace(/^<body[^>]*>/i, "")
+                .replace(/<\/body>$/i, "");
+            } else {
+              const nodes = Array.from(doc.body.childNodes || []);
+              html = nodes
+                .map((n) =>
+                  typeof n?.outerHTML === "string"
+                    ? n.outerHTML
+                    : typeof n?.textContent === "string"
+                      ? n.textContent
+                      : "",
+                )
+                .join("");
+            }
+          } catch (err) {
+            try {
+              html = doc.body.innerHTML;
+            } catch (err2) {
+              /* leave html as-is */
+            }
           }
         } else {
           try {
-            const escaped = moved.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            html = html.replace(new RegExp(`<img[^>]*src=\\"${escaped}\\"[^>]*>`, 'g'), '')
+            const escaped = moved.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            html = html.replace(
+              new RegExp(`<img[^>]*src=\\"${escaped}\\"[^>]*>`, "g"),
+              "",
+            );
           } catch (e) {}
         }
       }
     } catch (e) {}
-    return { html, meta: res.meta || {}, toc }
+    return { html, meta: res.meta || {}, toc };
   } catch (e) {
-    return { html: res.html, meta: res.meta || {}, toc: res.toc || [] }
+    return { html: res.html, meta: res.meta || {}, toc: res.toc || [] };
   }
 }
 
@@ -676,53 +967,170 @@ export async function parseMarkdownToHtml(md) {
  * @returns {Set<string>} - Set of detected language identifiers (canonical or fallback names)
  */
 export function detectFenceLanguages(md, supportedMap) {
-  const set = new Set()
-  const re = /```\s*([a-zA-Z0-9_\-+]+)?/g
+  const set = new Set();
+  const re = /```\s*([a-zA-Z0-9_\-+]+)?/g;
   const STOP = new Set([
-    'then', 'now', 'if', 'once', 'so', 'and', 'or', 'but', 'when', 'the', 'a', 'an', 'as',
-    'let', 'const', 'var', 'export', 'import', 'from', 'true', 'false', 'null', 'npm',
-    'run', 'echo', 'sudo', 'this', 'that', 'have', 'using', 'some', 'return', 'returns',
-    'function', 'console', 'log', 'error', 'warn', 'class', 'new', 'undefined',
-    'with', 'select', 'from', 'where', 'join', 'on', 'group', 'order', 'by', 'having', 'as', 'into', 'values',
-    'like', 'limit', 'offset', 'create', 'table', 'index', 'view', 'insert', 'update', 'delete', 'returning',
-    'and', 'or', 'not', 'all', 'any', 'exists', 'case', 'when', 'then', 'else', 'end', 'distance', 'geometry',
-    'you', 'which', 'would', 'why', 'cool', 'other', 'same', 'everything', 'check'
-  ])
-  const FALLBACK_KNOWN = new Set(['bash', 'sh', 'zsh', 'javascript', 'js', 'python', 'py', 'php', 'java', 'c', 'cpp', 'rust', 'go', 'ruby', 'perl', 'r', 'scala', 'swift', 'kotlin', 'cs', 'csharp', 'html', 'css', 'json', 'xml', 'yaml', 'yml', 'dockerfile', 'docker'])
-  let m
+    "then",
+    "now",
+    "if",
+    "once",
+    "so",
+    "and",
+    "or",
+    "but",
+    "when",
+    "the",
+    "a",
+    "an",
+    "as",
+    "let",
+    "const",
+    "var",
+    "export",
+    "import",
+    "from",
+    "true",
+    "false",
+    "null",
+    "npm",
+    "run",
+    "echo",
+    "sudo",
+    "this",
+    "that",
+    "have",
+    "using",
+    "some",
+    "return",
+    "returns",
+    "function",
+    "console",
+    "log",
+    "error",
+    "warn",
+    "class",
+    "new",
+    "undefined",
+    "with",
+    "select",
+    "from",
+    "where",
+    "join",
+    "on",
+    "group",
+    "order",
+    "by",
+    "having",
+    "as",
+    "into",
+    "values",
+    "like",
+    "limit",
+    "offset",
+    "create",
+    "table",
+    "index",
+    "view",
+    "insert",
+    "update",
+    "delete",
+    "returning",
+    "and",
+    "or",
+    "not",
+    "all",
+    "any",
+    "exists",
+    "case",
+    "when",
+    "then",
+    "else",
+    "end",
+    "distance",
+    "geometry",
+    "you",
+    "which",
+    "would",
+    "why",
+    "cool",
+    "other",
+    "same",
+    "everything",
+    "check",
+  ]);
+  const FALLBACK_KNOWN = new Set([
+    "bash",
+    "sh",
+    "zsh",
+    "javascript",
+    "js",
+    "python",
+    "py",
+    "php",
+    "java",
+    "c",
+    "cpp",
+    "rust",
+    "go",
+    "ruby",
+    "perl",
+    "r",
+    "scala",
+    "swift",
+    "kotlin",
+    "cs",
+    "csharp",
+    "html",
+    "css",
+    "json",
+    "xml",
+    "yaml",
+    "yml",
+    "dockerfile",
+    "docker",
+  ]);
+  let m;
   while ((m = re.exec(md))) {
     if (m[1]) {
-      const name = m[1].toLowerCase()
-      
-      if (BAD_LANGUAGES.has(name)) continue
-      
-      if (supportedMap?.size && name.length < 3 && !supportedMap.has(name) && !supportedMap.has(HLJS_ALIAS_MAP?.[name])) continue
+      const name = m[1].toLowerCase();
+
+      if (BAD_LANGUAGES.has(name)) continue;
+
+      if (
+        supportedMap?.size &&
+        name.length < 3 &&
+        !supportedMap.has(name) &&
+        !supportedMap.has(HLJS_ALIAS_MAP?.[name])
+      )
+        continue;
       if (supportedMap?.size) {
         if (supportedMap.has(name)) {
-          const canonical = supportedMap.get(name)
-          if (canonical) set.add(canonical)
-          continue
+          const canonical = supportedMap.get(name);
+          if (canonical) set.add(canonical);
+          continue;
         }
-        
+
         if (HLJS_ALIAS_MAP?.[name]) {
-          const mapped = HLJS_ALIAS_MAP[name]
+          const mapped = HLJS_ALIAS_MAP[name];
           if (supportedMap.has(mapped)) {
-            const canonical = supportedMap.get(mapped) || mapped
-            set.add(canonical)
-            continue
+            const canonical = supportedMap.get(mapped) || mapped;
+            set.add(canonical);
+            continue;
           }
         }
       }
-      const isKnown = FALLBACK_KNOWN.has(name)
-      if (isKnown) set.add(name)
+      const isKnown = FALLBACK_KNOWN.has(name);
+      if (isKnown) set.add(name);
       else if (
-        name.length >= 5 && name.length <= 30 &&
+        name.length >= 5 &&
+        name.length <= 30 &&
         /^[a-z][a-z0-9_\-+]*$/.test(name) &&
         !STOP.has(name)
-      ) set.add(name)
+      )
+        set.add(name);
     }
   }
-  return set
+  return set;
 }
 
 /**
@@ -732,20 +1140,28 @@ export function detectFenceLanguages(md, supportedMap) {
  * @returns {Promise<Set<string>>} Promise resolving to a set of detected language identifiers.
  */
 export async function detectFenceLanguagesAsync(mdText, supportedMap) {
-  if (markdownPlugins?.length) return detectFenceLanguages(mdText || '', supportedMap)
-  if (typeof process !== 'undefined' && process.env?.VITEST) return detectFenceLanguages(mdText || '', supportedMap)
-  const w = initRendererWorker?.()
+  if (markdownPlugins?.length)
+    return detectFenceLanguages(mdText || "", supportedMap);
+  if (typeof process !== "undefined" && process.env?.VITEST)
+    return detectFenceLanguages(mdText || "", supportedMap);
+  const w = initRendererWorker?.();
   if (w) {
     try {
-      const arr = supportedMap?.size ? Array.from(supportedMap.keys()) : []
-      const res = await _sendToRenderer({ type: 'detect', md: String(mdText ?? ''), supported: arr }, 200)
-      if (Array.isArray(res)) return new Set(res)
+      const arr = supportedMap?.size ? Array.from(supportedMap.keys()) : [];
+      const res = await _sendToRenderer(
+        { type: "detect", md: String(mdText ?? ""), supported: arr },
+        200,
+      );
+      if (Array.isArray(res)) return new Set(res);
     } catch (e) {
-      debugWarn('[markdown] detectFenceLanguagesAsync worker failed', e)
+      debugWarn("[markdown] detectFenceLanguagesAsync worker failed", e);
     }
   }
-  return detectFenceLanguages(mdText || '', supportedMap)
+  return detectFenceLanguages(mdText || "", supportedMap);
 }
 
 // Export internals for unit testing
-export { _splitIntoSections as _splitIntoSections, _slugifyLocal as _slugifyLocal }
+export {
+  _splitIntoSections as _splitIntoSections,
+  _slugifyLocal as _slugifyLocal,
+};

@@ -5,18 +5,31 @@
  *
  * @module ui
  */
-export { addHook, onPageLoad, onNavBuild, transformHtml, runHooks, _clearHooks } from './nimbi-cms.js'
+export {
+  addHook,
+  onPageLoad,
+  onNavBuild,
+  transformHtml,
+  runHooks,
+  _clearHooks,
+} from "./hookManager.js";
 
-import { fetchPageData } from './router.js'
-import { parseHrefToRoute } from './utils/urlHelper.js'
-import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton, createNavTree } from './htmlBuilder.js'
-import { setEagerForAboveFoldImages } from './utils/helpers.js'
-import { applyPageMeta } from './seoManager.js'
-import { attachImagePreview } from './imagePreview.js'
-import { debugWarn, debugError, incrementCounter } from './utils/debug.js'
-import { notFoundPage } from './slugManager.js'
-
-
+import { fetchPageData } from "./router.js";
+import { parseHrefToRoute } from "./utils/urlHelper.js";
+import {
+  prepareArticle,
+  executeEmbeddedScripts,
+  renderNotFound,
+  attachTocClickHandler,
+  scrollToAnchorOrTop,
+  ensureScrollTopButton,
+  createNavTree,
+} from "./htmlBuilder.js";
+import { setEagerForAboveFoldImages } from "./utils/helpers.js";
+import { applyPageMeta } from "./seoManager.js";
+import { attachImagePreview } from "./imagePreview.js";
+import { debugWarn, debugError, incrementCounter } from "./utils/debug.js";
+import { notFoundPage } from "./slugManager.js";
 
 /**
  * Initialize UI rendering helpers for a mounted CMS instance.
@@ -57,61 +70,65 @@ export function createUI(opts) {
     homePage,
     initialDocumentTitle,
     runHooks,
-    allowEmbeddedScripts = false
-  } = opts || {}
+    allowEmbeddedScripts = false,
+  } = opts || {};
   if (!contentWrap || !(contentWrap instanceof HTMLElement)) {
-    throw new TypeError('contentWrap must be an HTMLElement')
+    throw new TypeError("contentWrap must be an HTMLElement");
   }
 
-  let currentPagePath = null
-  const siteNav = createNavTree(t, [{ path: homePage, name: t('home'), isIndex: true, children: [] }])
-  const _preparedPageCache = new Map()
-  const _preparedPageCacheMax = 12
+  let currentPagePath = null;
+  const siteNav = createNavTree(t, [
+    { path: homePage, name: t("home"), isIndex: true, children: [] },
+  ]);
+  const _preparedPageCache = new Map();
+  const _preparedPageCacheMax = 12;
   // Serialize renders to avoid concurrent duplicate rendering when multiple
   // navigation events fire in quick succession (e.g. popstate + script-driven calls).
   // `_isRendering` guards active render; `_queuedRender` signals a subsequent
   // render should run once the active render completes.
-  let _isRendering = false
-  let _queuedRender = false
+  let _isRendering = false;
+  let _queuedRender = false;
 
   // Helper to clear an element's children with modern API when available.
   function _clearElement(el) {
     try {
-      if (!el) return
-      if (typeof el.replaceChildren === 'function') return el.replaceChildren()
-      while (el.firstChild) el.removeChild(el.firstChild)
+      if (!el) return;
+      if (typeof el.replaceChildren === "function") return el.replaceChildren();
+      while (el.firstChild) el.removeChild(el.firstChild);
     } catch (e) {
-      try { if (el) el.innerHTML = '' } catch (_) {}
+      try {
+        if (el) el.innerHTML = "";
+      } catch (_) {}
     }
   }
 
   function _pageContentSignature(data) {
     try {
-      const raw = String(data?.raw || '')
-      const len = raw.length
-      const head = raw.slice(0, 120)
-      const tail = raw.slice(Math.max(0, len - 120))
-      return `${len}:${head}:${tail}`
+      const raw = String(data?.raw || "");
+      const len = raw.length;
+      const head = raw.slice(0, 120);
+      const tail = raw.slice(Math.max(0, len - 120));
+      return `${len}:${head}:${tail}`;
     } catch (_) {
-      return '0::'
+      return "0::";
     }
   }
 
   function _cacheGetPrepared(key) {
-    const v = _preparedPageCache.get(key)
-    if (!v) return null
-    _preparedPageCache.delete(key)
-    _preparedPageCache.set(key, v)
-    return v
+    const v = _preparedPageCache.get(key);
+    if (!v) return null;
+    _preparedPageCache.delete(key);
+    _preparedPageCache.set(key, v);
+    return v;
   }
 
   function _cacheSetPrepared(key, value) {
     try {
-      if (_preparedPageCache.has(key)) _preparedPageCache.delete(key)
-      _preparedPageCache.set(key, value)
+      if (_preparedPageCache.has(key)) _preparedPageCache.delete(key);
+      _preparedPageCache.set(key, value);
       while (_preparedPageCache.size > _preparedPageCacheMax) {
-        const oldest = _preparedPageCache.keys().next().value
-        _preparedPageCache.delete(oldest)
+        const oldest = _preparedPageCache.keys().next().value;
+        _preparedPageCache.delete(oldest);
       }
     } catch (_) {}
   }
@@ -123,90 +140,180 @@ export function createUI(opts) {
    * @returns {Promise<void>}
    */
   async function renderPage(raw, hashAnchor) {
-    let data, pagePath, anchor
+    let data, pagePath, anchor;
     try {
-      ({ data, pagePath, anchor } = await fetchPageData(raw, contentBase))
+      ({ data, pagePath, anchor } = await fetchPageData(raw, contentBase));
     } catch (e) {
       // Treat expected 'no page data' failures as warnings when the
       // consumer has elected to use the inline not-found fallback
       // (i.e. `notFoundPage` is unset). Preserve error-level logs for
       // unexpected failures.
-      const msg = e?.message ? String(e.message) : ''
-      const expectedMissing = (!notFoundPage || typeof notFoundPage !== 'string' || !notFoundPage) && /no page data/i.test(msg)
+      const msg = e?.message ? String(e.message) : "";
+      const expectedMissing =
+        (!notFoundPage || typeof notFoundPage !== "string" || !notFoundPage) &&
+        /no page data/i.test(msg);
       try {
         if (expectedMissing) {
-          try { debugWarn('[nimbi-cms] fetchPageData (expected missing)', e) } catch (err) {}
+          try {
+            debugWarn("[nimbi-cms] fetchPageData (expected missing)", e);
+          } catch (err) {}
         } else {
-          try { debugError('[nimbi-cms] fetchPageData failed', e) } catch (err) {}
+          try {
+            debugError("[nimbi-cms] fetchPageData failed", e);
+          } catch (err) {}
         }
       } catch (_e) {}
       // When hosts choose to disable a configured `notFoundPage` (set to
       // `null`) we render a small inline 404 helper. In that case the
       // sidebar/nav TOC should be hidden so the page doesn't show stale
       // navigation for a missing route.
-      try { if (!notFoundPage && navWrap) _clearElement(navWrap) } catch (err) {}
-      renderNotFound(contentWrap, t, e)
-      return
+      try {
+        if (!notFoundPage && navWrap) _clearElement(navWrap);
+      } catch (err) {}
+      renderNotFound(contentWrap, t, e);
+      return;
     }
-    if (!anchor && hashAnchor) anchor = hashAnchor
+    if (!anchor && hashAnchor) anchor = hashAnchor;
 
-    try { scrollToAnchorOrTop(null) } catch (_) { debugWarn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
-    try { _clearElement(contentWrap) } catch (e) { try { contentWrap.innerHTML = '' } catch (_) {} }
+    try {
+      scrollToAnchorOrTop(null);
+    } catch (_) {
+      debugWarn("[nimbi-cms] scrollToAnchorOrTop failed", _);
+    }
+    try {
+      _clearElement(contentWrap);
+    } catch (e) {
+      try {
+        contentWrap.innerHTML = "";
+      } catch (_) {}
+    }
 
-    const preparedKey = `${String(pagePath ?? '')}|||${_pageContentSignature(data)}`
-    const preparedCached = _cacheGetPrepared(preparedKey)
+    const preparedKey = `${String(pagePath ?? "")}|||${_pageContentSignature(data)}`;
+    const preparedCached = _cacheGetPrepared(preparedKey);
 
-    let article, parsed, toc, topH1, h1Text, slugKey
+    let article, parsed, toc, topH1, h1Text, slugKey;
     if (preparedCached?.articleTemplate) {
-      article = preparedCached.articleTemplate.cloneNode(true)
-      toc = preparedCached.tocTemplate ? preparedCached.tocTemplate.cloneNode(true) : null
-      topH1 = article.querySelector('h1')
-      h1Text = topH1 ? (topH1.textContent || '').trim() : (preparedCached.h1Text || '')
-      slugKey = preparedCached.slugKey || (topH1 ? (topH1.id || '') : '')
-      parsed = { meta: Object.assign({}, preparedCached.meta || {}) }
+      article = preparedCached.articleTemplate.cloneNode(true);
+      toc = preparedCached.tocTemplate
+        ? preparedCached.tocTemplate.cloneNode(true)
+        : null;
+      topH1 = article.querySelector("h1");
+      h1Text = topH1
+        ? (topH1.textContent || "").trim()
+        : preparedCached.h1Text || "";
+      slugKey = preparedCached.slugKey || (topH1 ? topH1.id || "" : "");
+      parsed = { meta: Object.assign({}, preparedCached.meta || {}) };
     } else {
-      ({ article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase))
+      ({ article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(
+        t,
+        data,
+        pagePath,
+        anchor,
+        contentBase,
+      ));
       _cacheSetPrepared(preparedKey, {
         articleTemplate: article.cloneNode(true),
         tocTemplate: toc ? toc.cloneNode(true) : null,
         meta: Object.assign({}, parsed?.meta || {}),
-        h1Text: h1Text || '',
-        slugKey: slugKey || ''
-      })
+        h1Text: h1Text || "",
+        slugKey: slugKey || "",
+      });
     }
 
-    applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
-
-    try { _clearElement(navWrap) } catch (e) { try { navWrap.innerHTML = '' } catch (_) {} }
-    if (toc) {
-      navWrap.appendChild(toc)
-      attachTocClickHandler(toc)
-    }
-
-    try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { debugWarn('[nimbi-cms] transformHtml hooks failed', e) }
-
-    contentWrap.appendChild(article)
-
-    if (allowEmbeddedScripts) {
-      try { executeEmbeddedScripts(article) } catch (e) { debugWarn('[nimbi-cms] executeEmbeddedScripts failed', e) }
-    }
-
-    try { attachImagePreview(article, { t }) } catch (e) { debugWarn('[nimbi-cms] attachImagePreview failed', e) }
+    applyPageMeta(
+      t,
+      initialDocumentTitle,
+      parsed,
+      toc,
+      article,
+      pagePath,
+      anchor,
+      topH1,
+      h1Text,
+      slugKey,
+      data,
+    );
 
     try {
-      setEagerForAboveFoldImages(container, 100, false)
-      requestAnimationFrame(() => setEagerForAboveFoldImages(container, 100, false))
-      setTimeout(() => setEagerForAboveFoldImages(container, 100, false), 250)
+      _clearElement(navWrap);
     } catch (e) {
-      debugWarn('[nimbi-cms] setEagerForAboveFoldImages failed', e)
+      try {
+        navWrap.innerHTML = "";
+      } catch (_) {}
+    }
+    if (toc) {
+      navWrap.appendChild(toc);
+      attachTocClickHandler(toc);
     }
 
-    scrollToAnchorOrTop(anchor)
-    ensureScrollTopButton(article, topH1, { mountOverlay, container, navWrap, t })
+    try {
+      await runHooks("transformHtml", {
+        article,
+        parsed,
+        toc,
+        pagePath,
+        anchor,
+        topH1,
+        h1Text,
+        slugKey,
+        data,
+      });
+    } catch (e) {
+      debugWarn("[nimbi-cms] transformHtml hooks failed", e);
+    }
 
-    try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { debugWarn('[nimbi-cms] onPageLoad hooks failed', e) }
+    contentWrap.appendChild(article);
 
-    currentPagePath = pagePath
+    if (allowEmbeddedScripts) {
+      try {
+        executeEmbeddedScripts(article);
+      } catch (e) {
+        debugWarn("[nimbi-cms] executeEmbeddedScripts failed", e);
+      }
+    }
+
+    try {
+      attachImagePreview(article, { t });
+    } catch (e) {
+      debugWarn("[nimbi-cms] attachImagePreview failed", e);
+    }
+
+    try {
+      setEagerForAboveFoldImages(container, 100, false);
+      requestAnimationFrame(() =>
+        setEagerForAboveFoldImages(container, 100, false),
+      );
+      setTimeout(() => setEagerForAboveFoldImages(container, 100, false), 250);
+    } catch (e) {
+      debugWarn("[nimbi-cms] setEagerForAboveFoldImages failed", e);
+    }
+
+    scrollToAnchorOrTop(anchor);
+    ensureScrollTopButton(article, topH1, {
+      mountOverlay,
+      container,
+      navWrap,
+      t,
+    });
+
+    try {
+      await runHooks("onPageLoad", {
+        data,
+        pagePath,
+        anchor,
+        article,
+        toc,
+        topH1,
+        h1Text,
+        slugKey,
+        contentWrap,
+        navWrap,
+      });
+    } catch (e) {
+      debugWarn("[nimbi-cms] onPageLoad hooks failed", e);
+    }
+
+    currentPagePath = pagePath;
   }
 
   /**
@@ -219,26 +326,34 @@ export function createUI(opts) {
     // that another render is desired and return. When the active render
     // completes it will re-run `renderByQuery` to pick up the latest URL.
     if (_isRendering) {
-      _queuedRender = true
-      return
+      _queuedRender = true;
+      return;
     }
-    _isRendering = true
+    _isRendering = true;
     try {
-      try { incrementCounter('renderByQuery') } catch (_) {}
-      let parsed = parseHrefToRoute(location.href)
+      try {
+        incrementCounter("renderByQuery");
+      } catch (_) {}
+      let parsed = parseHrefToRoute(location.href);
       // If the path-style URL equals the site's content base (repo subpath)
       // treat it as the site root so the configured `homePage` is used
       // instead of attempting to resolve a page with the same name as
       // the repo folder (which produces duplicated subpath probes).
       try {
-        if (parsed?.type === 'path' && parsed?.page && contentBase) {
+        if (parsed?.type === "path" && parsed?.page && contentBase) {
           try {
-            const cb = (typeof contentBase === 'string') ? new URL(contentBase, location.href).pathname : ''
-            const cbNorm = String(cb ?? '').replace(/^\/+|\/+$/g, '')
-            const parsedNorm = String(parsed.page ?? '').replace(/^\/+|\/+$/g, '')
+            const cb =
+              typeof contentBase === "string"
+                ? new URL(contentBase, location.href).pathname
+                : "";
+            const cbNorm = String(cb ?? "").replace(/^\/+|\/+$/g, "");
+            const parsedNorm = String(parsed.page ?? "").replace(
+              /^\/+|\/+$/g,
+              "",
+            );
             if (cbNorm && parsedNorm === cbNorm) {
               // Null out the parsed page so later logic falls back to `homePage`
-              parsed.page = null
+              parsed.page = null;
             }
           } catch (_e) {}
         }
@@ -246,40 +361,56 @@ export function createUI(opts) {
       // If a path-style URL was used (e.g. /slug) convert it to the
       // canonical `?page=slug[...]` form so the rest of the pipeline only
       // sees the approved patterns. Use replaceState so we don't reload.
-      if (parsed?.type === 'path' && parsed?.page) {
+      if (parsed?.type === "path" && parsed?.page) {
         try {
-          let out = '?page=' + encodeURIComponent(parsed.page || '')
-          if (parsed.params) out += (out.includes('?') ? '&' : '?') + parsed.params
-          if (parsed.anchor) out += '#' + encodeURIComponent(parsed.anchor)
-          try { history.replaceState(history.state, '', out) } catch (e) { try { history.replaceState({}, '', out) } catch (_e) {} }
-          parsed = parseHrefToRoute(location.href)
-        } catch (e) { /* ignore replace failures */ }
+          let out = "?page=" + encodeURIComponent(parsed.page || "");
+          if (parsed.params)
+            out += (out.includes("?") ? "&" : "?") + parsed.params;
+          if (parsed.anchor) out += "#" + encodeURIComponent(parsed.anchor);
+          try {
+            history.replaceState(history.state, "", out);
+          } catch (e) {
+            try {
+              history.replaceState({}, "", out);
+            } catch (_e) {}
+          }
+          parsed = parseHrefToRoute(location.href);
+        } catch (e) {
+          /* ignore replace failures */
+        }
       }
-      const raw = parsed?.page ? parsed.page : homePage
-      const hashAnchor = parsed?.anchor ? parsed.anchor : null
-      await renderPage(raw, hashAnchor)
+      const raw = parsed?.page ? parsed.page : homePage;
+      const hashAnchor = parsed?.anchor ? parsed.anchor : null;
+      await renderPage(raw, hashAnchor);
     } catch (e) {
-      debugWarn('[nimbi-cms] renderByQuery failed', e)
-      try { if (!notFoundPage && navWrap) _clearElement(navWrap) } catch (err) {}
-      renderNotFound(contentWrap, t, e)
+      debugWarn("[nimbi-cms] renderByQuery failed", e);
+      try {
+        if (!notFoundPage && navWrap) _clearElement(navWrap);
+      } catch (err) {}
+      renderNotFound(contentWrap, t, e);
     } finally {
-      _isRendering = false
+      _isRendering = false;
       if (_queuedRender) {
-        _queuedRender = false
-        try { await renderByQuery() } catch (e) { /* ignore re-run errors */ }
+        _queuedRender = false;
+        try {
+          await renderByQuery();
+        } catch (e) {
+          /* ignore re-run errors */
+        }
       }
     }
   }
 
-  window.addEventListener('popstate', renderByQuery)
-  window.addEventListener('hashchange', renderByQuery)
+  window.addEventListener("popstate", renderByQuery);
+  window.addEventListener("hashchange", renderByQuery);
 
   /**
    * Compute the sessionStorage key used to persist scroll position
    * for the current URL.
    * @returns {string}
    */
-  const scrollStoreKey = () => `nimbi-cms-scroll:${location.pathname}${location.search}`
+  const scrollStoreKey = () =>
+    `nimbi-cms-scroll:${location.pathname}${location.search}`;
 
   /**
    * Persist current scroll position for the page into sessionStorage.
@@ -287,17 +418,17 @@ export function createUI(opts) {
    */
   const saveScrollPosition = () => {
     try {
-      const containerEl = container || document.querySelector('.nimbi-cms')
-      if (!containerEl) return
+      const containerEl = container || document.querySelector(".nimbi-cms");
+      if (!containerEl) return;
       const data = {
         top: containerEl.scrollTop || 0,
-        left: containerEl.scrollLeft || 0
-      }
-      sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data))
+        left: containerEl.scrollLeft || 0,
+      };
+      sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data));
     } catch (e) {
-      debugWarn('[nimbi-cms] save scroll position failed', e)
+      debugWarn("[nimbi-cms] save scroll position failed", e);
     }
-  }
+  };
 
   /**
    * Restore persisted scroll position from sessionStorage, if present.
@@ -305,37 +436,41 @@ export function createUI(opts) {
    */
   const restoreScrollPosition = () => {
     try {
-      const containerEl = container || document.querySelector('.nimbi-cms')
-      if (!containerEl) return
-      const stored = sessionStorage.getItem(scrollStoreKey())
-      if (!stored) return
-      const data = JSON.parse(stored)
-      if (typeof data?.top === 'number') {
-        containerEl.scrollTo({ top: data.top, left: (data.left || 0), behavior: 'auto' })
+      const containerEl = container || document.querySelector(".nimbi-cms");
+      if (!containerEl) return;
+      const stored = sessionStorage.getItem(scrollStoreKey());
+      if (!stored) return;
+      const data = JSON.parse(stored);
+      if (typeof data?.top === "number") {
+        containerEl.scrollTo({
+          top: data.top,
+          left: data.left || 0,
+          behavior: "auto",
+        });
       }
     } catch (_e) {
       /* ignore restore errors */
     }
-  }
+  };
 
-  window.addEventListener('pageshow', (event) => {
+  window.addEventListener("pageshow", (event) => {
     if (event.persisted) {
       try {
-        restoreScrollPosition()
-        setEagerForAboveFoldImages(container, 100, false)
+        restoreScrollPosition();
+        setEagerForAboveFoldImages(container, 100, false);
       } catch (e) {
-        debugWarn('[nimbi-cms] bfcache restore failed', e)
+        debugWarn("[nimbi-cms] bfcache restore failed", e);
       }
     }
-  })
+  });
 
-  window.addEventListener('pagehide', () => {
+  window.addEventListener("pagehide", () => {
     try {
-      saveScrollPosition()
+      saveScrollPosition();
     } catch (e) {
-      debugWarn('[nimbi-cms] save scroll position failed', e)
+      debugWarn("[nimbi-cms] save scroll position failed", e);
     }
-  })
+  });
 
-  return { renderByQuery, siteNav, getCurrentPagePath: () => currentPagePath }
+  return { renderByQuery, siteNav, getCurrentPagePath: () => currentPagePath };
 }

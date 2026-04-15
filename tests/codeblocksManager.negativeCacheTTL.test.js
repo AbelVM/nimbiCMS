@@ -31,16 +31,20 @@ describe('codeblocksManager negative-cache TTL retry', () => {
     expect(first).toBe(false)
 
     // Now simulate the language becoming available by resetting modules
-    // and mocking the language module before re-importing the manager.
+    // and injecting a custom importer before re-importing the manager.
     vi.resetModules()
-    vi.mock(`highlight.js/lib/languages/${name}.js`, () => ({ default: () => ({}) }), { virtual: true })
     const mod2 = await import('../src/codeblocksManager.js')
-    const { registerLanguage: reg2, SUPPORTED_HLJS_MAP: sm2, hljs: hl2 } = mod2
+    const { registerLanguage: reg2, SUPPORTED_HLJS_MAP: sm2, hljs: hl2, setLanguageImporter } = mod2
+    setLanguageImporter(async (candidate) => {
+      if (candidate === name) return { default: () => ({}) }
+      return null
+    })
     sm2.set(name, name)
     const spy = vi.spyOn(hl2, 'registerLanguage').mockImplementation(() => {})
     const ok = await reg2(name)
     expect(ok).toBe(true)
     expect(spy).toHaveBeenCalled()
+    setLanguageImporter(null)
 
     // restore timers and fetch
     vi.useRealTimers()
