@@ -38,3 +38,4 @@ workers, and extracting table-of-contents data.
 - [parseMarkdownToHtml](functions/parseMarkdownToHtml.md)
 - [setMarkdownExtensions](functions/setMarkdownExtensions.md)
 - [streamParseMarkdown](functions/streamParseMarkdown.md)
+- [teardownRendererWorkerPool](functions/teardownRendererWorkerPool.md)

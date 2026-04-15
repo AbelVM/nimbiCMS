@@ -63,7 +63,7 @@ export function rafThrottle(fn) {
   };
 }
 
-export function createRafBatcher() {
+function createRafBatcher() {
   let queue = [];
   let scheduled = false;
   return function schedule(fn) {

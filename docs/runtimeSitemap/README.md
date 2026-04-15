@@ -17,6 +17,7 @@ Generate sitemap JSON and RSS/Atom feeds from the runtime search index.
 
 ## Functions
 
+- [attachSitemapDownloadUI](functions/attachSitemapDownloadUI.md)
 - [exposeSitemapGlobals](functions/exposeSitemapGlobals.md)
 - [generateAtomXml](functions/generateAtomXml.md)
 - [generateRssXml](functions/generateRssXml.md)

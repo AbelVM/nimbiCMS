@@ -60,25 +60,15 @@ function createBuildConfig({ mode, shouldAnalyze }) {
 
   return defineConfig({
     define: defineValues,
-    worker: isUmd
-      ? {
-          format: 'es',
-          inline: true,
-          rollupOptions: {
-            output: {
-              codeSplitting: false
-            }
-          }
+    worker: {
+      format: 'es',
+      inline: true,
+      rollupOptions: {
+        output: {
+          codeSplitting: false
         }
-      : {
-          format: 'es',
-          inline: true,
-          rollupOptions: {
-            output: {
-              codeSplitting: false
-            }
-          }
-        },
+      }
+    },
     build: {
       assetsInlineLimit: 0,
       cssCodeSplit: false,
