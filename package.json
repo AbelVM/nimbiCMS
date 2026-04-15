@@ -41,7 +41,8 @@
     "prepare": "npm run build && npm run gen-dts && npm run docs",
     "check-dts": "npx tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck",
     "type-test": "npx tsd",
-    "docs": "typedoc --options typedoc.json"
+    "docs": "typedoc --options typedoc.json",
+    "benchmark": "node scripts/benchmark-cdp.js"
   },
   "dependencies": {
     "bulma": "^1.0.4",
