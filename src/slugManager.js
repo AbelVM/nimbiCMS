@@ -34,6 +34,12 @@ import { PowerSemaphore } from "performance-helpers/powerSemaphore";
 import { debugLog, debugWarn, debugError, isDebug } from "./utils/debug.js";
 import { yieldIfNeeded } from "./utils/idle.js";
 
+// Hoisted from `crawlAllMarkdown` so `ensureSlug` can yield during the
+// cooperative-crawl loop. The counter is pure state with no reason to be
+// per-call; keeping it at module scope fixes the `ReferenceError` that
+// made `yieldIfNeeded` a dead no-op.
+let crawlBatchYieldCount = 0;
+
 /**
  * Localized slug mapping entry. When multilingual sites are configured the
  * value stored for a slug may be an object with a `default` path and a
@@ -257,6 +263,8 @@ function _getSlugPool() {
 
 /**
  * Explicitly terminate and clear the slug worker pool.
+ * Uses the pool's own drain/terminate logic so in-flight tasks get a
+ * chance to complete before workers are torn down.
  * @returns {void}
  */
 export function teardownSlugWorkerPool() {
@@ -264,21 +272,11 @@ export function teardownSlugWorkerPool() {
   _slugPool = null;
   if (!pool) return;
   try {
-    const workers = Array.isArray(pool?.workers) ? pool.workers : [];
-    for (const entry of workers) {
-      try {
-        const underlying = entry?.worker?._underlying;
-        if (underlying && typeof underlying.terminate === "function") {
-          underlying.terminate();
-          continue;
-        }
-      } catch (_) {}
-      try {
-        const worker = entry?.worker;
-        if (worker && typeof worker.terminate === "function") {
-          worker.terminate();
-        }
-      } catch (_) {}
+    if (typeof pool.drain === "function") {
+      pool.drain().catch(() => {});
+    }
+    if (typeof pool.terminate === "function") {
+      pool.terminate();
     }
   } catch (e) {
     debugWarn("[slugManager] teardownSlugWorkerPool failed", e);
@@ -1653,7 +1651,13 @@ export async function buildSearchIndex(
       }
     } catch (_) {}
     if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length) {
-      paths = Array.from(allMarkdownPaths);
+      const seen = new Set(paths);
+      for (const p of allMarkdownPaths) {
+        if (!seen.has(p)) {
+          paths.push(p);
+          seen.add(p);
+        }
+      }
     }
     if (!paths.length) {
       if (mdToSlug && typeof mdToSlug.size === "number" && mdToSlug.size) {
@@ -2642,7 +2646,6 @@ export async function crawlAllMarkdown(
   }
 
   const concurrency = Math.max(1, Math.min(poolSize, 6));
-  let crawlBatchYieldCount = 0;
   while (queue.length) {
     if (queue.length > maxQueue) break;
     const batch = queue.splice(0, concurrency);

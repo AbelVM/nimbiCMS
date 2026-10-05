@@ -488,6 +488,7 @@ export async function fetchPageData(raw, contentBase) {
     /* ignore */
   }
   let anchor = null;
+  let fetchError = null;
 
   // Whether the original request explicitly referenced a .md or .html
   // resource. Used to avoid rejecting intentionally requested HTML pages.
@@ -783,7 +784,6 @@ export async function fetchPageData(raw, contentBase) {
   let data = null;
   let pagePath = null;
 
-  let fetchError = null;
   // When no explicit `notFoundPage` is configured and we don't have
   // an index mapping or slug mapping available, avoid issuing a flood
   // of network probes for guessed candidates (e.g. `bad_slug.html`,

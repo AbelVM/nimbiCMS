@@ -63,6 +63,8 @@ function _getRendererPool() {
 
 /**
  * Explicitly terminate and clear the renderer worker pool.
+ * Uses the pool's own drain/terminate logic so in-flight tasks get a
+ * chance to complete before workers are torn down.
  * @returns {void}
  */
 export function teardownRendererWorkerPool() {
@@ -70,21 +72,11 @@ export function teardownRendererWorkerPool() {
   _rendererPool = null;
   if (!pool) return;
   try {
-    const workers = Array.isArray(pool?.workers) ? pool.workers : [];
-    for (const entry of workers) {
-      try {
-        const underlying = entry?.worker?._underlying;
-        if (underlying && typeof underlying.terminate === "function") {
-          underlying.terminate();
-          continue;
-        }
-      } catch (_) {}
-      try {
-        const worker = entry?.worker;
-        if (worker && typeof worker.terminate === "function") {
-          worker.terminate();
-        }
-      } catch (_) {}
+    if (typeof pool.drain === "function") {
+      pool.drain().catch(() => {});
+    }
+    if (typeof pool.terminate === "function") {
+      pool.terminate();
     }
   } catch (e) {
     debugWarn("[markdown] teardownRendererWorkerPool failed", e);

@@ -17,15 +17,15 @@ import {
   setDefaultCrawlMaxQueue,
   setFetchConcurrency,
   setFetchNegativeCacheTTL,
-  _setAllMd,
-  slugify,
-  uniqueSlug,
-  _storeSlugMapping,
-  slugToMd,
-  mdToSlug,
-  allMarkdownPaths,
-  allMarkdownPathsSet,
-} from "./slugManager.js";
+   _setAllMd,
+   slugify,
+   uniqueSlug,
+   _storeSlugMapping,
+   slugToMd,
+   mdToSlug,
+   allMarkdownPaths,
+   allMarkdownPathsSet,
+ } from "./slugManager.js";
 import * as router from "./router.js";
 import * as markdown from "./markdown.js";
 import { refreshIndexPaths } from "./indexManager.js";
@@ -1050,21 +1050,18 @@ export async function initCMS(options = {}) {
           try {
             // Log current slug/index sizes after applying manifest + setContentBase
             try {
-              const sm2 = slugManager;
-              try {
-                debugInfo(
-                  "[nimbi-cms diagnostic] after setContentBase",
-                  () => ({
-                    manifestKeys: Object.keys(manifest ?? {}).length ?? 0,
-                    slugToMdSize: sm2?.slugToMd?.size ?? undefined,
-                    allMarkdownPathsLength:
-                      sm2?.allMarkdownPaths?.length ?? undefined,
-                    allMarkdownPathsSetSize:
-                      sm2?.allMarkdownPathsSet?.size ?? undefined,
-                    searchIndexLength: sm2?.searchIndex?.length ?? undefined,
-                  }),
-                );
-              } catch (e) {}
+              debugInfo(
+                "[nimbi-cms diagnostic] after setContentBase",
+                () => ({
+                  manifestKeys: Object.keys(manifest ?? {}).length ?? 0,
+                  slugToMdSize: slugToMd?.size ?? undefined,
+                  allMarkdownPathsLength:
+                    allMarkdownPaths?.length ?? undefined,
+                  allMarkdownPathsSetSize:
+                    allMarkdownPathsSet?.size ?? undefined,
+                  searchIndexLength: searchIndex?.length ?? undefined,
+                }),
+              );
             } catch (e) {}
           } catch (e) {}
         } catch (e) {}
@@ -1540,44 +1537,40 @@ export async function initCMS(options = {}) {
           // during nav build so initial direct page loads can probe
           // candidates (crawl/index lookups) even when no build-time
           // manifest was provided.
-          try {
-            if (typeof refreshIndexPaths === "function") {
-              try {
-                refreshIndexPaths(contentBase);
-                try {
-                  // Diagnostic: log slug/index sizes after index refresh
-                  try {
-                    const sm3 = slugManager;
-                    try {
-                      debugInfo(
-                        "[nimbi-cms diagnostic] after refreshIndexPaths",
-                        () => ({
-                          slugToMdSize:
-                            typeof sm3?.slugToMd?.size === "number"
-                              ? sm3?.slugToMd?.size
-                              : undefined,
-                          allMarkdownPathsLength: Array.isArray(
-                            sm3?.allMarkdownPaths,
-                          )
-                            ? sm3?.allMarkdownPaths.length
+           try {
+             if (typeof refreshIndexPaths === "function") {
+               try {
+                 refreshIndexPaths(contentBase);
+                 try {
+                   // Diagnostic: log slug/index sizes after index refresh
+                   try {
+                    debugInfo(
+                      "[nimbi-cms diagnostic] after refreshIndexPaths",
+                      () => ({
+                        slugToMdSize:
+                          typeof slugToMd?.size === "number"
+                            ? slugToMd?.size
                             : undefined,
-                          allMarkdownPathsSetSize:
-                            typeof sm3?.allMarkdownPathsSet?.size === "number"
-                              ? sm3?.allMarkdownPathsSet?.size
-                              : undefined,
-                        }),
-                      );
-                    } catch (e) {}
+                        allMarkdownPathsLength: Array.isArray(
+                          allMarkdownPaths,
+                        )
+                          ? allMarkdownPaths.length
+                          : undefined,
+                        allMarkdownPathsSetSize:
+                          typeof allMarkdownPathsSet?.size === "number"
+                            ? allMarkdownPathsSet?.size
+                            : undefined,
+                      }),
+                    );
                   } catch (e) {}
                 } catch (e) {}
                 // If no build-time manifest and slug maps are sparse, try using
                 // the runtime sitemap / search index exposed on `window` to
                 // populate slug->md mappings so direct URL loads can resolve.
                 try {
-                  const sm4 = slugManager;
                   const currentSize =
-                    typeof sm4?.slugToMd?.size === "number"
-                      ? sm4?.slugToMd?.size
+                    typeof slugToMd?.size === "number"
+                      ? slugToMd?.size
                       : 0;
                   // Decide whether to seed: prefer targeted seeding when the
                   // currently requested slug/path is missing, otherwise seed
@@ -1597,7 +1590,7 @@ export async function initCMS(options = {}) {
                             parsedCurrent.page
                           ) {
                             try {
-                              if (!sm4.slugToMd.has(parsedCurrent.page))
+                              if (!slugToMd.has(parsedCurrent.page))
                                 shouldSeed = true;
                             } catch (_) {}
                           } else if (
@@ -1608,8 +1601,8 @@ export async function initCMS(options = {}) {
                             try {
                               const rp = normalizePath(parsedCurrent.page);
                               if (
-                                !sm4.mdToSlug?.has?.(rp) &&
-                                !sm4.allMarkdownPathsSet?.has?.(rp)
+                                !mdToSlug?.has?.(rp) &&
+                                !allMarkdownPathsSet?.has?.(rp)
                               )
                                 shouldSeed = true;
                             } catch (_) {}
@@ -1639,7 +1632,7 @@ export async function initCMS(options = {}) {
                         try {
                           if (!it || !it.slug) continue;
                           const baseSlug = String(it.slug).split("::")[0];
-                          if (sm4.slugToMd.has(baseSlug)) continue;
+                          if (slugToMd.has(baseSlug)) continue;
                           let rawPath = it.sourcePath || it.path || null;
                           if (!rawPath && Array.isArray(resolvedIndex)) {
                             const found = (resolvedIndex || []).find(
@@ -1692,7 +1685,7 @@ export async function initCMS(options = {}) {
                           rel = normalizePath(rel);
 
                           try {
-                            sm4._storeSlugMapping(baseSlug, rel);
+                            _storeSlugMapping(baseSlug, rel);
                           } catch (_) {}
                           added++;
                         } catch (_) {}
@@ -1704,8 +1697,8 @@ export async function initCMS(options = {}) {
                             () => ({
                               added,
                               total:
-                                typeof sm4?.slugToMd?.size === "number"
-                                  ? sm4?.slugToMd?.size
+                                typeof slugToMd?.size === "number"
+                                  ? slugToMd?.size
                                   : undefined,
                             }),
                           );

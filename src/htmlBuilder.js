@@ -2601,7 +2601,10 @@ export function attachTocClickHandler(toc) {
             typeof window.renderByQuery === "function"
           ) {
             try {
-              window.renderByQuery();
+              const maybePromise = window.renderByQuery();
+              if (maybePromise && typeof maybePromise.catch === "function") {
+                maybePromise.catch(() => {});
+              }
             } catch (err) {
               debugWarn("[htmlBuilder] window.renderByQuery failed", err);
             }
@@ -2613,7 +2616,10 @@ export function attachTocClickHandler(toc) {
             }
           } else {
             try {
-              renderByQuery();
+              const maybePromise = renderByQuery();
+              if (maybePromise && typeof maybePromise.catch === "function") {
+                maybePromise.catch(() => {});
+              }
             } catch (err) {
               debugWarn("[htmlBuilder] renderByQuery failed", err);
             }
