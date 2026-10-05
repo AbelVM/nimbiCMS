@@ -63,6 +63,62 @@ function getBaseName(path) {
   return String(path ?? "").replace(/^.*\//, "");
 }
 
+function getSnapshotReverseMap(pathToSlug) {
+  const reverse = new Map();
+  try {
+    if (!pathToSlug || typeof pathToSlug !== "object") return reverse;
+    for (const [path, slug] of Object.entries(pathToSlug || {})) {
+      try {
+        if (!path || !slug) continue;
+        reverse.set(String(slug), String(path));
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return reverse;
+}
+
+function resolveActualPagePath(pagePath, snapshot) {
+  try {
+    const path = String(pagePath ?? "");
+    if (!path) return pagePath;
+    if (path.includes("/") || /\.(?:md|html?)$/i.test(path)) return path;
+    const reverse = getSnapshotReverseMap(snapshot?.pathToSlug);
+    return reverse.get(path) || pagePath;
+  } catch (_) {
+    return pagePath;
+  }
+}
+
+function getLastPathSegments(path, count = 2) {
+  try {
+    const parts = String(path ?? "").split("/").filter(Boolean);
+    if (!parts.length) return "";
+    return parts.slice(-Math.max(1, Math.min(count, parts.length))).join("/");
+  } catch (_) {
+    return String(path ?? "");
+  }
+}
+
+function getSlugForRelativePath(rel, pathToSlug) {
+  if (!rel || !pathToSlug) return null;
+  try {
+    if (pathToSlug.has(rel)) return pathToSlug.get(rel);
+  } catch (_) {}
+  const baseName = getBaseName(rel);
+  try {
+    if (baseName && pathToSlug.has(baseName)) return pathToSlug.get(baseName);
+  } catch (_) {}
+  const relSuffix = getLastPathSegments(rel, 2);
+  try {
+    for (const [key, slug] of pathToSlug.entries()) {
+      if (!key || !slug) continue;
+      if (key === rel || key === baseName) return slug;
+      if (String(key).endsWith(`/${relSuffix}`)) return slug;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function getSnapshotMap(snapshot) {
   return new Map(Object.entries(snapshot?.pathToSlug || {}));
 }
@@ -148,6 +204,7 @@ export async function rewriteAnchorsHtml(
     contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname);
   } catch (_) {}
 
+  pagePath = resolveActualPagePath(pagePath, snapshot);
   const pathToSlug = getSnapshotMap(snapshot);
   const learnedMappings = [];
   const pendingMd = new Set();
@@ -256,8 +313,7 @@ export async function rewriteAnchorsHtml(
       if (!rel) rel = homeSlug;
 
       if (!rel.endsWith(".md")) {
-        const baseName = getBaseName(rel);
-        const slug = pathToSlug.get(rel) || pathToSlug.get(baseName);
+        const slug = getSlugForRelativePath(rel, pathToSlug);
         if (slug) {
           anchor.setAttribute("href", buildPageUrl(slug));
         } else {

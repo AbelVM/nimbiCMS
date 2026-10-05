@@ -1,8 +1,12 @@
 import { it, expect, vi } from 'vitest'
 
+// The worker module id is static, but the mock factory differs per test, so
+// vi.doMock is used at runtime inside each test (Vitest 5 requires vi.mock
+// calls to be hoisted to the top level; vi.doMock is the runtime equivalent).
+
 it('parseMarkdownToHtml falls back when worker emits error event', async () => {
   vi.resetModules()
-  vi.mock('../src/worker/renderer.entry.js?worker&inline', () => ({
+  vi.doMock('../src/worker/renderer.entry.js?worker&inline', () => ({
     default: class FakeWorker {
       constructor() { this._listeners = { message: [], error: [] } }
       addEventListener(ev, h) { if (this._listeners[ev]) this._listeners[ev].push(h) }
@@ -17,7 +21,7 @@ it('parseMarkdownToHtml falls back when worker emits error event', async () => {
 
 it('parseMarkdownToHtml falls back when worker returns data.error', async () => {
   vi.resetModules()
-  vi.mock('../src/worker/renderer.entry.js?worker&inline', () => ({
+  vi.doMock('../src/worker/renderer.entry.js?worker&inline', () => ({
     default: class FakeWorker {
       constructor() { this._listeners = { message: [], error: [] } }
       addEventListener(ev, h) { if (this._listeners[ev]) this._listeners[ev].push(h) }
@@ -32,7 +36,7 @@ it('parseMarkdownToHtml falls back when worker returns data.error', async () => 
 
 it('parseMarkdownToHtml falls back on worker timeout', async () => {
   vi.resetModules()
-  vi.mock('../src/worker/renderer.entry.js?worker&inline', () => ({
+  vi.doMock('../src/worker/renderer.entry.js?worker&inline', () => ({
     default: class FakeWorker {
       constructor() { this._listeners = { message: [], error: [] } }
       addEventListener(ev, h) { if (this._listeners[ev]) this._listeners[ev].push(h) }

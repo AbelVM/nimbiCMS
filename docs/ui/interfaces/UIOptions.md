@@ -10,7 +10,7 @@
 
 ### allowEmbeddedScripts?
 
-> `optional` **allowEmbeddedScripts**: `boolean`
+> `optional` **allowEmbeddedScripts?**: `boolean`
 
 Opt-in to execute embedded scripts in rendered content. Enable only for trusted markdown sources.
 
@@ -58,7 +58,7 @@ Document title at initialization
 
 ### mountOverlay?
 
-> `optional` **mountOverlay**: `HTMLElement` \| `null`
+> `optional` **mountOverlay?**: `HTMLElement` \| `null`
 
 Optional overlay mount used by UI helpers
 

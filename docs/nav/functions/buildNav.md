@@ -62,9 +62,9 @@ Whether search UI should be rendered.
 
 ### searchIndexMode?
 
-Search index mode forwarded from initCMS.
+`"eager"` \| `"lazy"`
 
-`"eager"` | `"lazy"`
+Search index mode forwarded from initCMS.
 
 ### indexDepth?
 

@@ -6,7 +6,7 @@
 
 # Type Alias: NavBuildResult
 
-> **NavBuildResult**\<\> = `object`
+> **NavBuildResult** = `object`
 
 ## Type Parameters
 

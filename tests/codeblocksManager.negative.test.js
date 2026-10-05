@@ -22,8 +22,10 @@ describe('codeblocksManager negative-cache behavior', () => {
     // now reset modules and mock the language module to succeed
     vi.resetModules()
     // mock hljs core and the local language module to ensure registration succeeds
-    vi.mock('highlight.js/lib/core', () => ({ registerLanguage: () => {}, getLanguage: () => false }), { virtual: true })
-    vi.mock(`highlight.js/lib/languages/${name}.js`, () => ({ default: () => ({}) }), { virtual: true })
+    // vi.doMock is used here because the module id is dynamic (computed at
+    // runtime); vi.mock hoisting requires a static string.
+    vi.doMock('highlight.js/lib/core', () => ({ registerLanguage: () => {}, getLanguage: () => false }), { virtual: true })
+    vi.doMock(`highlight.js/lib/languages/${name}.js`, () => ({ default: () => ({}) }), { virtual: true })
     const mod2 = await import('../src/codeblocksManager.js')
     const { SUPPORTED_HLJS_MAP, registerLanguage: reg2, hljs } = mod2
     // allow candidate via supported map

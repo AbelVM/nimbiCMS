@@ -28,6 +28,7 @@ import {
 import { setEagerForAboveFoldImages } from "./utils/helpers.js";
 import { applyPageMeta } from "./seoManager.js";
 import { attachImagePreview } from "./imagePreview.js";
+import { observeCodeBlocks } from "./codeblocksManager.js";
 import { debugWarn, debugError, incrementCounter } from "./utils/debug.js";
 import { notFoundPage } from "./slugManager.js";
 
@@ -264,6 +265,12 @@ export function createUI(opts) {
 
     contentWrap.appendChild(article);
 
+    try {
+      observeCodeBlocks(article);
+    } catch (e) {
+      debugWarn("[nimbi-cms] observeCodeBlocks failed", e);
+    }
+
     if (allowEmbeddedScripts) {
       try {
         executeEmbeddedScripts(article);
@@ -280,10 +287,9 @@ export function createUI(opts) {
 
     try {
       setEagerForAboveFoldImages(container, 100, false);
-      requestAnimationFrame(() =>
-        setEagerForAboveFoldImages(container, 100, false),
-      );
-      setTimeout(() => setEagerForAboveFoldImages(container, 100, false), 250);
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => setEagerForAboveFoldImages(container, 100, false));
+      }
     } catch (e) {
       debugWarn("[nimbi-cms] setEagerForAboveFoldImages failed", e);
     }

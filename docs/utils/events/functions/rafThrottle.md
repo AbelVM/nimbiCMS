@@ -16,14 +16,4 @@
 
 ## Returns
 
-> (...`args`): `void`
-
-### Parameters
-
-#### args
-
-...`any`[]
-
-### Returns
-
-`void`
+(...`args`) => `void`

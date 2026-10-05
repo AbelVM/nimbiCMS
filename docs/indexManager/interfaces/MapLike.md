@@ -8,7 +8,7 @@
 
 ## Properties
 
-### set()
+### set
 
 > **set**: (`arg0`, `arg1`) => `any`
 
@@ -28,7 +28,7 @@
 
 ***
 
-### values()
+### values
 
 > **values**: () => `Iterable`\<`any`\>
 

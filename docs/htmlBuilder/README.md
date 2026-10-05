@@ -19,10 +19,12 @@ prepare content for rendering inside the UI.
 
 ## Functions
 
+- [\_buildAnchorWorkerSnapshot](functions/buildAnchorWorkerSnapshot.md)
 - [\_computeSlug](functions/computeSlug.md)
 - [\_ensureLanguages](functions/ensureLanguages.md)
 - [\_parseHtml](functions/parseHtml.md)
 - [\_parseMarkdown](functions/parseMarkdown.md)
+- [\_resolveSlugForWorkerPath](functions/resolveSlugForWorkerPath.md)
 - [attachTocClickHandler](functions/attachTocClickHandler.md)
 - [buildTocElement](functions/buildTocElement.md)
 - [createNavTree](functions/createNavTree.md)

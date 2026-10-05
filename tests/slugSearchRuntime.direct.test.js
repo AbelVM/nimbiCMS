@@ -44,6 +44,113 @@ describe('slugSearchRuntime direct branches', () => {
     expect(slugs.some((s) => s.includes('::b-section'))).toBe(true)
   })
 
+  it('buildSearchIndex discovers markdown links when raw markdown is fetched from seed paths', async () => {
+    global.fetch = vi.fn(async (url) => {
+      const u = asUrl(url)
+      if (/\/content\/$/.test(u)) {
+        return mkRes(true, '<html></html>')
+      }
+      if (/\/content\/navigation\.md$/.test(u)) {
+        return mkRes(true, '[Docs](docs/README.md)\n[Home](index.md)')
+      }
+      if (/\/content\/docs\/README\.md$/.test(u)) {
+        return mkRes(true, '# Docs Title\n\nDocs body')
+      }
+      if (/\/content\/index\.md$/.test(u)) {
+        return mkRes(true, '# Index Title\n\nIndex body')
+      }
+      return mkRes(false, '')
+    })
+
+    const runtime = await import('../src/slugSearchRuntime.js')
+    const idx = await runtime.buildSearchIndex('/content/', 1, undefined, [
+      'navigation.md',
+    ])
+    const paths = idx.map((x) => x.path)
+    const slugs = idx.map((x) => x.slug)
+
+    expect(paths).toContain('docs/README.md')
+    expect(slugs).toContain('docs-title')
+    expect(slugs).toContain('index-title')
+  })
+
+  it('buildSearchIndex treats root-relative markdown links as content-root paths from a nested source page', async () => {
+    global.fetch = vi.fn(async (url) => {
+      const u = asUrl(url)
+      if (/\/content\/$/.test(u)) return mkRes(true, '<html></html>')
+      if (/\/content\/assets\/navigation\.md$/.test(u)) {
+        return mkRes(
+          true,
+          '# Nav\n\n[Home](assets/brochure.md)\n[API](docs/README.md)',
+        )
+      }
+      if (/\/content\/assets\/brochure\.md$/.test(u))
+        return mkRes(true, '# Brochure\n\nContent')
+      if (/\/content\/docs\/README\.md$/.test(u))
+        return mkRes(true, '# Docs\n\nContent')
+      return mkRes(false, '')
+    })
+
+    const runtime = await import('../src/slugSearchRuntime.js')
+    const idx = await runtime.buildSearchIndex('/content/', 1, undefined, [
+      'assets/navigation.md',
+    ])
+    const paths = idx.map((x) => x.path).sort()
+
+    expect(paths).toEqual(
+      expect.arrayContaining(['assets/navigation.md', 'assets/brochure.md', 'docs/README.md']),
+    )
+  })
+
+  it('buildSearchIndex discovers extensionless links by probing likely .md/.html candidates', async () => {
+    global.fetch = vi.fn(async (url) => {
+      const u = asUrl(url)
+      if (/\/content\/$/.test(u)) {
+        return mkRes(
+          true,
+          '<a href="extensionless">Extensionless</a><a href="sub/">Subdir</a>',
+        )
+      }
+      if (/\/content\/extensionless\.md$/.test(u))
+        return mkRes(true, '# Extensionless Title\n\nBody')
+      if (/\/content\/sub\/$/.test(u))
+        return mkRes(true, '<a href="inner">Inner</a>')
+      if (/\/content\/sub\/inner\.html$/.test(u))
+        return mkRes(
+          true,
+          '<html><head><title>Inner Title</title></head><body><p>Body</p></body></html>',
+        )
+      return mkRes(false, '')
+    })
+
+    const runtime = await import('../src/slugSearchRuntime.js')
+    const idx = await runtime.buildSearchIndex('/content/', 1)
+    const slugs = idx.map((x) => x.slug)
+
+    expect(slugs).toContain('extensionless-title')
+    expect(slugs).toContain('inner-title')
+  })
+
+  it('ignores asset links when building search index', async () => {
+    global.fetch = vi.fn(async (url) => {
+      const u = asUrl(url)
+      if (/\/content\/$/.test(u)) {
+        return mkRes(true, '<a href="assets/lighthouse.png">Image</a><a href="about">About</a>')
+      }
+      if (/\/content\/about\.md$/.test(u)) return mkRes(true, '# About\n\nBody')
+      return mkRes(false, '')
+    })
+
+    const runtime = await import('../src/slugSearchRuntime.js')
+    const idx = await runtime.buildSearchIndex('/content/', 1)
+    const urls = global.fetch.mock.calls.map((c) => asUrl(c[0]))
+
+    expect(idx.map((x) => x.slug)).toContain('about')
+    expect(urls.some((u) => /lighthouse\.png\.md$/.test(u))).toBe(false)
+    expect(urls.some((u) => /lighthouse\.png\.html$/.test(u))).toBe(false)
+    expect(urls.some((u) => /lighthouse\.png\/README\./.test(u))).toBe(false)
+  })
+
   it('reuses in-flight index promise for concurrent buildSearchIndex calls', async () => {
     global.fetch = vi.fn(async (url) => {
       const u = asUrl(url)
@@ -94,7 +201,26 @@ describe('slugSearchRuntime direct branches', () => {
 
     expect(a).toEqual(['ok'])
     expect(b).toEqual({ done: true })
-    expect(buildSearchIndexWorker).toHaveBeenCalledWith('/content/', 2, ['skip'])
+    expect(buildSearchIndexWorker).toHaveBeenCalledWith('/content/', 2, ['skip'], undefined)
     expect(awaitSearchIndex).toHaveBeenCalledWith({ timeoutMs: 10 })
+  })
+
+  it('forwards seedPaths through buildSearchIndexWorker', async () => {
+    const buildSearchIndexWorker = vi.fn(async () => ['ok'])
+    vi.doMock('../src/slugManager.js', () => ({
+      buildSearchIndexWorker,
+      awaitSearchIndex: vi.fn(async () => ({ done: true }))
+    }))
+
+    const runtime = await import('../src/slugSearchRuntime.js')
+    const seeds = ['assets/brochure.md', 'assets/navigation.md']
+    await runtime.buildSearchIndexWorker('/content/', 2, ['skip'], seeds)
+
+    expect(buildSearchIndexWorker).toHaveBeenCalledWith(
+      '/content/',
+      2,
+      ['skip'],
+      seeds,
+    )
   })
 })

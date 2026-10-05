@@ -6,7 +6,7 @@
 
 # Function: buildSearchIndexWorker()
 
-> **buildSearchIndexWorker**(`contentBase`, `indexDepth?`, `noIndexing?`): `Promise`\<`object`[]\>
+> **buildSearchIndexWorker**(`contentBase`, `indexDepth?`, `noIndexing?`, `seedPaths?`): `Promise`\<`object`[]\>
 
 ## Parameters
 
@@ -19,6 +19,10 @@
 `number` = `1`
 
 ### noIndexing?
+
+`undefined` = `undefined`
+
+### seedPaths?
 
 `undefined` = `undefined`
 

@@ -6,7 +6,7 @@
 
 # Type Alias: RendererResult
 
-> **RendererResult**\<\> = `object`
+> **RendererResult** = `object`
 
 ## Type Parameters
 
@@ -18,4 +18,4 @@
 
 ### meta?
 
-> `optional` **meta**: [`Meta`](Meta.md)
+> `optional` **meta?**: [`Meta`](Meta.md)

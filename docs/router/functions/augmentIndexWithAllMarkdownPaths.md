@@ -15,9 +15,9 @@ Used by refreshIndexPaths and map-tracking helpers.
 
 ### arrOrMap
 
-array or object providing a `values()` iterator.
+`any`[] \| `string`[] \| \{ `values`: () => `Iterable`; \}
 
-`any`[] | `string`[] | \{ `values`: () => `Iterable`; \}
+array or object providing a `values()` iterator.
 
 ## Returns
 

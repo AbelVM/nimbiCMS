@@ -571,7 +571,16 @@ export function observeCodeBlocks(root) {
   }
   const aliasMapLocal = HLJS_ALIAS_MAP;
   const ensureObserver = () => {
-    if (__hlObserver) return __hlObserver;
+    const observerRoot = effectiveRoot === document ? null : effectiveRoot;
+    if (__hlObserver && __hlObserver.root === observerRoot) return __hlObserver;
+    if (__hlObserver) {
+      try {
+        __hlObserver.disconnect();
+      } catch (err) {
+        debugWarn("[codeblocksManager] observer disconnect failed", err);
+      }
+      __hlObserver = null;
+    }
     if (typeof IntersectionObserver === "undefined") return null;
     __hlObserver = new IntersectionObserver(
       (entries, obs) => {
@@ -689,7 +698,7 @@ export function observeCodeBlocks(root) {
           })();
         });
       },
-      { root: null, rootMargin: "300px", threshold: 0.1 },
+      { root: observerRoot, rootMargin: "300px", threshold: 0.1 },
     );
     return __hlObserver;
   };

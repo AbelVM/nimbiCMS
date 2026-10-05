@@ -6,7 +6,7 @@
 
 # Type Alias: L10NMap
 
-> **L10NMap**\<\> = `object`
+> **L10NMap** = `object`
 
 ## Type Parameters
 

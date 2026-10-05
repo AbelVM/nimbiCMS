@@ -39,9 +39,9 @@ Normalized path of the page (for link rewriting).
 
 ### anchor
 
-Optional anchor to scroll to.
+`string` \| `null`
 
-`string` | `null`
+Optional anchor to scroll to.
 
 ### contentBase
 

@@ -14,9 +14,9 @@ Render sitemap JSON to XML sitemap format.
 
 ### json
 
-sitemap JSON or entries array
+`any`[] \| \{ `entries`: `any`[]; `generatedAt`: `string`; \}
 
-`any`[] | \{ `entries`: `any`[]; `generatedAt`: `string`; \}
+sitemap JSON or entries array
 
 ## Returns
 

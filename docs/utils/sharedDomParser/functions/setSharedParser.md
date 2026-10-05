@@ -14,9 +14,9 @@ Replace the shared DOMParser instance. Intended for tests or polyfills.
 
 ### parser
 
-New DOMParser instance or null to clear.
+`DOMParser` \| `null`
 
-`DOMParser` | `null`
+New DOMParser instance or null to clear.
 
 ## Returns
 

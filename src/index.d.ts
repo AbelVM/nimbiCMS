@@ -334,8 +334,8 @@ export function setIndexPathsRefreshed(value: boolean): void
 export function attachImagePreview(opts: any): void
 
 // --- from src/htmlBuilder.js
-export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
-export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
+export function preScanHtmlSlugs(opts: any): Promise<void>
+export function preMapMdSlugs(opts: any): Promise<void>
 export function executeEmbeddedScripts(article: any): void
 export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): void
 

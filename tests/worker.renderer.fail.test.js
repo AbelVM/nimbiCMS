@@ -17,6 +17,11 @@ vi.mock('highlight.js/lib/core', () => {
   }
 })
 
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). These static mocks are file-scoped and active for every test.
+vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>` , setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>` , setOptions: () => {} } }))
+vi.mock('../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
+
 function decodePosted(m) {
   if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
     try { return u82o(m) } catch (_) {}
@@ -26,14 +31,11 @@ function decodePosted(m) {
 
 describe('renderer worker register failure when hljs core missing', () => {
   let posted = []
-  beforeEach(() => {
+beforeEach(() => {
     posted = []
     rendererFailMockState.noCore = false
     globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
-    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>` , setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>` , setOptions: () => {} } }))
-    vi.mock('../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
-
     // create a local language module that would succeed if hljs present
     const langPath = path.resolve('tests/_lang_ok.mjs')
     fs.writeFileSync(langPath, 'export default function(){ return {} }', 'utf8')
@@ -53,8 +55,10 @@ describe('renderer worker register failure when hljs core missing', () => {
     try { fs.unlinkSync(globalThis._rendererFail) } catch (_) {}
     try { delete globalThis.onmessage } catch (_) {}
     try { delete globalThis.postMessage } catch (_) {}
-    vi.unmock('../src/utils/frontmatter.js')
-    vi.unmock('marked')
+    // vi.unmock is intentionally omitted: the mocks are hoisted to the top
+    // level and are file-scoped, so they are reset automatically when the
+    // module registry is torn down. (In Vitest 5 vi.unmock is also hoistable,
+    // so a nested call here would throw.)
   })
 
   it('posts register-error when hljs core is unavailable even if language module exists', async () => {

@@ -127,11 +127,7 @@ export function parseInitOptionsFromQuery(queryString) {
           ? window.location.search
           : "";
 
-    if (
-      !qs &&
-      typeof window !== "undefined" &&
-      window.location
-    ) {
+    if (!qs && typeof window !== "undefined" && window.location) {
       try {
         const parsed = parseHrefToRoute(window.location.href);
         if (parsed && parsed.params)
@@ -1061,8 +1057,10 @@ export async function initCMS(options = {}) {
                   () => ({
                     manifestKeys: Object.keys(manifest ?? {}).length ?? 0,
                     slugToMdSize: sm2?.slugToMd?.size ?? undefined,
-                    allMarkdownPathsLength: sm2?.allMarkdownPaths?.length ?? undefined,
-                    allMarkdownPathsSetSize: sm2?.allMarkdownPathsSet?.size ?? undefined,
+                    allMarkdownPathsLength:
+                      sm2?.allMarkdownPaths?.length ?? undefined,
+                    allMarkdownPathsSetSize:
+                      sm2?.allMarkdownPathsSet?.size ?? undefined,
                     searchIndexLength: sm2?.searchIndex?.length ?? undefined,
                   }),
                 );
@@ -1463,11 +1461,7 @@ export async function initCMS(options = {}) {
               shouldTrySitemap = true;
           } catch (_) {}
 
-          if (
-            shouldTrySitemap ||
-            exposeSitemap === true ||
-            (typeof window !== "undefined" && window.__nimbiExposeSitemap)
-          ) {
+          if (shouldTrySitemap) {
             try {
               // Ensure the authoritative index is built before handling
               // sitemap/rss/atom requests. This will deterministically wait
@@ -1513,35 +1507,32 @@ export async function initCMS(options = {}) {
             } catch (e) {
               /* ignore dynamic import errors */
             }
+          } else if (
+            exposeSitemap === true ||
+            (typeof window !== "undefined" && window.__nimbiExposeSitemap)
+          ) {
+            try {
+              if (
+                runtimeSitemap &&
+                typeof runtimeSitemap.exposeSitemapGlobals === "function"
+              ) {
+                try {
+                  runtimeSitemap
+                    .exposeSitemapGlobals({
+                      includeAllMarkdown: true,
+                      homePage,
+                      navigationPage,
+                      notFoundPage,
+                      contentBase,
+                      indexDepth,
+                      noIndexing,
+                    })
+                    .catch(() => {});
+                } catch (_) {}
+              }
+            } catch (_) {}
           }
 
-          // Kick off a background sitemap build to expose runtime globals so
-          // developers and diagnostic tools can inspect the final sitemap
-          // even when the page wasn't explicitly requested as `?rss`.
-          try {
-            if (
-              runtimeSitemap &&
-              typeof runtimeSitemap.exposeSitemapGlobals === "function"
-            ) {
-              // fire-and-forget; allow an indefinite wait so the
-              // background population has ample time to complete in
-              // environments where crawling/indexing may be slow.
-              try {
-                runtimeSitemap
-                  .exposeSitemapGlobals({
-                    includeAllMarkdown: true,
-                    homePage,
-                    navigationPage,
-                    notFoundPage,
-                    contentBase,
-                    indexDepth,
-                    noIndexing,
-                    waitForIndexMs: Infinity,
-                  })
-                  .catch(() => {});
-              } catch (_) {}
-            }
-          } catch (_) {}
         } catch (e) {}
 
         try {
@@ -1721,6 +1712,15 @@ export async function initCMS(options = {}) {
                         } catch (_) {}
                         try {
                           refreshIndexPaths(contentBase);
+                        } catch (_) {}
+                        try {
+                          if (
+                            typeof window !== "undefined" &&
+                            window.__nimbiUI &&
+                            typeof window.__nimbiUI.renderByQuery === "function"
+                          ) {
+                            window.__nimbiUI.renderByQuery().catch(() => {})
+                          }
                         } catch (_) {}
                       }
                     }

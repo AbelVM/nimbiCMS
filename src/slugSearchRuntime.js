@@ -94,10 +94,19 @@ async function _runWithConcurrency(
 async function _crawlAllMarkdown(
   contentBase,
   maxQueue = DEFAULT_MAX_CRAWL_QUEUE,
+  seedPaths = undefined,
 ) {
   const seenDirs = new Set();
   const found = new Set();
   const queue = [""];
+  if (Array.isArray(seedPaths)) {
+    for (const path of seedPaths) {
+      try {
+        const normalized = _sanitizePath(path);
+        if (normalized) queue.push(normalized);
+      } catch (_) {}
+    }
+  }
   const baseAbs = _toAbsoluteBase(contentBase);
   const basePath = _ensureTrailingSlash(new URL(baseAbs).pathname);
   while (queue.length && queue.length <= maxQueue) {
@@ -115,10 +124,23 @@ async function _crawlAllMarkdown(
     }
     if (!html) continue;
 
-    const hrefRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
+    const hrefs = [];
+    const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
+    const mdLinkRe = /(?:^|[^!])\[[^\]]+\]\(([^)]+)\)/g;
     let match = null;
-    while ((match = hrefRegex.exec(html))) {
-      const href = match[1];
+
+    while ((match = htmlLinkRe.exec(html))) {
+      try {
+        if (match?.[1]) hrefs.push(match[1]);
+      } catch (_) {}
+    }
+    while ((match = mdLinkRe.exec(html))) {
+      try {
+        if (match?.[1]) hrefs.push(match[1]);
+      } catch (_) {}
+    }
+
+    for (const href of hrefs) {
       if (
         !href ||
         _isExternalHref(href, baseAbs) ||
@@ -139,15 +161,78 @@ async function _crawlAllMarkdown(
         continue;
       }
 
-      if (!/\.(md|html?)($|[?#])/i.test(href)) continue;
+      if (/\.(md|html?)($|[?#])/i.test(href)) {
+        try {
+          const linkUrl = new URL(href, url);
+          let rel = linkUrl.pathname.startsWith(basePath)
+            ? linkUrl.pathname.slice(basePath.length)
+            : linkUrl.pathname.replace(/^\//, "");
+          rel = _sanitizePath(rel).split(/[?#]/)[0];
+          if (rel) {
+            found.add(rel);
+            if (!seenDirs.has(rel)) queue.push(rel);
+          }
+        } catch (_) {}
+        try {
+          const rootLinkUrl = new URL(href, baseAbs);
+          let rootRel = rootLinkUrl.pathname.startsWith(basePath)
+            ? rootLinkUrl.pathname.slice(basePath.length)
+            : rootLinkUrl.pathname.replace(/^\//, "");
+          rootRel = _sanitizePath(rootRel).split(/[?#]/)[0];
+          if (rootRel && !found.has(rootRel)) {
+            found.add(rootRel);
+            if (!seenDirs.has(rootRel)) queue.push(rootRel);
+          }
+        } catch (_) {}
+        continue;
+      }
+
+      let path = href.split(/[?#]/)[0].replace(/\/+$/, "");
+      let rootPath = null;
       try {
-        const linkUrl = new URL(href, url);
-        let rel = linkUrl.pathname.startsWith(basePath)
-          ? linkUrl.pathname.slice(basePath.length)
-          : linkUrl.pathname.replace(/^\//, "");
-        rel = _sanitizePath(rel).split(/[?#]/)[0];
-        if (rel) found.add(rel);
+        const rootUrl = new URL(href, baseAbs);
+        rootPath = rootUrl.pathname.startsWith(basePath)
+          ? rootUrl.pathname.slice(basePath.length)
+          : rootUrl.pathname.replace(/^\//, "");
       } catch (_) {}
+      try {
+        const resolved = new URL(href, url);
+        path = resolved.pathname.startsWith(basePath)
+          ? resolved.pathname.slice(basePath.length)
+          : resolved.pathname.replace(/^\//, "");
+      } catch (_) {}
+      path = _sanitizePath(path).split(/[?#]/)[0].replace(/\/+$/, "");
+      if (rootPath) {
+        rootPath = _sanitizePath(rootPath).split(/[?#]/)[0].replace(/\/+$/, "");
+      }
+      const lastSegment = String(path).split("/").pop() || "";
+      if (/\.[^./]+$/i.test(lastSegment)) continue;
+      if (path) {
+        const candidates = [
+          `${path}.md`,
+          `${path}.html`,
+          `${path}/README.md`,
+          `${path}/README.html`,
+        ];
+        for (const candidate of candidates) {
+          found.add(candidate);
+          if (!seenDirs.has(candidate)) queue.push(candidate);
+        }
+      }
+      if (rootPath && rootPath !== path) {
+        const rootCandidates = [
+          `${rootPath}.md`,
+          `${rootPath}.html`,
+          `${rootPath}/README.md`,
+          `${rootPath}/README.html`,
+        ];
+        for (const candidate of rootCandidates) {
+          if (!found.has(candidate)) {
+            found.add(candidate);
+            if (!seenDirs.has(candidate)) queue.push(candidate);
+          }
+        }
+      }
     }
   }
   return Array.from(found);
@@ -195,7 +280,7 @@ export async function buildSearchIndex(
     const seeds = Array.isArray(seedPaths)
       ? seedPaths.map((p) => _sanitizePath(p)).filter(Boolean)
       : [];
-    const discovered = await _crawlAllMarkdown(contentBase);
+    const discovered = await _crawlAllMarkdown(contentBase, DEFAULT_MAX_CRAWL_QUEUE, seeds);
     const allPaths = Array.from(new Set(discovered.concat(seeds)))
       .filter((p) => /\.(md|html?)$/i.test(p))
       .filter(
@@ -290,9 +375,15 @@ export async function buildSearchIndexWorker(
   contentBase,
   indexDepth = 1,
   noIndexing = undefined,
+  seedPaths = undefined,
 ) {
   const runtime = await getSlugRuntime();
-  return runtime.buildSearchIndexWorker(contentBase, indexDepth, noIndexing);
+  return runtime.buildSearchIndexWorker(
+    contentBase,
+    indexDepth,
+    noIndexing,
+    seedPaths,
+  );
 }
 
 export async function awaitSearchIndex(opts = {}) {

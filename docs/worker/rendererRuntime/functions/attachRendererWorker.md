@@ -16,14 +16,4 @@
 
 ## Returns
 
-> (`ev`): `Promise`\<`void`\>
-
-### Parameters
-
-#### ev
-
-`any`
-
-### Returns
-
-`Promise`\<`void`\>
+(`ev`) => `Promise`\<`void`\>

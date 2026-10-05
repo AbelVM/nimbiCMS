@@ -6,7 +6,7 @@
 
 # Type Alias: ResolutionValue
 
-> **ResolutionValue**\<\> = `object`
+> **ResolutionValue** = `object`
 
 ## Type Parameters
 

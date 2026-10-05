@@ -3,21 +3,23 @@ import { describe, it, expect, vi } from 'vitest'
 describe('markdown additional coverage', () => {
   it('imports with navigator present to exercise poolSize branch', async () => {
     vi.resetModules()
-    const origNavigator = global.navigator
+    const origNavigator = globalThis.navigator
     try {
       // simulate a browser-like environment before importing the module
       // so the top-level poolSize expression takes the navigator path
       // eslint-disable-next-line no-global-assign
-      global.navigator = { hardwareConcurrency: 8 }
+      Object.defineProperty(globalThis, 'navigator', { value: { hardwareConcurrency: 8 }, configurable: true, writable: true, enumerable: true })
       const md = await import('../src/markdown.js')
       expect(md).toBeTruthy()
       // ensure initRendererWorker can be invoked
       const w = md.initRendererWorker && md.initRendererWorker()
       expect(w !== undefined).toBe(true)
     } finally {
-      // restore
+      // restore. In Vitest 5 + jsdom 30 `navigator` is a getter-only
+      // inherited property, so assignment throws; defineProperty is the
+      // only way to put it back.
       // eslint-disable-next-line no-global-assign
-      global.navigator = origNavigator
+      Object.defineProperty(globalThis, 'navigator', { value: origNavigator, configurable: true, writable: true, enumerable: true })
     }
   })
 

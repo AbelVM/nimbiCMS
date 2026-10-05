@@ -14,9 +14,9 @@ Set a custom importer function for language modules.
 
 ### fn
 
-Importer function or `null` to clear.
+((`candidate`) => `Promise`\<`unknown`\>) \| `null`
 
-(`candidate`) => `Promise`\<`unknown`\> | `null`
+Importer function or `null` to clear.
 
 ## Returns
 

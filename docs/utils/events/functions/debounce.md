@@ -25,14 +25,4 @@ These helpers coalesce rapid events and batch DOM writes using requestAnimationF
 
 ## Returns
 
-> (...`args`): `void`
-
-### Parameters
-
-#### args
-
-...`any`[]
-
-### Returns
-
-`void`
+(...`args`) => `void`

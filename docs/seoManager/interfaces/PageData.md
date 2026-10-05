@@ -10,10 +10,10 @@
 
 ### meta?
 
-> `optional` **meta**: `Object`
+> `optional` **meta?**: `Object`
 
 ***
 
 ### raw?
 
-> `optional` **raw**: `string`
+> `optional` **raw?**: `string`

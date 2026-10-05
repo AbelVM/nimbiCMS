@@ -23,7 +23,6 @@ import {
   hljs,
   SUPPORTED_HLJS_MAP,
   registerLanguage,
-  observeCodeBlocks,
 } from "./codeblocksManager.js";
 import {
   buildPageUrl,
@@ -123,6 +122,105 @@ function resolvePathWithBase(path, base) {
       }
     }
   }
+}
+
+function resolveActualPagePath(pagePath) {
+  try {
+    const path = String(pagePath ?? "");
+    if (!path) return pagePath;
+    if (path.includes("/") || /\.(?:md|html?)$/i.test(path)) return path;
+    if (slugToMd?.has?.(path)) {
+      const mapped = slugToMd.get(path);
+      if (typeof mapped === "string") return mapped;
+      if (mapped && typeof mapped === "object") return mapped.default || path;
+    }
+  } catch (e) {}
+  return pagePath;
+}
+
+function getLastPathSegments(path, count = 2) {
+  try {
+    const parts = String(path ?? "").split("/").filter(Boolean);
+    if (!parts.length) return "";
+    return parts.slice(-Math.max(1, Math.min(count, parts.length))).join("/");
+  } catch (e) {
+    return String(path ?? "");
+  }
+}
+
+function getResolvedIndexPathToSlug() {
+  try {
+    if (typeof window === "undefined") return null;
+    let entries = null;
+    if (Array.isArray(window.__nimbiResolvedIndex)) entries = window.__nimbiResolvedIndex;
+    else if (Array.isArray(window.__nimbiSitemapFinal)) entries = window.__nimbiSitemapFinal;
+    else if (window.__nimbiSitemapJson && Array.isArray(window.__nimbiSitemapJson.entries)) {
+      entries = window.__nimbiSitemapJson.entries;
+    }
+    if (!Array.isArray(entries)) return null;
+
+    const map = new Map();
+    for (const item of entries) {
+      try {
+        if (!item || typeof item !== "object") continue;
+        let path = null;
+        if (typeof item.path === "string") path = item.path;
+        else if (typeof item.sourcePath === "string") path = item.sourcePath;
+        else if (typeof item.loc === "string") {
+          try {
+            const url = new URL(item.loc, location.href);
+            path = String(url.pathname).replace(/^\//, "");
+          } catch (_e) {
+            path = item.loc;
+          }
+        }
+        const slug = typeof item.slug === "string" ? item.slug : null;
+        if (!path || !slug) continue;
+        if (!map.has(path)) map.set(path, slug);
+        const baseName = String(path).replace(/^.*\//, "");
+        if (baseName && !map.has(baseName)) map.set(baseName, slug);
+      } catch (_) {
+        continue;
+      }
+    }
+    return map;
+  } catch (_) {
+    return null;
+  }
+}
+
+function getSlugForRelativePath(rel) {
+  if (!rel) return null;
+  try {
+    if (mdToSlug?.has?.(rel)) return mdToSlug.get(rel);
+  } catch (err) {}
+  const baseName = String(rel ?? "").replace(/^.*\//, "");
+  try {
+    if (baseName && mdToSlug?.has?.(baseName)) return mdToSlug.get(baseName);
+  } catch (err) {}
+  const resolvedIndexMap = getResolvedIndexPathToSlug();
+  try {
+    if (resolvedIndexMap?.has?.(rel)) return resolvedIndexMap.get(rel);
+    if (baseName && resolvedIndexMap?.has?.(baseName)) return resolvedIndexMap.get(baseName);
+  } catch (err) {}
+  const relSuffix = getLastPathSegments(rel, 2);
+  try {
+    for (const [slug, mapped] of slugToMd || []) {
+      let mappedPath = null;
+      if (typeof mapped === "string") mappedPath = mapped;
+      else if (mapped && typeof mapped === "object") mappedPath = mapped.default || "";
+      if (!mappedPath) continue;
+      if (mappedPath === rel || mappedPath === baseName) return slug;
+      if (mappedPath.endsWith(`/${relSuffix}`)) return slug;
+    }
+    if (resolvedIndexMap) {
+      for (const [path, slug] of resolvedIndexMap.entries()) {
+        if (path === rel || path === baseName) return slug;
+        if (String(path).endsWith(`/${relSuffix}`)) return slug;
+      }
+    }
+  } catch (err) {}
+  return null;
 }
 
 /**
@@ -426,6 +524,8 @@ function lazyLoadImages(el, pagePath, contentBase) {
  */
 function rewriteRelativeAssets(el, pagePath, contentBase) {
   try {
+    pagePath = resolveActualPagePath(pagePath);
+    pagePath = resolveActualPagePath(pagePath);
     const pageDir = pagePath?.includes("/")
       ? pagePath.substring(0, pagePath.lastIndexOf("/") + 1)
       : "";
@@ -551,6 +651,7 @@ let _lastContentBasePath = "";
  */
 async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
   try {
+    pagePath = resolveActualPagePath(pagePath);
     // default to canonical hrefs unless explicitly overridden
     opts = opts || {};
     opts.canonical = opts.canonical !== false;
@@ -674,38 +775,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
             rel = trimTrailingSlash(rel);
             if (!rel) rel = HOME_SLUG;
             if (!rel.endsWith(".md")) {
-              let slugKey = null;
-              try {
-                if (mdToSlug?.has?.(rel)) {
-                  slugKey = mdToSlug?.get?.(rel);
-                } else {
-                  try {
-                    const baseName = String(rel ?? "").replace(/^.*\//, "");
-                    if (baseName && mdToSlug?.has?.(baseName))
-                      slugKey = mdToSlug?.get?.(baseName);
-                  } catch (e) {
-                    debugWarn(
-                      "[htmlBuilder] mdToSlug baseName check failed",
-                      e,
-                    );
-                  }
-                }
-              } catch (err) {
-                debugWarn("[htmlBuilder] mdToSlug access check failed", err);
-              }
-              if (!slugKey) {
-                try {
-                  const baseName = String(rel ?? "").replace(/^.*\//, "");
-                  for (const [k, v] of slugToMd || []) {
-                    if (v === rel || v === baseName) {
-                      slugKey = k;
-                      break;
-                    }
-                  }
-                } catch (err) {
-                  /* ignore iteration errors */
-                }
-              }
+              const slugKey = getSlugForRelativePath(rel);
               if (slugKey) {
                 const urlVal = opts?.canonical
                   ? buildPageUrl(slugKey, null)
@@ -741,7 +811,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
     }
 
     if (pending.size) {
-      if (!_hbShouldProbe(contentBase)) {
+      if (!_hbShouldProbe(contentBase) || opts?.allowProbe === false) {
         try {
           debugWarn(
             "[htmlBuilder] skipping md title probes (probing disabled)",
@@ -835,7 +905,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
     }
 
     if (htmlPending.size) {
-      if (!_hbShouldProbe(contentBase)) {
+      if (!_hbShouldProbe(contentBase) || opts?.allowProbe === false) {
         try {
           debugWarn(
             "[htmlBuilder] skipping html title probes (probing disabled)",
@@ -916,12 +986,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
 
     for (const info of anchorInfo) {
       const { node: a, frag, rel } = info;
-      let slug = null;
-      try {
-        if (mdToSlug?.has?.(rel)) slug = mdToSlug?.get?.(rel);
-      } catch (err) {
-        debugWarn("[htmlBuilder] mdToSlug access failed", err);
-      }
+      let slug = getSlugForRelativePath(rel);
       if (slug) {
         const urlVal = opts?.canonical
           ? buildPageUrl(slug, frag)
@@ -936,15 +1001,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
     }
     for (const info of htmlAnchorInfo) {
       const { node: a, rel } = info;
-      let slug = null;
-      try {
-        if (mdToSlug?.has?.(rel)) slug = mdToSlug?.get?.(rel);
-      } catch (err) {
-        debugWarn(
-          "[htmlBuilder] mdToSlug access failed for htmlAnchorInfo",
-          err,
-        );
-      }
+      let slug = getSlugForRelativePath(rel);
       if (!slug) {
         try {
           const baseName = String(rel ?? "").replace(/^.*\//, "");
@@ -1129,7 +1186,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
  * @param {string} base - Base URL used for `fetchMarkdown` when resolving links.
  * @returns {Promise<void>} - Resolves when all title fetches and slug mappings have completed.
  */
-export async function preScanHtmlSlugs(linkEls, base) {
+export async function preScanHtmlSlugs(linkEls, base, opts = {}) {
   if (!linkEls || !linkEls.length) return;
 
   const htmlPaths = new Set();
@@ -1181,7 +1238,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
 
   if (!htmlPaths.size) return;
 
-  if (!_hbShouldProbe(base)) {
+  if (!_hbShouldProbe(base) || opts?.allowProbe === false) {
     try {
       debugWarn("[htmlBuilder] skipping preScanHtmlSlugs (probing disabled)");
     } catch (e) {}
@@ -1258,7 +1315,7 @@ export async function preScanHtmlSlugs(linkEls, base) {
  * @param {string} contentBase - Base URL used when resolving relative markdown paths.
  * @returns {Promise<void>} - Resolves once mapping and any title fetches are complete.
  */
-export async function preMapMdSlugs(linkEls, contentBase) {
+export async function preMapMdSlugs(linkEls, contentBase, opts = {}) {
   if (!linkEls || !linkEls.length) return;
 
   const anchorInfo = [];
@@ -1308,70 +1365,92 @@ export async function preMapMdSlugs(linkEls, contentBase) {
   }
 
   if (pending.size) {
-    if (!_hbShouldProbe(contentBase)) {
+    if (!_hbShouldProbe(contentBase) || opts?.allowProbe === false) {
       try {
         debugWarn(
           "[htmlBuilder] skipping preMapMdSlugs probes (probing disabled)",
         );
       } catch (e) {}
-    } else {
-      await Promise.all(
-        Array.from(pending).map(async (rel) => {
-          try {
-            const m = String(rel).match(/([^\/]+)\.md$/);
-            const basename = m && m[1];
-            if (basename && slugToMd.has(basename)) {
+      for (const rel of Array.from(pending)) {
+        try {
+          const m = String(rel).match(/([^\/]+)\.md$/);
+          const basename = m && m[1];
+          if (basename) {
+            const candidate = slugify(basename);
+            if (candidate) {
               try {
-                const mapped = slugToMd.get(basename);
-                if (mapped) {
-                  try {
-                    const pathVal =
-                      typeof mapped === "string"
-                        ? mapped
-                        : mapped?.default
-                          ? mapped.default
-                          : null;
-                    if (pathVal) storeSlugMapping(basename, pathVal);
-                  } catch (err) {
-                    debugWarn("[htmlBuilder] _storeSlugMapping failed", err);
-                  }
-                }
+                storeSlugMapping(candidate, rel);
               } catch (err) {
                 debugWarn(
-                  "[htmlBuilder] preMapMdSlugs slug map access failed",
+                  "[htmlBuilder] setting fallback preMapMdSlugs mapping failed",
                   err,
                 );
               }
-              return;
             }
-          } catch (err) {
-            debugWarn("[htmlBuilder] preMapMdSlugs basename check failed", err);
           }
+        } catch (err) {
+          /* ignore per-path fallback errors */
+        }
+      }
+      return;
+    }
 
-          try {
-            const mdData = await fetchMarkdown(rel, contentBase);
-            if (mdData && mdData.raw) {
-              const m2 = (mdData.raw || "").match(/^#\s+(.+)$/m);
-              if (m2 && m2[1]) {
-                const candidate = slugify(m2[1].trim());
-                if (candidate) {
-                  try {
-                    storeSlugMapping(candidate, rel);
-                  } catch (err) {
-                    debugWarn(
-                      "[htmlBuilder] preMapMdSlugs setting slug mapping failed",
-                      err,
-                    );
-                  }
+    await Promise.all(
+      Array.from(pending).map(async (rel) => {
+        try {
+          const m = String(rel).match(/([^\/]+)\.md$/);
+          const basename = m && m[1];
+          if (basename && slugToMd.has(basename)) {
+            try {
+              const mapped = slugToMd.get(basename);
+              if (mapped) {
+                try {
+                  const pathVal =
+                    typeof mapped === "string"
+                      ? mapped
+                      : mapped?.default
+                        ? mapped.default
+                        : null;
+                  if (pathVal) storeSlugMapping(basename, pathVal);
+                } catch (err) {
+                  debugWarn("[htmlBuilder] _storeSlugMapping failed", err);
+                }
+              }
+            } catch (err) {
+              debugWarn(
+                "[htmlBuilder] preMapMdSlugs slug map access failed",
+                err,
+              );
+            }
+            return;
+          }
+        } catch (err) {
+          debugWarn("[htmlBuilder] preMapMdSlugs basename check failed", err);
+        }
+
+        try {
+          const mdData = await fetchMarkdown(rel, contentBase);
+          if (mdData && mdData.raw) {
+            const m2 = (mdData.raw || "").match(/^#\s+(.+)$/m);
+            if (m2 && m2[1]) {
+              const candidate = slugify(m2[1].trim());
+              if (candidate) {
+                try {
+                  storeSlugMapping(candidate, rel);
+                } catch (err) {
+                  debugWarn(
+                    "[htmlBuilder] preMapMdSlugs setting slug mapping failed",
+                    err,
+                  );
                 }
               }
             }
-          } catch (err) {
-            debugWarn("[htmlBuilder] preMapMdSlugs fetch failed", err);
           }
-        }),
-      );
-    }
+        } catch (err) {
+          debugWarn("[htmlBuilder] preMapMdSlugs fetch failed", err);
+        }
+      }),
+    );
   }
 }
 
@@ -1776,12 +1855,6 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
   } catch (err) {
     debugWarn("[htmlBuilder] processing code elements failed", err);
   }
-  try {
-    observeCodeBlocks(article);
-  } catch (err) {
-    debugWarn("[htmlBuilder] observeCodeBlocks failed", err);
-  }
-
   lazyLoadImages(article, pagePath, contentBase);
 
   try {
@@ -2147,19 +2220,41 @@ function _resolveSlugForWorkerPath(candidate) {
     const baseName = String(candidate).replace(/^.*\//, "");
     if (baseName && mdToSlug?.has?.(baseName)) return mdToSlug.get(baseName);
   } catch (_) {}
+  const resolvedIndexMap = getResolvedIndexPathToSlug();
+  try {
+    if (resolvedIndexMap?.has?.(candidate)) return resolvedIndexMap.get(candidate);
+    const baseName = String(candidate).replace(/^.*\//, "");
+    if (baseName && resolvedIndexMap?.has?.(baseName)) return resolvedIndexMap.get(baseName);
+  } catch (_) {}
+  const candidateSuffix = getLastPathSegments(candidate, 2);
   try {
     for (const [slug, mapped] of slugToMd || []) {
       if (mapped === candidate) return slug;
       const baseName = String(candidate).replace(/^.*\//, "");
       if (mapped === baseName) return slug;
-      if (mapped && typeof mapped === "object") {
+      if (typeof mapped === "string") {
+        if (mapped.endsWith(`/${candidateSuffix}`)) return slug;
+      } else if (mapped && typeof mapped === "object") {
         if (mapped.default === candidate || mapped.default === baseName)
+          return slug;
+        if (mapped.default && mapped.default.endsWith(`/${candidateSuffix}`))
           return slug;
         const langs =
           mapped.langs && typeof mapped.langs === "object"
             ? Object.values(mapped.langs)
             : [];
         if (langs.includes(candidate) || langs.includes(baseName)) return slug;
+        for (const langPath of langs) {
+          if (typeof langPath === "string" && langPath.endsWith(`/${candidateSuffix}`))
+            return slug;
+        }
+      }
+    }
+    if (resolvedIndexMap) {
+      for (const [path, slug] of resolvedIndexMap.entries()) {
+        const baseName = String(candidate).replace(/^.*\//, "");
+        if (path === candidate || path === baseName) return slug;
+        if (String(path).endsWith(`/${candidateSuffix}`)) return slug;
       }
     }
   } catch (_) {}
@@ -2167,6 +2262,7 @@ function _resolveSlugForWorkerPath(candidate) {
 }
 
 function _buildAnchorWorkerSnapshot(article, contentBase, pagePath) {
+  pagePath = resolveActualPagePath(pagePath);
   const candidates = new Set();
   let contentBasePath = "/";
   try {
@@ -2279,6 +2375,7 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   if (!w) throw new Error("anchor worker unavailable");
   if (!article || typeof article.innerHTML !== "string")
     throw new Error("invalid article element");
+  pagePath = resolveActualPagePath(pagePath);
   const html = String(article.innerHTML);
   const snapshot = _buildAnchorWorkerSnapshot(article, contentBase, pagePath);
   const res = await _sendToAnchorWorker({
@@ -2302,8 +2399,12 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
       }
     }
   }
+  let shouldRetryWithMainThread = false;
   if (typeof rewrittenHtml === "string") {
     try {
+      const outputContainsMd = String(rewrittenHtml ?? "").includes(".md");
+      const inputContainsMd = String(html ?? "").includes(".md");
+      if (inputContainsMd && outputContainsMd) shouldRetryWithMainThread = true;
       const _parser2 = getSharedParser && getSharedParser();
       if (_parser2) {
         const doc = _parser2.parseFromString(
@@ -2333,6 +2434,15 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
       }
     } catch (e) {
       debugWarn("[htmlBuilder] applying rewritten anchors failed", e);
+      shouldRetryWithMainThread = true;
+    }
+  }
+
+  if (shouldRetryWithMainThread) {
+    try {
+      await rewriteAnchors(article, contentBase, pagePath);
+    } catch (err) {
+      debugWarn("[htmlBuilder] main-thread fallback after worker rewrite failed", err);
     }
   }
 }
@@ -2397,7 +2507,7 @@ export { computeSlug as _computeSlug };
  * Worker-based anchor rewrite helper export.
  * @returns {Worker|null}
  */
-export { rewriteAnchorsWorker as _rewriteAnchorsWorker };
+export { rewriteAnchorsWorker as _rewriteAnchorsWorker, _buildAnchorWorkerSnapshot, _resolveSlugForWorkerPath };
 
 /**
  * Attach a click handler to a generated TOC so clicks perform SPA navigation.

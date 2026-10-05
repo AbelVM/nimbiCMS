@@ -10,22 +10,22 @@
 
 ### module?
 
-> `optional` **module**: `unknown`
+> `optional` **module?**: `unknown`
 
 ***
 
 ### ok?
 
-> `optional` **ok**: `boolean`
+> `optional` **ok?**: `boolean`
 
 ***
 
 ### promise?
 
-> `optional` **promise**: `Promise`\<`unknown`\>
+> `optional` **promise?**: `Promise`\<`unknown`\>
 
 ***
 
 ### ts?
 
-> `optional` **ts**: `number`
+> `optional` **ts?**: `number`

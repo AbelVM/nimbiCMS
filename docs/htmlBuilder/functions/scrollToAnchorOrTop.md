@@ -14,9 +14,9 @@ Scroll to a specific anchor ID inside the CMS container or to top.
 
 ### anchor
 
-Element id (without '#') or null to scroll to top.
+`string` \| `null`
 
-`string` | `null`
+Element id (without '#') or null to scroll to top.
 
 ## Returns
 

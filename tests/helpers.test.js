@@ -75,6 +75,27 @@ describe('utils helpers', () => {
     expect(preloadLink.href).toContain('example.com/foo.png')
   })
 
+  it('setEagerForAboveFoldImages only marks the first above-fold image eager', () => {
+    const container = document.createElement('div')
+    const img1 = document.createElement('img')
+    img1.src = 'https://example.com/a.png'
+    img1.getBoundingClientRect = () => ({ top: 0, height: 100, bottom: 100 })
+    const img2 = document.createElement('img')
+    img2.src = 'https://example.com/b.png'
+    img2.getBoundingClientRect = () => ({ top: 0, height: 100, bottom: 100 })
+    container.appendChild(img1)
+    container.appendChild(img2)
+
+    setEagerForAboveFoldImages(container)
+
+    expect(img1.getAttribute('loading')).toBe('eager')
+    expect(img1.getAttribute('fetchpriority')).toBe('high')
+    expect(img1.getAttribute('data-eager-by-nimbi')).toBe('1')
+    expect(img2.getAttribute('loading')).toBe('lazy')
+    expect(img2.getAttribute('fetchpriority')).not.toBe('high')
+    expect(img2.getAttribute('data-eager-by-nimbi')).toBeNull()
+  })
+
   it('setEagerForAboveFoldImages handles getComputedStyle throwing', () => {
     const original = window.getComputedStyle
     window.getComputedStyle = () => { throw new Error('boom') }

@@ -6,7 +6,7 @@
 
 # Type Alias: SitemapJson
 
-> **SitemapJson**\<\> = `object`
+> **SitemapJson** = `object`
 
 ## Type Parameters
 

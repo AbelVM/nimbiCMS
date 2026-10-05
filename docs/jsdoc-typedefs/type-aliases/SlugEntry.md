@@ -6,7 +6,7 @@
 
 # Type Alias: SlugEntry
 
-> **SlugEntry**\<\> = `object`
+> **SlugEntry** = `object`
 
 ## Type Parameters
 
@@ -14,8 +14,8 @@
 
 ### default?
 
-> `optional` **default**: `string`
+> `optional` **default?**: `string`
 
 ### langs?
 
-> `optional` **langs**: `Record`\<`string`, `string`\>
+> `optional` **langs?**: `Record`\<`string`, `string`\>

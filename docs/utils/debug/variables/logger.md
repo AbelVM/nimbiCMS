@@ -6,6 +6,6 @@
 
 # Variable: \_logger
 
-> `const` **\_logger**: `any`
+> `const` **\_logger**: `PowerLogger`
 
 Shared logger instance (starts disabled at level 0).

@@ -14,7 +14,8 @@ import {
   _computeSlug,
   rewriteAnchors,
   rewriteAnchors as _rewriteAnchors,
-  rewriteAnchorsWorker
+  rewriteAnchorsWorker,
+  _buildAnchorWorkerSnapshot
 } from '../src/htmlBuilder.js'
 import { slugify, slugToMd, mdToSlug, searchIndex } from '../src/slugManager.js'
 import * as slugMgr from '../src/slugManager.js'
@@ -42,6 +43,10 @@ describe('htmlBuilder utilities', () => {
     mdToSlug.clear()
     // clear any search index state from prior tests
     searchIndex.splice(0)
+    // clear any resolved index state from prior tests
+    delete globalThis.__nimbiResolvedIndex
+    delete globalThis.__nimbiSitemapFinal
+    delete globalThis.__nimbiSitemapJson
     // remove any leftover container or scroll button elements from prior runs
     document.querySelectorAll('.nimbi-cms, .nimbi-scroll-top').forEach(el => el.remove())
   })
@@ -99,6 +104,16 @@ describe('htmlBuilder utilities', () => {
     await preMapMdSlugs(anchors, 'http://example.com/base/')
     expect(slugToMd.get('foo-title')).toBe('foo.md')
     expect(slugToMd.get('another')).toBe('sub/bar.md')
+  })
+
+  it('builds worker anchor snapshot pathToSlug from resolved index entries', () => {
+    globalThis.__nimbiResolvedIndex = [
+      { path: 'docs/bulmaManager/README.md', slug: 'bulmamanager' },
+    ]
+    const article = document.createElement('article')
+    article.innerHTML = '<a href="bulmaManager/README.md">bulmaManager</a>'
+    const snapshot = _buildAnchorWorkerSnapshot(article, 'http://example.com/', 'docs/README.md')
+    expect(snapshot.pathToSlug['docs/bulmaManager/README.md']).toBe('bulmamanager')
   })
 
   it('parseHtml returns html and toc entries', () => {

@@ -3,18 +3,18 @@ import { it, expect, vi } from 'vitest'
 // Integration-style test: ensure `initCMS` actually uses the provided
 // `navigationPage` when fetching the navigation markdown. We mock only
 // the modules that `init.js` interacts with so the test runs in-node.
+//
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). These static mocks are file-scoped and active for every test.
 
-vi.resetModules()
+vi.mock('../src/bulmaManager.js', () => ({ ensureBulma: async () => {}, setStyle: () => {}, registerThemedElement: () => {} }))
+vi.mock('../src/markdown.js', async () => ({ parseMarkdownToHtml: async (md) => ({ html: String(md ?? '') }), detectFenceLanguages: () => new Set(), addMarkdownExtension: () => {} }))
+vi.mock('../src/router.js', () => ({ setResolutionCacheTtl: () => {}, setResolutionCacheMax: () => {}, RESOLUTION_CACHE_TTL: 0, RESOLUTION_CACHE_MAX: 0 }))
+vi.mock('../src/nav.js', () => ({ buildNav: async (wrap, container) => ({ navbar: document.createElement('nav'), linkEls: [] }) }))
+vi.mock('../src/ui.js', () => ({ createUI: () => ({ renderByQuery: async () => {} }) }))
 
 it('initCMS fetches configured navigationPage (option)', async () => {
   const fetched = []
-
-  // Mock other modules used by init.js to avoid DOM-heavy behavior
-  vi.mock('../src/bulmaManager.js', () => ({ ensureBulma: async () => {}, setStyle: () => {}, registerThemedElement: () => {} }))
-  vi.mock('../src/markdown.js', async () => ({ parseMarkdownToHtml: async (md) => ({ html: String(md ?? '') }), detectFenceLanguages: () => new Set(), addMarkdownExtension: () => {} }))
-  vi.mock('../src/router.js', () => ({ setResolutionCacheTtl: () => {}, setResolutionCacheMax: () => {}, RESOLUTION_CACHE_TTL: 0, RESOLUTION_CACHE_MAX: 0 }))
-  vi.mock('../src/nav.js', () => ({ buildNav: async (wrap, container) => ({ navbar: document.createElement('nav'), linkEls: [] }) }))
-  vi.mock('../src/ui.js', () => ({ createUI: () => ({ renderByQuery: async () => {} }) }))
 
   // Provide a simple DOM mount
   document.body.innerHTML = '<div id="app"></div>'
@@ -37,12 +37,6 @@ it('initCMS fetches configured navigationPage (option)', async () => {
 it('initCMS respects navigationPage URL override when allowed', async () => {
   const fetched = []
   vi.resetModules()
-
-  vi.mock('../src/bulmaManager.js', () => ({ ensureBulma: async () => {}, setStyle: () => {}, registerThemedElement: () => {} }))
-  vi.mock('../src/markdown.js', async () => ({ parseMarkdownToHtml: async (md) => ({ html: String(md ?? '') }), detectFenceLanguages: () => new Set(), addMarkdownExtension: () => {} }))
-  vi.mock('../src/router.js', () => ({ setResolutionCacheTtl: () => {}, setResolutionCacheMax: () => {}, RESOLUTION_CACHE_TTL: 0, RESOLUTION_CACHE_MAX: 0 }))
-  vi.mock('../src/nav.js', () => ({ buildNav: async (wrap, container) => ({ navbar: document.createElement('nav'), linkEls: [] }) }))
-  vi.mock('../src/ui.js', () => ({ createUI: () => ({ renderByQuery: async () => {} }) }))
 
   const origHref = window.location.href
   try {

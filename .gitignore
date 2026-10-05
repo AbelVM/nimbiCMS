@@ -24,6 +24,7 @@ Thumbs.db
 # Vite cache
 .vite/
 node_modules/.vite/
+.zvec-grep/
 
 # Coverage
 coverage/
@@ -50,3 +51,10 @@ benchmarks/*.json
 tools/audit/*.json
 dot/
 bundle-analysis.html
+benchmarks/reports/
+benchmarks/profiles/
+.github/
+.vscode/
+eslint-plugin-nimbi-debug/
+tools/
+verbose/

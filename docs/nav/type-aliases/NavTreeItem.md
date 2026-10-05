@@ -6,7 +6,7 @@
 
 # Type Alias: NavTreeItem
 
-> **NavTreeItem**\<\> = `object`
+> **NavTreeItem** = `object`
 
 ## Type Parameters
 
@@ -14,11 +14,11 @@
 
 ### children?
 
-> `optional` **children**: `NavTreeItem`[]
+> `optional` **children?**: `NavTreeItem`[]
 
 ### isIndex?
 
-> `optional` **isIndex**: `boolean`
+> `optional` **isIndex?**: `boolean`
 
 ### name
 

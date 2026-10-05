@@ -4,7 +4,12 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 ## Unreleased
 
-- ...
+- **[CHORE]** Bump dependencies and dev-dependencies to the latest versions
+  - **Vitest 5** (`vitest`, `@vitest/coverage-v8`): test files updated to hoist `vi.mock`/`vi.doMock` calls to the top level, as Vitest 5 makes nested mocks a hard error. `clearMocks` pinned to `false` to preserve existing mock-call-history behavior.
+  - **TypeScript 7** (`typescript`): type-checked with TS 7 via a side-by-side compiler setup (`typescript7`), keeping `typescript` on 6.x for `typedoc`, which still requires the TS 6 compiler API. `tsconfig.json` uses `moduleResolution: "Bundler"` and `check-dts` runs with `--ignoreConfig`.
+  - **jsdom 30**, **cssnano 9** (+ `postcss-discard-duplicates` 9, `postcss-merge-rules` 9), **puppeteer 25** (with the required `await` on `executablePath()`), **marked 18.1.0**, plus minor/patch bumps across the toolchain.
+- **[TEST]** Fix `slugWorker.unit.test.js` to pass the 4-arg `buildSearchIndex` signature (`contentBase, indexDepth, noIndexing, seedPaths`) introduced in the source.
+- **[TEST]** Fix `markdown.coverage.extra.test.js` to set `navigator` via `Object.defineProperty`, which is required under jsdom 30 (the property is getter-only).
 
 ## V1.1.0 Extreme Makeover
 
@@ -15,7 +20,11 @@ Brand new architecture on top of [performance-helpers](https://abelvm.github.io/
 - Leaner bundles
 - Less potential bugs
 
+- **[FIX]** Code highlighting regression
+- **[FIX]** Indexing regression
 - **[FEAT]** Gate the execution of external scripts in the pages with `executeEmbeddedScripts` option
+- **[FEAT]** Added `lighthouse` benchmarks to avoid performance regressions
+- **[CHORE]** Bump dependencies and dev-dependencies to latest versions
 
 ## v1.0.8
 
@@ -44,7 +53,7 @@ Brand new architecture on top of [performance-helpers](https://abelvm.github.io/
 - **[PERF]** Reuse DOMParser
 - **[PERF]** Memoize expensive transforms and metrics
 - **[PERF]** Use Sets/Maps for membership checks
-- **[PERF]** Batch DOM updates
+- **[PERF]** Batch DOM updatesnpm install
 - **[PERF]** Gate expensive debug/log formatting
 - **[PERF]** Fetch caching & dedupe
 - **[PERF]** Negative cache for dynamic imports

@@ -10,55 +10,55 @@
 
 ### allowEmbeddedScripts?
 
-> `optional` **allowEmbeddedScripts**: `boolean`
+> `optional` **allowEmbeddedScripts?**: `boolean`
 
 ***
 
 ### allowUrlPathOverrides?
 
-> `optional` **allowUrlPathOverrides**: `boolean`
+> `optional` **allowUrlPathOverrides?**: `boolean`
 
 ***
 
 ### availableLanguages?
 
-> `optional` **availableLanguages**: `string`[]
+> `optional` **availableLanguages?**: `string`[]
 
 ***
 
 ### bulmaCustomize?
 
-> `optional` **bulmaCustomize**: `string`
+> `optional` **bulmaCustomize?**: `string`
 
 ***
 
 ### cacheMaxEntries?
 
-> `optional` **cacheMaxEntries**: `number`
+> `optional` **cacheMaxEntries?**: `number`
 
 ***
 
 ### cacheTtlMinutes?
 
-> `optional` **cacheTtlMinutes**: `number`
+> `optional` **cacheTtlMinutes?**: `number`
 
 ***
 
 ### contentPath?
 
-> `optional` **contentPath**: `string`
+> `optional` **contentPath?**: `string`
 
 ***
 
 ### crawlMaxQueue?
 
-> `optional` **crawlMaxQueue**: `number`
+> `optional` **crawlMaxQueue?**: `number`
 
 ***
 
 ### defaultStyle?
 
-> `optional` **defaultStyle**: `"light"` \| `"dark"` \| `"system"`
+> `optional` **defaultStyle?**: `"light"` \| `"dark"` \| `"system"`
 
 ***
 
@@ -70,64 +70,64 @@
 
 ### exposeSitemap?
 
-> `optional` **exposeSitemap**: `boolean`
+> `optional` **exposeSitemap?**: `boolean`
 
 ***
 
 ### homePage?
 
-> `optional` **homePage**: `string`
+> `optional` **homePage?**: `string`
 
 ***
 
 ### l10nFile?
 
-> `optional` **l10nFile**: `string` \| `null`
+> `optional` **l10nFile?**: `string` \| `null`
 
 ***
 
 ### lang?
 
-> `optional` **lang**: `string`
+> `optional` **lang?**: `string`
 
 ***
 
 ### manifest?
 
-> `optional` **manifest**: `Object`
+> `optional` **manifest?**: `Object`
 
 ***
 
 ### markdownExtensions?
 
-> `optional` **markdownExtensions**: `Record`\<`string`, `unknown`\>[]
+> `optional` **markdownExtensions?**: `Record`\<`string`, `unknown`\>[]
 
 ***
 
 ### notFoundPage?
 
-> `optional` **notFoundPage**: `string` \| `null`
+> `optional` **notFoundPage?**: `string` \| `null`
 
 ***
 
 ### searchIndex?
 
-> `optional` **searchIndex**: `boolean`
+> `optional` **searchIndex?**: `boolean`
 
 ***
 
 ### searchIndexMode?
 
-> `optional` **searchIndexMode**: `"eager"` \| `"lazy"`
+> `optional` **searchIndexMode?**: `"eager"` \| `"lazy"`
 
 ***
 
 ### seoMap?
 
-> `optional` **seoMap**: `Object`
+> `optional` **seoMap?**: `Object`
 
 ***
 
 ### skipRootReadme?
 
-> `optional` **skipRootReadme**: `boolean`
+> `optional` **skipRootReadme?**: `boolean`

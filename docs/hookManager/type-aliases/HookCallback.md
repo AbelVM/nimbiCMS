@@ -4,9 +4,9 @@
 
 [nimbi-cms](../../README.md) / [hookManager](../README.md) / HookCallback
 
-# Type Alias: HookCallback()
+# Type Alias: HookCallback
 
-> **HookCallback**\<\> = (`ctx`) => `void` \| `Promise`\<`void`\>
+> **HookCallback** = (`ctx`) => `void` \| `Promise`\<`void`\>
 
 ## Type Parameters
 

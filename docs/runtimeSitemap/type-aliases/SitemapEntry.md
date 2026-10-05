@@ -6,7 +6,7 @@
 
 # Type Alias: SitemapEntry
 
-> **SitemapEntry**\<\> = `object`
+> **SitemapEntry** = `object`
 
 ## Type Parameters
 
@@ -14,19 +14,19 @@
 
 ### \_titleSource?
 
-> `optional` **\_titleSource**: `string`
+> `optional` **\_titleSource?**: `string`
 
 ### baseSlug?
 
-> `optional` **baseSlug**: `string`
+> `optional` **baseSlug?**: `string`
 
 ### excerpt?
 
-> `optional` **excerpt**: `string`
+> `optional` **excerpt?**: `string`
 
 ### lastmod?
 
-> `optional` **lastmod**: `string`
+> `optional` **lastmod?**: `string`
 
 ### loc
 
@@ -38,8 +38,8 @@
 
 ### sourcePath?
 
-> `optional` **sourcePath**: `string`
+> `optional` **sourcePath?**: `string`
 
 ### title?
 
-> `optional` **title**: `string`
+> `optional` **title?**: `string`

@@ -10,22 +10,22 @@
 
 ### renderer?
 
-> `optional` **renderer**: `Object`
+> `optional` **renderer?**: `Object`
 
 ***
 
 ### tokenizer?
 
-> `optional` **tokenizer**: `Function`
+> `optional` **tokenizer?**: `Function`
 
 ***
 
 ### transform?
 
-> `optional` **transform**: `Function`
+> `optional` **transform?**: `Function`
 
 ***
 
 ### walkTokens?
 
-> `optional` **walkTokens**: `Function`
+> `optional` **walkTokens?**: `Function`

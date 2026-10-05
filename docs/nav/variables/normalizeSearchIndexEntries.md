@@ -4,7 +4,7 @@
 
 [nimbi-cms](../../README.md) / [nav](../README.md) / normalizeSearchIndexEntries
 
-# Variable: normalizeSearchIndexEntries()
+# Variable: normalizeSearchIndexEntries
 
 > `const` **normalizeSearchIndexEntries**: (`entries`) => `any`[] = `normalizeSearchIndexEntriesMut`
 

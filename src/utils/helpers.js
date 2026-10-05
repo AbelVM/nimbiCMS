@@ -243,12 +243,12 @@ export function setEagerForAboveFoldImages(
 
     let foundAboveFold = false;
     let firstVisibleImage = null;
+    let hasMarkedEagerImage = false;
 
     imgs.forEach((img) => {
       try {
         const beforeLoading = img.getAttribute?.("loading");
-        if (beforeLoading !== "eager" && img.setAttribute)
-          img.setAttribute("loading", "lazy");
+        const explicitEager = beforeLoading === "eager";
 
         const rect = img?.getBoundingClientRect
           ? img.getBoundingClientRect()
@@ -266,7 +266,7 @@ export function setEagerForAboveFoldImages(
           effectiveBottom >= visibleTop,
         );
 
-        if (isAboveFold) {
+        if (isAboveFold && !hasMarkedEagerImage) {
           if (img.setAttribute) {
             img.setAttribute("loading", "eager");
             img.setAttribute("fetchpriority", "high");
@@ -277,29 +277,35 @@ export function setEagerForAboveFoldImages(
           }
           preloadImage(src);
           foundAboveFold = true;
+          hasMarkedEagerImage = true;
+        } else if (!explicitEager && img.setAttribute) {
+          img.setAttribute("loading", "lazy");
         }
 
         if (!firstVisibleImage && rect?.top <= visibleBottom) {
-          firstVisibleImage = { img, src, rect, beforeLoading };
+          firstVisibleImage = { img, src, rect, beforeLoading, explicitEager };
         }
       } catch (err) {
         debugWarn("[helpers] setEagerForAboveFoldImages per-image failed", err);
       }
     });
 
-    if (!foundAboveFold && firstVisibleImage) {
-      const { img, src, rect, beforeLoading } = firstVisibleImage;
-      try {
-        if (img.setAttribute) {
-          img.setAttribute("loading", "eager");
-          img.setAttribute("fetchpriority", "high");
-          img.setAttribute("data-eager-by-nimbi", "1");
-        } else {
-          img.loading = "eager";
-          img.fetchPriority = "high";
+    if (!hasMarkedEagerImage && firstVisibleImage) {
+      const { img, src, explicitEager } = firstVisibleImage;
+      if (!explicitEager) {
+        try {
+          if (img.setAttribute) {
+            img.setAttribute("loading", "eager");
+            img.setAttribute("fetchpriority", "high");
+            img.setAttribute("data-eager-by-nimbi", "1");
+          } else {
+            img.loading = "eager";
+            img.fetchPriority = "high";
+          }
+          hasMarkedEagerImage = true;
+        } catch (err) {
+          debugWarn("[helpers] setEagerForAboveFoldImages fallback failed", err);
         }
-      } catch (err) {
-        debugWarn("[helpers] setEagerForAboveFoldImages fallback failed", err);
       }
     }
   } catch (err) {

@@ -304,9 +304,10 @@ globSync('src/**/*.js').forEach(file => {
   // pre-split source lines once for comment indexing
   const srcLines = src.split('\n')
   comments.forEach(c => {
-    if (!c.line) return
+    const commentLine = c.line || (Array.isArray(c.source) && c.source[0] && c.source[0].number)
+    if (!commentLine) return
     // compute position of the start of the comment based on line number
-    const idx = srcLines.slice(0, c.line - 1).join('\n').length
+    const idx = srcLines.slice(0, commentLine - 1).join('\n').length
     let endIdx = src.indexOf('*/', idx)
     if (endIdx === -1) {
       endIdx = idx

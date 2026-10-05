@@ -6,7 +6,7 @@
 
 # Type Alias: ArticleResult
 
-> **ArticleResult**\<\> = `object`
+> **ArticleResult** = `object`
 
 ## Type Parameters
 

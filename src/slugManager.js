@@ -8,7 +8,13 @@
 
 import * as l10n from "./l10nManager.js";
 import { refreshIndexPaths, isIndexPathsRefreshed } from "./indexManager.js";
-import { setAllMarkdownPaths, slugToMd, mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from "./slugState.js";
+import {
+  setAllMarkdownPaths,
+  slugToMd,
+  mdToSlug,
+  allMarkdownPaths,
+  allMarkdownPathsSet,
+} from "./slugState.js";
 import { parseHrefToRoute } from "./utils/urlHelper.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import {
@@ -297,7 +303,8 @@ export function initSlugWorker() {
 
 function _sendToWorker(msg) {
   const w = initSlugWorker?.();
-  if (!w) return Promise.reject(new Error("slug worker required but unavailable"));
+  if (!w)
+    return Promise.reject(new Error("slug worker required but unavailable"));
   return _getSlugPool()
     .postMessage(msg, undefined, { awaitResponse: true, timeout: 5000 })
     .then((result) => {
@@ -322,6 +329,7 @@ export async function buildSearchIndexWorker(
   contentBase,
   indexDepth = 1,
   noIndexing = undefined,
+  seedPaths = undefined,
 ) {
   const w = initSlugWorker?.();
   if (!w) throw new Error("slug worker required but unavailable");
@@ -330,6 +338,7 @@ export async function buildSearchIndexWorker(
     contentBase,
     indexDepth,
     noIndexing,
+    seedPaths,
   });
 }
 
@@ -372,9 +381,11 @@ export function _storeSlugMapping(slug, rel) {
       const firstSeg = parts[0];
       // Modernized: use Set for availableLanguages if array is large
       const isLang = Array.isArray(availableLanguages)
-        ? (availableLanguages.length > 8
-            ? (availableLanguages._set ||= new Set(availableLanguages)).has(firstSeg)
-            : availableLanguages.includes(firstSeg))
+        ? availableLanguages.length > 8
+          ? (availableLanguages._set ||= new Set(availableLanguages)).has(
+              firstSeg,
+            )
+          : availableLanguages.includes(firstSeg)
         : false;
       let entry = slugToMd.get(slug);
       if (!entry || typeof entry === "string") {
@@ -515,7 +526,11 @@ export function removeSlugResolver(fn) {
  * Reverse mapping of `slugToMd` (markdown path -> slug).
  * @type {Map<string,string>}
  */
-export { mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from "./slugState.js";
+export {
+  mdToSlug,
+  allMarkdownPaths,
+  allMarkdownPathsSet,
+} from "./slugState.js";
 
 let _allMd = {};
 
@@ -751,9 +766,11 @@ export function setContentBase(contentBase) {
               const firstSeg = parts[0];
               // Modernized: use Set for availableLanguages if array is large
               const isLang = Array.isArray(availableLanguages)
-                ? (availableLanguages.length > 8
-                    ? (availableLanguages._set ||= new Set(availableLanguages)).has(firstSeg)
-                    : availableLanguages.includes(firstSeg))
+                ? availableLanguages.length > 8
+                  ? (availableLanguages._set ||= new Set(
+                      availableLanguages,
+                    )).has(firstSeg)
+                  : availableLanguages.includes(firstSeg)
                 : false;
               let entry = slugToMd.get(slugKey);
               if (!entry || typeof entry === "string") {
@@ -1731,7 +1748,29 @@ export async function buildSearchIndex(
                     href = pageDirForLinks + href;
                   }
                   href = normalizePath(href);
-                  if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue;
+                  if (!href || href.startsWith("#") || href.startsWith("?")) continue;
+
+                  if (!/\.(md|html?)(?:$|[?#])/i.test(href)) {
+                    const hrefBase = href.split(/[?#]/)[0].replace(/\/+$/, "");
+                    const lastSegment = String(hrefBase).split("/").pop() || "";
+                    if (/\.[^./]+$/i.test(lastSegment)) continue;
+                    const candidates = [
+                      `${hrefBase}.md`,
+                      `${hrefBase}.html`,
+                      `${hrefBase}/README.md`,
+                      `${hrefBase}/README.html`,
+                    ];
+                    for (const candidate of candidates) {
+                      if (!candidate || isExcluded(candidate)) continue;
+                      if (!visited.has(candidate)) {
+                        visited.add(candidate);
+                        queue.push(candidate);
+                        paths.push(candidate);
+                      }
+                    }
+                    continue;
+                  }
+
                   href = href.split(/[?#]/)[0];
                   if (isExcluded(href)) continue;
                   if (!visited.has(href)) {
@@ -2700,6 +2739,16 @@ export async function crawlAllMarkdown(
               path = normalizePath(path);
               if (/\.(md|html?)$/i.test(path)) {
                 result.add(path);
+              } else {
+                const hrefBase = path.split(/[?#]/)[0].replace(/\/+$/, "");
+                const lastSegment = String(hrefBase).split("/").pop() || "";
+                if (/\.[^./]+$/i.test(lastSegment)) continue;
+                if (hrefBase) {
+                  result.add(`${hrefBase}.md`);
+                  result.add(`${hrefBase}.html`);
+                  result.add(`${hrefBase}/README.md`);
+                  result.add(`${hrefBase}/README.html`);
+                }
               }
             } catch (err) {
               debugLog(

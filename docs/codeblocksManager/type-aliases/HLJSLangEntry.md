@@ -6,7 +6,7 @@
 
 # Type Alias: HLJSLangEntry
 
-> **HLJSLangEntry**\<\> = `object`
+> **HLJSLangEntry** = `object`
 
 ## Type Parameters
 
@@ -14,8 +14,8 @@
 
 ### aliases?
 
-> `optional` **aliases**: `string`[]
+> `optional` **aliases?**: `string`[]
 
 ### name?
 
-> `optional` **name**: `string`
+> `optional` **name?**: `string`

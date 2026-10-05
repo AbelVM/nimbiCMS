@@ -10,7 +10,7 @@
 
 ## Type Declaration
 
-### debugError()
+### debugError
 
 > **debugError**: (...`args`) => `void`
 
@@ -24,7 +24,7 @@
 
 `void`
 
-### debugInfo()
+### debugInfo
 
 > **debugInfo**: (...`args`) => `void`
 
@@ -38,7 +38,7 @@
 
 `void`
 
-### debugLog()
+### debugLog
 
 > **debugLog**: (...`args`) => `void`
 
@@ -52,7 +52,7 @@
 
 `void`
 
-### debugWarn()
+### debugWarn
 
 > **debugWarn**: (...`args`) => `void`
 
@@ -66,7 +66,7 @@
 
 `void`
 
-### getDebugCounters()
+### getDebugCounters
 
 > **getDebugCounters**: () => `Record`\<`string`, `number`\>
 
@@ -74,7 +74,7 @@
 
 `Record`\<`string`, `number`\>
 
-### getDebugLevel()
+### getDebugLevel
 
 > **getDebugLevel**: () => `number`
 
@@ -82,7 +82,7 @@
 
 `number`
 
-### incrementCounter()
+### incrementCounter
 
 > **incrementCounter**: (`name`) => `void`
 
@@ -96,7 +96,7 @@
 
 `void`
 
-### isDebug()
+### isDebug
 
 > **isDebug**: () => `boolean`
 
@@ -104,7 +104,7 @@
 
 `boolean`
 
-### isDebugLevel()
+### isDebugLevel
 
 > **isDebugLevel**: (`level?`) => `boolean`
 
@@ -118,7 +118,7 @@
 
 `boolean`
 
-### resetDebugCounters()
+### resetDebugCounters
 
 > **resetDebugCounters**: () => `void`
 
@@ -128,7 +128,7 @@ Reset all counters.
 
 `void`
 
-### setDebugLevel()
+### setDebugLevel
 
 > **setDebugLevel**: (`level`) => `void`
 

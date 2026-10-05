@@ -4,6 +4,11 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 import { u82o } from '../node_modules/performance-helpers/src/helpers/powerBuffer.js'
 
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). These static mocks are file-scoped and active for every test.
+vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: { foo: 'bar' } }) }))
+vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} } }))
+
 function decodePosted(m) {
   if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
     try { return u82o(m) } catch (_) {}
@@ -17,8 +22,6 @@ describe('renderer worker edges', () => {
     posted = []
     globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
-    vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: { foo: 'bar' } }) }))
-    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} } }))
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
     let rewritten = src.replace(/(^|\n)onmessage\s*=\s*/g, '$1globalThis.onmessage = ')
     rewritten = rewritten.replace("./rendererRuntime.js", "../../src/worker/rendererRuntime.js")
@@ -30,8 +33,10 @@ describe('renderer worker edges', () => {
     try { delete globalThis.onmessage } catch (_) {}
     try { delete globalThis.postMessage } catch (_) {}
     try { fs.unlinkSync(globalThis._rendererEdgeModule) } catch(_) {}
-    vi.unmock('../../src/utils/frontmatter.js')
-    vi.unmock('marked')
+    // vi.unmock is intentionally omitted: the mocks are hoisted to the top
+    // level and are file-scoped, so they are reset automatically when the
+    // module registry is torn down. (In Vitest 5 vi.unmock is also hoistable,
+    // so a nested call here would throw.)
   })
 
   it('posts result containing meta when frontmatter present', async () => {
@@ -44,8 +49,10 @@ describe('renderer worker edges', () => {
   })
 
   it('register posts register-error when ensureHljs fails', async () => {
-    // simulate ensureHljs failing by mocking CDN core import to throw
-    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => { throw new Error('no core') }, { virtual: true })
+    // simulate ensureHljs failing by mocking CDN core import to throw.
+    // vi.doMock is used (not vi.mock) because the factory differs per test
+    // and must be applied at runtime rather than hoisted at file load.
+    vi.doMock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => { throw new Error('no core') }, { virtual: true })
     const mod = await import(pathToFileURL(globalThis._rendererEdgeModule).href)
     await globalThis.onmessage({ data: { type: 'register', name: 'x', url: 'https://example.com/lang.js' } })
     const last = posted[posted.length - 1]

@@ -6,6 +6,6 @@
 
 # Type Alias: LanguageImportCacheMap
 
-> **LanguageImportCacheMap**\<\> = `Map`\<`string`, [`LanguageImportCacheEntry`](../interfaces/LanguageImportCacheEntry.md)\>
+> **LanguageImportCacheMap** = `Map`\<`string`, [`LanguageImportCacheEntry`](../interfaces/LanguageImportCacheEntry.md)\>
 
 ## Type Parameters

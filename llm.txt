@@ -1,0 +1,66 @@
+# nimbiCMS — Machine-Readable Project Summary
+
+## Identity
+- **name**: nimbi-cms
+- **version**: 1.1.0
+- **description**: Lightweight CMS client for static sites with Bulma UI and search/indexing features
+- **author**: Abel Vázquez Montoro
+- **license**: MIT
+- **repo**: https://github.com/AbelVM/nimbiCMS
+- **homepage**: https://abelvm.github.io/nimbiCMS/
+- **type**: ESM
+- **source**: plain JavaScript (no TS in src/)
+- **types**: generated `src/index.d.ts` from JSDoc via `scripts/gen-dts.js`
+
+## Runtime Requirements
+- **Node**: 22+ (cssnano 9 / postcss 9 require Node 22)
+- **engines.node**: ">=16" (stale; intentionally untouched for semver safety)
+
+## Key Scripts
+| script | command | purpose |
+|--------|---------|---------|
+| test | `npx vitest run` | 799 tests, jsdom 30 |
+| test:coverage | `npx vitest run --coverage` | V8 coverage |
+| lint | `eslint src` | 0 errors target |
+| build | `npm run build:lib && npm run build:umd` | ESM + CJS + UMD |
+| gen-dts | `node scripts/gen-dts.js` | generate types from JSDoc |
+| check-dts | `node node_modules/typescript7/bin/tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck --ignoreConfig` | TS 7 type check |
+| docs | `typedoc --options typedoc.json` | TypeDoc (TS 6 API) |
+| prepare | `npm run build && npm run gen-dts && npm run docs` | CI entry point |
+| benchmark:lighthouse | `node benchmarks/benchmark-lighthouse.js` | Lighthouse benchmarks |
+
+## Dependency State (2026-10-05)
+- **Vitest**: 5.0.3
+- **@vitest/coverage-v8**: 5.0.3
+- **TypeScript**: 6.0.3 (side-by-side with 7.0.2 via `typescript7` alias)
+- **jsdom**: 30
+- **cssnano**: 9
+- **postcss-discard-duplicates**: 9
+- **postcss-merge-rules**: 9
+- **puppeteer**: 25
+- **marked**: 18.1.0
+- **typedoc**: 0.28.20 (crashes under TS 7; requires TS 6 API)
+- **tsd**: 0.33.0 (bundles its own TS 5.9.2)
+- **vulnerabilities**: 11 (down from 48)
+
+## Critical Patterns
+- **TS 7 aliasing**: `"typescript": "npm:@typescript/typescript6@^6.0.2"` + `"typescript7": "npm:typescript@^7.0.2"` in package.json
+- **Vitest 5 mocking**: `vi.mock`/`vi.doMock` must be top-level; `clearMocks: false` in vitest.config.js
+- **jsdom 30 navigator**: use `Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true, enumerable: true })`
+- **puppeteer 25**: `executablePath()` returns Promise; must `await`
+- **src/index.d.ts**: generated; never edit by hand
+
+## Known Issues
+- `npm run type-test` fails: `src/index.test-d.ts` does not exist (pre-existing)
+- `tests/nav/buildNav.more-branches.test.js` timing-flaky under parallel load
+- `engines.node: ">=16"` stale (real minimum Node 22+)
+- `benchmark` script points to deleted `scripts/benchmark-cdp.js`
+
+## Verification
+```bash
+npm ci && npm run build && npm run gen-dts && npm run check-dts && npm test && npm run lint && npm run docs && npm run prepare
+```
+Expected: 0 errors, 799 passed / 0 failed.
+
+## See Also
+- `AGENTS.md` — full operational guide with conventions, do-not-do list, and upgrade notes.

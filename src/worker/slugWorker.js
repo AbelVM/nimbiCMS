@@ -39,9 +39,14 @@ onmessage = async (ev) => {
   };
   try {
     if (msg.type === "buildSearchIndex") {
-      const { contentBase, indexDepth, noIndexing } = msg;
+      const { contentBase, indexDepth, noIndexing, seedPaths } = msg;
       try {
-        const res = await buildSearchIndex(contentBase, indexDepth, noIndexing);
+        const res = await buildSearchIndex(
+          contentBase,
+          indexDepth,
+          noIndexing,
+          seedPaths,
+        );
         _reply(res);
       } catch (e) {
         _replyErr(e);
@@ -71,9 +76,14 @@ onmessage = async (ev) => {
 export async function handleSlugWorkerMessage(msg) {
   try {
     if (msg.type === "buildSearchIndex") {
-      const { id, contentBase, indexDepth, noIndexing } = msg;
+      const { id, contentBase, indexDepth, noIndexing, seedPaths } = msg;
       try {
-        const res = await buildSearchIndex(contentBase, indexDepth, noIndexing);
+        const res = await buildSearchIndex(
+          contentBase,
+          indexDepth,
+          noIndexing,
+          seedPaths,
+        );
         return { id, result: res };
       } catch (e) {
         return { id, error: String(e) };

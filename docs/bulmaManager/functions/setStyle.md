@@ -23,9 +23,9 @@ applied to `document.documentElement` to support global/UMD usage.
 
 ### style
 
-chosen theme mode.
+`"light"` \| `"dark"` \| `"system"`
 
-`"light"` | `"dark"` | `"system"`
+chosen theme mode.
 
 ## Returns
 

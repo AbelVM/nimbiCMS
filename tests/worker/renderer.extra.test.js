@@ -4,6 +4,11 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 import { u82o } from '../../node_modules/performance-helpers/src/helpers/powerBuffer.js'
 
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). The factory is static, so it is safe to keep active for the whole
+// file.
+vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
+
 function decodePosted(m) {
   if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
     try { return u82o(m) } catch (_) {}
@@ -17,7 +22,6 @@ describe('renderer worker extra', () => {
     posted = []
     globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
-    vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
     // prepare a fake language module
     const langMod = `export default function(hljs) { return { name: 'fake' } }`;
     const langPath = path.resolve('tests/worker/_fake_lang.mjs')
@@ -38,7 +42,10 @@ describe('renderer worker extra', () => {
     try { delete globalThis.postMessage } catch (_) {}
     try { fs.unlinkSync(path.resolve('tests/worker/_fake_lang.mjs')) } catch (_) {}
     try { fs.unlinkSync(globalThis._rendererTestModuleExtra) } catch (_) {}
-    vi.unmock('../../src/utils/frontmatter.js')
+    // vi.unmock is intentionally omitted: the mock is hoisted to the top
+    // level and is file-scoped, so it is reset automatically when the module
+    // registry is torn down. (In Vitest 5 vi.unmock is also hoistable, so a
+    // nested call here would throw.)
   })
 
   it('register success posts registered when hljs available', async () => {

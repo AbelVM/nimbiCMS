@@ -6,7 +6,7 @@
 
 # Type Alias: NavItem
 
-> **NavItem**\<\> = `object`
+> **NavItem** = `object`
 
 ## Type Parameters
 
@@ -14,7 +14,7 @@
 
 ### children?
 
-> `optional` **children**: `NavItem`[]
+> `optional` **children?**: `NavItem`[]
 
 ### name
 

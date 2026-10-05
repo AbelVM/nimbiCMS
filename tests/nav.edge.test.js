@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
-// Import modules dynamically inside tests so mocks can be applied first
+
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). The factory is static (it only overrides fetchMarkdown), so it is
+// safe to keep active for every test in the file.
+vi.mock('../src/slugManager.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    fetchMarkdown: async (p, base) => ({ raw: '<html><head><title>My Title</title></head><body></body></html>' })
+  }
+})
 
 describe('nav edge cases', () => {
   beforeEach(() => {
@@ -38,13 +48,6 @@ describe('nav edge cases', () => {
   })
 
   it('html link with title sets slug mapping when fetchMarkdown returns title', async () => {
-    vi.mock('../src/slugManager.js', async (importOriginal) => {
-      const actual = await importOriginal()
-      return {
-        ...actual,
-        fetchMarkdown: async (p, base) => ({ raw: '<html><head><title>My Title</title></head><body></body></html>' })
-      }
-    })
     const slugModLocal = await import('../src/slugManager.js')
     const slug = slugModLocal.slugify('My Title')
     // include brand link first so buildNav creates a brand, then the html link

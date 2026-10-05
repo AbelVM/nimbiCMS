@@ -518,6 +518,7 @@ export async function buildNav(
         return [];
       } catch (err) {
         debugWarn("[nimbi-cms] buildSearchIndex failed", err);
+        searchIndexPromise = null;
         return [];
       } finally {
         if (searchInput) {
@@ -1600,7 +1601,17 @@ export async function buildNav(
         try {
           await ensureSearchIndex();
 
-          const idx = await searchIndexPromise;
+          let idx = await searchIndexPromise;
+          if (!Array.isArray(idx) || !idx.length) {
+            if (Array.isArray(window.__nimbiSearchIndex) && window.__nimbiSearchIndex.length) {
+              idx = window.__nimbiSearchIndex;
+            } else if (
+              Array.isArray(window.__nimbiResolvedIndex) &&
+              window.__nimbiResolvedIndex.length
+            ) {
+              idx = window.__nimbiResolvedIndex;
+            }
+          }
           const filtered = Array.isArray(idx)
             ? idx.filter(
                 (e) =>
@@ -1610,6 +1621,7 @@ export async function buildNav(
             : [];
           showResults(filtered.slice(0, 10));
         } catch (err) {
+          searchIndexPromise = null;
           debugWarn("[nimbi-cms] search input handler failed", err);
           showResults([]);
         }

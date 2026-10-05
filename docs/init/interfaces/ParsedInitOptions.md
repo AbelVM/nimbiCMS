@@ -10,100 +10,100 @@
 
 ### availableLanguages?
 
-> `optional` **availableLanguages**: `string`[]
+> `optional` **availableLanguages?**: `string`[]
 
 ***
 
 ### bulmaCustomize?
 
-> `optional` **bulmaCustomize**: `string`
+> `optional` **bulmaCustomize?**: `string`
 
 ***
 
 ### cacheMaxEntries?
 
-> `optional` **cacheMaxEntries**: `number`
+> `optional` **cacheMaxEntries?**: `number`
 
 ***
 
 ### cacheTtlMinutes?
 
-> `optional` **cacheTtlMinutes**: `number`
+> `optional` **cacheTtlMinutes?**: `number`
 
 ***
 
 ### contentPath?
 
-> `optional` **contentPath**: `string`
+> `optional` **contentPath?**: `string`
 
 ***
 
 ### defaultStyle?
 
-> `optional` **defaultStyle**: `"light"` \| `"dark"` \| `"system"`
+> `optional` **defaultStyle?**: `"light"` \| `"dark"` \| `"system"`
 
 ***
 
 ### fetchConcurrency?
 
-> `optional` **fetchConcurrency**: `number`
+> `optional` **fetchConcurrency?**: `number`
 
 ***
 
 ### homePage?
 
-> `optional` **homePage**: `string`
+> `optional` **homePage?**: `string`
 
 ***
 
 ### indexDepth?
 
-> `optional` **indexDepth**: `number`
+> `optional` **indexDepth?**: `number`
 
 ***
 
 ### l10nFile?
 
-> `optional` **l10nFile**: `string` \| `null`
+> `optional` **l10nFile?**: `string` \| `null`
 
 ***
 
 ### lang?
 
-> `optional` **lang**: `string`
+> `optional` **lang?**: `string`
 
 ***
 
 ### navigationPage?
 
-> `optional` **navigationPage**: `string`
+> `optional` **navigationPage?**: `string`
 
 ***
 
 ### negativeFetchCacheTTL?
 
-> `optional` **negativeFetchCacheTTL**: `number`
+> `optional` **negativeFetchCacheTTL?**: `number`
 
 ***
 
 ### noIndexing?
 
-> `optional` **noIndexing**: `string`[]
+> `optional` **noIndexing?**: `string`[]
 
 ***
 
 ### notFoundPage?
 
-> `optional` **notFoundPage**: `string` \| `null`
+> `optional` **notFoundPage?**: `string` \| `null`
 
 ***
 
 ### searchIndex?
 
-> `optional` **searchIndex**: `boolean`
+> `optional` **searchIndex?**: `boolean`
 
 ***
 
 ### searchIndexMode?
 
-> `optional` **searchIndexMode**: `"eager"` \| `"lazy"`
+> `optional` **searchIndexMode?**: `"eager"` \| `"lazy"`

@@ -6,6 +6,6 @@
 
 # Type Alias: LocaleDict
 
-> **LocaleDict**\<\> = `Object`\<`string`, `string`\>
+> **LocaleDict** = `Object`\<`string`, `string`\>
 
 ## Type Parameters

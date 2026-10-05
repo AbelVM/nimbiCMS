@@ -6,7 +6,7 @@
 
 # Type Alias: FetchResult
 
-> **FetchResult**\<\> = `object`
+> **FetchResult** = `object`
 
 ## Type Parameters
 
@@ -14,7 +14,7 @@
 
 ### isHtml?
 
-> `optional` **isHtml**: `boolean`
+> `optional` **isHtml?**: `boolean`
 
 ### raw
 
@@ -22,4 +22,4 @@
 
 ### status?
 
-> `optional` **status**: `number`
+> `optional` **status?**: `number`

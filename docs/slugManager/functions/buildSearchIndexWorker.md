@@ -6,7 +6,7 @@
 
 # Function: buildSearchIndexWorker()
 
-> **buildSearchIndexWorker**(`contentBase`, `indexDepth?`, `noIndexing?`): `Promise`\<`object`[]\>
+> **buildSearchIndexWorker**(`contentBase`, `indexDepth?`, `noIndexing?`, `seedPaths?`): `Promise`\<`object`[]\>
 
 Build the search index using the slug worker when available.
 
@@ -23,6 +23,10 @@ Base URL where markdown content is hosted
 `number` = `1`
 
 ### noIndexing?
+
+`undefined` = `undefined`
+
+### seedPaths?
 
 `undefined` = `undefined`
 

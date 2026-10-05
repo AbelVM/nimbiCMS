@@ -33,9 +33,9 @@ Optional page path used to normalize relative links.
 
 ### anchor?
 
-Optional anchor id to scroll to after rendering.
+`string` \| `null`
 
-`string` | `null`
+Optional anchor id to scroll to after rendering.
 
 ## Returns
 

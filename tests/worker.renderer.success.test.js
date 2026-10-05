@@ -4,6 +4,12 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 import { u82o } from '../node_modules/performance-helpers/src/helpers/powerBuffer.js'
 
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). These static mocks are file-scoped and active for every test.
+vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
+vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} } }))
+vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => ({ default: { registerLanguage: () => {}, getLanguage: () => false } }), { virtual: true })
+
 function decodePosted(m) {
   if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
     try { return u82o(m) } catch (_) {}
@@ -17,9 +23,6 @@ describe('renderer worker register-success (idempotent)', () => {
     posted = []
     globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
-    // mock frontmatter and marked reasonably
-    vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
-    vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} }, default: { parse: (s) => `<p>${String(s ?? '')}</p>`, setOptions: () => {} } }))
 
     // prepare a local language module file
     const langPath = path.resolve('tests/worker/_lang_test_module2.mjs')
@@ -39,13 +42,15 @@ describe('renderer worker register-success (idempotent)', () => {
     try { delete globalThis.postMessage } catch (_) {}
     try { fs.unlinkSync(globalThis._langTestModule2) } catch(_) {}
     try { fs.unlinkSync(globalThis._rendererRegModule2) } catch(_) {}
-    vi.unmock('../../src/utils/frontmatter.js')
-    vi.unmock('marked')
+    // vi.unmock is intentionally omitted: the mocks are hoisted to the top
+    // level and are file-scoped, so they are reset automatically when the
+    // module registry is torn down. (In Vitest 5 vi.unmock is also
+    // hoistable, so a nested call here would throw.)
   })
 
   it('posts registered when language module loads; repeated register still posts registered', async () => {
-    // mock the CDN core import used by ensureHljs
-    vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => ({ default: { registerLanguage: () => {}, getLanguage: () => false } }), { virtual: true })
+    // CDN core mock is hoisted to the top of the file (see line 11), so it is
+    // already active here — no vi.mock call is needed inside the test body.
     const tmpPath = globalThis._rendererRegModule2
     const mod = await import(pathToFileURL(tmpPath).href)
     const langUrl = pathToFileURL(globalThis._langTestModule2).href

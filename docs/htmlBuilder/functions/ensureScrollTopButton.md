@@ -22,9 +22,9 @@ The article element produced by `prepareArticle`.
 
 ### topH1
 
-The top-level H1 element for the article, if present.
+`HTMLElement` \| `null`
 
-`HTMLElement` | `null`
+The top-level H1 element for the article, if present.
 
 ### opts?
 
