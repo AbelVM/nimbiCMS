@@ -1,28 +1,61 @@
-# Lighthouse Benchmark
+# Lighthouse Benchmarks
 
-This script runs Lighthouse (headful) against the local `dev` site and the deployed site (`https://abelvm.github.io/nimbiCMS/`) and produces HTML/JSON reports plus a `results.md` summary.
+This folder contains performance benchmarks for nimbiCMS using [Lighthouse](https://developer.chrome.com/docs/lighthouse/).
 
-How to run
+## What gets measured
 
-1. Ensure Chrome is installed and accessible in your PATH.
-2. From the project root run:
+The benchmark script runs Lighthouse against two targets:
+
+- **Dev** — the local development server
+- **Deployed** — the live site at `https://abelvm.github.io/nimbiCMS/`
+
+For each target, it measures both **desktop** and **mobile** performance, in **cold** (no cache) and **warm** (cached) conditions.
+
+## Reports
+
+Raw reports are saved to `benchmarks/reports/`:
+
+- `dev_desktop.json` / `dev_desktop.html` — dev, desktop (canonical cold run)
+- `dev_desktop_cold.json` / `dev_desktop_cold.html`
+- `dev_desktop_warm.json` / `dev_desktop_warm.html`
+- `dev_mobile.json` / `dev_mobile.html` — dev, mobile (canonical cold run)
+- `dev_mobile_cold.json` / `dev_mobile_cold.html`
+- `dev_mobile_warm.json` / `dev_mobile_warm.html`
+- `deployed_desktop.json` / `deployed_desktop.html` — deployed, desktop (canonical cold run)
+- `deployed_desktop_cold.json` / `deployed_desktop_cold.html`
+- `deployed_desktop_warm.json` / `deployed_desktop_warm.html`
+- `deployed_mobile.json` / `deployed_mobile.html` — deployed, mobile (canonical cold run)
+- `deployed_mobile_cold.json` / `deployed_mobile_cold.html`
+- `deployed_mobile_warm.json` / `deployed_mobile_warm.html`
+- `results.md` — human-readable comparison table
+
+## How to run
+
+### Prerequisites
+
+- Node.js 22+
+- Chrome or Chromium installed and available in your PATH
+
+### Run
 
 ```bash
 npm run benchmark:lighthouse
 ```
 
-What it does
+The script will:
 
-- Starts a local server with `npx serve -L -p {port}` (random free port).
-- Runs Lighthouse (cold and warm) for `desktop` and `mobile` on both `dev` (local) and `deployed` URLs.
-- Saves reports to `benchmarks/reports/`:
-  - `dev_desktop.json`, `dev_desktop.html` (canonical — cold)
-  - `dev_desktop_cold.json`, `dev_desktop_cold.html`
-  - `dev_desktop_warm.json`, `dev_desktop_warm.html`
-  - same pattern for `dev_mobile`, `deployed_desktop`, `deployed_mobile`.
-- Generates `benchmarks/reports/results.md` with a comparison table (desktop/mobile × cold/warm).
+1. Start a local server on a random free port
+2. Run Lighthouse (cold and warm) for desktop and mobile on both dev and deployed URLs
+3. Save reports to `benchmarks/reports/`
+4. Generate `benchmarks/reports/results.md` with a comparison table
 
-Notes
+### Output
 
-- The script uses the local `lighthouse` and `serve` available via `npx` (they are devDependencies).
-- The script attempts to persist a Chrome profile under `benchmarks/profiles/` to allow warm runs to reuse cache.
+After the run completes, open `benchmarks/reports/results.md` to see a side-by-side comparison of performance metrics.
+
+## Notes
+
+- The script uses `lighthouse` and `serve` via `npx` (they are devDependencies).
+- Chrome profiles are persisted under `benchmarks/profiles/` to allow warm runs to reuse cache.
+- The script retries Lighthouse runs up to 4 times with backoff to handle flakiness.
+- For deployed warm runs, the script pre-warms the Chrome profile via Puppeteer to populate cache before measuring.

@@ -27,3 +27,4 @@ translating keys with optional replacements.
 - [loadL10nFile](functions/loadL10nFile.md)
 - [setLang](functions/setLang.md)
 - [t](functions/t.md)
+- [tPlural](functions/tPlural.md)

@@ -1,13 +1,13 @@
 # AGENTS.md — nimbiCMS Operational Guide
 
-> Last updated: 2026-10-05
+> Last updated: 2026-10-06
 > Project: nimbi-cms v1.1.0 | ESM | MIT | Author: Abel Vázquez Montoro
 
 ---
 
-## 1. Project Overview
+## 1. Project overview
 
-nimbiCMS is a lightweight CMS client for static sites with Bulma UI, search/indexing, and markdown rendering. It ships as an ESM package with a generated `.d.ts` file.
+nimbiCMS is a lightweight, client-side CMS for static sites. It renders Markdown, builds navigation, manages search, and updates SEO tags — all in the browser, with no backend.
 
 - **Repo**: https://github.com/AbelVM/nimbiCMS
 - **Homepage**: https://abelvm.github.io/nimbiCMS/
@@ -17,7 +17,7 @@ nimbiCMS is a lightweight CMS client for static sites with Bulma UI, search/inde
 
 ---
 
-## 2. Install / Setup
+## 2. Install / setup
 
 ```bash
 npm ci
@@ -28,7 +28,7 @@ npm ci
 
 ---
 
-## 3. Script Inventory
+## 3. Scripts
 
 | Script | Purpose | Notes |
 |--------|---------|-------|
@@ -53,9 +53,7 @@ npm ci
 
 ---
 
-## 4. Architecture
-
-### Source Layout
+## 4. Source layout
 
 ```
 src/
@@ -103,7 +101,7 @@ src/
     └── slugWorker.js
 ```
 
-### Key Patterns
+### Key patterns
 
 - **Workers**: `src/worker/` contains Web Worker code. Tests use a `TestWorker` stub defined in `tests/setup.js`.
 - **JSDoc types**: All public APIs are documented with JSDoc. `scripts/gen-dts.js` parses these and writes `src/index.d.ts`.
@@ -111,15 +109,15 @@ src/
 
 ---
 
-## 5. TypeScript 7 — Side-by-Side Aliasing
+## 5. TypeScript 7 — side-by-side aliasing
 
-### Why This Pattern?
+### Why?
 
 - `typedoc` v0.28.20 **crashes** under TypeScript 7 (`TypeError: Cannot read properties of undefined (reading 'PropertyDeclaration')` at `ts4.SyntaxKind`). It requires the TS 6 compiler API.
 - `tsd` v0.33.0 **bundles its own** `@tsd/typescript@^5.9.2` and is independent of the project's `typescript` version.
 - We want to type-check our generated `.d.ts` with TS 7 for modern strictness.
 
-### The Setup
+### The setup
 
 In `package.json`:
 
@@ -131,7 +129,7 @@ In `package.json`:
 - `typescript` → TS 6.0.3 (used by `typedoc` via its peer dependency)
 - `typescript7` → TS 7.0.2 (used explicitly by `check-dts`)
 
-### How It Works
+### How it works
 
 - `npm install` resolves both aliases into `node_modules/`:
   - `node_modules/typescript/` → TS 6.0.3
@@ -139,7 +137,7 @@ In `package.json`:
 - `check-dts` runs: `node node_modules/typescript7/bin/tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck --ignoreConfig`
 - `tsconfig.json` uses `moduleResolution: "Bundler"` (changed from `"Node"` for TS 7 compatibility) and `ignoreDeprecations: "6.0"` (harmless in TS 7).
 
-### Do Not Change
+### Do not change
 
 - Do **not** upgrade `typedoc` to 0.29 (does not exist; 0.28.20 is latest).
 - Do **not** try to make `typedoc` work with TS 7 — it is a known incompatibility.
@@ -147,15 +145,15 @@ In `package.json`:
 
 ---
 
-## 6. Vitest 5 — Mocking Rules
+## 6. Vitest 5 — mocking rules
 
-### Hard Rules
+### Hard rules
 
 1. **`vi.mock()` and `vi.doMock()` must be at the top level** (module scope). Vitest 5 throws on load if they are nested inside `describe` or `beforeEach`.
 2. **`vi.unmock()` is deprecated/removed** for top-level hoisting. Do not use it in `afterEach`.
 3. **`clearMocks` defaults to `true`** in Vitest 5. This project pins it to `false` in `vitest.config.js` because the existing suite records mock call history across tests.
 
-### Dynamic / Per-Test Factories
+### Dynamic / per-test factories
 
 Use `vi.doMock()` for per-test mock factories:
 
@@ -165,7 +163,7 @@ vi.doMock('module', () => ({ ... }))
 
 `vi.doMock` is runtime-safe and can be called inside `beforeEach` or individual tests.
 
-### Static Mocks
+### Static mocks
 
 Hoist to module scope:
 
@@ -184,7 +182,7 @@ vi.mock('module', () => ({ ... }))
 
 ---
 
-## 7. jsdom 30 — navigator is Getter-Only
+## 7. jsdom 30 — navigator is getter-only
 
 Under jsdom 30, `navigator` is getter-only on the Window prototype. Direct assignment throws.
 
@@ -203,7 +201,7 @@ Always restore the original value in `afterEach`.
 
 ---
 
-## 8. Build / Test / Docs Conventions
+## 8. Build / test / docs conventions
 
 ### Build
 
@@ -228,14 +226,14 @@ Always restore the original value in `afterEach`.
 - `npm run docs` must pass after any public API change.
 - `npm run gen-dts` must pass after any new export is added.
 
-### Type Checking
+### Type checking
 
 - `npm run check-dts` validates `src/index.d.ts` with TS 7.
 - `npm run type-test` runs `tsd` — **currently fails** with pre-existing `src/index.test-d.ts does not exist` error. This is independent of the TS 7 upgrade.
 
 ---
 
-## 9. Known Issues
+## 9. Known issues
 
 | Issue | Status | Notes |
 |-------|--------|-------|
@@ -247,7 +245,7 @@ Always restore the original value in `afterEach`.
 
 ---
 
-## 10. Do Not Do
+## 10. Do not do
 
 1. **Do not edit `src/index.d.ts` by hand** — it is generated. Run `npm run gen-dts` instead.
 2. **Do not upgrade `typedoc`** — 0.28.20 is latest; it crashes under TS 7.
@@ -262,9 +260,9 @@ Always restore the original value in `afterEach`.
 
 ---
 
-## 11. Dependency Upgrade Notes (2026-10-05)
+## 11. Dependency upgrade notes (2026-10-05)
 
-### Applied Upgrades
+### Applied upgrades
 
 - **Vitest**: 4.x → 5.0.3
 - **@vitest/coverage-v8**: 2.x → 5.0.3
@@ -281,14 +279,14 @@ Always restore the original value in `afterEach`.
 
 - Dropped from **48** to **11** after upgrades.
 
-### Test Fixes
+### Test fixes
 
 - `tests/worker/slugWorker.unit.test.js`: Updated assertion to match 4-arg `buildSearchIndex` signature.
 - `tests/markdown.coverage.extra.test.js`: Fixed `navigator` assignment for jsdom 30.
 
 ---
 
-## 12. Quick Reference
+## 12. Quick reference
 
 ```bash
 # Full verification sequence

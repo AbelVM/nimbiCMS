@@ -1,9 +1,10 @@
 # nimbiCMS — Machine-Readable Project Summary
 
 ## Identity
+
 - **name**: nimbi-cms
 - **version**: 1.1.0
-- **description**: Lightweight CMS client for static sites with Bulma UI and search/indexing features
+- **description**: Lightweight, client-side CMS for static sites. No database, no build step, no backend — just Markdown files and a browser.
 - **author**: Abel Vázquez Montoro
 - **license**: MIT
 - **repo**: https://github.com/AbelVM/nimbiCMS
@@ -12,24 +13,45 @@
 - **source**: plain JavaScript (no TS in src/)
 - **types**: generated `src/index.d.ts` from JSDoc via `scripts/gen-dts.js`
 
-## Runtime Requirements
+## What it does
+
+nimbiCMS turns a folder of Markdown or HTML files into a fully functional website. It runs entirely in the browser:
+
+- Renders GitHub-flavored Markdown to HTML on the fly
+- Builds navigation, search, and table of contents automatically
+- Manages URLs, slugs, and SEO meta tags (Open Graph, Twitter Cards)
+- Generates runtime sitemap, RSS 2.0, and Atom 1.0 feeds
+- Keeps the site fast with web workers and smart caching
+
+Target audience: writers, editors, developers, and teams who want to publish content without managing a CMS backend. Not intended for multi-user editorial workflows.
+
+## Runtime requirements
+
 - **Node**: 22+ (cssnano 9 / postcss 9 require Node 22)
 - **engines.node**: ">=16" (stale; intentionally untouched for semver safety)
+- **Browser**: modern browsers with ES module support (for ESM build)
 
-## Key Scripts
+## Key scripts
+
 | script | command | purpose |
 |--------|---------|---------|
 | test | `npx vitest run` | 799 tests, jsdom 30 |
 | test:coverage | `npx vitest run --coverage` | V8 coverage |
 | lint | `eslint src` | 0 errors target |
+| lint:fix | `eslint src --fix` | Auto-fix lint issues |
+| format | `prettier --write "src/**/*.js"` | Format source files |
 | build | `npm run build:lib && npm run build:umd` | ESM + CJS + UMD |
+| build:lib | `vite build --config vite.config.js` | ESM/CJS bundles |
+| build:umd | `BUILD_TARGET=umd vite build --config vite.config.js` | UMD bundle |
 | gen-dts | `node scripts/gen-dts.js` | generate types from JSDoc |
 | check-dts | `node node_modules/typescript7/bin/tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck --ignoreConfig` | TS 7 type check |
 | docs | `typedoc --options typedoc.json` | TypeDoc (TS 6 API) |
 | prepare | `npm run build && npm run gen-dts && npm run docs` | CI entry point |
 | benchmark:lighthouse | `node benchmarks/benchmark-lighthouse.js` | Lighthouse benchmarks |
+| dev | `vite` | Dev server |
 
-## Dependency State (2026-10-05)
+## Dependency state (2026-10-05)
+
 - **Vitest**: 5.0.3
 - **@vitest/coverage-v8**: 5.0.3
 - **TypeScript**: 6.0.3 (side-by-side with 7.0.2 via `typescript7` alias)
@@ -43,24 +65,95 @@
 - **tsd**: 0.33.0 (bundles its own TS 5.9.2)
 - **vulnerabilities**: 11 (down from 48)
 
-## Critical Patterns
+## Critical patterns
+
 - **TS 7 aliasing**: `"typescript": "npm:@typescript/typescript6@^6.0.2"` + `"typescript7": "npm:typescript@^7.0.2"` in package.json
 - **Vitest 5 mocking**: `vi.mock`/`vi.doMock` must be top-level; `clearMocks: false` in vitest.config.js
 - **jsdom 30 navigator**: use `Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true, enumerable: true })`
 - **puppeteer 25**: `executablePath()` returns Promise; must `await`
 - **src/index.d.ts**: generated; never edit by hand
 
-## Known Issues
+## Source layout
+
+```
+src/
+├── nimbi-cms.js          # Public entrypoint
+├── init.js               # initCMS() and option parsing
+├── htmlBuilder.js        # Article rendering, TOC, anchors
+├── nav.js                # Navigation tree building
+├── slugManager.js        # Slug resolution, crawling, search index
+├── markdown.js           # Markdown parsing pipeline
+├── codeblocksManager.js  # Code highlighting (highlight.js)
+├── hookManager.js        # Hook system
+├── seoManager.js         # SEO meta tags
+├── runtimeSitemap.js     # RSS/Atom/Sitemap generation
+├── l10nManager.js        # Localization
+├── bulmaManager.js       # Bulma theming
+├── ui.js                 # UI helpers
+├── imagePreview.js       # Image preview
+├── indexManager.js       # Index cache management
+├── router.js             # Routing logic
+├── worker-manager.js     # Worker pool management
+├── utils/                # Shared utilities
+└── worker/               # Web Worker code
+```
+
+## Public API (high level)
+
+- `initCMS(options)` — mount the CMS into a page
+- `getVersion()` — returns package version as `Promise<string>`
+- `setDebugLevel(level)` — adjust logging verbosity (0–3)
+- `addHook(name, fn)` — register hook callbacks
+- `onPageLoad(fn)` — hook after page render
+- `onNavBuild(fn)` — hook after nav construction
+- `transformHtml(fn)` — hook before article append
+- `ensureBulma(bulmaCustomize?, pageDir?)` — ensure Bulma is loaded
+- `setStyle(style)` — switch light/dark/system theme
+- `setThemeVars(vars)` — apply CSS custom properties
+- `t(key, ...args)` — translate UI string
+- `loadL10nFile(url)` — fetch and merge localization file
+- `setLang(code)` — switch UI language at runtime
+- `registerLanguage(name, modulePath)` — register highlight.js language
+- `observeCodeBlocks(root)` — apply syntax highlighting to DOM subtree
+- `setHighlightTheme(name, { useCdn })` — switch highlight.js theme
+
+For full types and JSDoc, see `docs/` or `src/index.d.ts`.
+
+## Configuration (essential options)
+
+```js
+initCMS({
+  el: '#app',              // required: mount target
+  contentPath: '/content', // URL path to content folder
+  homePage: 'home.md',     // home page path
+  notFoundPage: '_404.md', // optional 404 page
+  defaultStyle: 'light',   // 'light' | 'dark' | 'system'
+  bulmaCustomize: 'none',  // 'none' | 'local' | Bulmaswatch theme name
+  searchIndex: true,       // enable search box
+  exposeSitemap: true      // enable runtime sitemap
+})
+```
+
+All options can be overridden via URL params when `allowUrlPathOverrides: true` is set (off by default for security).
+
+## Known issues
+
 - `npm run type-test` fails: `src/index.test-d.ts` does not exist (pre-existing)
 - `tests/nav/buildNav.more-branches.test.js` timing-flaky under parallel load
 - `engines.node: ">=16"` stale (real minimum Node 22+)
 - `benchmark` script points to deleted `scripts/benchmark-cdp.js`
 
 ## Verification
+
 ```bash
 npm ci && npm run build && npm run gen-dts && npm run check-dts && npm test && npm run lint && npm run docs && npm run prepare
 ```
+
 Expected: 0 errors, 799 passed / 0 failed.
 
-## See Also
-- `AGENTS.md` — full operational guide with conventions, do-not-do list, and upgrade notes.
+## See also
+
+- `README.md` — user-facing documentation and quick start
+- `AGENTS.md` — full operational guide with conventions, do-not-do list, and upgrade notes
+- `docs/` — generated API documentation (TypeDoc)
+- `benchmarks/` — Lighthouse performance benchmarks

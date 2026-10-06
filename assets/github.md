@@ -1,34 +1,34 @@
-# Using GitHub pages fully online
+# Using GitHub Pages fully online
 
-This quickstart guide will help you set up a blog, knowledge base or your cookbook using only [GitHub](https://github.com) web interface.
+This quickstart guide will help you set up a blog, knowledge base, or cookbook using only the [GitHub](https://github.com) web interface.
 
-You will need some basic knwoledge about [GitHub‑flavored Markdown](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)
+You will need some basic knowledge about [GitHub-flavored Markdown](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax).
 
-## Create a free user in GitHub
+## Create a free GitHub account
 
 Obviously :sweat_smile:
 
-For the sake of this tutorial, let's say that your GitHub user name is `username`
+For the sake of this tutorial, let's say that your GitHub user name is `username`.
 
 ## Create your repository
 
-Once within your account click the `New` button in the left area of the page, on top of the repositories search box.
+Once logged in, click the **New** button near the top-left of the page, next to the repositories search box.
 
-Follow the instructions and make your repository `public` so you want be able to use it to host your new content site
+Follow the instructions and make your repository **public** so you can use it to host your new content site.
 
-For the sake of this tutorial, let's say that your GitHub repository is called `repositoryname`
+For the sake of this tutorial, let's say that your GitHub repository is called `repositoryname`.
 
 So, now you should have a repository URL like `https://github.com/username/repositoryname`.
 
 ## The scaffolding
 
-Now, you will need some structure there.
+Now you will need some structure there.
 
-Let's use a folder for your articles, and, once again, for the sake of this tutorial, let's say that the folder is called `content`. To do so using the web interface, you need to create your first article indeed. Let's call make it `home` and we'll make it your home page later.
+Let's use a folder for your articles. For the sake of this tutorial, let's say that the folder is called `content`. To do so using the web interface, you need to create your first article. Let's call it `home` and we'll make it your home page later.
 
-Click the button `Add File` and select the option `Create new file`, or just browse to `https://github.com/username/repositoryname/new/main`.
+Click the button **Add file** and select **Create new file**, or just browse to `https://github.com/username/repositoryname/new/main`.
 
-In the `Name your file...` input , just type `content/home.md`. You can then add some text there
+In the **Name your file...** input, just type `content/home.md`. You can then add some text there:
 
 ```markdown
 # Welcome to repositoryname!
@@ -42,13 +42,15 @@ est laborum.
 
 ```
 
-You can use the `Preview` button to check the results.
+You can use the **Preview** button to check the results.
 
 Ok, now you need some more files there.
 
 ### The navigation
 
-You need to define the links that will appear in the top navigation bar. To do so, you need to create a markdown file in  `content` folder with any name, but let's call it `navigation.md`. Let's follow the same steps that you followed to create your homepage, but the contents will be something like
+You need to define the links that will appear in the top navigation bar. To do so, create a markdown file in the `content` folder. Let's call it `_navigation.md` (the leading underscore is important — it tells nimbiCMS this is a special file).
+
+Follow the same steps that you followed to create your homepage, but the contents will be something like:
 
 ```markdown
 [home](home.md)
@@ -57,13 +59,13 @@ You need to define the links that will appear in the top navigation bar. To do s
 
 ```
 
-All those lines are markdown links to files in `content` folder. You can use subfolders, but you can't point out of `content` folder. The only required line is the first one, because `home` is special.
+All those lines are markdown links to files in the `content` folder. You can use subfolders, but you can't point outside the `content` folder. The first line is special — it defines the home page.
 
 Now, to follow this tutorial, you should create both `recipes.md` and `about.md` and fill them with the content you'd like.
 
 ### The "Not Found" page
 
-Now, you need to create a page to redirect errors (when someone mistype a direction). Let's call it `notfound.md` (`404.md` would be the typical name for this kind of file, as 404 is the error code for `not found`). You should put some meaningful message there, like
+Now you need to create a page to show when someone visits a URL that does not exist. Let's call it `_404.md` (404 is the standard HTTP error code for "not found"). You should put some friendly message there, like:
 
 ```markdown
 
@@ -77,7 +79,7 @@ But you're definitely lost.
 
 ### The Jekyll override
 
-[Jekyll](https://github.com/jekyll/jekyll) is a simple, blog-aware, static site generator perfect and is the default engine behind GitHub Pages. Problem is that, if you want to use **nimbiCMS** in GitHub pages and any of your files start wih an underscore (for example `_navigation.md` or `_home.md`), GitHub's Jekyll processor will ignore them by default.
+[Jekyll](https://github.com/jekyll/jekyll) is a simple, blog-aware, static site generator and is the default engine behind GitHub Pages. The problem is that if you want to use **nimbiCMS** in GitHub Pages and any of your files start with an underscore (for example `_navigation.md` or `_404.md`), GitHub's Jekyll processor will ignore them by default.
 
 Add an empty `.nojekyll` file at the repository root to disable Jekyll in your repository so those files are served.
 
@@ -119,13 +121,10 @@ In the root folder of your repository, create a file called exactly `index.html`
           el: '#app',
           contentPath: './content',
           homePage: 'home.md',
-          notFoundPage: 'notfound.md',
-          navigationPage: 'navigation.md',,
+          notFoundPage: '_404.md',
+          navigationPage: '_navigation.md',
           indexDepth: 3,
-          style: 'light',
-          bulma: 'materia',
-          highlightTheme: 'monokai',
-          useCdn: true
+          defaultStyle: 'light'
         });
   </script>
 </body>
@@ -134,25 +133,23 @@ In the root folder of your repository, create a file called exactly `index.html`
 
 ```
 
-The code above renders a web with the same styling as this one. You can go to the [playground](playground.html) and play with the styling. Once you've got the styling combination you like, just go back to your HTML file and set the values of `bulma` (the overall theme), `style` and `higlightTheme` (the styling for blocks of code) to fit your selection.
+The code above renders a site with nimbiCMS default styling. You can visit the [playground](playground.html) and play with the styling. Once you have found a styling combination you like, you can customize the theme using the options documented in the main [README](../README.md).
 
 You should change the title from `My Content Site` to the title of your choice.
 
-
 ## Enable GitHub Pages
 
-Let's publish the web.
+Let's publish the site.
 
-You need to enable `Pages` in your repository settings. To do so, click on :gear:`Settings` button and then `Pages` on the right menu, or just go to `https://github.com/username/repositoryname/settings/pages`
+You need to enable **Pages** in your repository settings. To do so, click on the **Settings** gear icon and then **Pages** on the right menu, or just go to `https://github.com/username/repositoryname/settings/pages`
 
-* **Build and deployment** : `Deploy from a branch`
-* **Branch** : `main` and press `Save` button
+- **Build and deployment**: `Deploy from a branch`
+- **Branch**: `main` and press **Save**
 
 That's it!
-
 
 ## Enjoy
 
 Your new content site is now published at `https://username.github.io/repositoryname`
 
-Now you can add fine-tune your web, there are lots of options. Just check the [readme](../README.md) for further info on customizing.
+Now you can add and fine-tune your site. There are lots of options. Just check the main [README](../README.md) for further info on customizing.
