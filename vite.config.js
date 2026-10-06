@@ -84,7 +84,6 @@ function createBuildConfig({ mode, shouldAnalyze }) {
     define: defineValues,
     worker: {
       format: 'es',
-      inline: true,
       rollupOptions: {
         output: {
           codeSplitting: true
@@ -94,7 +93,7 @@ function createBuildConfig({ mode, shouldAnalyze }) {
     build: {
       sourcemap: 'hidden',
       assetsInlineLimit: 4096,
-      cssCodeSplit: false,
+      cssCodeSplit: true,
       // CSS minification is handled in postcss.config.cjs via cssnano.
       cssMinify: false,
       minify: 'esbuild',
@@ -153,7 +152,7 @@ export default defineConfig(({ command }) => {
           overlay: false
         }
       },
-      worker: { format: 'es', inline: true }
+      worker: { format: 'es' }
     }
   }
 
