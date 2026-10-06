@@ -14,15 +14,6 @@ import {
   setImportNegativeCacheTTL,
 } from "./utils/importCache.js";
 
-// Static map of all highlight.js language modules. Vite will emit one chunk
-// per language at build time; imports are resolved statically, so there is
-// no runtime template-literal resolution and no CDN fallback needed for
-// languages that were bundled.
-const HLJS_LANGUAGE_MODULES = import.meta.glob(
-  "../node_modules/highlight.js/lib/languages/*.js",
-  { eager: false },
-);
-
 /**
  * Expose the internal `hljs` (highlight.js core) instance for tests
  * and advanced usage (language registration, theming helpers).
@@ -448,26 +439,14 @@ export async function registerLanguage(name, modulePath) {
                 return null;
               }
             }
-            const globKey = `highlight.js/lib/languages/${candidate}.js`;
-            const loader = HLJS_LANGUAGE_MODULES[globKey];
-            if (loader && typeof loader === "function") {
-              try {
-                return await loader();
-              } catch (_globErr) {
-                // fall through to dynamic import / CDN fallback below
-              }
-            }
-            // Fallback for test environments where vi.mock may register
-            // virtual modules that import.meta.glob cannot see, and for
-            // any language not covered by the static glob bundle.
             try {
               try {
                 return await import(
-                  `highlight.js/lib/languages/${candidate}.js`
+                  /* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`
                 );
               } catch (_withExt) {
                 return await import(
-                  `highlight.js/lib/languages/${candidate}`
+                  /* @vite-ignore */ `highlight.js/lib/languages/${candidate}`
                 );
               }
             } catch (_localErr) {
