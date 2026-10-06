@@ -499,4 +499,15 @@ describe('htmlBuilder utilities', () => {
     expect(document.querySelector('.nimbi-scroll-top')).toBeTruthy()
   })
 
+  it('ensureScrollTopButton uses a default aria-label when no translator is provided', () => {
+    const article = document.createElement('article')
+    const navWrap = document.createElement('div')
+    navWrap.className = 'nimbi-nav-wrap'
+    document.body.appendChild(navWrap)
+    ensureScrollTopButton(article, null, { navWrap, t: null })
+    const btn = document.querySelector('.nimbi-scroll-top')
+    expect(btn).toBeTruthy()
+    expect(btn.getAttribute('aria-label')).toBe('Scroll to top')
+  })
+
 })

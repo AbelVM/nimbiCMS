@@ -6,14 +6,19 @@
 
 # Function: \_parseHtml()
 
-> **\_parseHtml**(`raw`): \{ `html`: `string`; `meta`: \{ \}; `toc`: `any`[]; \} \| \{ `html`: `any`; `meta`: \{ \}; `toc`: `never`[]; \}
+> **\_parseHtml**(`raw`): [`ParsedPage`](../type-aliases/ParsedPage.md)
+
+Parse raw HTML input and return the normalized "parsed" object used by the
+rendering pipeline.
 
 ## Parameters
 
 ### raw
 
-`any`
+`string`
+
+HTML string to parse
 
 ## Returns
 
-\{ `html`: `string`; `meta`: \{ \}; `toc`: `any`[]; \} \| \{ `html`: `any`; `meta`: \{ \}; `toc`: `never`[]; \}
+[`ParsedPage`](../type-aliases/ParsedPage.md)

@@ -19,6 +19,8 @@ describe('markdown parse uses shared DOMParser', () => {
     const res1 = await md.parseMarkdownToHtml('# Heading\nSome text')
     const res2 = await md.parseMarkdownToHtml('# Heading\nSome text')
 
+    // 1 construction: shared parser (created at import time)
+    // DOMPurify reuses the shared parser instead of creating its own
     expect(constructed).toBe(1)
     expect(res1 && typeof res1 === 'object').toBeTruthy()
     delete global.DOMParser

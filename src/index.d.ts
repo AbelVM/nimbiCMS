@@ -260,6 +260,7 @@ export const defaultCrawlMaxQueue: number
 
 // --- from src/seoManager.js
 export function ensureDocumentMeta(): void
+export function setHreflangTags(pageSlug: string): void
 export function getSiteNameFromMeta(): string
 export function setSeoMap(map: object): any
 export function injectSeoForPage(page: string, initialDocumentTitle: string): any
@@ -339,7 +340,7 @@ export function attachImagePreview(opts: any): void
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(opts: any): Promise<void>
 export function preMapMdSlugs(opts: any): Promise<void>
-export function executeEmbeddedScripts(article: any): void
+export function executeEmbeddedScripts(article: any, allowEmbeddedScripts: boolean): void
 export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): void
 
 

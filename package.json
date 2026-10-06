@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "bulma": "^1.0.4",
+    "dompurify": "^3.4.16",
     "highlight.js": "^11.12.0",
     "marked": "^18.1.0",
     "performance-helpers": "^1.0.3"
@@ -54,9 +55,9 @@
   "devDependencies": {
     "@fullhuman/postcss-purgecss": "^8.0.0",
     "@vitest/coverage-v8": "^5.0.3",
-    "axe-core": "^4.13.0",
+    "axe-core": "^4.14.0",
     "comment-parser": "^1.4.9",
-    "cssnano": "^9.3.1",
+    "cssnano": "^9.3.2",
     "esbuild": "^0.28.2",
     "eslint": "^10.12.0",
     "eslint-plugin-unused-imports": "^4.4.1",
@@ -65,8 +66,8 @@
     "lighthouse": "^13.5.0",
     "postcss": "^8.5.29",
     "postcss-discard-duplicates": "^9.0.5",
-    "postcss-merge-rules": "^9.1.1",
-    "postcss-preset-env": "^11.6.0",
+    "postcss-merge-rules": "^9.1.2",
+    "postcss-preset-env": "^11.6.1",
     "prettier": "^3.9.9",
     "puppeteer": "^25.12.0",
     "reading-time": "^1.5.0",
@@ -77,9 +78,9 @@
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.13.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "^8.3.2",
-    "vitest": "^5.0.3",
-    "typescript7": "npm:typescript@^7.0.2"
+    "typescript7": "npm:typescript@^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
   },
   "main": "dist/nimbi-cms.cjs.js",
   "module": "dist/nimbi-cms.es.js",

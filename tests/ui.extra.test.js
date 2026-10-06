@@ -79,7 +79,8 @@ describe('createUI focused branches', () => {
     const ui = createUI({ contentWrap, navWrap, container, t: (s)=>s, contentBase: '/content/', homePage: 'home', initialDocumentTitle: 'T', runHooks })
     await ui.renderByQuery()
 
-    expect(htmlBuilder.executeEmbeddedScripts).not.toHaveBeenCalled()
+    expect(htmlBuilder.executeEmbeddedScripts).toHaveBeenCalledTimes(1)
+    expect(htmlBuilder.executeEmbeddedScripts).toHaveBeenCalledWith(expect.anything(), false)
   })
 
   it('executes embedded scripts when allowEmbeddedScripts is true', async () => {

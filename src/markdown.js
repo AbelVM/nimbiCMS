@@ -14,6 +14,7 @@ import { debugWarn } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import { getWorkerPoolSize } from "./utils/helpers.js";
 import { slugify } from "./slugManager.js";
+import DOMPurify from "dompurify";
 
 const poolSize = getWorkerPoolSize();
 
@@ -471,7 +472,7 @@ export async function parseMarkdownToHtml(md) {
     } catch (e) {
       debugWarn("[markdown] apply plugins failed", e);
     }
-    const html = marked.parse(content);
+    const html = DOMPurify.sanitize(marked.parse(content));
     try {
       const parser = getSharedParser();
       if (parser) {
@@ -616,7 +617,7 @@ export async function parseMarkdownToHtml(md) {
         );
       } catch (e) {}
       marked.setOptions({ gfm: true });
-      let html = marked.parse(content);
+      let html = DOMPurify.sanitize(marked.parse(content));
       const heads = [];
       const used = new Set();
       html = html.replace(
@@ -697,7 +698,7 @@ export async function parseMarkdownToHtml(md) {
             }
           },
         });
-        let html = marked.parse(content);
+let html = DOMPurify.sanitize(marked.parse(content));
         try {
           html = html.replace(
             /<pre><code>([\s\S]*?)<\/code><\/pre>/g,
@@ -801,7 +802,7 @@ export async function parseMarkdownToHtml(md) {
           }
         },
       });
-      const html = marked.parse(content);
+const html = DOMPurify.sanitize(marked.parse(content));
       return { html, meta: data || {} };
     } catch (e) {
       throw new Error("renderer worker required but unavailable");

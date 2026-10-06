@@ -36,7 +36,7 @@ describe('htmlBuilder asset handling', () => {
     const s = document.createElement('script')
     s.textContent = 'window.__HTMLBUILDER_TEST = true;'
     article.appendChild(s)
-    executeEmbeddedScripts(article)
+    executeEmbeddedScripts(article, true)
     expect(window.__HTMLBUILDER_TEST).toBe(true)
     // script should be removed
     expect(article.querySelectorAll('script').length).toBe(0)

@@ -703,7 +703,15 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
         } catch (e) {}
         const href = a.getAttribute?.("href") || "";
         if (!href) continue;
-        if (isExternalLink(href)) continue;
+        if (isExternalLink(href)) {
+          try {
+            a.setAttribute(
+              "rel",
+              "noopener noreferrer nofollow",
+            );
+          } catch (_) {}
+          continue;
+        }
         try {
           if (href.startsWith("?") || href.indexOf("?") !== -1) {
             try {
@@ -1995,12 +2003,21 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
  * This should be called after the `article` is appended to the document
  * so that scripts which query the DOM find their target elements.
  * @param {HTMLElement} article - Article element containing script tags.
+ * @param {boolean} [allowEmbeddedScripts=false] - When true, execute inline scripts via `new Function` and inject external scripts. When false, strip all script tags.
  * @returns {void}
  */
-export function executeEmbeddedScripts(article) {
+export function executeEmbeddedScripts(article, allowEmbeddedScripts = false) {
   if (!article || !article.querySelectorAll) return;
   try {
     const scripts = Array.from(article.querySelectorAll("script"));
+    if (!allowEmbeddedScripts) {
+      for (const s of scripts) {
+        try {
+          s.parentNode?.removeChild(s);
+        } catch (_) {}
+      }
+      return;
+    }
     for (const s of scripts) {
       try {
         const newScript = document.createElement("script");
@@ -2015,6 +2032,7 @@ export function executeEmbeddedScripts(article) {
           "referrerpolicy",
           "id",
           "class",
+          "nonce",
         ]);
         for (const attr of s.attributes) {
           try {
@@ -2023,28 +2041,54 @@ export function executeEmbeddedScripts(article) {
             }
           } catch (e) {}
         }
-        if (!s.src) {
-          const inline = s.textContent || "";
-          let executed = false;
-          try {
-            const fn = new Function(inline);
-            fn();
-            executed = true;
-          } catch (e) {
-            executed = false;
-          }
-          if (executed) {
-            s.parentNode?.removeChild(s);
-            try {
-              debugInfo("[htmlBuilder] executed inline script via Function");
-            } catch (e) {}
-            continue;
-          }
-          try {
-            newScript.type = "module";
-          } catch (e) {}
-          newScript.textContent = inline;
-        }
+         if (!s.src) {
+           const inline = s.textContent || "";
+           let executed = false;
+           try {
+             const fn = new Function(inline);
+             fn();
+             executed = true;
+           } catch (e) {
+             executed = false;
+           }
+           if (executed) {
+             s.parentNode?.removeChild(s);
+             try {
+               debugInfo("[htmlBuilder] executed inline script via Function");
+             } catch (e) {}
+             // Still inject newScript so CSP nonce is preserved on the DOM
+             try {
+               (
+                 document.head ||
+                 document.body ||
+                 document.documentElement
+               ).appendChild(newScript);
+             } catch (appendErr) {
+               try {
+                 try {
+                   newScript.type = "text/javascript";
+                 } catch (e) {}
+                 (
+                   document.head ||
+                   document.body ||
+                   document.documentElement
+                 ).appendChild(newScript);
+               } catch (appendErr2) {
+                 try {
+                   debugWarn(
+                     "[htmlBuilder] injected script append failed, skipping",
+                     { src: srcLabel, err: appendErr2 },
+                   );
+                 } catch (e) {}
+               }
+             }
+             continue;
+           }
+           try {
+             newScript.type = "module";
+           } catch (e) {}
+           newScript.textContent = inline;
+         }
         if (s.src) {
           try {
             const exists = document.querySelector?.(`script[src="${s.src}"]`);
@@ -2764,7 +2808,7 @@ export function ensureScrollTopButton(
   } = {},
 ) {
   try {
-    const tFn = t || ((k) => (typeof k === "string" ? k : ""));
+    const tFn = typeof t === "function" ? t : () => undefined;
     const containerEl = container || document.querySelector(".nimbi-cms");
     const mountElLocal = mountEl || document.querySelector(".nimbi-mount");
     const mountOverlayEl =
@@ -2776,7 +2820,7 @@ export function ensureScrollTopButton(
     if (!btn) {
       btn = document.createElement("button");
       btn.className = "nimbi-scroll-top button is-primary is-rounded is-small";
-      btn.setAttribute("aria-label", tFn("scrollToTop"));
+      btn.setAttribute("aria-label", tFn("scrollToTop") || "Scroll to top");
       btn.innerHTML =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>';
       try {

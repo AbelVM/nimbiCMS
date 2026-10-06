@@ -25,7 +25,7 @@ describe('htmlBuilder deeper branches', () => {
     const script = document.createElement('script')
     script.textContent = 'window.__TEST_SCRIPT_RAN = (window.__TEST_SCRIPT_RAN||0) + 1'
     container.appendChild(script)
-    executeEmbeddedScripts(container)
+    executeEmbeddedScripts(container, true)
     expect(window.__TEST_SCRIPT_RAN).toBeGreaterThanOrEqual(1)
     expect(container.querySelector('script')).toBeNull()
   })

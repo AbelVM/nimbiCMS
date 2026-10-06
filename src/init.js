@@ -734,7 +734,7 @@ export async function initCMS(options = {}) {
             } catch (_) {}
             window.__nimbiRenderingErrors__.push(rec);
           } catch (_) {}
-        });
+        }, { signal: cmsAbortController.signal });
         window.addEventListener("unhandledrejection", function (ev) {
           try {
             const rec = {
@@ -916,15 +916,28 @@ export async function initCMS(options = {}) {
       }
       if (lang) setLang(lang);
       try {
-        if (typeof document !== "undefined" && document.documentElement) {
-          const pageLang =
-            typeof lang === "string" && lang.trim()
-              ? lang.trim().split("-")[0]
-              : currentLang;
-          try {
-            document.documentElement.setAttribute("lang", pageLang);
-          } catch (_) {}
-        }
+      if (typeof document !== "undefined" && document.documentElement) {
+        const pageLang =
+          typeof lang === "string" && lang.trim()
+            ? lang.trim().split("-")[0]
+            : currentLang;
+        try {
+          document.documentElement.setAttribute("lang", pageLang);
+        } catch (_) {}
+        // Set dir="rtl" for RTL locales
+        try {
+          const loc = new Intl.Locale(pageLang || "en");
+          const isRtl =
+            (loc.textInfo && loc.textInfo.direction === "rtl") ||
+            ["ar", "he", "fa", "ur", "ps", "sd", "ug", "ku", "dv", "yi"].includes(
+              String(pageLang || "").split("-")[0].toLowerCase(),
+            );
+          document.documentElement.setAttribute(
+            "dir",
+            isRtl ? "rtl" : "ltr",
+          );
+        } catch (_) {}
+      }
       } catch (_) {}
 
       if (typeof cacheTtlMinutes === "number" && cacheTtlMinutes >= 0) {
@@ -1288,21 +1301,27 @@ export async function initCMS(options = {}) {
         // rethrow the error so init fails as before
         throw e;
       }
+setStyle(defaultStyle);
+  await ensureBulma(bulmaCustomize, pageDir);
 
-      setStyle(defaultStyle);
-      await ensureBulma(bulmaCustomize, pageDir);
-      const ui = createUI({
-        contentWrap,
-        navWrap,
-        container,
-        mountOverlay,
-        t,
-        contentBase,
-        homePage,
-        initialDocumentTitle,
-        runHooks,
-        allowEmbeddedScripts,
-      });
+  // Create an AbortController for cleanup on destroy/teardown.
+  // All UI and navigation event listeners will be wired to this signal
+  // so that a single `abort()` call removes them all.
+  const cmsAbortController = typeof window !== "undefined" ? new AbortController() : { signal: { abort: () => {} } };
+
+  const ui = createUI({
+    contentWrap,
+    navWrap,
+    container,
+    mountOverlay,
+    t,
+    contentBase,
+    homePage,
+    initialDocumentTitle,
+    runHooks,
+    allowEmbeddedScripts,
+    signal: cmsAbortController.signal,
+  });
       try {
         if (typeof window !== "undefined") {
           try {
@@ -1353,6 +1372,7 @@ export async function initCMS(options = {}) {
           indexDepth,
           noIndexing,
           navbarLogo,
+          cmsAbortController.signal,
         );
         try {
           await runHooks("onNavBuild", {

@@ -9,6 +9,7 @@
 import { normalizePath } from "./utils/helpers.js";
 import { getTextMetrics } from "./utils/textMetrics.js";
 import { debugWarn } from "./utils/debug.js";
+import { availableLanguages, getLanguages } from "./slugManager.js";
 
 /**
  * Page data shape passed around the renderer.
@@ -97,7 +98,105 @@ function upsertLinkRel(rel, href) {
   }
 }
 
-function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
+/**
+ * Detect whether a language code is RTL using Intl.Locale.
+ * @param {string} lang - Language code (e.g. 'ar', 'he', 'fa').
+ * @returns {boolean} - True when the language is right-to-left.
+ */
+function _isRtlLang(lang) {
+  try {
+    if (!lang) return false;
+    const loc = new Intl.Locale(lang);
+    if (loc.textInfo && typeof loc.textInfo.direction === "string") {
+      return loc.textInfo.direction === "rtl";
+    }
+    // Fallback: check known RTL language prefixes
+    const short = String(lang).split("-")[0].toLowerCase();
+    return ["ar", "he", "fa", "ur", "ps", "sd", "ug", "ku", "dv", "yi"].includes(
+      short,
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Emit hreflang `<link rel="alternate">` tags for every configured
+ * available language plus an `x-default` fallback. Each tag points to
+ * the current page URL with the appropriate `?lang=` query parameter.
+ * Safe to call multiple times; existing tags are updated in place.
+ * @param {string} [pageSlug] - Optional page slug for the canonical URL.
+ * @returns {void}
+ */
+export function setHreflangTags(pageSlug) {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    const langs = getLanguages();
+    if (!Array.isArray(langs) || langs.length === 0) return;
+
+    try {
+      const base =
+        typeof location !== "undefined" && location?.origin
+          ? location.origin + location.pathname.split("?")[0]
+          : "";
+      if (!base) return;
+
+      const slug = pageSlug || "";
+      const baseUrl = slug
+        ? `${base}?page=${encodeURIComponent(slug)}`
+        : base;
+
+      // Remove any previously emitted hreflang links to avoid duplicates
+      try {
+        const existing = document.querySelectorAll(
+          'link[rel="alternate"][hreflang]',
+        );
+        existing.forEach((el) => el.remove());
+      } catch (_) {}
+
+      for (const lang of langs) {
+        try {
+          const href = `${baseUrl}&lang=${encodeURIComponent(String(lang))}`;
+          const link = document.createElement("link");
+          link.setAttribute("rel", "alternate");
+          link.setAttribute("hreflang", String(lang));
+          link.setAttribute("href", href);
+          document.head.appendChild(link);
+        } catch (_) {}
+      }
+
+      // x-default fallback
+      try {
+        const xDefault = document.createElement("link");
+        xDefault.setAttribute("rel", "alternate");
+        xDefault.setAttribute("hreflang", "x-default");
+        xDefault.setAttribute("href", baseUrl);
+        document.head.appendChild(xDefault);
+      } catch (_) {}
+    } catch (e) {
+      debugWarn("[seoManager] setHreflangTags failed", e);
+    }
+  } catch (e) {
+    debugWarn("[seoManager] setHreflangTags failed", e);
+  }
+}
+
+/**
+ * Set or update Open Graph and Twitter Card meta tags.
+ * @param {Object} meta - Page metadata object.
+ * @param {string} [titleOverride] - Optional title override.
+ * @param {string} [imageOverride] - Optional image URL override.
+ * @param {string} [descOverride] - Optional description override.
+ * @param {string} [pageType] - Optional page type for og:type (e.g. 'article', 'website').
+ * @returns {void}
+ */
+function setOgTwitter(
+  meta,
+  titleOverride,
+  imageOverride,
+  descOverride,
+  pageType,
+) {
   const title =
     titleOverride && String(titleOverride).trim()
       ? titleOverride
@@ -120,7 +219,53 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
   if (img) {
     upsertMeta("property", "og:image", img);
     upsertMeta("name", "twitter:image", img);
+    if (meta.image_width)
+      upsertMeta("property", "og:image:width", String(meta.image_width));
+    if (meta.image_height)
+      upsertMeta("property", "og:image:height", String(meta.image_height));
   }
+  // og:type — default to 'website', use 'article' for content pages
+  const ogType = pageType || meta.og_type || (meta.type === "Article" ? "article" : "website");
+  upsertMeta("property", "og:type", ogType);
+  // og:locale — derive from current language
+  try {
+    const lang =
+      typeof navigator !== "undefined"
+        ? navigator.language || navigator.languages?.[0] || "en"
+        : "en";
+    const locale = String(lang).replace("-", "_").toLowerCase();
+    upsertMeta("property", "og:locale", locale);
+    // og:locale:alternate — one per available language
+    const langs = getLanguages();
+    if (Array.isArray(langs) && langs.length > 0) {
+      for (const l of langs) {
+        try {
+          const altLocale = String(l).replace("-", "_").toLowerCase();
+          upsertMeta("property", "og:locale:alternate", altLocale);
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  // article:published_time / article:modified_time
+  if (meta.date) {
+    try {
+      const d = new Date(meta.date);
+      if (!isNaN(d.getTime()))
+        upsertMeta("property", "article:published_time", d.toISOString());
+    } catch (_) {}
+  }
+  if (meta.dateModified) {
+    try {
+      const d = new Date(meta.dateModified);
+      if (!isNaN(d.getTime()))
+        upsertMeta("property", "article:modified_time", d.toISOString());
+    } catch (_) {}
+  }
+  // twitter:site / twitter:creator
+  if (meta.twitter_site)
+    upsertMeta("name", "twitter:site", String(meta.twitter_site));
+  if (meta.twitter_creator)
+    upsertMeta("name", "twitter:creator", String(meta.twitter_creator));
 }
 
 /**
@@ -155,7 +300,8 @@ export function setMetaTags(
           : "";
   if (finalDesc && String(finalDesc).trim()) setTag("description", finalDesc);
   setTag("robots", meta.robots || "index,follow");
-  setOgTwitter(meta, titleOverride, imageOverride, finalDesc);
+  setOgTwitter(meta, titleOverride, imageOverride, finalDesc, meta.type);
+  setHreflangTags(data.slug || data.meta?.slug || "");
 }
 
 /**
@@ -240,9 +386,65 @@ function _computeCanonical(page) {
       debugWarn("[seoManager] upsertMeta og:url failed", e);
     }
 
+    function _inferPageType(page, meta) {
+      try {
+        const raw = String(meta?.type || "").trim();
+        if (raw) return raw;
+        const p = String(page || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+        if (!p || p === "index" || p === "home") return "WebPage";
+        const segments = p.split("/");
+        const first = segments[0] || "";
+        const last = segments[segments.length - 1] || "";
+        const map = {
+          about: "AboutPage",
+          contact: "ContactPage",
+          blog: "Blog",
+          posts: "Blog",
+          article: "Article",
+          articles: "Article",
+          news: "NewsArticle",
+          product: "Product",
+          products: "Product",
+          event: "Event",
+          events: "Event",
+          person: "ProfilePage",
+          people: "ProfilePage",
+          author: "ProfilePage",
+          authors: "ProfilePage",
+          search: "SearchResultsPage",
+          faq: "FAQPage",
+          faqs: "FAQPage",
+          help: "WebPage",
+          support: "WebPage",
+          docs: "TechArticle",
+          documentation: "TechArticle",
+          tutorial: "TechArticle",
+          howto: "HowTo",
+          "how-to": "HowTo",
+          recipe: "Recipe",
+          recipes: "Recipe",
+          review: "Review",
+          reviews: "Review",
+          video: "VideoObject",
+          videos: "VideoObject",
+          audio: "AudioObject",
+          podcast: "PodcastEpisode",
+        };
+        // For single-segment paths (e.g., /blog, /about), use the first segment mapping
+        if (segments.length === 1 && map[first]) return map[first];
+        // For multi-segment paths, check the last segment first (e.g., /blog/about -> AboutPage)
+        if (map[last]) return map[last];
+        // Default to Article for content paths
+        return "Article";
+      } catch (_) {
+        return "Article";
+      }
+    }
+
+    const pageType = _inferPageType(pagePath, meta);
     const json = {
       "@context": "https://schema.org",
-      "@type": "Article",
+      "@type": pageType,
       headline: title || "",
       description: description || "",
       url: canonical || location.href.split("#")[0],
@@ -250,6 +452,27 @@ function _computeCanonical(page) {
     if (image) json.image = String(image);
     if (meta.date) json.datePublished = meta.date;
     if (meta.dateModified) json.dateModified = meta.dateModified;
+    if (meta.author) {
+      json.author = {
+        "@type": "Person",
+        name: String(meta.author),
+      };
+    }
+    try {
+      const siteName = getSiteNameFromMeta();
+      if (siteName) {
+        json.publisher = {
+          "@type": "Organization",
+          name: siteName,
+        };
+      }
+    } catch (_) {}
+    if (canonical) {
+      json.mainEntityOfPage = {
+        "@type": "WebPage",
+        "@id": canonical,
+      };
+    }
 
     const id = "nimbi-jsonld";
     let el = document.getElementById(id);
@@ -324,7 +547,7 @@ export function injectSeoForPage(page, initialDocumentTitle = "") {
       // Populate standard meta tags (robots, og, twitter) using setMetaTags
       try {
         setMetaTags(
-          { meta: meta },
+          { meta: meta, slug: page },
           meta.title || undefined,
           meta.image || undefined,
           meta.description || undefined,
@@ -333,6 +556,9 @@ export function injectSeoForPage(page, initialDocumentTitle = "") {
       } catch (e) {
         /* continue */
       }
+    } catch (e) {}
+    try {
+      setHreflangTags(page);
     } catch (e) {}
     try {
       setStructuredData(

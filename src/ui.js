@@ -60,7 +60,7 @@ import { notFoundPage } from "./slugManager.js";
  * @param {UIOptions} opts
  * @returns {UIReturn}
  */
-export function createUI(opts) {
+ export function createUI(opts) {
   const {
     contentWrap,
     navWrap,
@@ -72,6 +72,7 @@ export function createUI(opts) {
     initialDocumentTitle,
     runHooks,
     allowEmbeddedScripts = false,
+    signal,
   } = opts || {};
   if (!contentWrap || !(contentWrap instanceof HTMLElement)) {
     throw new TypeError("contentWrap must be an HTMLElement");
@@ -271,12 +272,10 @@ export function createUI(opts) {
       debugWarn("[nimbi-cms] observeCodeBlocks failed", e);
     }
 
-    if (allowEmbeddedScripts) {
-      try {
-        executeEmbeddedScripts(article);
-      } catch (e) {
-        debugWarn("[nimbi-cms] executeEmbeddedScripts failed", e);
-      }
+    try {
+      executeEmbeddedScripts(article, allowEmbeddedScripts);
+    } catch (e) {
+      debugWarn("[nimbi-cms] executeEmbeddedScripts failed", e);
     }
 
     try {
@@ -407,8 +406,16 @@ export function createUI(opts) {
     }
   }
 
-  window.addEventListener("popstate", renderByQuery);
-  window.addEventListener("hashchange", renderByQuery);
+  const addEventListener = (target, type, listener, options) => {
+    if (signal) {
+      target.addEventListener(type, listener, { ...options, signal });
+    } else {
+      target.addEventListener(type, listener, options);
+    }
+  };
+
+  addEventListener(window, "popstate", renderByQuery);
+  addEventListener(window, "hashchange", renderByQuery);
 
   /**
    * Compute the sessionStorage key used to persist scroll position
@@ -459,7 +466,7 @@ export function createUI(opts) {
     }
   };
 
-  window.addEventListener("pageshow", (event) => {
+  addEventListener(window, "pageshow", (event) => {
     if (event.persisted) {
       try {
         restoreScrollPosition();
@@ -470,7 +477,7 @@ export function createUI(opts) {
     }
   });
 
-  window.addEventListener("pagehide", () => {
+  addEventListener(window, "pagehide", () => {
     try {
       saveScrollPosition();
     } catch (e) {

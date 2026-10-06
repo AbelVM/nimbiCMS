@@ -10,6 +10,7 @@ Utility helper functions used by the runtime.
 
 ## Functions
 
+- [addResourceHints](functions/addResourceHints.md)
 - [buildPageUrl](functions/buildPageUrl.md)
 - [decodeHtmlEntities](functions/decodeHtmlEntities.md)
 - [encodeURL](functions/encodeURL.md)

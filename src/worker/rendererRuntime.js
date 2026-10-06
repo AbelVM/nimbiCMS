@@ -1,4 +1,5 @@
 import * as _markedModule from "marked";
+import DOMPurify from "dompurify";
 import { parseFrontmatter } from "../utils/frontmatter.js";
 import {
   importUrlWithCache,
@@ -247,7 +248,7 @@ function detectLanguagesMessage(id, mdText, supported) {
 async function renderMarkdownResult(md, idCounts = new Map()) {
   const { content, data } = parseFrontmatter(md || "");
   await ensureHljs().catch(() => {});
-  const parsed = postProcessHtml(marked.parse(content), idCounts);
+  const parsed = postProcessHtml(DOMPurify.sanitize(marked.parse(content)), idCounts);
   return { html: parsed.html, meta: data || {}, toc: parsed.toc };
 }
 
@@ -259,7 +260,7 @@ async function streamMarkdownResult(msg, onChunk) {
   const sections = _splitIntoSections(content, chunkSize);
   const idCounts = new Map();
   for (let i = 0; i < sections.length; i++) {
-    const rendered = postProcessHtml(marked.parse(sections[i]), idCounts);
+    const rendered = postProcessHtml(DOMPurify.sanitize(marked.parse(sections[i])), idCounts);
     onChunk({
       id,
       type: "chunk",

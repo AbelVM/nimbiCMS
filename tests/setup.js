@@ -2,6 +2,7 @@
 
 // Lightweight markdown renderer to emulate the inlined worker used in-browser.
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { parseFrontmatter } from '../src/utils/frontmatter.js'
 import * as slugMgr from '../src/slugManager.js'
 import { u82o } from 'performance-helpers/powerBuffer'
@@ -50,7 +51,7 @@ if (typeof globalThis.Worker === 'undefined') {
           if (data.type === 'render') {
             const md = data.md || ''
             const { content, data: fm } = parseFrontmatter(md)
-            let html = marked.parse(content)
+            let html = DOMPurify.sanitize(marked.parse(content))
             // post-process: heading ids, lazy images, clean language-undefined
             try {
               const parser = new DOMParser()

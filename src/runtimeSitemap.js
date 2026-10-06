@@ -29,6 +29,9 @@ import { yieldIfNeeded } from "./utils/idle.js";
  *   excerpt?: string,
  *   sourcePath?: string,
  *   lastmod?: string,
+ *   changefreq?: string,
+ *   priority?: number,
+ *   hreflang?: Array<{lang: string, href: string}>,
  *   _titleSource?: string,
  *   baseSlug?: string
  * }} SitemapEntry

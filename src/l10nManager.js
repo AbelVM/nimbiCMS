@@ -112,6 +112,16 @@ export function setLang(lang) {
   try {
     if (typeof document !== "undefined" && document.documentElement) {
       document.documentElement.setAttribute("lang", short);
+      // Set dir="rtl" for RTL locales
+      try {
+        const loc = new Intl.Locale(short || "en");
+        const isRtl =
+          (loc.textInfo && loc.textInfo.direction === "rtl") ||
+          ["ar", "he", "fa", "ur", "ps", "sd", "ug", "ku", "dv", "yi"].includes(
+            short,
+          );
+        document.documentElement.setAttribute("dir", isRtl ? "rtl" : "ltr");
+      } catch (_) {}
     }
   } catch (_) {}
   try {

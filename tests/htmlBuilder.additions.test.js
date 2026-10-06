@@ -48,9 +48,38 @@ describe('htmlBuilder additional branches', () => {
     const s = document.createElement('script')
     s.textContent = 'window.__testInlineExecuted = 123'
     article.appendChild(s)
-    executeEmbeddedScripts(article)
+    executeEmbeddedScripts(article, true)
     expect(window.__testInlineExecuted).toBe(123)
     expect(article.querySelector('script')).toBeNull()
     delete window.__testInlineExecuted
+  })
+
+  it('executeEmbeddedScripts strips scripts when allowEmbeddedScripts is false', () => {
+    const article = document.createElement('article')
+    const inlineScript = document.createElement('script')
+    inlineScript.textContent = 'window.__testShouldNotRun = 1'
+    article.appendChild(inlineScript)
+    const externalScript = document.createElement('script')
+    externalScript.src = 'https://example.com/x.js'
+    article.appendChild(externalScript)
+    executeEmbeddedScripts(article, false)
+    expect(window.__testShouldNotRun).toBeUndefined()
+    expect(article.querySelector('script')).toBeNull()
+  })
+
+  it('executeEmbeddedScripts preserves nonce attribute when allowEmbeddedScripts is true', () => {
+    const article = document.createElement('article')
+    const s = document.createElement('script')
+    s.setAttribute('nonce', 'abc123')
+    s.textContent = 'window.__testNoncePreserved = true'
+    article.appendChild(s)
+    executeEmbeddedScripts(article, true)
+    expect(window.__testNoncePreserved).toBe(true)
+    const remaining = article.querySelector('script')
+    expect(remaining).toBeNull()
+    const injected = document.querySelector('script[nonce="abc123"]')
+    expect(injected).toBeTruthy()
+    injected?.remove()
+    delete window.__testNoncePreserved
   })
 })

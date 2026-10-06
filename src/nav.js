@@ -202,6 +202,7 @@ export async function buildNav(
   indexDepth = 1,
   noIndexing = undefined,
   logoOption = "favicon",
+  signal,
 ) {
   if (!navbarWrap || !(navbarWrap instanceof HTMLElement)) {
     throw new TypeError("navbarWrap must be an HTMLElement");
@@ -242,6 +243,14 @@ export async function buildNav(
   let resolvedIndexForSitemap = null;
   // Map of normalized navigation href -> slug (helps resolve search results)
   const navHrefToSlug = new Map();
+
+  const addEventListener = (target, type, listener, options) => {
+    if (signal) {
+      target.addEventListener(type, listener, { ...options, signal });
+    } else {
+      target.addEventListener(type, listener, options);
+    }
+  };
 
   /**
    * Close the mobile hamburger menu and update ARIA attributes.
@@ -1739,9 +1748,9 @@ export async function buildNav(
         } catch (e) {
           /* ignore */
         }
-      };
-      document.addEventListener("click", searchOutsideHandler, true);
-      document.addEventListener("touchstart", searchOutsideHandler, true);
+  };
+  addEventListener(document, "click", searchOutsideHandler, true);
+  addEventListener(document, "touchstart", searchOutsideHandler, true);
     } catch (e) {
       /* ignore */
     }
@@ -2006,8 +2015,8 @@ export async function buildNav(
         /* ignore */
       }
     };
-    document.addEventListener("click", outsideHandler, true);
-    document.addEventListener("touchstart", outsideHandler, true);
+    addEventListener(document, "click", outsideHandler, true);
+    addEventListener(document, "touchstart", outsideHandler, true);
   } catch (e) {
     /* ignore */
   }

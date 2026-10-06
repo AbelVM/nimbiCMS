@@ -18,6 +18,7 @@ structured data for pages.
 ## Functions
 
 - [applyPageMeta](functions/applyPageMeta.md)
+- [ensureDocumentMeta](functions/ensureDocumentMeta.md)
 - [getSiteNameFromMeta](functions/getSiteNameFromMeta.md)
 - [injectSeoForPage](functions/injectSeoForPage.md)
 - [markNotFound](functions/markNotFound.md)

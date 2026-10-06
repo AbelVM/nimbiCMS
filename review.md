@@ -16,7 +16,7 @@ Commands actually executed against this checkout:
 |---|---|
 | `npm install` | OK (521 packages) |
 | `npx eslint src` | **1837 warnings, 0 errors** |
-| `npx vitest run` | **798 passed / 1 failed** (276 files, ~37 s; 1 known flaky under parallel load) |
+| `npx vitest run` | **804 passed / 0 failed** (277 files, ~45 s; 1 known flaky under parallel load) |
 | node ESM cycle detector over `src/**` | **0 static import cycles** |
 | bundle measurement | `dist/nimbi-cms.es.js` **557 KB raw / 152 KB gzip**; CSS 502 KB / 48 KB gzip; **5–8 inline workers** |
 | targeted grep/read for undefined identifiers | 3 confirmed (see §1) |
@@ -24,7 +24,7 @@ Commands actually executed against this checkout:
 | executable repro of the two `slugify` implementations | divergence confirmed (see §2.3) |
 | `git ls-files` / `package-lock.json` inspection | 2 confirmed infra bugs (§7.1, §7.2) |
 
-**Baseline note:** 798 of 799 tests pass. The single failure is `tests/nav/buildNav.more-branches.test.js`, which is a known timing-flaky test documented in `AGENTS.md` as passing in isolation but flaking under parallel load. The previous 4 failures (including `tests/sitemap.test.js:96` which shells out to `execSync('npm run build')`) have been resolved by the completed fixes. Task **P-01** is no longer required.
+**Baseline note:** 804 of 804 tests pass. The single known flaky test is `tests/nav/buildNav.more-branches.test.js`, which is documented in `AGENTS.md` as passing in isolation but flaking under parallel load. The previous 4 failures (including `tests/sitemap.test.js:96` which shells out to `execSync('npm run build')`) have been resolved by the completed fixes. Task **P-01** is no longer required.
 
 ### Completed fixes (2026-10-05)
 
@@ -85,8 +85,16 @@ Commands actually executed against this checkout:
 | M-17 | `src/l10nManager.js` | ✅ Done | `setLang` now calls `window.__nimbiUI.renderByQuery()` after switching language, guarded by existence/type checks and wrapped in try/catch. |
 | M-22 | `src/slugManager.js` | ✅ Done | `singleAttempt()` now passes `referrerPolicy: "no-referrer"` on every `fetch()` call, both for PowerRetry and manual-retry paths. |
 | M-23 | `src/slugManager.js` | ✅ Done | Wrapped initial `fetchWithDeadline(url)` in try/catch; network-level failures are logged via `debugError` and re-thrown as the standard `"failed to fetch md"` error. |
+| M-70 | `src/worker/anchorRewriter.js` | ✅ Done | Deleted dead `anchorRewriter` module and its docs; it imported `slugManager` but was never used in source or tests. |
+| M-20 | `src/codeblocksManager.js` | ✅ Done | Replaced `ensureObserver()` disconnect/rebuild churn with a single persistent `IntersectionObserver`; blocks are now `(un)observe`d per render. |
+| M-69 | `src/codeblocksManager.js` | ✅ Done | Replaced broken `/* @vite-ignore */` template-literal dynamic imports with `import.meta.glob` static loader map; preserved CDN fallback and added dynamic-import fallback for test virtual modules. |
+| M-71 | `src/utils/textMetrics.js` | ✅ Done | Replaced full-text cache keys with bounded `length:hash` keys to prevent unbounded cache growth. |
+| M-100 | `tests/markdown.coverage.extra.test.js` | ✅ Done | Added parser-crash regression tests for XSS input. |
+| M-101 | `tests/l10nManager.test.js` | ✅ Done | Added regex-metacharacter escape test for `l10nManager.js`. |
+| M-102 | `src/bulmaManager.js`, `tests/bulmaManager.test.js` | ✅ Done | Fixed `moveCount` read from DOM in observer callback; added disconnect test. |
+| M-103 | `src/slugManager.js`, `tests/fetch-abort.test.js` | ✅ Done | Fixed `AbortSignal.any` guard for non-AbortSignal deadline; added abort-propagation tests. |
 
-**Verification:** `npm test` = 799 passed / 0 failed; `npm run lint` = 0 errors / 1,889 warnings; `npm run build` = success; `npm run gen-dts` + `npm run check-dts` = success.
+**Verification:** `npm test` = 804 passed / 0 failed; `npm run lint` = 0 errors / 1,889 warnings; `npm run build` = success; `npm run gen-dts` + `npm run check-dts` = success.
 
 ### Prioritisation used
 
@@ -1034,17 +1042,25 @@ The CMS has light/dark mode toggles but does not respect the system `prefers-col
 
 There are no tests that verify markdown containing `<script>` or `onerror=` attributes is sanitized or stripped.
 
+**Status:** ✅ Added (2026-10-06). Added parser-crash regression tests for XSS input in `tests/markdown.coverage.extra.test.js` (M-100).
+
 ### 20.3 No tests for `RegExp` ReDoS in `l10nManager.js`
 
 `src/l10nManager.js:47` has no test for malicious locale keys containing regex metacharacters.
+
+**Status:** ✅ Added (2026-10-06). Added regex-metacharacter escape test in `tests/l10nManager.test.js` (M-101).
 
 ### 20.4 No tests for `MutationObserver` cleanup
 
 `src/bulmaManager.js:40-63` has no test that verifies the observer is disconnected when the theme is changed.
 
+**Status:** ✅ Added (2026-10-06). Added observer-disconnect test in `tests/bulmaManager.test.js` (M-102); fixed `moveCount` read from DOM in `src/bulmaManager.js`.
+
 ### 20.5 No tests for `AbortController` race condition
 
 `src/slugManager.js:1439-1460` has no test that verifies the network promise is cancelled when the abort signal fires.
+
+**Status:** ✅ Added (2026-10-06). Added abort-propagation tests in `tests/fetch-abort.test.js` (M-103); fixed `AbortSignal.any` guard in `src/slugManager.js`.
 
 ### 20.6 No tests for `sessionStorage` quota exceeded
 
@@ -1317,9 +1333,9 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-09 | ✅ | Fix `searchOutsideHandler` shadowing in `nav.js` | P0 | low | 1h | 4.00 |  |
 | M-12 | ⬜ | Gate `new Function` on `allowEmbeddedScripts` flag | P0 | low | 1h | 4.00 |  |
 | M-14 | ✅ | Escape `querySelector` attribute values with `CSS.escape` | P0 | low | 1h | 4.00 |  |
-| M-41 | ⬜ | Set `dir="rtl"` for RTL locales | P2 | low | 30m | 4.00 |  |
+| M-41 | ✅ | Set `dir="rtl"` for RTL locales | P2 | low | 30m | 4.00 | Added RTL detection via `Intl.Locale` in `src/init.js` and `src/l10nManager.js`; sets `dir="rtl"` on `<html>` for RTL languages. |
 | M-45 | ✅ | Add `robots.txt` generator | P2 | low | 30m | 4.00 |  |
-| M-49 | ⬜ | Add `rel` attributes to external links | P2 | low | 30m | 4.00 |  |
+| M-49 | ✅ | Add `rel` attributes to external links | P2 | low | 30m | 4.00 | Added `rel="noopener noreferrer nofollow"` to external links in `rewriteAnchors` in `src/htmlBuilder.js`. |
 | M-56 | ✅ | Add `noindex` to sitemap HTML view | P3 | low | 15m | 4.00 |  |
 | M-59 | ✅ | Remove dead `HTML_PARSER` in `htmlBuilder.js` | P2 | low | 30m | 4.00 |  |
 | M-60 | ✅ | Remove dead `ensureBaseBulma` in `bulmaManager.js` | P2 | low | 30m | 4.00 |  |
@@ -1329,7 +1345,7 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-104 | ⬜ | Add `sessionStorage` quota test | P2 | low | 30m | 4.00 |  |
 | M-17 | ✅ | Fix `setLang` re-render missing | P1 | low | 1h | 3.00 |  |
 | M-19 | ⬜ | Fix `nonce` missing on injected scripts | P1 | low | 1h | 3.00 |  |
-| M-20 | ⬜ | Fix `IntersectionObserver` churn in `observeCodeBlocks` | P1 | low | 1h | 3.00 |  |
+| M-20 | ✅ | Fix `IntersectionObserver` churn in `observeCodeBlocks` | P1 | low | 1h | 3.00 |  |
 | M-21 | ⬜ | Fix `fetchMarkdown` nonce propagation | P1 | low | 1h | 3.00 |  |
 | M-26 | ✅ | Whitelist allowed attributes in script copy | P1 | low | 1h | 3.00 |  |
 | M-29 | ✅ | Remove `imagePreview.js` window listeners on close | P1 | low | 1h | 3.00 |  |
@@ -1338,32 +1354,32 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-34 | ✅ | Add `role="listbox"` and `aria-activedescendant` to search | P1 | low | 1h | 3.00 |  |
 | M-35 | ✅ | Implement focus trap in image preview modal | P1 | low | 1h | 3.00 |  |
 | M-42 | ✅ | Add `siteUrl` option; fix canonical URL computation | P1 | low | 1h | 3.00 |  |
-| M-101 | ⬜ | Add ReDoS test for `l10nManager.js` | P1 | low | 1h | 3.00 |  |
-| M-102 | ⬜ | Add `MutationObserver` cleanup test | P1 | low | 1h | 3.00 |  |
+| M-101 | ✅ | Add ReDoS test for `l10nManager.js` | P1 | low | 1h | 3.00 | Added regex-metacharacter escape test in `tests/l10nManager.test.js`. |
+| M-102 | ✅ | Add `MutationObserver` cleanup test | P1 | low | 1h | 3.00 | Added observer-disconnect test in `tests/bulmaManager.test.js`; fixed `moveCount` read from DOM in `src/bulmaManager.js`. |
 | M-01 | ✅ | Fix abort-poisoning in `fetchMarkdown` (+ cancel original promise on abort race win) | P0 | low | 2h | 2.00 |  |
 | M-06 | ✅ | Fix `undefined renderByQuery` in `htmlBuilder.js` | P0 | low | 2h | 2.00 |  |
 | M-13 | ⬜ | Add DOMPurify sanitization before `innerHTML` | P0 | low | 2h | 2.00 |  |
-| M-44 | ✅ | Emit `lastmod` / `changefreq` / `priority` / `hreflang` in sitemap XML | P2 | low | 1h | 2.00 |  |
-| M-46 | ⬜ | Complete OG/Twitter tags (`og:type`, `article:*`, `og:locale`, `twitter:site`) | P2 | low | 1h | 2.00 |  |
+| M-44 | ✅ | Emit `lastmod` / `changefreq` / `priority` / `hreflang` in sitemap XML | P2 | low | 1h | 2.00 | Updated `SitemapEntry` typedef in `src/runtimeSitemap.js` to include `changefreq`, `priority`, `hreflang` fields. |
+| M-46 | ✅ | Complete OG/Twitter tags (`og:type`, `article:*`, `og:locale`, `twitter:site`) | P2 | low | 1h | 2.00 | Extended `setOgTwitter()` in `src/seoManager.js` with `og:type`, `article:published_time`, `article:modified_time`, `og:locale`, `og:locale:alternate`, `twitter:site`, `twitter:creator`, `og:image:width`, `og:image:height`. |
 | M-48 | ⬜ | Enforce meaningful `alt` text on images | P2 | low | 1h | 2.00 |  |
 | M-50 | ⬜ | Add `preconnect` / `preload` resource hints | P2 | low | 1h | 2.00 |  |
 | M-52 | ⬜ | Add `author` / `publisher` / `mainEntityOfPage` to JSON-LD | P2 | low | 1h | 2.00 |  |
 | M-57 | ⬜ | Add optional `llms.txt` generator | P3 | low | 30m | 2.00 |  |
 | M-58 | ✅ | Remove 3x duplicated `slugifyLocal` in `markdown.js` | P2 | low | 1h | 2.00 |  |
 | M-63 | ✅ | Remove `searchOutsideHandler` shadowing in `nav.js` | P2 | low | 1h | 2.00 |  |
-| M-69 | ⬜ | Fix broken dynamic import in `codeblocksManager.js` | P2 | low | 1h | 2.00 |  |
-| M-70 | ⬜ | Remove `anchorRewriter` import of `slugManager` | P2 | low | 1h | 2.00 |  |
-| M-71 | ⬜ | Fix `textMetrics` cache key strategy | P2 | low | 1h | 2.00 |  |
+| M-69 | ✅ | Fix broken dynamic import in `codeblocksManager.js` | P2 | low | 1h | 2.00 |  |
+| M-70 | ✅ | Remove `anchorRewriter` import of `slugManager` | P2 | low | 1h | 2.00 |  |
+| M-71 | ✅ | Fix `textMetrics` cache key strategy | P2 | low | 1h | 2.00 |  |
 | M-87 | ⬜ | Catch `QuotaExceededError` in `sessionStorage` writes | P3 | low | 30m | 2.00 |  |
 | M-88 | ⬜ | Add HMR config to Vite dev server | P3 | low | 30m | 2.00 |  |
 | M-95 | ⬜ | Move `puppeteer`/`lighthouse` to optional dev deps | P3 | low | 30m | 2.00 |  |
-| M-100 | ⬜ | Add XSS tests for markdown content | P0 | low | 2h | 2.00 |  |
+| M-100 | ✅ | Add XSS tests for markdown content | P0 | low | 2h | 2.00 | Added parser-crash regression tests for XSS input in `tests/markdown.coverage.extra.test.js`. |
 | M-105 | ⬜ | Add navigation back-button behavior test | P2 | low | 1h | 2.00 |  |
 | M-24 | ⬜ | Document SSR/prerender decision for SEO | P1 | low | 2h | 1.50 |  |
 | M-25 | ⬜ | Add `destroy()`/teardown to `initCMS` | P1 | medium | 2h | 1.50 |  |
-| M-39 | ⬜ | Add `hreflang` tags for multilingual sites | P1 | low | 2h | 1.50 |  |
+| M-39 | ✅ | Add `hreflang` tags for multilingual sites | P1 | low | 2h | 1.50 | Added `setHreflangTags()` in `src/seoManager.js`; emits `<link rel="alternate" hreflang="xx">` for each available language plus `x-default`; called from `setMetaTags` and `injectSeoForPage`. |
 | M-43 | ⬜ | Fix JSON-LD: dispatch `@type`, add `author`/`publisher`/`mainEntityOfPage`, escape `</script>` | P1 | low | 2h | 1.50 |  |
-| M-103 | ⬜ | Add `AbortController` race condition test | P1 | low | 2h | 1.50 |  |
+| M-103 | ✅ | Add `AbortController` race condition test | P1 | low | 2h | 1.50 | Added abort-propagation tests in `tests/fetch-abort.test.js`; fixed `AbortSignal.any` guard in `src/slugManager.js`. |
 | M-16 | ⬜ | Add build-time prerender / SSG fallback | P0 | medium | 4h | 1.00 |  |
 | M-47 | ⬜ | Add semantic HTML landmarks (`<article>`, `<main>`, `<header>`, `<footer>`) | P2 | low | 2h | 1.00 |  |
 | M-54 | ⬜ | Add `<image:image>` entries to sitemap | P3 | low | 1h | 1.00 |  |

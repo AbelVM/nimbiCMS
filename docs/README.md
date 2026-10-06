@@ -40,7 +40,6 @@
 - [utils/urlHelper](utils/urlHelper/README.md)
 - [version](version/README.md)
 - [worker-manager](worker-manager/README.md)
-- [worker/anchorRewriter](worker/anchorRewriter/README.md)
 - [worker/anchorRuntime](worker/anchorRuntime/README.md)
 - [worker/anchorWorker](worker/anchorWorker/README.md)
 - [worker/renderer](worker/renderer/README.md)

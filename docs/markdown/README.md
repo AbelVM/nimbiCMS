@@ -39,3 +39,9 @@ workers, and extracting table-of-contents data.
 - [setMarkdownExtensions](functions/setMarkdownExtensions.md)
 - [streamParseMarkdown](functions/streamParseMarkdown.md)
 - [teardownRendererWorkerPool](functions/teardownRendererWorkerPool.md)
+
+## References
+
+### slugify
+
+Re-exports [slugify](../slugManager/functions/slugify.md)
