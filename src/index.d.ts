@@ -259,6 +259,7 @@ export const defaultCrawlMaxQueue: number
 
 
 // --- from src/seoManager.js
+export function ensureDocumentMeta(): void
 export function getSiteNameFromMeta(): string
 export function setSeoMap(map: object): any
 export function injectSeoForPage(page: string, initialDocumentTitle: string): any
@@ -273,6 +274,8 @@ export function generateSitemapJson(opts: object): Promise<SitemapJson>
 export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
+export function generateRobotsTxt(opts: object): string
+export function clearSitemapWriteTimer(): any
 export function handleSitemapRequest(opts: any): any
 export function attachSitemapDownloadUI(opts: {filename?: string}): HTMLElement|null
 export function exposeSitemapGlobals(opts: any): any
@@ -440,6 +443,7 @@ export function yieldIfNeeded(iteration: number, threshold: number): Promise<voi
 export const normalizePath: any
 export const trimTrailingSlash: any
 export const ensureTrailingSlash: any
+export function addResourceHints(): any
 export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): void
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
 export function safe(fn: any): string

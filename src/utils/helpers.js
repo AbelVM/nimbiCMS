@@ -162,6 +162,38 @@ function preloadImage(url) {
 }
 
 /**
+ * Known external origins used by nimbi-cms that benefit from early connection
+ * hints. Inline workers and local assets are not listed here.
+ * @type {string[]}
+ */
+const EXTERNAL_RESOURCE_ORIGINS = [
+  "https://cdn.jsdelivr.net",
+  "https://unpkg.com",
+];
+
+/**
+ * Inject `<link rel="preconnect">` hints for external origins used by the
+ * library (CDNs for highlight.js and Bulma). Safe to call multiple times.
+ * @returns {void}
+ */
+export function addResourceHints() {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    for (const origin of EXTERNAL_RESOURCE_ORIGINS) {
+      try {
+        if (document.querySelector(`link[rel="preconnect"][href="${origin}"]`))
+          continue;
+        const link = document.createElement("link");
+        link.rel = "preconnect";
+        link.href = origin;
+        link.crossOrigin = "anonymous";
+        document.head.appendChild(link);
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+/**
  * Mark images that are above the fold as eager and high priority.
  *
  * This runs in a best-effort fashion: it scans all images within `container`,

@@ -467,18 +467,11 @@ export async function buildNav(
         const buildFn =
           typeof globalBuild === "function"
             ? globalBuild
-            : runtimeBuildSearchIndex;
+             : runtimeBuildSearchIndex;
         const workerFn =
           typeof globalWorker === "function"
             ? globalWorker
             : runtimeBuildSearchIndexWorker;
-        debugLog(
-          "[nimbi-cms test] ensureSearchIndex: buildFn=" +
-            typeof buildFn +
-            " workerFn=" +
-            typeof workerFn +
-            " (global preferred)",
-        );
         const seeds = [];
         try {
           if (homePage) seeds.push(homePage);
@@ -507,7 +500,6 @@ export async function buildNav(
           }
         }
         if (typeof buildFn === "function") {
-          debugLog("[nimbi-cms test] calling buildFn");
           return await buildFn(
             contentBase,
             indexDepth,
@@ -1219,6 +1211,7 @@ export async function buildNav(
 
     const trigger = document.createElement("div");
     trigger.className = "dropdown-trigger";
+    trigger.setAttribute("aria-expanded", "false");
     trigger.appendChild(searchItem);
 
     const dropdownMenu = document.createElement("div");
@@ -1228,6 +1221,8 @@ export async function buildNav(
     dropdownContent = document.createElement("div");
     dropdownContent.id = "nimbi-search-results";
     dropdownContent.className = "dropdown-content nimbi-search-results";
+    dropdownContent.setAttribute("role", "listbox");
+    dropdownContent.setAttribute("aria-hidden", "true");
 
     resultsContainer = dropdownContent;
 
@@ -1259,9 +1254,18 @@ export async function buildNav(
           );
           if (prev) prev.classList.remove("is-selected");
           const all = dropdownContent.querySelectorAll(".nimbi-search-result");
-          if (!all || !all.length) return;
+          if (!all || !all.length) {
+            selectedIndex = -1;
+            try {
+              if (searchInput) searchInput.removeAttribute("aria-activedescendant");
+            } catch (e) {}
+            return;
+          }
           if (i < 0) {
             selectedIndex = -1;
+            try {
+              if (searchInput) searchInput.removeAttribute("aria-activedescendant");
+            } catch (e) {}
             return;
           }
           if (i >= all.length) i = all.length - 1;
@@ -1271,6 +1275,10 @@ export async function buildNav(
             selectedIndex = i;
             try {
               el.scrollIntoView({ block: "nearest" });
+            } catch (e) {}
+            try {
+              if (searchInput && el.id)
+                searchInput.setAttribute("aria-activedescendant", el.id);
             } catch (e) {}
           }
         } catch (e) {
@@ -1314,6 +1322,9 @@ export async function buildNav(
           if (key === "Escape") {
             try {
               dropdown.classList.remove("is-active");
+              try {
+                trigger.setAttribute("aria-expanded", "false");
+              } catch (e) {}
             } catch (e) {}
             try {
               document.documentElement.classList.remove("nimbi-search-open");
@@ -1399,6 +1410,9 @@ export async function buildNav(
           if (dropdown) {
             dropdown.classList.add("is-active");
             try {
+              trigger.setAttribute("aria-expanded", "true");
+            } catch (e) {}
+            try {
               document.documentElement.classList.add("nimbi-search-open");
             } catch (e) {}
           }
@@ -1407,6 +1421,9 @@ export async function buildNav(
           } catch (e) {}
           try {
             dropdownContent.classList.add("is-open");
+          } catch (e) {}
+          try {
+            dropdownContent.setAttribute("aria-hidden", "false");
           } catch (e) {}
           try {
             dropdownContent.setAttribute("tabindex", "0");
@@ -1463,6 +1480,9 @@ export async function buildNav(
               }
               try {
                 dropdownContent.style.display = "none";
+                try {
+                  dropdownContent.setAttribute("aria-hidden", "true");
+                } catch (e) {}
               } catch (e) {}
               try {
                 dropdownContent.classList.remove("is-open");
@@ -1632,24 +1652,6 @@ export async function buildNav(
       } catch (e) {
         /* ignore attach failures in constrained env */
       }
-
-      try {
-        document.addEventListener(
-          "input",
-          (ev) => {
-            try {
-              if (ev && ev.target && ev.target.id === "nimbi-search") {
-                handleInput(ev);
-              }
-            } catch (e) {
-              /* ignore */
-            }
-          },
-          true,
-        );
-      } catch (e) {
-        /* ignore attach failures in constrained env */
-      }
     }
 
     if (searchIndexMode === "eager") {
@@ -1704,7 +1706,7 @@ export async function buildNav(
     }
 
     try {
-      const searchOutsideHandler = (ev) => {
+      searchOutsideHandler = (ev) => {
         try {
           const tgt = ev && ev.target;
           if (!resultsContainer) return;

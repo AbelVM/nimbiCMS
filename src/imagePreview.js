@@ -602,6 +602,34 @@ function openPreview(src, alt = "", naturalWidth = 0, naturalHeight = 0) {
   } catch (e) {}
 
   modal.focus();
+
+  try {
+    const focusable = modal.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length) {
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const trap = (ev) => {
+        try {
+          if (ev.key !== "Tab") return;
+          if (ev.shiftKey) {
+            if (document.activeElement === first) {
+              ev.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last) {
+              ev.preventDefault();
+              first.focus();
+            }
+          }
+        } catch (e) {}
+      };
+      modal.addEventListener("keydown", trap);
+      modal._focusTrapHandler = trap;
+    }
+  } catch (e) {}
 }
 
 /**
@@ -617,6 +645,13 @@ function closePreview() {
 
   try {
     document.documentElement.classList.remove("nimbi-image-preview-open");
+  } catch (e) {}
+
+  try {
+    if (_modal._focusTrapHandler) {
+      _modal.removeEventListener("keydown", _modal._focusTrapHandler);
+      _modal._focusTrapHandler = null;
+    }
   } catch (e) {}
 }
 

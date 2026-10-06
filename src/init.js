@@ -34,11 +34,14 @@ import * as runtimeSitemap from "./runtimeSitemap.js";
 import { awaitSearchIndex as awaitSearchIndexRuntime } from "./slugSearchRuntime.js";
 import { createUI } from "./ui.js";
 import { parseHrefToRoute } from "./utils/urlHelper.js";
-import { normalizePath } from "./utils/helpers.js";
+import {
+  normalizePath,
+  addResourceHints,
+} from "./utils/helpers.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
-import { injectSeoForPage, setSeoMap } from "./seoManager.js";
+import { injectSeoForPage, setSeoMap, ensureDocumentMeta } from "./seoManager.js";
 import { runHooks } from "./hookManager.js";
-import { t, loadL10nFile, setLang } from "./l10nManager.js";
+import { t, loadL10nFile, setLang, currentLang } from "./l10nManager.js";
 import {
   ensureBulma,
   setStyle,
@@ -497,6 +500,15 @@ export async function initCMS(options = {}) {
     throw new TypeError("el must be a CSS selector string or a DOM element");
   }
 
+  // Idempotence guard: prevent double initialization on the same mount element.
+  try {
+    if (mountEl && mountEl._nimbiCmsInitialized) {
+      throw new Error("initCMS already called on this element");
+    }
+  } catch (e) {
+    if (e instanceof Error && /already called/.test(e.message)) throw e;
+  }
+
   if (typeof contentPath !== "string" || !contentPath.trim()) {
     throw new TypeError(
       'initCMS(options): "contentPath" must be a non-empty string when provided',
@@ -698,6 +710,9 @@ export async function initCMS(options = {}) {
       if (finalOptions?.seoMap && typeof finalOptions.seoMap === "object")
         setSeoMap(finalOptions.seoMap);
     } catch (e) {}
+    try {
+      addResourceHints();
+    } catch (e) {}
     // Attach a lightweight runtime error/rejection logger for debugging render issues.
     try {
       if (typeof window !== "undefined") {
@@ -742,6 +757,9 @@ export async function initCMS(options = {}) {
       const pageForSeo = parsedForSeo?.page
         ? parsedForSeo.page
         : homePage || undefined;
+      try {
+        ensureDocumentMeta();
+      } catch (e) {}
       try {
         if (pageForSeo)
           injectSeoForPage(pageForSeo, initialDocumentTitle || "");
@@ -897,6 +915,17 @@ export async function initCMS(options = {}) {
         setLanguages(availableLanguages);
       }
       if (lang) setLang(lang);
+      try {
+        if (typeof document !== "undefined" && document.documentElement) {
+          const pageLang =
+            typeof lang === "string" && lang.trim()
+              ? lang.trim().split("-")[0]
+              : currentLang;
+          try {
+            document.documentElement.setAttribute("lang", pageLang);
+          } catch (_) {}
+        }
+      } catch (_) {}
 
       if (typeof cacheTtlMinutes === "number" && cacheTtlMinutes >= 0) {
         if (typeof router.setResolutionCacheTtl === "function") {

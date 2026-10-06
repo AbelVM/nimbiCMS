@@ -270,6 +270,10 @@ function stripContentBasePrefix(rel, contentBasePath) {
 export function createNavTree(t, tree) {
   const nav = document.createElement("aside");
   nav.className = "menu box nimbi-nav";
+  nav.setAttribute("role", "navigation");
+  try {
+    nav.setAttribute("aria-label", t("navigation"));
+  } catch (e) {}
   const label = document.createElement("p");
   label.className = "menu-label";
   label.textContent = t("navigation");
@@ -385,6 +389,10 @@ export function createNavTree(t, tree) {
 export function buildTocElement(t, toc, pagePath = "") {
   const aside = document.createElement("aside");
   aside.className = "menu box nimbi-toc-inner is-hidden-mobile";
+  aside.setAttribute("role", "navigation");
+  try {
+    aside.setAttribute("aria-label", t("onThisPage"));
+  } catch (e) {}
   const label = document.createElement("p");
   label.className = "menu-label";
   label.textContent = t("onThisPage");
@@ -1461,8 +1469,6 @@ export async function preMapMdSlugs(linkEls, contentBase, opts = {}) {
  * @param {string} raw - HTML string to parse
  * @returns {ParsedPage}
  */
-const HTML_PARSER = getSharedParser();
-
 function parseHtml(raw) {
   try {
     const parser = getSharedParser();
@@ -1998,9 +2004,23 @@ export function executeEmbeddedScripts(article) {
     for (const s of scripts) {
       try {
         const newScript = document.createElement("script");
+        const allowedAttrs = new Set([
+          "src",
+          "type",
+          "async",
+          "defer",
+          "crossorigin",
+          "integrity",
+          "nomodule",
+          "referrerpolicy",
+          "id",
+          "class",
+        ]);
         for (const attr of s.attributes) {
           try {
-            newScript.setAttribute(attr.name, attr.value);
+            if (allowedAttrs.has(attr.name)) {
+              newScript.setAttribute(attr.name, attr.value);
+            }
           } catch (e) {}
         }
         if (!s.src) {
@@ -2758,7 +2778,7 @@ export function ensureScrollTopButton(
       btn.className = "nimbi-scroll-top button is-primary is-rounded is-small";
       btn.setAttribute("aria-label", tFn("scrollToTop"));
       btn.innerHTML =
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>';
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>';
       try {
         if (mountOverlayEl && mountOverlayEl.appendChild)
           mountOverlayEl.appendChild(btn);

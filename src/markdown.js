@@ -13,6 +13,7 @@ import emojimap from "./utils/emojiMap.js";
 import { debugWarn } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import { getWorkerPoolSize } from "./utils/helpers.js";
+import { slugify } from "./slugManager.js";
 
 const poolSize = getWorkerPoolSize();
 
@@ -193,15 +194,7 @@ import { BAD_LANGUAGES, HLJS_ALIAS_MAP } from "./codeblocksManager.js";
 
 // Small slugify helper reused by streaming logic to match parseMarkdownToHtml
 function _slugifyLocal(s) {
-  try {
-    return String(s ?? "")
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\-\s]+/g, "")
-      .replace(/\s+/g, "-");
-  } catch (e) {
-    return "heading";
-  }
+  return slugify(s);
 }
 
 /**
@@ -472,9 +465,6 @@ export async function parseMarkdownToHtml(md) {
     } catch (e) {}
     marked.setOptions({
       gfm: true,
-      mangle: false,
-      headerIds: false,
-      headerPrefix: "",
     });
     try {
       markdownPlugins.forEach((p) => marked.use(p));
@@ -490,17 +480,6 @@ export async function parseMarkdownToHtml(md) {
         const heads = doc.querySelectorAll("h1,h2,h3,h4,h5,h6");
         const docToc = [];
         const used = new Set();
-        const slugifyLocal = (s) => {
-          try {
-            return String(s ?? "")
-              .toLowerCase()
-              .trim()
-              .replace(/[^a-z0-9\-\s]+/g, "")
-              .replace(/\s+/g, "-");
-          } catch (e) {
-            return "heading";
-          }
-        };
         const classesFor = (level) => {
           const resp = {
             1: "is-size-3-mobile is-size-2-tablet is-size-1-desktop",
@@ -522,7 +501,7 @@ export async function parseMarkdownToHtml(md) {
           try {
             const level = Number(h.tagName.substring(1));
             const text = (h.textContent || "").trim();
-            let base = slugifyLocal(text) || "heading";
+            let base = slugify(text) || "heading";
             let candidate = base;
             let i = 2;
             while (used.has(candidate)) {
@@ -636,27 +615,16 @@ export async function parseMarkdownToHtml(md) {
           (m, name) => emojimap[name] || m,
         );
       } catch (e) {}
-      marked.setOptions({ gfm: true, headerIds: true, mangle: false });
+      marked.setOptions({ gfm: true });
       let html = marked.parse(content);
       const heads = [];
       const used = new Set();
-      const slugifyLocal = (s) => {
-        try {
-          return String(s ?? "")
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9\-\s]+/g, "")
-            .replace(/\s+/g, "-");
-        } catch (e) {
-          return "heading";
-        }
-      };
       html = html.replace(
         /<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g,
         (full, lvl, attrs, inner) => {
           const level = Number(lvl);
           const text = inner.replace(/<[^>]+>/g, "").trim();
-          let base = slugifyLocal(text) || "heading";
+          let base = slugify(text) || "heading";
           let candidate = base;
           let i = 2;
           while (used.has(candidate)) {
@@ -716,8 +684,6 @@ export async function parseMarkdownToHtml(md) {
         } catch (e) {}
         marked.setOptions({
           gfm: true,
-          headerIds: true,
-          mangle: false,
           highlighted: (code, lang) => {
             try {
               if (lang && hljs?.getLanguage?.(lang))
@@ -758,23 +724,12 @@ export async function parseMarkdownToHtml(md) {
         } catch (e) {}
         const heads = [];
         const used = new Set();
-        const slugifyLocal = (s) => {
-          try {
-            return String(s ?? "")
-              .toLowerCase()
-              .trim()
-              .replace(/[^a-z0-9\-\s]+/g, "")
-              .replace(/\s+/g, "-");
-          } catch (e) {
-            return "heading";
-          }
-        };
         html = html.replace(
           /<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g,
           (full, lvl, attrs, inner) => {
             const level = Number(lvl);
             const text = inner.replace(/<[^>]+>/g, "").trim();
-            let base = slugifyLocal(text) || "heading";
+            let base = slugify(text) || "heading";
             let candidate = base;
             let i = 2;
             while (used.has(candidate)) {
@@ -819,24 +774,45 @@ export async function parseMarkdownToHtml(md) {
   } catch (e) {
     /* ignore and continue to worker path */
   }
-  if (!w) throw new Error("renderer worker required but unavailable");
+  if (!w) {
+    // Worker is unavailable; degrade to a synchronous main-thread parse
+    // with basic highlight.js integration so fenced code blocks still
+    // render instead of rejecting the whole page.
+    try {
+      let { content, data } = parseFrontmatter(md || "");
+      try {
+        content = String(content ?? "").replace(
+          /:([^:\s]+):/g,
+          (m, name) => emojimap[name] || m,
+        );
+      } catch (e) {}
+      marked.setOptions({
+        gfm: true,
+        highlighted: (code, lang) => {
+          try {
+            if (lang && hljs?.getLanguage?.(lang))
+              return hljs.highlight(code, { language: lang }).value;
+            if (hljs?.getLanguage?.("plaintext")) {
+              return hljs.highlight(code, { language: "plaintext" }).value;
+            }
+            return code;
+          } catch (e) {
+            return code;
+          }
+        },
+      });
+      const html = marked.parse(content);
+      return { html, meta: data || {} };
+    } catch (e) {
+      throw new Error("renderer worker required but unavailable");
+    }
+  }
   const res = await _sendToRenderer({ type: "render", md });
   if (!res || typeof res !== "object" || res.html === undefined)
     throw new Error("renderer worker returned invalid response");
   try {
     const idCounts = new Map();
     const toc = [];
-    const slugifyLocal = (s) => {
-      try {
-        return String(s ?? "")
-          .toLowerCase()
-          .trim()
-          .replace(/[^a-z0-9\-\s]+/g, "")
-          .replace(/\s+/g, "-");
-      } catch (e) {
-        return "heading";
-      }
-    };
     const classesFor = (level) => {
       const resp = {
         1: "is-size-3-mobile is-size-2-tablet is-size-1-desktop",
@@ -861,7 +837,7 @@ export async function parseMarkdownToHtml(md) {
         const level = Number(lvl);
         const text = inner.replace(/<[^>]+>/g, "").trim();
         const idMatch = (attrs || "").match(/\sid="([^"]+)"/);
-        const base = idMatch ? idMatch[1] : slugifyLocal(text) || "heading";
+        const base = idMatch ? idMatch[1] : slugify(text) || "heading";
         const prev = idCounts.get(base) || 0;
         const idx = prev + 1;
         idCounts.set(base, idx);
@@ -1156,4 +1132,5 @@ export async function detectFenceLanguagesAsync(mdText, supportedMap) {
 export {
   _splitIntoSections as _splitIntoSections,
   _slugifyLocal as _slugifyLocal,
+  slugify,
 };

@@ -1242,7 +1242,7 @@ export async function fetchPageData(raw, contentBase) {
                         }
                       };
                       const els = doc.querySelectorAll(
-                        "[src],[href],[srcset],[xlink\:href],[poster]",
+                        "[src],[href],[srcset],[poster]",
                       );
                       const rewritten = [];
                       for (const el of Array.from(els || [])) {

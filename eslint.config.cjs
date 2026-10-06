@@ -38,6 +38,7 @@ module.exports = [
         URLSearchParams: 'readonly',
         Worker: 'readonly',
         XMLSerializer: 'readonly',
+        CSS: 'readonly',
         process: 'readonly',
         renderByQuery: 'readonly',
         findSlugForPath: 'readonly',

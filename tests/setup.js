@@ -6,6 +6,11 @@ import { parseFrontmatter } from '../src/utils/frontmatter.js'
 import * as slugMgr from '../src/slugManager.js'
 import { u82o } from 'performance-helpers/powerBuffer'
 
+// Provide build-time defines expected by source modules during tests.
+if (typeof globalThis.__HIGHLIGHT_JS_VERSION__ === 'undefined') {
+  globalThis.__HIGHLIGHT_JS_VERSION__ = '11.11.1'
+}
+
 // Stub Worker so code that constructs a Worker doesn't throw ReferenceError
 if (typeof globalThis.Worker === 'undefined') {
   class TestWorker {

@@ -35,7 +35,23 @@ export function createWorkerFromRaw(code) {
         workerUrl = URL.createObjectURL(blob);
         cache.set(code, workerUrl);
       }
-      return new Worker(workerUrl, { type: "module" });
+      let worker = null;
+      try {
+        worker = new Worker(workerUrl, { type: "module" });
+      } catch (err) {
+        try {
+          debugWarn("[worker-manager] Worker construction failed", err);
+        } catch (e) {}
+        return null;
+      }
+      try {
+        worker.addEventListener("error", (ev) => {
+          try {
+            debugWarn("[worker-manager] Worker error", ev);
+          } catch (e) {}
+        });
+      } catch (e) {}
+      return worker;
     } catch (err) {
       try {
         debugWarn("[worker-manager] createWorkerFromRaw failed", err);

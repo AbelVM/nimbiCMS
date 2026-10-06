@@ -24,7 +24,11 @@ import { debugWarn } from "./utils/debug.js";
  * @returns {void}
  */
 export function setTag(name, content) {
-  let tag = document.querySelector(`meta[name="${name}"]`);
+  const escapedName =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(name))
+      : String(name);
+  let tag = document.querySelector(`meta[name="${escapedName}"]`);
   if (!tag) {
     tag = document.createElement("meta");
     tag.setAttribute("name", name);
@@ -33,8 +37,38 @@ export function setTag(name, content) {
   tag.setAttribute("content", content);
 }
 
+/**
+ * Ensure essential document-level meta tags exist (charset, viewport).
+ * Safe to call multiple times; only adds missing tags.
+ * @returns {void}
+ */
+export function ensureDocumentMeta() {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    try {
+      if (!document.querySelector('meta[charset]')) {
+        const charset = document.createElement("meta");
+        charset.setAttribute("charset", "utf-8");
+        document.head.prepend(charset);
+      }
+    } catch (e) {}
+    try {
+      if (!document.querySelector('meta[name="viewport"]')) {
+        const viewport = document.createElement("meta");
+        viewport.setAttribute("name", "viewport");
+        viewport.setAttribute("content", "width=device-width, initial-scale=1");
+        document.head.appendChild(viewport);
+      }
+    } catch (e) {}
+  } catch (e) {}
+}
+
 function upsertMeta(attrName, attrValue, content) {
-  let sel = `meta[${attrName}="${attrValue}"]`;
+  const escapedAttrValue =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(attrValue))
+      : String(attrValue);
+  let sel = `meta[${attrName}="${escapedAttrValue}"]`;
   let tag = document.querySelector(sel);
   if (!tag) {
     tag = document.createElement("meta");
@@ -47,7 +81,11 @@ function upsertMeta(attrName, attrValue, content) {
 function upsertLinkRel(rel, href) {
   try {
     if (!rel) return;
-    let link = document.querySelector(`link[rel="${rel}"]`);
+    const escapedRel =
+      typeof CSS !== "undefined" && CSS.escape
+        ? CSS.escape(String(rel))
+        : String(rel);
+    let link = document.querySelector(`link[rel="${escapedRel}"]`);
     if (!link) {
       link = document.createElement("link");
       link.setAttribute("rel", rel);
@@ -179,23 +217,21 @@ export function setStructuredData(
             ?.getAttribute("content") ||
           "";
     const image = imageOverride || meta.image || null;
-    let canonical = "";
+function _computeCanonical(page) {
+  try {
+    const p = normalizePath(page);
     try {
-      if (pagePath) {
-        const p = normalizePath(pagePath);
-        try {
-          const base = location.origin + location.pathname;
-          canonical = base.split("?")[0] + "?page=" + encodeURIComponent(p);
-        } catch (e) {
-          canonical = location.href.split("#")[0];
-        }
-      } else {
-        canonical = location.href.split("#")[0];
-      }
+      const base = location.origin + location.pathname;
+      return base.split("?")[0] + "?page=" + encodeURIComponent(p);
     } catch (e) {
-      canonical = location.href.split("#")[0];
-      debugWarn("[seoManager] compute canonical failed", e);
+      return location.href.split("#")[0];
     }
+  } catch (e) {
+    return location.href.split("#")[0];
+  }
+}
+
+    const canonical = _computeCanonical(pagePath);
 
     if (canonical) upsertLinkRel("canonical", canonical);
     try {
@@ -223,7 +259,7 @@ export function setStructuredData(
       el.id = id;
       document.head.appendChild(el);
     }
-    el.textContent = JSON.stringify(json, null, 2);
+    el.textContent = JSON.stringify(json, null, 2).replace(/<\/script>/gi, "<\\/script>");
   } catch (e) {
     debugWarn("[seoManager] setStructuredData failed", e);
   }

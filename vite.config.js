@@ -10,7 +10,7 @@ const libraryEntry = path.resolve(__dirname, 'src/nimbi-cms.js')
 
 function readPackageMetadata() {
   let pkg = null
-  let highlightJsVersion = '11.11.1'
+  let highlightJsVersion = null
   try {
     const pkgPath = path.resolve(__dirname, 'package.json')
     pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
@@ -70,6 +70,7 @@ function createBuildConfig({ mode, shouldAnalyze }) {
       }
     },
     build: {
+      sourcemap: 'hidden',
       assetsInlineLimit: 0,
       cssCodeSplit: false,
       // CSS minification is handled in postcss.config.cjs via cssnano.

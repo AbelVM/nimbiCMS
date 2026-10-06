@@ -24,7 +24,7 @@ export { hljs };
 const HIGHLIGHT_JS_VERSION =
   typeof __HIGHLIGHT_JS_VERSION__ !== "undefined"
     ? String(__HIGHLIGHT_JS_VERSION__)
-    : "11.11.1";
+    : null;
 
 /**
  * @typedef {{name?:string,aliases?:string[]}} HLJSLangEntry
@@ -450,6 +450,9 @@ export async function registerLanguage(name, modulePath) {
                 );
               }
             } catch (_localErr) {
+              if (!HIGHLIGHT_JS_VERSION) {
+                return null;
+              }
               try {
                 const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/es/languages/${candidate}.js`;
                 let host = null;
@@ -803,6 +806,15 @@ export function setHighlightTheme(theme, { useCdn = true } = {}) {
     try {
       debugWarn(
         "Requested highlight theme not bundled; set useCdn=true to load theme from CDN",
+      );
+    } catch (e) {}
+    return;
+  }
+
+  if (!HIGHLIGHT_JS_VERSION) {
+    try {
+      debugWarn(
+        "Cannot load highlight.js theme from CDN: HIGHLIGHT_JS_VERSION is not defined",
       );
     } catch (e) {}
     return;

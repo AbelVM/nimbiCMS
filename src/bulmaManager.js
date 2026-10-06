@@ -37,7 +37,18 @@ function injectLink(href, attrs = {}) {
         l.getAttribute("data-bulmaswatch-move-count") || 0,
       );
       let moving = false;
-      const observer = new MutationObserver(() => {
+      let observer = null;
+      try {
+        const existingObserver = l.getAttribute("data-bulmaswatch-observer");
+        if (existingObserver) {
+          observer = document.querySelector(
+            `[data-bulmaswatch-observer="${existingObserver}"]`,
+          );
+        }
+      } catch (e) {
+        observer = null;
+      }
+      const observerCallback = () => {
         try {
           if (moving) return;
           const parent = l.parentNode;
@@ -46,6 +57,11 @@ function injectLink(href, attrs = {}) {
           if (last === l) return;
           if (moveCount >= 1000) {
             l.setAttribute("data-bulmaswatch-move-stopped", "1");
+            if (observer) {
+              try {
+                observer.disconnect();
+              } catch (e) {}
+            }
             return;
           }
           moving = true;
@@ -60,7 +76,10 @@ function injectLink(href, attrs = {}) {
         } catch (e) {
           /* ignore */
         }
-      });
+      };
+      if (!observer) {
+        observer = new MutationObserver(observerCallback);
+      }
       try {
         observer.observe(document.head, { childList: true });
         l.setAttribute("data-bulmaswatch-observer", "1");
@@ -73,55 +92,6 @@ function injectLink(href, attrs = {}) {
     } catch (e) {
       /* ignore */
     }
-  }
-}
-
-async function ensureBaseBulma() {
-  const localCandidates = [
-    "/dist/bulma.min.css",
-    "/dist/bulma.css",
-    "/bulma.css",
-  ];
-  for (const p of localCandidates) {
-    try {
-      const res = await fetch(p, { method: "HEAD" });
-      if (res?.ok) {
-        if (!document.querySelector(`link[href="${p}"]`)) {
-          const l = document.createElement("link");
-          l.rel = "stylesheet";
-          l.href = p;
-          l.setAttribute("data-bulma-base", "1");
-          const ourCss = document.querySelector(
-            'link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]',
-          );
-          if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss);
-          else document.head.appendChild(l);
-        }
-        return;
-      }
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
-  try {
-    const href =
-      location?.protocol === "file:"
-        ? "https://unpkg.com/bulma/css/bulma.min.css"
-        : "//unpkg.com/bulma/css/bulma.min.css";
-    if (!document.querySelector(`link[href="${href}"]`)) {
-      const l = document.createElement("link");
-      l.rel = "stylesheet";
-      l.href = href;
-      l.setAttribute("data-bulma-base", "1");
-      const ourCss = document.querySelector(
-        'link[href*="/dist/nimbi-cms.css"], link[href*="dist/nimbi-cms.css"]',
-      );
-      if (ourCss?.parentNode) ourCss.parentNode.insertBefore(l, ourCss);
-      else document.head.appendChild(l);
-    }
-  } catch (e) {
-    /* ignore */
   }
 }
 

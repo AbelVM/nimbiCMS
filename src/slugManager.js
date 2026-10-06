@@ -1062,8 +1062,7 @@ export let fetchMarkdown = async function (path, base, opts) {
   try {
     const o = (String(path ?? "").match(/([^\/]+)\.md(?:$|[?#])/) || [])[1];
     const isBare = typeof path === "string" && String(path).indexOf("/") === -1;
-    const wasPageToken = false;
-    if (o && (isBare || wasPageToken) && slugToMd.has(o)) {
+    if (o && isBare && slugToMd.has(o)) {
       const mapped = resolveSlugPath(o) || slugToMd.get(o);
       if (mapped && mapped !== path) {
         path = mapped;
@@ -1391,7 +1390,6 @@ export let fetchMarkdown = async function (path, base, opts) {
         }
       } catch (e) {}
       throw new Error("failed to fetch md");
-      throw new Error("failed to fetch md");
     }
     const raw = await res.text();
     const trimmed = raw.trim().slice(0, 128).toLowerCase();
@@ -1428,9 +1426,12 @@ export let fetchMarkdown = async function (path, base, opts) {
     return isHtml ? { raw, isHtml: true } : { raw };
   })();
 
-  // If the caller supplied an AbortSignal, race the network promise
-  // against the signal so the returned promise rejects promptly when
-  // the caller aborts (ensures fetchCache/negativeFetchCache cleanup).
+  // Cache the unraced promise so concurrent callers share the same
+  // underlying fetch regardless of their AbortSignal state. A caller
+  // without a signal must not be poisoned by another caller's abort.
+  fetchCache.set(url, promise);
+
+  let onAbort = null;
   let returned = promise;
   try {
     if (signal && typeof signal === "object") {
@@ -1442,7 +1443,7 @@ export let fetchMarkdown = async function (path, base, opts) {
             return reject(ae);
           }
         } catch (_) {}
-        const onAbort = () => {
+        onAbort = () => {
           const ae = new Error("aborted");
           ae.name = "AbortError";
           try {
@@ -1459,28 +1460,35 @@ export let fetchMarkdown = async function (path, base, opts) {
     }
   } catch (_) {}
 
-  const tracked = returned.catch((err) => {
-    if (
-      err &&
-      (err.name === "AbortError" ||
-        err.code === "EABORT" ||
-        err.code === "EDEADLINE")
-    ) {
+  const tracked = returned
+    .finally(() => {
+      try {
+        if (onAbort && signal && typeof signal.removeEventListener === "function") {
+          signal.removeEventListener("abort", onAbort);
+        }
+      } catch (_) {}
+    })
+    .catch((err) => {
+      if (
+        err &&
+        (err.name === "AbortError" ||
+          err.code === "EABORT" ||
+          err.code === "EDEADLINE")
+      ) {
+        try {
+          fetchCache.delete(url);
+        } catch (_) {}
+        throw err;
+      }
+      try {
+        negativeFetchCache.set(url, Date.now() + NEGATIVE_CACHE_TTL_MS);
+      } catch (_) {}
       try {
         fetchCache.delete(url);
       } catch (_) {}
       throw err;
-    }
-    try {
-      negativeFetchCache.set(url, Date.now() + NEGATIVE_CACHE_TTL_MS);
-    } catch (_) {}
-    try {
-      fetchCache.delete(url);
-    } catch (_) {}
-    throw err;
-  });
+    });
 
-  fetchCache.set(url, tracked);
   return tracked;
 };
 

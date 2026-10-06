@@ -44,7 +44,8 @@ export function t(key, replacements = {}) {
   const dict = L10N[currentLang] || L10N.en;
   let s = dict?.[key] || L10N.en[key] || "";
   for (const k of Object.keys(replacements)) {
-    s = s.replace(new RegExp(`\{${k}\}`, "g"), String(replacements[k]));
+    const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    s = s.replace(new RegExp(`\\{${escaped}\\}`, "g"), String(replacements[k]));
   }
   return s;
 }
@@ -83,7 +84,11 @@ export async function loadL10nFile(path, pageDir) {
   };
   try {
     if (!/^https?:\/\//.test(path)) {
-      resolved = new URL(path, location.origin + pageDir).toString();
+      if (/^file:\/\//i.test(path)) {
+        resolved = path;
+      } else {
+        resolved = new URL(path, location.origin + pageDir).toString();
+      }
     }
     const res = await fetchWithDeadline(resolved);
     if (!res.ok) return;
@@ -101,6 +106,12 @@ export async function loadL10nFile(path, pageDir) {
  * @returns {void}
  */
 export function setLang(lang) {
-  const short = String(lang).split("-")[0].toLowerCase();
+  const raw = String(lang ?? "");
+  const short = raw.split("-")[0].toLowerCase();
   currentLang = L10N[short] ? short : "en";
+  try {
+    if (typeof document !== "undefined" && document.documentElement) {
+      document.documentElement.setAttribute("lang", short);
+    }
+  } catch (_) {}
 }

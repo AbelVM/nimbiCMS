@@ -792,11 +792,24 @@ export function generateSitemapXml(json) {
       : [];
 
   let s = '<?xml version="1.0" encoding="UTF-8"?>\n';
-  s += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+  s +=
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n';
   for (const e of entries) {
     try {
       s += "  <url>\n";
       s += `    <loc>${_escapeXml(String(e.loc ?? ""))}</loc>\n`;
+      if (e.lastmod)
+        s += `    <lastmod>${_escapeXml(String(e.lastmod))}</lastmod>\n`;
+      if (e.changefreq)
+        s += `    <changefreq>${_escapeXml(String(e.changefreq))}</changefreq>\n`;
+      if (e.priority)
+        s += `    <priority>${_escapeXml(String(e.priority))}</priority>\n`;
+      if (e.hreflang) {
+        const hreflangs = Array.isArray(e.hreflang) ? e.hreflang : [e.hreflang];
+        for (const hl of hreflangs) {
+          s += `    <xhtml:link rel="alternate" hreflang="${_escapeXml(String(hl.lang))}" href="${_escapeXml(String(hl.href))}" />\n`;
+        }
+      }
       s += "  </url>\n";
     } catch (_) {}
   }
@@ -881,6 +894,38 @@ export function generateAtomXml(json) {
   return s;
 }
 
+/**
+ * Generate a robots.txt content string from the runtime search index.
+ * @param {Object} [opts]
+ * @param {string} [opts.sitemapUrl] - absolute URL of the sitemap
+ * @param {Array} [opts.disallow] - array of path patterns to disallow
+ * @returns {string} robots.txt content
+ */
+export function generateRobotsTxt(opts = {}) {
+  const { sitemapUrl, disallow = [] } = opts || {};
+  let s = "User-agent: *\n";
+  for (const p of disallow) {
+    s += `Disallow: ${String(p)}\n`;
+  }
+  if (typeof sitemapUrl === "string" && sitemapUrl.trim())
+    s += `Sitemap: ${String(sitemapUrl.trim())}\n`;
+  return s;
+}
+
+/**
+ * Clear any pending sitemap write timer.
+ * Safe to call multiple times.
+ */
+export function clearSitemapWriteTimer() {
+  try {
+    if (typeof window !== "undefined" && window.__nimbiSitemapWriteTimer) {
+      clearTimeout(window.__nimbiSitemapWriteTimer);
+      window.__nimbiSitemapWriteTimer = null;
+      window.__nimbiSitemapPendingWrite = null;
+    }
+  } catch (_) {}
+}
+
 function _writeXmlToDocument(xml, mimeType = "application/xml") {
   try {
     try {
@@ -954,7 +999,7 @@ function _generateHtmlFromJson(finalJson) {
         ? finalJson
         : [];
     let html =
-      '<!doctype html><html><head><meta charset="utf-8"><title>Sitemap</title></head><body>';
+      '<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Sitemap</title></head><body>';
     html += "<h1>Sitemap</h1><ul>";
     for (const e of entries) {
       try {
@@ -1011,7 +1056,10 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
           len: newLen,
         };
       }
-      if (window.__nimbiSitemapWriteTimer) return;
+      if (window.__nimbiSitemapWriteTimer) {
+        clearTimeout(window.__nimbiSitemapWriteTimer);
+        window.__nimbiSitemapWriteTimer = null;
+      }
       window.__nimbiSitemapWriteTimer = setTimeout(() => {
         try {
           if (typeof window === "undefined") return;
@@ -1047,6 +1095,12 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
         } catch (_) {}
       }, 40);
     } catch (e) {}
+    try {
+      if (!window.__nimbiSitemapUnloadListenerAttached) {
+        window.__nimbiSitemapUnloadListenerAttached = true;
+        window.addEventListener("beforeunload", clearSitemapWriteTimer);
+      }
+    } catch (_) {}
   } catch (e) {}
 }
 
@@ -1598,7 +1652,11 @@ export function attachSitemapDownloadUI(mount, opts = {}) {
         try {
           const a = document.createElement("a");
           a.href = url;
-          a.download = String(opts?.filename || "sitemap.json");
+          a.download = String(opts?.filename || "sitemap.json")
+            .replace(/\\/g, "_")
+            .replace(/[^A-Za-z0-9_.-]/g, "_")
+            .replace(/^_+/, "")
+            .replace(/_+$/, "") || "sitemap.json";
           a.style.display = "none";
           document.body.appendChild(a);
           a.click();
