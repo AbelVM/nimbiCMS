@@ -1,4 +1,4 @@
-import { t, setLang, loadL10nFile, currentLang } from '../src/l10nManager.js'
+import { t, tPlural, setLang, loadL10nFile, currentLang } from '../src/l10nManager.js'
 
 describe('l10nManager', () => {
   beforeEach(() => {
@@ -50,5 +50,52 @@ describe('l10nManager', () => {
     const result = t('home', { 'a{2,}b': 'value', '(a|b)*': 'other' })
     expect(result).toBe('Home')
     expect(Date.now() - start).toBeLessThan(1000)
+  })
+
+  it('tPlural selects the correct plural form for the current locale', async () => {
+    // Load a test locale with pluralization entries
+    global.fetch = vi.fn(async () => {
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          en: {
+            article: {
+              one: '1 article',
+              other: '{count} articles'
+            }
+          },
+          es: {
+            article: {
+              one: '1 artículo',
+              other: '{count} artículos'
+            }
+          }
+        })
+      }
+    })
+
+    await loadL10nFile('dummy.json', '/pages/')
+
+    setLang('en')
+    expect(tPlural('article', 0)).toBe('0 articles')
+    expect(tPlural('article', 1)).toBe('1 article')
+    expect(tPlural('article', 2)).toBe('2 articles')
+    expect(tPlural('article', 5)).toBe('5 articles')
+    expect(tPlural('article', 1, { count: 'one' })).toBe('1 article')
+
+    setLang('es')
+    expect(tPlural('article', 0)).toBe('0 artículos')
+    expect(tPlural('article', 1)).toBe('1 artículo')
+    expect(tPlural('article', 2)).toBe('2 artículos')
+  })
+
+  it('tPlural falls back to base key or English when plural form is missing', () => {
+    setLang('en')
+    // 'home' has no plural forms; should fall back to base key
+    expect(tPlural('home', 1)).toBe('Home')
+    expect(tPlural('home', 2)).toBe('Home')
+
+    // Unknown key should return empty string
+    expect(tPlural('nonexistent', 1)).toBe('')
   })
 })

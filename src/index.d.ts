@@ -315,6 +315,7 @@ export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<stri
 
 // --- from src/l10nManager.js
 export function loadL10nFile(path: string, pageDir: string): Promise<void>
+export function tPlural(opts: any): string
 export function formatDate(opts: any): string
 export function formatNumber(opts: any): string
 export function setLang(lang: string): void

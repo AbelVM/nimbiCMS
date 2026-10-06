@@ -100,6 +100,55 @@ export async function loadL10nFile(path, pageDir) {
 }
 
 /**
+ * Translate a key using the current language with pluralization support.
+ * Uses `Intl.PluralRules` to select the correct plural form based on `count`.
+ * Translation keys should be of the form `key.one`, `key.other`, etc.
+ * Falls back to the base key or English if the plural form is not found.
+ *
+ * @param {string} key - Translation key prefix (e.g. 'article').
+ * @param {number} count - The count used to determine the plural form.
+ * @param {Record<string,string>} [replacements] - Optional replacements for token interpolation.
+ * @returns {string} - The translated string with pluralization applied.
+ */
+export function tPlural(key, count, replacements = {}) {
+  try {
+    const dict = L10N[currentLang] || L10N.en;
+    const rules = new Intl.PluralRules(currentLang);
+    const category = rules.select(count);
+    const pluralKey = `${key}.${category}`;
+    let s = dict?.[pluralKey] || "";
+    if (!s) {
+      const base = dict?.[key];
+      if (base && typeof base === "object") {
+        s = base[category] || "";
+      } else if (typeof base === "string") {
+        s = base;
+      }
+    }
+    if (!s) {
+      s = L10N.en[pluralKey] || "";
+    }
+    if (!s) {
+      const enBase = L10N.en[key];
+      if (enBase && typeof enBase === "object") {
+        s = enBase[category] || "";
+      } else if (typeof enBase === "string") {
+        s = enBase;
+      }
+    }
+    // Automatically replace {count} with the numeric count
+    const allReplacements = { count: String(count), ...replacements };
+    for (const k of Object.keys(allReplacements)) {
+      const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      s = s.replace(new RegExp(`\\{${escaped}\\}`, "g"), String(allReplacements[k]));
+    }
+    return s;
+  } catch (_) {
+    return t(key, replacements);
+  }
+}
+
+/**
  * Format a date using the current locale.
  *
  * @param {Date|string|number} date - The date to format.
