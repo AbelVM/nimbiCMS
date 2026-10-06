@@ -32,12 +32,48 @@
   <noscript>
     <link rel="stylesheet" href="./dist/nimbi-cms.css">
   </noscript>
+
+  <!-- Import map for bare module specifiers (browser-native, static) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "nimbi-cms": "./dist/nimbi-cms.es.js",
+      "nimbi-cms/lib": "./dist/nimbi-cms.es.js"
+    }
+  }
+  </script>
 </head>
 
 <body>
   <div id="app"></div>
-  <script src="./dist/nimbi-cms.js" defer></script>
-  <script defer>
+
+  <!-- ESM loader using import map for bare module specifiers -->
+  <script type="module">
+    import { initCMS } from 'nimbi-cms';
+    window.addEventListener('DOMContentLoaded', function () {
+      try {
+        initCMS({
+          el: '#app',
+          contentPath: './',
+          indexDepth: 3,
+          searchIndexMode: 'lazy',
+          noIndexing: ['coverage', 'tmp', 'tests'],
+          defaultStyle: 'system',
+          homePage: 'assets/brochure.md',
+          notFoundPage: 'assets/404.md',
+          navigationPage: 'assets/navigation.md',
+          debugLevel: 0,
+          allowEmbeddedScripts: true
+        });
+      } catch (e) {
+        console.error('[index.html] initCMS failed', e);
+      }
+    });
+  </script>
+
+  <!-- UMD fallback for browsers without import map / ESM support -->
+  <script nomodule src="./dist/nimbi-cms.js" defer></script>
+  <script nomodule defer>
     window.addEventListener('DOMContentLoaded', function () {
       if (!window.nimbiCMS) {
         console.warn('nimbiCMS UMD bundle not found at /dist/nimbi-cms.js');

@@ -426,7 +426,17 @@ import { notFoundPage } from "./slugManager.js";
       }
       const raw = parsed?.page ? parsed.page : homePage;
       const hashAnchor = parsed?.anchor ? parsed.anchor : null;
-      await renderPage(raw, hashAnchor);
+      if (typeof document.startViewTransition === "function") {
+        try {
+          await document.startViewTransition(async () => {
+            await renderPage(raw, hashAnchor);
+          }).finished;
+        } catch {
+          // View transition was skipped or failed; DOM state is still valid.
+        }
+      } else {
+        await renderPage(raw, hashAnchor);
+      }
     } catch (e) {
       debugWarn("[nimbi-cms] renderByQuery failed", e);
       try {

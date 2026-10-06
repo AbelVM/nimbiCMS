@@ -44,6 +44,29 @@ function createAnalyzePlugins(shouldAnalyze) {
     : []
 }
 
+function createImportMapPlugin(enabled) {
+  if (!enabled) return null
+  return {
+    name: 'vite:import-map',
+    apply: 'build',
+    closeBundle() {
+      const { pkg } = readPackageMetadata()
+      const pkgName = pkg?.name || 'nimbi-cms'
+
+      const importMap = {
+        imports: {
+          [pkgName]: './dist/nimbi-cms.es.js',
+          [`${pkgName}/lib`]: './dist/nimbi-cms.es.js',
+        }
+      }
+
+      const importMapPath = path.resolve(__dirname, 'dist/import-map.json')
+      fs.mkdirSync(path.dirname(importMapPath), { recursive: true })
+      fs.writeFileSync(importMapPath, JSON.stringify(importMap, null, 2), 'utf8')
+    }
+  }
+}
+
 function createBuildConfig({ mode, shouldAnalyze }) {
   const { pkg, highlightJsVersion } = readPackageMetadata()
   const isUmd = mode === 'umd'
@@ -112,7 +135,10 @@ function createBuildConfig({ mode, shouldAnalyze }) {
                 codeSplitting: true
               }
             ],
-        plugins: createAnalyzePlugins(shouldAnalyze && !isUmd)
+        plugins: [
+          ...createAnalyzePlugins(shouldAnalyze && !isUmd),
+          createImportMapPlugin(!isUmd)
+        ].filter(Boolean)
       }
     }
   })

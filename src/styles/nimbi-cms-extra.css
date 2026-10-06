@@ -1042,3 +1042,112 @@ body {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ==========================================================================
+   CSS Container Queries (Task M-111)
+
+   Container queries let components respond to their own container width
+   instead of the viewport. This is the correct primitive for a CMS that
+   renders articles inside sidebars of varying width — the content column
+   width is independent of the viewport width.
+
+   Two containers are established below:
+   - .nimbi-content       → container-name: content-area
+   - .nimbi-nav-wrap      → container-name: navigation-sidebar
+
+   The @container rules that follow complement (not replace) the existing
+   viewport-based @media rules, adding responsiveness that fires when the
+   container itself is narrow or wide regardless of viewport size.
+   ========================================================================== */
+
+/* Establish the article content wrapper as a container.
+   container-type: inline-size makes the element a query container whose
+   inline (horizontal) dimension can be observed by @container rules.
+   This does not change the existing flex layout — it only enables queries. */
+.nimbi-content {
+    container-type: inline-size;
+    container-name: content-area;
+}
+
+/* Establish the navigation sidebar as a container so the nav layout can
+   adapt to the actual sidebar width rather than the viewport width. */
+.nimbi-nav-wrap {
+    container-type: inline-size;
+    container-name: navigation-sidebar;
+}
+
+/* Container query example: content area — narrow
+   When the content column is narrow (e.g. a boxed layout on a wide
+   viewport, or a small viewport with a wide sidebar), cap the article
+   max-width so text stays within a readable measure and tables switch
+   to auto layout so they don't overflow.
+   This fires independently of @media — a wide browser window with a
+   narrow content column will still get these adjustments. */
+@container content-area (max-width: 500px) {
+    .nimbi-content {
+        max-width: 600px;
+    }
+
+    .nimbi-article table,
+    .nimbi-cms table {
+        table-layout: auto;
+    }
+
+    .nimbi-article table th:first-child,
+    .nimbi-article table td:first-child,
+    .nimbi-cms table th:first-child,
+    .nimbi-cms table td:first-child {
+        min-width: 120px;
+    }
+}
+
+/* Container query example: content area — wide
+   When the content column is wide, relax the max-width so the article
+   uses the full available width and tables use fixed layout for
+   even column distribution. */
+@container content-area (min-width: 750px) {
+    .nimbi-content {
+        max-width: 900px;
+    }
+
+    .nimbi-article table,
+    .nimbi-cms table {
+        table-layout: fixed;
+    }
+}
+
+/* Container query example: navigation sidebar — narrow
+   When the sidebar is squeezed (e.g. a 3-column layout on a small
+   tablet), compact the nav links and TOC by reducing font size and
+   leftward indentation so labels still fit. */
+@container navigation-sidebar (max-width: 200px) {
+    .nimbi-nav-wrap .menu-list li a {
+        font-size: 0.85em;
+        padding-left: 0.25rem !important;
+    }
+
+    .nimbi-toc-inner ul ul {
+        margin-left: 0.5rem;
+    }
+
+    .nimbi-toc-inner ul ul ul {
+        margin-left: 0.75rem;
+    }
+}
+
+/* Container query example: navigation sidebar — wide
+   When the sidebar has room, restore standard font size for nav links
+   and use the full indentation for nested TOC levels. */
+@container navigation-sidebar (min-width: 240px) {
+    .nimbi-nav-wrap .menu-list li a {
+        font-size: 0.95em;
+    }
+
+    .nimbi-toc-inner ul ul {
+        margin-left: 0.75rem;
+    }
+
+    .nimbi-toc-inner ul ul ul {
+        margin-left: 1.25rem;
+    }
+}
