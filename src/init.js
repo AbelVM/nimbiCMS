@@ -432,13 +432,7 @@ export async function initCMS(options = {}) {
         try {
           const buildErrorContainer = () => {
             const container = document.createElement("div");
-            container.style.padding = "1rem";
-            try {
-              container.style.fontFamily = "system-ui, sans-serif";
-            } catch (_) {}
-            container.style.color = "#b00";
-            container.style.background = "#fee";
-            container.style.border = "1px solid #b00";
+            container.className = "nimbi-init-error";
             const strong = document.createElement("strong");
             strong.textContent = "NimbiCMS failed to initialize:";
             container.appendChild(strong);
@@ -446,9 +440,6 @@ export async function initCMS(options = {}) {
               container.appendChild(document.createElement("br"));
             } catch (_) {}
             const pre = document.createElement("pre");
-            try {
-              pre.style.whiteSpace = "pre-wrap";
-            } catch (_) {}
             pre.textContent = String(err);
             container.appendChild(pre);
             return container;
@@ -1902,9 +1893,7 @@ setStyle(defaultStyle);
           a.rel = "noopener noreferrer nofollow";
           a.setAttribute("aria-label", `nimbiCMS version ${v}`);
           // Keep the badge out of LCP candidate selection during initial paint.
-          a.style.visibility = "hidden";
-          a.style.opacity = "0";
-          a.style.pointerEvents = "none";
+          a.classList.add("is-hidden");
           try {
             registerThemedElement(a);
           } catch (e) {
@@ -1914,9 +1903,7 @@ setStyle(defaultStyle);
             mountEl.appendChild(a);
             const reveal = () => {
               try {
-                a.style.visibility = "";
-                a.style.opacity = "";
-                a.style.pointerEvents = "";
+                a.classList.remove("is-hidden");
               } catch (e) {
                 /* ignore */
               }

@@ -657,7 +657,7 @@ export async function buildNav(
                 a.appendChild(title);
                 a.addEventListener("click", () => {
                   try {
-                    resultsEl.style.display = "none";
+                    resultsEl.classList.add("is-hidden");
                   } catch (_) {}
                 });
                 panel.appendChild(a);
@@ -667,12 +667,10 @@ export async function buildNav(
             });
             scheduleDOMWrite(() => {
               try {
+                resultsEl.classList.remove("is-hidden");
                 resultsEl.appendChild(panel);
               } catch (e) {}
             });
-            try {
-              resultsEl.style.display = "block";
-            } catch (e) {}
           } catch (e) {
             /* ignore panel render failures */
           }
@@ -836,9 +834,6 @@ export async function buildNav(
       img.alt = label;
       img.title = label;
       img.src = logoSrc;
-      try {
-        img.style.marginRight = "0.5em";
-      } catch (e) {}
       try {
         if (!brandItem.textContent || !String(brandItem.textContent).trim()) {
           brandItem.textContent = label;
@@ -1342,7 +1337,7 @@ export async function buildNav(
               document.documentElement.classList.remove("nimbi-search-open");
             } catch (e) {}
             try {
-              dropdownContent.style.display = "none";
+              dropdownContent.classList.add("is-hidden");
             } catch (e) {}
             try {
               dropdownContent.classList.remove("is-open");
@@ -1391,7 +1386,7 @@ export async function buildNav(
             } catch (e) {}
             try {
               if (dropdownContent) {
-                dropdownContent.style.display = "none";
+                dropdownContent.classList.add("is-hidden");
                 dropdownContent.classList.remove("is-open");
                 dropdownContent.removeAttribute("tabindex");
               }
@@ -1429,7 +1424,7 @@ export async function buildNav(
             } catch (e) {}
           }
           try {
-            dropdownContent.style.display = "block";
+            dropdownContent.classList.remove("is-hidden");
           } catch (e) {}
           try {
             dropdownContent.classList.add("is-open");
@@ -1491,7 +1486,7 @@ export async function buildNav(
                 } catch (e) {}
               }
               try {
-                dropdownContent.style.display = "none";
+                dropdownContent.classList.add("is-hidden");
                 try {
                   dropdownContent.setAttribute("aria-hidden", "true");
                 } catch (e) {}
@@ -1582,7 +1577,7 @@ export async function buildNav(
         } catch (e) {}
       }
       try {
-        dropdownContent.style.display = "block";
+        dropdownContent.classList.remove("is-hidden");
       } catch (e) {}
       try {
         dropdownContent.classList.add("is-open");
@@ -1623,7 +1618,7 @@ export async function buildNav(
           } catch (e) {}
           try {
             if (dropdownContent) {
-              dropdownContent.style.display = "none";
+              dropdownContent.classList.add("is-hidden");
               dropdownContent.classList.remove("is-open");
               dropdownContent.removeAttribute("tabindex");
             }
@@ -1725,7 +1720,7 @@ export async function buildNav(
           if (
             !resultsContainer.classList.contains("is-open") &&
             resultsContainer.style &&
-            resultsContainer.style.display !== "block"
+            !resultsContainer.classList.contains("is-hidden")
           )
             return;
           if (
@@ -1743,7 +1738,7 @@ export async function buildNav(
             } catch (e) {}
           }
           try {
-            resultsContainer.style.display = "none";
+            resultsContainer.classList.add("is-hidden");
           } catch (e) {}
           try {
             resultsContainer.classList.remove("is-open");
@@ -2119,9 +2114,9 @@ try {
         if (ev && ev.target && ev.target.id === "nimbi-search") {
           const r = document.getElementById("nimbi-search-results");
           if (r && ev.target && ev.target.value) {
-            try {
-              r.style.display = "block";
-            } catch (e) {}
+          try {
+            r.classList.remove("is-hidden");
+          } catch (e) {}
           }
         }
       } catch (e) {}

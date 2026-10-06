@@ -38,6 +38,7 @@ module.exports = [
         ResizeObserver: 'readonly',
         sessionStorage: 'readonly',
         setTimeout: 'readonly',
+        structuredClone: 'readonly',
         URLSearchParams: 'readonly',
         Worker: 'readonly',
         XMLSerializer: 'readonly',

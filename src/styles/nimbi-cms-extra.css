@@ -759,6 +759,43 @@ body,
     opacity: 0.95
 }
 
+/* Init error container styles (replaces inline styles from init.js) */
+.nimbi-init-error {
+    padding: 1rem;
+    font-family: system-ui, sans-serif;
+    color: #b00;
+    background: #fee;
+    border: 1px solid #b00;
+}
+
+.nimbi-init-error pre {
+    white-space: pre-wrap;
+}
+
+/* Version label hidden state (replaces inline visibility/opacity/pointer-events) */
+.nimbi-version-label.is-hidden {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Sitemap download link hidden state */
+.nimbi-sitemap-download {
+    display: none;
+}
+
+/* Search results visibility toggles (replaces inline display in nav.js) */
+.nimbi-search-results.is-hidden,
+.nimbi-search-dropdown-content.is-hidden,
+#nimbi-search-results.is-hidden {
+    display: none;
+}
+
+/* Navbar logo margin (replaces inline marginRight in nav.js) */
+.nimbi-navbar-logo {
+    margin-right: 0.5em;
+}
+
 
 [data-theme="dark"] .nimbi-version-label,
 .nimbi-mount[data-theme="dark"] .nimbi-version-label {

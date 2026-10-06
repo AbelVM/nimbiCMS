@@ -65,7 +65,7 @@ describe('nav search & burger', () => {
     // wait for debounce + promise resolution
     await new Promise((r) => setTimeout(r, 150))
 
-    expect(results.style.display).toBe('block')
+    expect(results.classList.contains('is-hidden')).toBe(false)
     const link = results.querySelector('a')
     expect(link).toBeTruthy()
     const linkHref = link.getAttribute('href') || ''

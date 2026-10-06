@@ -1772,7 +1772,7 @@ export function attachSitemapDownloadUI(mount, opts = {}) {
             .replace(/[^A-Za-z0-9_.-]/g, "_")
             .replace(/^_+/, "")
             .replace(/_+$/, "") || "sitemap.json";
-          a.style.display = "none";
+          a.className = "nimbi-sitemap-download";
           document.body.appendChild(a);
           a.click();
           a.remove();
