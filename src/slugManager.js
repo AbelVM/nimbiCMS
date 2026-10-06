@@ -1456,11 +1456,12 @@ export let fetchMarkdown = async function (path, base, opts) {
     return isHtml ? { raw, isHtml: true } : { raw };
   })();
 
-  // Cache the unraced promise so concurrent callers share the same
-  // underlying fetch regardless of their AbortSignal state. A caller
-  // without a signal must not be poisoned by another caller's abort.
+  // Cache the promise so concurrent callers share the same underlying fetch.
   fetchCache.set(url, promise);
 
+  // If the caller provided an AbortSignal, wire it to the returned promise
+  // so that aborting the signal rejects the caller-visible promise with
+  // AbortError, while keeping the shared fetch promise itself unraced.
   let onAbort = null;
   let returned = promise;
   try {

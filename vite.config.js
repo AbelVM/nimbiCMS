@@ -64,7 +64,7 @@ function createBuildConfig({ mode, shouldAnalyze }) {
       inline: true,
       rollupOptions: {
         output: {
-          codeSplitting: false
+          codeSplitting: true
         }
       }
     },
@@ -96,20 +96,20 @@ function createBuildConfig({ mode, shouldAnalyze }) {
               name: 'nimbiCMS',
               entryFileNames: 'nimbi-cms.js',
               exports: 'named',
-              codeSplitting: false
+              codeSplitting: true
             }
           : [
               {
                 format: 'es',
                 entryFileNames: 'nimbi-cms.es.js',
                 exports: 'named',
-                codeSplitting: false
+                codeSplitting: true
               },
               {
                 format: 'cjs',
                 entryFileNames: 'nimbi-cms.cjs.js',
                 exports: 'named',
-                codeSplitting: false
+                codeSplitting: true
               }
             ],
         plugins: createAnalyzePlugins(shouldAnalyze && !isUmd)

@@ -70,6 +70,14 @@ function _routerShouldLog() {
  */
 export let RESOLUTION_CACHE_TTL = 5 * 60 * 1000; // five minutes
 
+// Lazy-sweep interval (ms) for periodic TTL cleanup of the resolution cache.
+// Instead of sweeping on every read (O(n)), the sweep runs on a timer.
+const RESOLUTION_CACHE_SWEEP_INTERVAL = 60 * 1000; // 60 seconds
+
+// Interval ID for the lazy-sweep timer. Started when TTL is enabled
+// (positive value via `setResolutionCacheTtl`), cleared otherwise.
+let _resolutionCachePurgeTimerId = null;
+
 // Controller used to cancel the previous in-flight `fetchPageData` call
 let _lastFetchPageDataController = null;
 
@@ -104,6 +112,34 @@ export function setResolutionCacheTtl(ms) {
     resolutionCache.defaultTTL =
       RESOLUTION_CACHE_TTL > 0 ? RESOLUTION_CACHE_TTL : Infinity;
   } catch (_e) {}
+  _scheduleResolutionCachePurge();
+}
+
+/**
+ * Start (or restart) the periodic lazy-sweep timer for the resolution cache.
+ * The timer fires `_purgeExpiredEntries()` every
+ * `RESOLUTION_CACHE_SWEEP_INTERVAL` ms instead of on every read, avoiding the
+ * O(n) per-read cost.  When TTL is disabled (non-positive), the timer is
+ * cleared so no unnecessary work runs.
+ * @returns {void}
+ */
+function _scheduleResolutionCachePurge() {
+  try {
+    if (_resolutionCachePurgeTimerId !== null) {
+      clearInterval(_resolutionCachePurgeTimerId);
+      _resolutionCachePurgeTimerId = null;
+    }
+  } catch (_e) {}
+  if (RESOLUTION_CACHE_TTL > 0) {
+    try {
+      _resolutionCachePurgeTimerId = setInterval(
+        _purgeExpiredEntries,
+        RESOLUTION_CACHE_SWEEP_INTERVAL,
+      );
+    } catch (_e) {
+      _resolutionCachePurgeTimerId = null;
+    }
+  }
 }
 
 /**
@@ -126,6 +162,9 @@ export const resolutionCache = new PowerCache({
   maxEntries: RESOLUTION_CACHE_MAX,
   defaultTTL: RESOLUTION_CACHE_TTL > 0 ? RESOLUTION_CACHE_TTL : Infinity,
 });
+
+// Kick off the periodic lazy-sweep timer when TTL is enabled by default.
+_scheduleResolutionCachePurge();
 
 function _isLegacyResolutionRecord(record) {
   return (
