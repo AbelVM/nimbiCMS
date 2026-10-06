@@ -1393,7 +1393,7 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-81 | ✅ | Enable worker code splitting in `vite.config.js` | P2 | medium | 2h | 1.00 | Removed `inline: true` from worker config; workers now emitted as separate chunks. |
 | M-83 | ✅ | Enable CSS code splitting and purge unused Bulma | P2 | low | 2h | 1.00 | Changed `cssCodeSplit: false` to `cssCodeSplit: true`; PurgeCSS already configured in `postcss.config.cjs`. |
 | M-90 | ✅ | Remove `process.env.VITEST` define, use `import.meta.env` | P3 | low | 1h | 1.00 | `process.env.VITEST` already removed from `vite.config.js`; no source files reference it. |
-| M-91 | ⬜ | Switch to `esbuild` minification or fix terser sourcemaps | P3 | low | 1h | 1.00 |  |
+| M-91 | ✅ | Switch to `esbuild` minification or fix terser sourcemaps | P3 | low | 1h | 1.00 | `minify: 'esbuild'` already set in `vite.config.js`. |
 | M-94 | ✅ | Simplify TypeScript aliases in `package.json` | P3 | low | 1h | 1.00 | Aliases preserved with documentation comment explaining dual TS setup (TS 6 for typedoc, TS 7 for check-dts). |
 | M-98 | ✅ | Add `prefers-reduced-motion` media query | P3 | low | 1h | 1.00 | Added in `src/styles/nimbi-cms-extra.css`; disables View Transitions and reduces motion when user prefers reduced motion. |
 | M-99 | ✅ | Add `prefers-color-scheme` detection on init | P3 | low | 1h | 1.00 | Added in `src/init.js`; detects `prefers-color-scheme: dark` and applies appropriate Bulma class. |
@@ -1425,8 +1425,8 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-121 | ✅ | Audit `PowerPool` options for v2 validation compliance | P2 | low | 30m | 4.00 | All three pools pass valid numbers for `size`, `minSize`, and `autoScale`; no action required. |
 | M-122 | ✅ | Add `messageCodec: 'legacy'` bridge to all `PowerPool` instances | P3 | low | 30m | 2.00 | Added `messageCodec: 'legacy'` to `_anchorPool`, `_slugPool`, and `_rendererPool`. |
 | M-123 | ✅ | Consider `maxQueueLength` backpressure on worker pools | P3 | low | 30m | 2.00 | Added `maxQueueLength: 100` to all three `PowerPool` instances. |
-| M-124 | ⬜ | Use `AbortSignal` on `PowerSemaphore.acquire` for teardown cancellation | P3 | low | 1h | 1.00 |  |
-| M-125 | ⬜ | Use `dispose()` in worker pool teardown paths | P3 | low | 1h | 1.00 |  |
+| M-124 | ✅ | Use `AbortSignal` on `PowerSemaphore.acquire` for teardown cancellation | P3 | low | 1h | 1.00 | `{ signal }` passed to `sem.run()` in `src/htmlBuilder.js:72` and `src/slugManager.js:222`. |
+| M-125 | ✅ | Use `dispose()` in worker pool teardown paths | P3 | low | 1h | 1.00 | `pool.dispose()` called in `src/markdown.js:97-99` and `src/slugManager.js:296-298`. |
 
 **Legend:** ⬜ not started | 🟡 in progress | ✅ done | ⏰ blocked | ➖ deferred | ❌ rejected
 
