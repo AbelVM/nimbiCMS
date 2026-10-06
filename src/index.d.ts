@@ -315,6 +315,8 @@ export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<stri
 
 // --- from src/l10nManager.js
 export function loadL10nFile(path: string, pageDir: string): Promise<void>
+export function formatDate(opts: any): string
+export function formatNumber(opts: any): string
 export function setLang(lang: string): void
 
 
@@ -326,6 +328,7 @@ export function setLang(lang: string): void
 export function parseInitOptionsFromQuery(queryString: string): any
 export const currentHighlightTheme: string
 export const initialDocumentTitle: string
+export function destroy(): void
 
 
 // --- from src/indexManager.js
@@ -342,6 +345,7 @@ export function preScanHtmlSlugs(opts: any): Promise<void>
 export function preMapMdSlugs(opts: any): Promise<void>
 export function executeEmbeddedScripts(article: any, allowEmbeddedScripts: boolean): void
 export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): void
+export function teardownAnchorWorkerPool(): void
 
 
 
@@ -442,6 +446,10 @@ export const normalizePath: any
 export const trimTrailingSlash: any
 export const ensureTrailingSlash: any
 export function addResourceHints(): any
+export function addPreloadHints(highlightJsVersion: string, theme: string): void
+export function setCspNonce(nonce: any): any
+export function getCspNonce(): string|null
+export function applyCspNonce(el: any): void
 export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): void
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
 export function safe(fn: any): string

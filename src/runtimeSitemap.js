@@ -32,6 +32,7 @@ import { yieldIfNeeded } from "./utils/idle.js";
  *   changefreq?: string,
  *   priority?: number,
  *   hreflang?: Array<{lang: string, href: string}>,
+ *   image?: string,
  *   _titleSource?: string,
  *   baseSlug?: string
  * }} SitemapEntry
@@ -83,6 +84,32 @@ function _humanizeSlug(slug) {
 }
 
 /**
+ * Resolve a relative image URL to an absolute URL using the current origin.
+ * @param {string} img - Image path or URL from frontmatter
+ * @returns {string|null} Absolute URL or null if unresolvable
+ */
+function _resolveImageUrl(img) {
+  try {
+    if (!img || typeof img !== "string") return null;
+    const trimmed = img.trim();
+    if (!trimmed) return null;
+    // Already absolute
+    if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+    // Protocol-relative
+    if (trimmed.startsWith("//")) return "https:" + trimmed;
+    // Relative path - resolve against current origin
+    try {
+      if (typeof location !== "undefined" && location.origin) {
+        return new URL(trimmed, location.origin).href;
+      }
+    } catch (_) {}
+    return trimmed;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Humanize a slug/token into a readable title string.
  * @param {string} slug
  * @returns {string}
@@ -104,6 +131,7 @@ function makeEntryFromIndexItem(baseNoQs, it) {
     if (it.title) ent.title = String(it.title);
     if (it.excerpt) ent.excerpt = String(it.excerpt);
     if (it.path) ent.sourcePath = normalizePath(String(it.path));
+    if (it.image) ent.image = String(it.image);
     return ent;
   } catch {
     return null;
@@ -316,12 +344,14 @@ export async function generateSitemapJson(opts = {}) {
           excerpt: it.excerpt ? String(it.excerpt) : undefined,
           path: p,
           source: "index",
+          image: it.image ? String(it.image) : undefined,
         });
         if (p)
           pathMap.set(p, {
             title: entryTitle || undefined,
             excerpt: it.excerpt ? String(it.excerpt) : undefined,
             slug: slugKey,
+            image: it.image ? String(it.image) : undefined,
           });
         const ent = makeEntryFromIndexItem(baseNoQs, it);
         if (!ent || !ent.slug) continue;
@@ -334,6 +364,7 @@ export async function generateSitemapJson(opts = {}) {
             ent._titleSource = "index";
           }
           if (t?.excerpt) ent.excerpt = t.excerpt;
+          if (t?.image) ent.image = t.image;
         }
         entries.push(ent);
       } catch {
@@ -372,6 +403,7 @@ export async function generateSitemapJson(opts = {}) {
               ent._titleSource = "index";
             }
             if (t?.excerpt) ent.excerpt = t.excerpt;
+            if (t?.image) ent.image = t.image;
           } else if (mappedPath) {
             // try path->title fallback
             const pm = pathMap.get(mappedPath);
@@ -380,6 +412,7 @@ export async function generateSitemapJson(opts = {}) {
               ent._titleSource = "path";
               if (!ent.excerpt && pm?.excerpt) ent.excerpt = pm.excerpt;
             }
+            if (!ent.image && pm?.image) ent.image = pm.image;
           }
           seenSlugs.add(slug);
           if (typeof slug === "string") {
@@ -428,6 +461,7 @@ export async function generateSitemapJson(opts = {}) {
                 ent._titleSource = "index";
               }
               if (t?.excerpt) ent.excerpt = t.excerpt;
+              if (t?.image) ent.image = t.image;
             }
             seenSlugs.add(hpSlug);
             entries.push(ent);
@@ -632,6 +666,8 @@ export async function generateSitemapJson(opts = {}) {
           }
           if (t?.excerpt) ent.excerpt = t.excerpt;
           if (t?.path) ent.sourcePath = t.path;
+          if (t?.lastmod) ent.lastmod = t.lastmod;
+          if (t?.image) ent.image = t.image;
         } else if (pathMap && slugToMd?.has?.(base)) {
           const mdVal = slugToMd?.get?.(base);
           let mappedPath = null;
@@ -651,6 +687,8 @@ export async function generateSitemapJson(opts = {}) {
             }
             if (pm?.excerpt) ent.excerpt = pm.excerpt;
             ent.sourcePath = mappedPath;
+            if (pm?.lastmod) ent.lastmod = pm.lastmod;
+            if (pm?.image) ent.image = pm.image;
           }
         }
         if (!ent) {
@@ -796,7 +834,7 @@ export function generateSitemapXml(json) {
 
   let s = '<?xml version="1.0" encoding="UTF-8"?>\n';
   s +=
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n';
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
   for (const e of entries) {
     try {
       s += "  <url>\n";
@@ -811,6 +849,14 @@ export function generateSitemapXml(json) {
         const hreflangs = Array.isArray(e.hreflang) ? e.hreflang : [e.hreflang];
         for (const hl of hreflangs) {
           s += `    <xhtml:link rel="alternate" hreflang="${_escapeXml(String(hl.lang))}" href="${_escapeXml(String(hl.href))}" />\n`;
+        }
+      }
+      if (e.image) {
+        const imgUrl = _resolveImageUrl(String(e.image));
+        if (imgUrl) {
+          s += `    <image:image>\n`;
+          s += `      <image:loc>${_escapeXml(imgUrl)}</image:loc>\n`;
+          s += `    </image:image>\n`;
         }
       }
       s += "  </url>\n";

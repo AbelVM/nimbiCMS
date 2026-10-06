@@ -54,8 +54,7 @@ function createBuildConfig({ mode, shouldAnalyze }) {
       pkg?.homepage ||
       (typeof pkg?.repository === 'string' ? pkg.repository : pkg?.repository?.url) ||
       ''
-    ),
-    'process.env.VITEST': 'false'
+    )
   }
 
   return defineConfig({
@@ -71,16 +70,11 @@ function createBuildConfig({ mode, shouldAnalyze }) {
     },
     build: {
       sourcemap: 'hidden',
-      assetsInlineLimit: 0,
+      assetsInlineLimit: 4096,
       cssCodeSplit: false,
       // CSS minification is handled in postcss.config.cjs via cssnano.
       cssMinify: false,
-      minify: 'terser',
-      terserOptions: {
-        format: {
-          comments: false
-        }
-      },
+      minify: 'esbuild',
       emptyOutDir: !isUmd,
       lib: isUmd
         ? {
@@ -127,7 +121,12 @@ function createBuildConfig({ mode, shouldAnalyze }) {
 export default defineConfig(({ command }) => {
   if (command !== 'build') {
     return {
-      server: { port: 5173 },
+      server: {
+        port: 5173,
+        hmr: {
+          overlay: false
+        }
+      },
       worker: { format: 'es', inline: true }
     }
   }

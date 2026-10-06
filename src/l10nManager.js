@@ -100,6 +100,45 @@ export async function loadL10nFile(path, pageDir) {
 }
 
 /**
+ * Format a date using the current locale.
+ *
+ * @param {Date|string|number} date - The date to format.
+ * @param {Intl.DateTimeFormatOptions} [options] - Optional formatting options.
+ * @returns {string} - The formatted date string.
+ */
+export function formatDate(date, options = {}) {
+  try {
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return String(date);
+    const formatter = new Intl.DateTimeFormat(currentLang, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      ...options,
+    });
+    return formatter.format(d);
+  } catch (_) {
+    return String(date);
+  }
+}
+
+/**
+ * Format a number using the current locale.
+ *
+ * @param {number} value - The number to format.
+ * @param {Intl.NumberFormatOptions} [options] - Optional formatting options.
+ * @returns {string} - The formatted number string.
+ */
+export function formatNumber(value, options = {}) {
+  try {
+    const formatter = new Intl.NumberFormat(currentLang, options);
+    return formatter.format(value);
+  } catch (_) {
+    return String(value);
+  }
+}
+
+/**
  * Switch the current UI language. Falls back to English if the requested
  * language is not available.
  * @param {string} lang - Language code to switch to (e.g. 'en', 'es').

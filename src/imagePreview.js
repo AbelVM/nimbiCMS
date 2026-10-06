@@ -44,6 +44,7 @@ function _createModal() {
     closeButton.type = "button";
     closeButton.setAttribute("data-nimbi-preview-close", "");
     closeButton.textContent = "✕";
+    closeButton.setAttribute("aria-hidden", "true");
 
     const wrapper = document.createElement("div");
     wrapper.className = "nimbi-image-preview__image-wrapper";
@@ -62,16 +63,19 @@ function _createModal() {
     fitBtn.type = "button";
     fitBtn.setAttribute("data-nimbi-preview-fit", "");
     fitBtn.textContent = "⤢";
+    fitBtn.setAttribute("aria-hidden", "true");
     const originalBtn = document.createElement("button");
     originalBtn.className = "button is-small";
     originalBtn.type = "button";
     originalBtn.setAttribute("data-nimbi-preview-original", "");
     originalBtn.textContent = "1:1";
+    originalBtn.setAttribute("aria-hidden", "true");
     const resetBtn = document.createElement("button");
     resetBtn.className = "button is-small";
     resetBtn.type = "button";
     resetBtn.setAttribute("data-nimbi-preview-reset", "");
     resetBtn.textContent = "⟲";
+    resetBtn.setAttribute("aria-hidden", "true");
     group1.appendChild(fitBtn);
     group1.appendChild(originalBtn);
     group1.appendChild(resetBtn);
@@ -83,6 +87,7 @@ function _createModal() {
     zoomOut.type = "button";
     zoomOut.setAttribute("data-nimbi-preview-zoom-out", "");
     zoomOut.textContent = "−";
+    zoomOut.setAttribute("aria-hidden", "true");
     const zoomLabel = document.createElement("div");
     zoomLabel.className = "nimbi-image-preview__zoom";
     zoomLabel.setAttribute("data-nimbi-preview-zoom-label", "");
@@ -92,6 +97,7 @@ function _createModal() {
     zoomIn.type = "button";
     zoomIn.setAttribute("data-nimbi-preview-zoom-in", "");
     zoomIn.textContent = "＋";
+    zoomIn.setAttribute("aria-hidden", "true");
     group2.appendChild(zoomOut);
     group2.appendChild(zoomLabel);
     group2.appendChild(zoomIn);
@@ -112,20 +118,20 @@ function _createModal() {
       <div class="modal-background"></div>
       <div class="modal-content">
         <div class="nimbi-image-preview__content box" role="document">
-          <button class="button is-small nimbi-image-preview__close" type="button" data-nimbi-preview-close>✕</button>
+          <button class="button is-small nimbi-image-preview__close" type="button" data-nimbi-preview-close aria-hidden="true">✕</button>
           <div class="nimbi-image-preview__image-wrapper">
             <img data-nimbi-preview-image alt="" />
           </div>
           <div class="nimbi-image-preview__controls">
             <div class="nimbi-image-preview__group">
-              <button class="button is-small" type="button" data-nimbi-preview-fit>⤢</button>
-              <button class="button is-small" type="button" data-nimbi-preview-original>1:1</button>
-              <button class="button is-small" type="button" data-nimbi-preview-reset>⟲</button>
+              <button class="button is-small" type="button" data-nimbi-preview-fit aria-hidden="true">⤢</button>
+              <button class="button is-small" type="button" data-nimbi-preview-original aria-hidden="true">1:1</button>
+              <button class="button is-small" type="button" data-nimbi-preview-reset aria-hidden="true">⟲</button>
             </div>
             <div class="nimbi-image-preview__group">
-              <button class="button is-small" type="button" data-nimbi-preview-zoom-out>−</button>
+              <button class="button is-small" type="button" data-nimbi-preview-zoom-out aria-hidden="true">−</button>
               <div class="nimbi-image-preview__zoom" data-nimbi-preview-zoom-label>100%</div>
-              <button class="button is-small" type="button" data-nimbi-preview-zoom-in>＋</button>
+              <button class="button is-small" type="button" data-nimbi-preview-zoom-in aria-hidden="true">＋</button>
             </div>
           </div>
         </div>

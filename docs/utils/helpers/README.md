@@ -10,16 +10,20 @@ Utility helper functions used by the runtime.
 
 ## Functions
 
+- [addPreloadHints](functions/addPreloadHints.md)
 - [addResourceHints](functions/addResourceHints.md)
+- [applyCspNonce](functions/applyCspNonce.md)
 - [buildPageUrl](functions/buildPageUrl.md)
 - [decodeHtmlEntities](functions/decodeHtmlEntities.md)
 - [encodeURL](functions/encodeURL.md)
 - [ensureTrailingSlash](functions/ensureTrailingSlash.md)
+- [getCspNonce](functions/getCspNonce.md)
 - [getWorkerPoolSize](functions/getWorkerPoolSize.md)
 - [isExternalLink](functions/isExternalLink.md)
 - [joinPaths](functions/joinPaths.md)
 - [normalizePath](functions/normalizePath.md)
 - [safe](functions/safe.md)
+- [setCspNonce](functions/setCspNonce.md)
 - [setEagerForAboveFoldImages](functions/setEagerForAboveFoldImages.md)
 - [setLazyload](functions/setLazyload.md)
 - [trimTrailingSlash](functions/trimTrailingSlash.md)

@@ -11,6 +11,7 @@
 let currentStyle = "light";
 
 import { debugLog, debugWarn } from "./utils/debug.js";
+import { applyCspNonce } from "./utils/helpers.js";
 
 /**
  * @typedef {Record<string,string>} ThemeVars
@@ -163,6 +164,7 @@ export async function ensureBulma(bulmaCustomize = "none", pageDir = "/") {
           const css = await res.text();
           const s = document.createElement("style");
           s.setAttribute("data-bulma-override", p);
+          applyCspNonce(s);
           s.appendChild(
             document.createTextNode(`\n/* bulma override: ${p} */\n` + css),
           );

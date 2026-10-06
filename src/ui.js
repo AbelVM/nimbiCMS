@@ -79,6 +79,8 @@ import { notFoundPage } from "./slugManager.js";
   }
 
   let currentPagePath = null;
+  // In-memory fallback for scroll positions when sessionStorage is full
+  const _scrollMemory = {};
   const siteNav = createNavTree(t, [
     { path: homePage, name: t("home"), isIndex: true, children: [] },
   ]);
@@ -264,7 +266,39 @@ import { notFoundPage } from "./slugManager.js";
       debugWarn("[nimbi-cms] transformHtml hooks failed", e);
     }
 
-    contentWrap.appendChild(article);
+    // Ensure skip-to-content link exists for keyboard accessibility
+    try {
+      if (!document.querySelector(".nimbi-skip-link")) {
+        const skipLink = document.createElement("a");
+        skipLink.className = "nimbi-skip-link";
+        skipLink.href = "#main";
+        skipLink.textContent = "Skip to content";
+        skipLink.setAttribute("aria-label", "Skip to content");
+        // Insert as the first child of the mount element
+        const mountEl =
+          document.querySelector(".nimbi-mount") ||
+          document.querySelector(".nimbi-cms") ||
+          document.body;
+        if (mountEl && mountEl.firstChild) {
+          mountEl.insertBefore(skipLink, mountEl.firstChild);
+        } else if (mountEl) {
+          mountEl.appendChild(skipLink);
+        }
+      }
+    } catch (_) {}
+
+    // Wrap article in <main> for semantic HTML landmarks
+    try {
+      let mainEl = contentWrap.querySelector("main.nimbi-main");
+      if (!mainEl) {
+        mainEl = document.createElement("main");
+        mainEl.className = "nimbi-main";
+        contentWrap.appendChild(mainEl);
+      }
+      mainEl.appendChild(article);
+    } catch (_) {
+      contentWrap.appendChild(article);
+    }
 
     try {
       observeCodeBlocks(article);
@@ -327,6 +361,12 @@ import { notFoundPage } from "./slugManager.js";
    * @returns {Promise<void>}
    */
   async function renderByQuery() {
+    // Performance timing: measure render duration
+    const renderStart =
+      typeof performance !== "undefined" &&
+      typeof performance.now === "function"
+        ? performance.now()
+        : null;
     // Prevent concurrent renders: if a render is already in progress, mark
     // that another render is desired and return. When the active render
     // completes it will re-run `renderByQuery` to pick up the latest URL.
@@ -394,6 +434,16 @@ import { notFoundPage } from "./slugManager.js";
       } catch (err) {}
       renderNotFound(contentWrap, t, e);
     } finally {
+      // Performance timing: log render duration
+      if (renderStart !== null) {
+        try {
+          const renderEnd = performance.now();
+          const duration = renderEnd - renderStart;
+          if (typeof window !== "undefined" && window.__nimbiRenderTimings) {
+            window.__nimbiRenderTimings.push(duration);
+          }
+        } catch (_) {}
+      }
       _isRendering = false;
       if (_queuedRender) {
         _queuedRender = false;
@@ -439,6 +489,16 @@ import { notFoundPage } from "./slugManager.js";
       };
       sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data));
     } catch (e) {
+      // QuotaExceededError: sessionStorage is full; fall back to in-memory storage
+      if (e && e.name === "QuotaExceededError") {
+        try {
+          _scrollMemory[scrollStoreKey()] = {
+            top: (container || document.querySelector(".nimbi-cms"))?.scrollTop || 0,
+            left: (container || document.querySelector(".nimbi-cms"))?.scrollLeft || 0,
+          };
+        } catch (_e2) {}
+        return;
+      }
       debugWarn("[nimbi-cms] save scroll position failed", e);
     }
   };
@@ -451,10 +511,18 @@ import { notFoundPage } from "./slugManager.js";
     try {
       const containerEl = container || document.querySelector(".nimbi-cms");
       if (!containerEl) return;
-      const stored = sessionStorage.getItem(scrollStoreKey());
-      if (!stored) return;
-      const data = JSON.parse(stored);
-      if (typeof data?.top === "number") {
+      let data = null;
+      try {
+        const stored = sessionStorage.getItem(scrollStoreKey());
+        if (stored) data = JSON.parse(stored);
+      } catch (_e) {
+        /* ignore sessionStorage read errors */
+      }
+      // Fall back to in-memory storage if sessionStorage was unavailable
+      if (!data && _scrollMemory[scrollStoreKey()]) {
+        data = _scrollMemory[scrollStoreKey()];
+      }
+      if (data && typeof data?.top === "number") {
         containerEl.scrollTo({
           top: data.top,
           left: data.left || 0,

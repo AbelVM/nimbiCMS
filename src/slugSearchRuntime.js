@@ -1,4 +1,5 @@
 import * as slugManagerRuntime from "./slugManager.js";
+import { parseFrontmatter } from "./utils/frontmatter.js";
 
 let _indexPromise = null;
 let _cachedIndex = [];
@@ -297,7 +298,25 @@ export async function buildSearchIndex(
       const isHtml = /\.html?$/i.test(path);
       const { title, excerpt } = _extractTitleAndExcerpt(raw, isHtml);
       const pageSlug = _slugify(title || path);
-      entries.push({ slug: pageSlug, title, excerpt, path });
+      // Extract lastmod from frontmatter date/dateModified fields
+      let lastmod = null;
+      let image = null;
+      try {
+        if (!isHtml) {
+          const { data: fm } = parseFrontmatter(raw);
+          const dateRaw = fm.dateModified || fm.date || fm.lastmod;
+          if (dateRaw) {
+            const d = new Date(dateRaw);
+            if (!isNaN(d.getTime())) lastmod = d.toISOString().split("T")[0];
+          }
+          // Extract image from frontmatter (og:image, image, cover, featured_image)
+          const imgRaw = fm.image || fm.og_image || fm.cover || fm.featured_image;
+          if (imgRaw && String(imgRaw).trim()) {
+            image = String(imgRaw).trim();
+          }
+        }
+      } catch (_) {}
+      entries.push({ slug: pageSlug, title, excerpt, path, lastmod, image });
 
       if (Number(indexDepth) >= 2) {
         const headingRegex = isHtml
@@ -315,6 +334,7 @@ export async function buildSearchIndex(
             excerpt: "",
             path,
             parentTitle: title || "",
+            lastmod,
           });
         }
       }

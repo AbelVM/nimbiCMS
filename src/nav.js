@@ -1211,6 +1211,7 @@ export async function buildNav(
     searchControl = document.createElement("div");
     searchControl.className = "control";
     if (searchIndexMode === "eager") searchControl.classList.add("is-loading");
+    searchControl.setAttribute("aria-live", "polite");
     searchControl.appendChild(searchInput);
     searchItem.appendChild(searchControl);
 
@@ -1232,6 +1233,8 @@ export async function buildNav(
     dropdownContent.className = "dropdown-content nimbi-search-results";
     dropdownContent.setAttribute("role", "listbox");
     dropdownContent.setAttribute("aria-hidden", "true");
+    dropdownContent.setAttribute("aria-live", "polite");
+    dropdownContent.setAttribute("aria-relevant", "all");
 
     resultsContainer = dropdownContent;
 

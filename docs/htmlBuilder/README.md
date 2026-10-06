@@ -38,6 +38,7 @@ prepare content for rendering inside the UI.
 - [rewriteAnchors](functions/rewriteAnchors.md)
 - [rewriteAnchorsWorker](functions/rewriteAnchorsWorker.md)
 - [scrollToAnchorOrTop](functions/scrollToAnchorOrTop.md)
+- [teardownAnchorWorkerPool](functions/teardownAnchorWorkerPool.md)
 
 ## References
 

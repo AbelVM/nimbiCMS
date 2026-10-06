@@ -20,9 +20,21 @@
 
 > `optional` **baseSlug?**: `string`
 
+### changefreq?
+
+> `optional` **changefreq?**: `string`
+
 ### excerpt?
 
 > `optional` **excerpt?**: `string`
+
+### hreflang?
+
+> `optional` **hreflang?**: `object`[]
+
+### image?
+
+> `optional` **image?**: `string`
 
 ### lastmod?
 
@@ -31,6 +43,10 @@
 ### loc
 
 > **loc**: `string`
+
+### priority?
+
+> `optional` **priority?**: `number`
 
 ### slug
 

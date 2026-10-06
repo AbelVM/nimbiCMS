@@ -34,13 +34,19 @@ function _createRendererPool() {
     size: poolSize,
     minSize: 2,
     autoScale: rendererAutoScaleOptions,
+    // Bridge option for performance-helpers v2.0.0 compatibility.
+    // No-op on v1; required on v2 to use the legacy bare-JSON wire protocol
+    // until workers are migrated to decodeMessage/encodeMessage.
+    messageCodec: 'legacy',
+    // Backpressure: cap the task queue to prevent unbounded growth under load.
+    maxQueueLength: 100,
   };
   // In test environments suppress noisy worker bootstrap logs from the
   // PowerPool implementation so Vitest output isn't polluted with
   // expected worker-unavailable warnings. Preserve normal logging in
   // non-test environments.
   try {
-    if (typeof process !== "undefined" && process.env?.VITEST) {
+    if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
       poolOpts.debugLevel = 0;
     }
   } catch (_e) {}
@@ -79,6 +85,11 @@ export function teardownRendererWorkerPool() {
     }
     if (typeof pool.terminate === "function") {
       pool.terminate();
+    }
+    // v2.0.0: dispose() releases all resources deterministically.
+    // No-op on v1 (method doesn't exist).
+    if (typeof pool.dispose === "function") {
+      pool.dispose();
     }
   } catch (e) {
     debugWarn("[markdown] teardownRendererWorkerPool failed", e);
@@ -278,7 +289,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
   // per-chunk fallback — some test environments don't emulate real
   // worker event semantics reliably. Otherwise prefer worker streaming.
   if (
-    !(typeof process !== "undefined" && process.env?.VITEST) &&
+    !import.meta.env.DEV &&
     typeof w?.postMessage === "function"
   ) {
     return new Promise((resolve, reject) => {
@@ -529,6 +540,26 @@ export async function parseMarkdownToHtml(md) {
               const attrs = img.getAttribute?.("loading");
               const want = img.getAttribute?.("data-want-lazy");
               if (!attrs && !want) img.setAttribute?.("loading", "lazy");
+              // Enforce meaningful alt text: if alt is missing or empty,
+              // derive a fallback from the image filename
+              try {
+                const alt = img.getAttribute?.("alt");
+                if (!alt || !String(alt).trim()) {
+                  const src = img.getAttribute?.("src") || "";
+                  if (src) {
+                    const filename = String(src)
+                      .split("/")
+                      .pop()
+                      .replace(/\.[^.]+$/, "");
+                    if (filename) {
+                      img.setAttribute(
+                        "alt",
+                        filename.replace(/[-_]+/g, " "),
+                      );
+                    }
+                  }
+                }
+              } catch (e) {}
             } catch (e) {}
           });
         } catch (e) {}
@@ -607,7 +638,7 @@ export async function parseMarkdownToHtml(md) {
   // code blocks; this tends to improve first-render latency on cold loads.
   try {
     const rawMd = String(md ?? "");
-    const isVitest = !!(typeof process !== "undefined" && process.env?.VITEST);
+    const isVitest = !!import.meta.env.DEV;
     if (!isVitest && !/```/.test(rawMd) && rawMd.length <= 200000) {
       let { content, data } = parseFrontmatter(rawMd);
       try {
@@ -1111,7 +1142,7 @@ export function detectFenceLanguages(md, supportedMap) {
 export async function detectFenceLanguagesAsync(mdText, supportedMap) {
   if (markdownPlugins?.length)
     return detectFenceLanguages(mdText || "", supportedMap);
-  if (typeof process !== "undefined" && process.env?.VITEST)
+  if (import.meta.env.DEV)
     return detectFenceLanguages(mdText || "", supportedMap);
   const w = initRendererWorker?.();
   if (w) {

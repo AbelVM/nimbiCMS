@@ -4,6 +4,14 @@
  */
 
 /**
+ * NOTE: All PowerMemoizer instances below use an explicit `keyResolver`
+ * to ensure consistent cache keys across performance-helpers v1 and v2.
+ * In v2.0.0, the default `keyResolver` changed from `JSON.stringify(args)`
+ * to `simpleArgsKey`. Since all our memoizers use scalar string args,
+ * the behavior is equivalent, but we pin the resolver for safety.
+ */
+
+/**
  * Return true if the href points to an external or special link.  This
  * matches absolute URLs and mailto/tel schemes.
  *
@@ -191,6 +199,68 @@ export function addResourceHints() {
       } catch (e) {}
     }
   } catch (e) {}
+}
+
+/**
+ * Inject `<link rel="preload">` hints for critical external resources
+ * (e.g. highlight.js theme CSS). Safe to call multiple times.
+ * @param {string} [highlightJsVersion] - The highlight.js version to preload theme for.
+ * @param {string} [theme='monokai'] - The highlight.js theme name.
+ * @returns {void}
+ */
+export function addPreloadHints(highlightJsVersion, theme = "monokai") {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    if (!highlightJsVersion) return;
+    const href = `https://cdn.jsdelivr.net/npm/highlight.js@${highlightJsVersion}/styles/${theme}.css`;
+    try {
+      if (document.querySelector(`link[rel="preload"][href="${href}"]`)) return;
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "style";
+      link.href = href;
+      link.crossOrigin = "anonymous";
+      link.fetchPriority = "high";
+      document.head.appendChild(link);
+    } catch (e) {}
+  } catch (e) {}
+}
+
+/**
+ * Module-level CSP nonce used to tag dynamically injected inline scripts
+ * and styles so they pass a strict Content-Security-Policy.
+ * @type {string|null}
+ */
+let cspNonce = null;
+
+/**
+ * Set the CSP nonce to apply to dynamically injected inline scripts/styles.
+ * @param {string} nonce - The nonce value from the host page's CSP header.
+ * @returns {void}
+ */
+export function setCspNonce(nonce) {
+  cspNonce = typeof nonce === "string" ? nonce : null;
+}
+
+/**
+ * Get the current CSP nonce, or null if not set.
+ * @returns {string|null}
+ */
+export function getCspNonce() {
+  return cspNonce;
+}
+
+/**
+ * Apply the current CSP nonce to an element if one is set.
+ * @param {HTMLElement} el - The element to apply the nonce to.
+ * @returns {void}
+ */
+export function applyCspNonce(el) {
+  if (cspNonce && el && typeof el.setAttribute === "function") {
+    try {
+      el.setAttribute("nonce", cspNonce);
+    } catch (e) {}
+  }
 }
 
 /**

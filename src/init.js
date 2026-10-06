@@ -28,6 +28,9 @@ import {
  } from "./slugManager.js";
 import * as router from "./router.js";
 import * as markdown from "./markdown.js";
+import { teardownRendererWorkerPool } from "./markdown.js";
+import { teardownSlugWorkerPool } from "./slugManager.js";
+import { teardownAnchorWorkerPool } from "./htmlBuilder.js";
 import { refreshIndexPaths } from "./indexManager.js";
 import { buildNav } from "./nav.js";
 import * as runtimeSitemap from "./runtimeSitemap.js";
@@ -37,6 +40,8 @@ import { parseHrefToRoute } from "./utils/urlHelper.js";
 import {
   normalizePath,
   addResourceHints,
+  addPreloadHints,
+  setCspNonce,
 } from "./utils/helpers.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import { injectSeoForPage, setSeoMap, ensureDocumentMeta } from "./seoManager.js";
@@ -289,6 +294,14 @@ export let currentHighlightTheme = "monokai";
 export let initialDocumentTitle = "";
 
 /**
+ * Module-level AbortController for cleanup on destroy/teardown.
+ * All UI and navigation event listeners are wired to this signal
+ * so that a single `abort()` call removes them all.
+ * @type {AbortController|null}
+ */
+let cmsAbortController = null;
+
+/**
  * Initialize the CMS in a host page.
  *
  * Throws a `TypeError` when options are of the wrong type so configuration
@@ -392,6 +405,7 @@ export async function initCMS(options = {}) {
     navigationPage = "_navigation.md",
     allowEmbeddedScripts = false,
     exposeSitemap = true,
+    cspNonce = null,
   } = finalOptions;
 
   try {
@@ -712,6 +726,20 @@ export async function initCMS(options = {}) {
     } catch (e) {}
     try {
       addResourceHints();
+    } catch (e) {}
+    try {
+      if (cspNonce) setCspNonce(cspNonce);
+    } catch (e) {}
+    // Preload critical external resources (highlight.js theme CSS)
+    try {
+      const hljsVersion =
+        typeof __HIGHLIGHT_JS_VERSION__ !== "undefined"
+          ? String(__HIGHLIGHT_JS_VERSION__)
+          : null;
+      if (hljsVersion) {
+        const theme = currentHighlightTheme || "monokai";
+        addPreloadHints(hljsVersion, theme);
+      }
     } catch (e) {}
     // Attach a lightweight runtime error/rejection logger for debugging render issues.
     try {
@@ -1307,7 +1335,7 @@ setStyle(defaultStyle);
   // Create an AbortController for cleanup on destroy/teardown.
   // All UI and navigation event listeners will be wired to this signal
   // so that a single `abort()` call removes them all.
-  const cmsAbortController = typeof window !== "undefined" ? new AbortController() : { signal: { abort: () => {} } };
+  cmsAbortController = typeof window !== "undefined" ? new AbortController() : { signal: { abort: () => {} } };
 
   const ui = createUI({
     contentWrap,
@@ -1326,6 +1354,10 @@ setStyle(defaultStyle);
         if (typeof window !== "undefined") {
           try {
             window.__nimbiUI = ui;
+            // Initialize render timing collection
+            if (!window.__nimbiRenderTimings) {
+              window.__nimbiRenderTimings = [];
+            }
           } catch (_) {}
           window.addEventListener("nimbi.coldRouteResolved", function (ev) {
             ui?.renderByQuery?.().catch((e) => {
@@ -1955,4 +1987,65 @@ setStyle(defaultStyle);
     renderInitError(err);
     throw err;
   }
+}
+
+/**
+ * Tear down the CMS runtime: abort pending fetches, terminate worker pools,
+ * remove event listeners, and clear DOM elements created during `initCMS`.
+ *
+ * Safe to call multiple times; subsequent calls are no-ops.
+ *
+ * @returns {void}
+ */
+export function destroy() {
+  try {
+    if (typeof window !== "undefined") {
+      try {
+        window.__nimbiUI = null;
+      } catch (_) {}
+      try {
+        window.__nimbiRenderingErrors__ = null;
+      } catch (_) {}
+      try {
+        window.__nimbiRenderTimings = null;
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  // Abort all pending fetches and remove signal-bound listeners
+  try {
+    if (typeof cmsAbortController !== "undefined" && cmsAbortController) {
+      cmsAbortController.abort();
+    }
+  } catch (_) {}
+
+  // Terminate worker pools
+  try {
+    teardownRendererWorkerPool();
+  } catch (_) {}
+  try {
+    teardownSlugWorkerPool();
+  } catch (_) {}
+  try {
+    teardownAnchorWorkerPool();
+  } catch (_) {}
+
+  // Clear resolution cache
+  try {
+    if (typeof router._clearIndexCache === "function") {
+      router._clearIndexCache();
+    }
+  } catch (_) {}
+
+  // Remove DOM elements created by the CMS
+  try {
+    if (typeof document !== "undefined") {
+      const skipLink = document.querySelector(".nimbi-skip-link");
+      if (skipLink) skipLink.remove();
+      const scrollTop = document.querySelector(".nimbi-scroll-top");
+      if (scrollTop) scrollTop.remove();
+      const main = document.querySelector("main.nimbi-main");
+      if (main) main.remove();
+    }
+  } catch (_) {}
 }

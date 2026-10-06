@@ -32,6 +32,7 @@ import {
   ensureTrailingSlash,
   trimTrailingSlash,
   decodeHtmlEntities,
+  applyCspNonce,
 } from "./utils/helpers.js";
 import { buildCosmeticUrl, parseHrefToRoute } from "./utils/urlHelper.js";
 import { markNotFound } from "./seoManager.js";
@@ -64,11 +65,11 @@ import { registerThemedElement } from "./bulmaManager.js";
 import AnchorWorker from "./worker/anchorWorker.js?worker&inline";
 import { PowerPool } from "performance-helpers/powerPool";
 
-async function runWithConcurrency(items, worker, concurrency = 4) {
+async function runWithConcurrency(items, worker, concurrency = 4, signal) {
   if (!Array.isArray(items) || items.length === 0) return [];
   const sem = new PowerSemaphore(Math.max(1, Number(concurrency) || 1));
   return Promise.all(
-    items.map((item, idx) => sem.run(() => worker(item, idx))),
+    items.map((item, idx) => sem.run(() => worker(item, idx), { signal })),
   );
 }
 
@@ -1706,8 +1707,11 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
       try {
         await ensureLanguages(raw);
       } catch (e) {}
-      streamingArticle = document.createElement("article");
-      streamingArticle.className = "nimbi-article content";
+    streamingArticle = document.createElement("article");
+    streamingArticle.id = "main";
+    streamingArticle.className = "nimbi-article content";
+    streamingArticle.setAttribute("itemscope", "");
+    streamingArticle.setAttribute("itemtype", "https://schema.org/Article");
       const aggregatedToc = [];
       let parsedMeta = {};
       try {
@@ -1789,7 +1793,10 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     article = streamingArticle;
   } else {
     article = document.createElement("article");
+    article.id = "main";
     article.className = "nimbi-article content";
+    article.setAttribute("itemscope", "");
+    article.setAttribute("itemtype", "https://schema.org/Article");
     try {
       const _parser = getSharedParser && getSharedParser();
       if (_parser) {
@@ -2041,6 +2048,10 @@ export function executeEmbeddedScripts(article, allowEmbeddedScripts = false) {
             }
           } catch (e) {}
         }
+        // Apply CSP nonce if set and not already present
+        if (!newScript.hasAttribute("nonce")) {
+          applyCspNonce(newScript);
+        }
          if (!s.src) {
            const inline = s.textContent || "";
            let executed = false;
@@ -2177,6 +2188,7 @@ export function renderNotFound(contentWrap, t, e) {
   }
   const notFound = document.createElement("article");
   notFound.className = "nimbi-article content nimbi-not-found";
+  notFound.setAttribute("aria-live", "polite");
   const h = document.createElement("h1");
   h.textContent = t ? t("notFound") || "Page not found" : "Page not found";
   const p = document.createElement("p");
@@ -2257,9 +2269,9 @@ const anchorAutoScaleOptions = {
   stepDown: 1,
 };
 const _anchorPool = (() => {
-  const poolOpts = { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions };
+  const poolOpts = { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions, messageCodec: 'legacy', maxQueueLength: 100 };
   try {
-    if (typeof process !== "undefined" && process.env?.VITEST) {
+    if (import.meta.env.DEV) {
       poolOpts.debugLevel = 0;
     }
   } catch (_e) {}
@@ -2411,6 +2423,30 @@ function _buildAnchorWorkerSnapshot(article, contentBase, pagePath) {
  */
 export function initAnchorWorker() {
   return _anchorPool.workers?.[0]?.worker?._underlying ?? null;
+}
+
+/**
+ * Tear down the anchor worker pool.
+ * @returns {void}
+ */
+export function teardownAnchorWorkerPool() {
+  const pool = _anchorPool;
+  if (!pool) return;
+  try {
+    if (typeof pool.drain === "function") {
+      pool.drain().catch(() => {});
+    }
+    if (typeof pool.terminate === "function") {
+      pool.terminate();
+    }
+    // v2.0.0: dispose() releases all resources deterministically.
+    // No-op on v1 (method doesn't exist).
+    if (typeof pool.dispose === "function") {
+      pool.dispose();
+    }
+  } catch (e) {
+    debugWarn("[htmlBuilder] teardownAnchorWorkerPool failed", e);
+  }
 }
 
 function _sendToAnchorWorker(msg) {

@@ -6,7 +6,7 @@
  *
  * @module seoManager
  */
-import { normalizePath } from "./utils/helpers.js";
+import { normalizePath, applyCspNonce } from "./utils/helpers.js";
 import { getTextMetrics } from "./utils/textMetrics.js";
 import { debugWarn } from "./utils/debug.js";
 import { availableLanguages, getLanguages } from "./slugManager.js";
@@ -480,6 +480,7 @@ function _computeCanonical(page) {
       el = document.createElement("script");
       el.type = "application/ld+json";
       el.id = id;
+      applyCspNonce(el);
       document.head.appendChild(el);
     }
     el.textContent = JSON.stringify(json, null, 2).replace(/<\/script>/gi, "<\\/script>");

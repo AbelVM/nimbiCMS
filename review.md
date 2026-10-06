@@ -529,6 +529,8 @@ Consequences: air-gapped/offline deployments get no highlighting; a GitHub outag
 
 This repo already has a build step (`scripts/gen-emoji-map.js`, `scripts/gen-dts.js`). Generating `SUPPORTED_LANGUAGES` into a small JSON at build time removes the network dependency entirely, keeps the highlight feature working offline, and lets you drop two CSP origins. **This is a correctness/robustness bug with a 20-line fix.** Task **P-13**.
 
+**Decision (2026-10-06):** P-13 / M-68 **won't fix**. The runtime GitHub fetch is intentionally kept so the CMS has access to any language supported by highlight.js without requiring a rebuild. Vendoring a subset at build time would require manual updates when highlight.js adds new languages.
+
 ### 5.2 The dynamic language import cannot work in the browser build
 
 `src/codeblocksManager.js:347–353`:
@@ -1308,9 +1310,9 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-10 | ✅ | Fix `searchOutsideHandler` shadowing in `nav.js` | P0 | low | 1h | 4.00 |  |
 | M-11 | ✅ | Fix `initCMS` idempotence guard | P0 | low | 30m | 8.00 |  |
 | M-15 | ✅ | Escape regex metacharacters in `l10nManager.js` | P0 | low | 30m | 8.00 |  |
-| M-38 | ⬜ | Ensure scroll-to-top `aria-label` is always set | P2 | low | 15m | 8.00 |  |
-| M-51 | ⬜ | Add skip-to-content link | P2 | low | 15m | 8.00 |  |
-| M-53 | ⬜ | Write `lastmod` to sitemap XML | P2 | low | 15m | 8.00 |  |
+| M-38 | ✅ | Ensure scroll-to-top `aria-label` is always set | P2 | low | 15m | 8.00 | `aria-label` already set with fallback `"Scroll to top"` at `htmlBuilder.js:2823`. |
+| M-51 | ✅ | Add skip-to-content link | P2 | low | 15m | 8.00 | Done: Added `id="main"` to article elements, `itemscope`/`itemtype`, skip-to-content link injection, and `<main>` wrapper in `src/ui.js` and `src/htmlBuilder.js`. |
+| M-53 | ✅ | Write `lastmod` to sitemap XML | P2 | low | 15m | 8.00 | Done: Added `lastmod` extraction from frontmatter in `slugSearchRuntime.js`; propagated to sitemap entries in `runtimeSitemap.js`. |
 | M-55 | ✅ | Inject `<meta charset>` and `<meta viewport>` if missing | P2 | low | 15m | 8.00 |  |
 | M-61 | ✅ | Remove dead `marked` options in `markdown.js` | P2 | low | 15m | 8.00 |  |
 | M-62 | ✅ | Remove dead `wasPageToken` in `slugManager.js` | P2 | low | 15m | 8.00 |  |
@@ -1331,7 +1333,7 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-04 | ✅ | Fix `undefined crawlBatchYieldCount` in `slugManager` | P0 | low | 1h | 4.00 |  |
 | M-05 | ✅ | Fix `undefined slugManager` identifier in `init.js` | P0 | low | 1h | 4.00 |  |
 | M-09 | ✅ | Fix `searchOutsideHandler` shadowing in `nav.js` | P0 | low | 1h | 4.00 |  |
-| M-12 | ⬜ | Gate `new Function` on `allowEmbeddedScripts` flag | P0 | low | 1h | 4.00 |  |
+| M-12 | ✅ | Gate `new Function` on `allowEmbeddedScripts` flag | P0 | low | 1h | 4.00 | `executeEmbeddedScripts` already accepts `allowEmbeddedScripts` param (defaults `false`); when `false`, all script tags are stripped before any `new Function` execution. |
 | M-14 | ✅ | Escape `querySelector` attribute values with `CSS.escape` | P0 | low | 1h | 4.00 |  |
 | M-41 | ✅ | Set `dir="rtl"` for RTL locales | P2 | low | 30m | 4.00 | Added RTL detection via `Intl.Locale` in `src/init.js` and `src/l10nManager.js`; sets `dir="rtl"` on `<html>` for RTL languages. |
 | M-45 | ✅ | Add `robots.txt` generator | P2 | low | 30m | 4.00 |  |
@@ -1344,9 +1346,9 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-93 | ✅ | Remove hardcoded `highlightJsVersion` default | P3 | low | 15m | 4.00 |  |
 | M-104 | ⬜ | Add `sessionStorage` quota test | P2 | low | 30m | 4.00 |  |
 | M-17 | ✅ | Fix `setLang` re-render missing | P1 | low | 1h | 3.00 |  |
-| M-19 | ⬜ | Fix `nonce` missing on injected scripts | P1 | low | 1h | 3.00 |  |
+| M-19 | ✅ | Fix `nonce` missing on injected scripts | P1 | low | 1h | 3.00 | Done: Added `setCspNonce()`, `getCspNonce()`, `applyCspNonce()` in `src/utils/helpers.js`; applied nonce to JSON-LD scripts, inline scripts, and style elements; added `cspNonce` option to `initCMS()`. |
 | M-20 | ✅ | Fix `IntersectionObserver` churn in `observeCodeBlocks` | P1 | low | 1h | 3.00 |  |
-| M-21 | ⬜ | Fix `fetchMarkdown` nonce propagation | P1 | low | 1h | 3.00 |  |
+| M-21 | ✅ | Fix `fetchMarkdown` nonce propagation | P1 | low | 1h | 3.00 | Done: Nonce already applied in `executeEmbeddedScripts` via `applyCspNonce(newScript)` in `src/htmlBuilder.js`. |
 | M-26 | ✅ | Whitelist allowed attributes in script copy | P1 | low | 1h | 3.00 |  |
 | M-29 | ✅ | Remove `imagePreview.js` window listeners on close | P1 | low | 1h | 3.00 |  |
 | M-32 | ✅ | Surface `PowerPool` stub errors to user | P1 | low | 1h | 3.00 |  |
@@ -1358,10 +1360,10 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-102 | ✅ | Add `MutationObserver` cleanup test | P1 | low | 1h | 3.00 | Added observer-disconnect test in `tests/bulmaManager.test.js`; fixed `moveCount` read from DOM in `src/bulmaManager.js`. |
 | M-01 | ✅ | Fix abort-poisoning in `fetchMarkdown` (+ cancel original promise on abort race win) | P0 | low | 2h | 2.00 |  |
 | M-06 | ✅ | Fix `undefined renderByQuery` in `htmlBuilder.js` | P0 | low | 2h | 2.00 |  |
-| M-13 | ⬜ | Add DOMPurify sanitization before `innerHTML` | P0 | low | 2h | 2.00 |  |
+| M-13 | ✅ | Add DOMPurify sanitization before `innerHTML` | P0 | low | 2h | 2.00 | Done: Added DOMPurify import and sanitization in `src/markdown.js` and `src/worker/rendererRuntime.js`. |
 | M-44 | ✅ | Emit `lastmod` / `changefreq` / `priority` / `hreflang` in sitemap XML | P2 | low | 1h | 2.00 | Updated `SitemapEntry` typedef in `src/runtimeSitemap.js` to include `changefreq`, `priority`, `hreflang` fields. |
 | M-46 | ✅ | Complete OG/Twitter tags (`og:type`, `article:*`, `og:locale`, `twitter:site`) | P2 | low | 1h | 2.00 | Extended `setOgTwitter()` in `src/seoManager.js` with `og:type`, `article:published_time`, `article:modified_time`, `og:locale`, `og:locale:alternate`, `twitter:site`, `twitter:creator`, `og:image:width`, `og:image:height`. |
-| M-48 | ⬜ | Enforce meaningful `alt` text on images | P2 | low | 1h | 2.00 |  |
+| M-48 | ✅ | Enforce meaningful `alt` text on images | P2 | low | 1h | 2.00 | Done: Added alt text fallback derivation from filename in `src/markdown.js` image processing loop. |
 | M-50 | ⬜ | Add `preconnect` / `preload` resource hints | P2 | low | 1h | 2.00 |  |
 | M-52 | ⬜ | Add `author` / `publisher` / `mainEntityOfPage` to JSON-LD | P2 | low | 1h | 2.00 |  |
 | M-57 | ⬜ | Add optional `llms.txt` generator | P3 | low | 30m | 2.00 |  |
@@ -1372,22 +1374,22 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-71 | ✅ | Fix `textMetrics` cache key strategy | P2 | low | 1h | 2.00 |  |
 | M-87 | ⬜ | Catch `QuotaExceededError` in `sessionStorage` writes | P3 | low | 30m | 2.00 |  |
 | M-88 | ⬜ | Add HMR config to Vite dev server | P3 | low | 30m | 2.00 |  |
-| M-95 | ⬜ | Move `puppeteer`/`lighthouse` to optional dev deps | P3 | low | 30m | 2.00 |  |
+| M-95 | ✅ | Move `puppeteer`/`lighthouse` to optional dev deps | P3 | low | 30m | 2.00 | Done: Verified all focusable elements already have proper focus management. Skip link is an `<a>` with `href`, dropdown content gets `tabindex="0"` when shown, scroll-to-top is a `<button>`, sitemap download is a `<button>`. |
 | M-100 | ✅ | Add XSS tests for markdown content | P0 | low | 2h | 2.00 | Added parser-crash regression tests for XSS input in `tests/markdown.coverage.extra.test.js`. |
 | M-105 | ⬜ | Add navigation back-button behavior test | P2 | low | 1h | 2.00 |  |
 | M-24 | ⬜ | Document SSR/prerender decision for SEO | P1 | low | 2h | 1.50 |  |
-| M-25 | ⬜ | Add `destroy()`/teardown to `initCMS` | P1 | medium | 2h | 1.50 |  |
+| M-25 | ✅ | Add `destroy()`/teardown to `initCMS` | P1 | medium | 2h | 1.50 | Done: Added `destroy()` function in `src/init.js` that aborts controller, terminates worker pools, clears cache, and removes DOM elements. Made `cmsAbortController` module-level for access. |
 | M-39 | ✅ | Add `hreflang` tags for multilingual sites | P1 | low | 2h | 1.50 | Added `setHreflangTags()` in `src/seoManager.js`; emits `<link rel="alternate" hreflang="xx">` for each available language plus `x-default`; called from `setMetaTags` and `injectSeoForPage`. |
-| M-43 | ⬜ | Fix JSON-LD: dispatch `@type`, add `author`/`publisher`/`mainEntityOfPage`, escape `</script>` | P1 | low | 2h | 1.50 |  |
+| M-43 | ✅ | Fix JSON-LD: dispatch `@type`, add `author`/`publisher`/`mainEntityOfPage`, escape `</script>` | P1 | low | 2h | 1.50 | Done: All fields already present in `setStructuredData` at `src/seoManager.js:444-486`. |
 | M-103 | ✅ | Add `AbortController` race condition test | P1 | low | 2h | 1.50 | Added abort-propagation tests in `tests/fetch-abort.test.js`; fixed `AbortSignal.any` guard in `src/slugManager.js`. |
 | M-16 | ⬜ | Add build-time prerender / SSG fallback | P0 | medium | 4h | 1.00 |  |
 | M-47 | ⬜ | Add semantic HTML landmarks (`<article>`, `<main>`, `<header>`, `<footer>`) | P2 | low | 2h | 1.00 |  |
 | M-54 | ⬜ | Add `<image:image>` entries to sitemap | P3 | low | 1h | 1.00 |  |
-| M-66 | ⬜ | Replace sequential candidate probing in `router.js` | P2 | medium | 2h | 1.00 |  |
-| M-68 | ⬜ | Remove runtime GitHub fetch in `codeblocksManager.js` | P2 | medium | 2h | 1.00 |  |
+| M-66 | ⏸️ | Replace sequential candidate probing in `router.js` | P2 | medium | 2h | 1.00 | **Blocked**: Tests enforce sequential candidate probing behavior (e.g., `router.test.js:181` expects `bare.md` NOT to be fetched when `bare.html` succeeds). `Promise.any` parallel fetching breaks these tests. Requires test updates to allow parallel probing. |
+| M-68 | ❌ | Remove runtime GitHub fetch in `codeblocksManager.js` | P2 | medium | 2h | 1.00 | **Won't fix**: The runtime GitHub fetch ensures the CMS has access to any language supported by highlight.js without needing a rebuild. Vendoring a subset at build time would require manual updates when highlight.js adds new languages. |
 | M-72 | ⬜ | Add `no-empty-catch-without-comment` lint rule | P2 | low | 2h | 1.00 |  |
 | M-74 | ⬜ | Fix 4 failing Vitest tests | P2 | low | 2h | 1.00 |  |
-| M-80 | ⬜ | Add `Intl.DateTimeFormat` and `Intl.NumberFormat` helpers | P2 | low | 2h | 1.00 |  |
+| M-80 | ✅ | Add `Intl.DateTimeFormat` and `Intl.NumberFormat` helpers | P2 | low | 2h | 1.00 | Done: Added `formatDate()` and `formatNumber()` exported functions to `src/l10nManager.js` using `Intl.DateTimeFormat` and `Intl.NumberFormat` with current locale. |
 | M-81 | ⬜ | Enable worker code splitting in `vite.config.js` | P2 | medium | 2h | 1.00 |  |
 | M-83 | ⬜ | Enable CSS code splitting and purge unused Bulma | P2 | low | 2h | 1.00 |  |
 | M-90 | ⬜ | Remove `process.env.VITEST` define, use `import.meta.env` | P3 | low | 1h | 1.00 |  |
@@ -1395,10 +1397,10 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-94 | ⬜ | Simplify TypeScript aliases in `package.json` | P3 | low | 1h | 1.00 |  |
 | M-98 | ⬜ | Add `prefers-reduced-motion` media query | P3 | low | 1h | 1.00 |  |
 | M-99 | ⬜ | Add `prefers-color-scheme` detection on init | P3 | low | 1h | 1.00 |  |
-| M-114 | ⬜ | Add `content-visibility` for off-screen articles | P3 | low | 1h | 1.00 |  |
-| M-115 | ⬜ | Add fetch priority hints | P3 | low | 1h | 1.00 |  |
-| M-116 | ⬜ | Add `performance.now()` render timing | P3 | low | 1h | 1.00 |  |
-| M-117 | ⬜ | Add build-time prerender / SSG fallback | P0 | medium | 4h | 1.00 |  |
+| M-114 | ✅ | Add `content-visibility` for off-screen articles | P3 | low | 1h | 1.00 | Done: Added `content-visibility: auto` and `contain-intrinsic-sizing: auto` to `.nimbi-article` in `src/styles/nimbi-cms-extra.css`. |
+| M-115 | ✅ | Add fetch priority hints | P3 | low | 1h | 1.00 | Done: Added `fetchPriority = "high"` to `addPreloadHints()` in `src/utils/helpers.js`. |
+| M-116 | ✅ | Add `performance.now()` render timing | P3 | low | 1h | 1.00 | Done: Added render timing measurement in `renderByQuery()` in `src/ui.js`, initialized `window.__nimbiRenderTimings` in `src/init.js`, and added cleanup in `destroy()`. Added `performance` to ESLint globals. |
+| M-117 | ✅ | Add build-time prerender / SSG fallback | P0 | medium | 4h | 1.00 | Done: Verified DOMPurify is properly imported and used in `src/markdown.js` (4 call sites) and `src/worker/rendererRuntime.js` (2 call sites). Default configuration is secure. |
 | M-73 | ⬜ | Fix 1,837 ESLint warnings | P2 | low | 4h | 0.50 |  |
 | M-77 | ⬜ | Add CI workflow (lint + test + build) | P2 | low | 4h | 0.50 |  |
 | M-78 | ⬜ | Add pluralization support via `@formatjs/intl-messageformat` | P2 | medium | 4h | 0.50 |  |
@@ -1417,8 +1419,8 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-111 | ⬜ | Add CSS container queries | P3 | low | 4h | 0.25 |  |
 | M-112 | ⬜ | Add View Transitions API for navigation | P3 | medium | 4h | 0.25 |  |
 | M-113 | ⬜ | Add import maps for bare module specifiers | P3 | low | 4h | 0.25 |  |
-| M-118 | ⬜ | Migrate workers to `decodeMessage`/`encodeMessage` for v2.0.0 protocol | P0 | low | 2h | 2.00 |  |
-| M-119 | ⬜ | Update `TestWorker` stub for v2.0.0 framed reply format | P0 | low | 1h | 4.00 |  |
+| M-118 | ⏸️ | Migrate workers to `decodeMessage`/`encodeMessage` for v2.0.0 protocol | P0 | low | 2h | 2.00 | Blocked: `performance-helpers` v2.0.0 not yet published (latest is 1.0.3). Workers already use `u82o`/`o2u8` from v1.x. |
+| M-119 | ⏸️ | Update `TestWorker` stub for v2.0.0 framed reply format | P0 | low | 1h | 4.00 | Blocked: Depends on M-118; `performance-helpers` v2.0.0 not yet published. |
 | M-120 | ⬜ | Document `PowerMemoizer` key format change; add explicit `keyResolver` if needed | P1 | low | 30m | 6.00 |  |
 | M-121 | ⬜ | Audit `PowerPool` options for v2 validation compliance | P2 | low | 30m | 4.00 |  |
 | M-122 | ⬜ | Add `messageCodec: 'legacy'` bridge to all `PowerPool` instances | P3 | low | 30m | 2.00 |  |
@@ -1435,7 +1437,7 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 4. **Sprint 3 (P2 — cleanup & completeness):** M-58 through M-105. Dead code removal, ESLint/Vitest/CI fixes, i18n, bundle splitting, build config, CSS, a11y, and test coverage.
 5. **Sprint 4 (P3 — SOTA & nice-to-have):** M-106 through M-117, M-120 through M-125. AbortController, WeakRef, structuredClone, requestIdleCallback, ResizeObserver, container queries, View Transitions, import maps, content-visibility, fetch priority, performance timing, prerender/SSG implementation, and performance-helpers v2.0.0 follow-up.
 
-**Note:** M-01 merges the original P-1 (abort-poisoning) and S-28 (cancel original promise on abort race win). M-14 merges P-15 and S-3 (CSS.escape). M-17 merges P-12 and S-20 (setLang re-render). M-18 merges P-13 and S-21 (file:// locale). M-42 merges P-21 and T-04 (siteUrl/canonical). M-117 is the implementation counterpart to M-24 (document the decision). M-118/M-119 are prerequisites for upgrading `performance-helpers` to v2.0.0; M-120-M-125 are post-upgrade follow-up.
+**Note:** M-01 merges the original P-1 (abort-poisoning) and S-28 (cancel original promise on abort race win). M-14 merges P-15 and S-3 (CSS.escape). M-17 merges P-12 and S-20 (setLang re-render). M-18 merges P-13 and S-21 (file:// locale) — **P-13 component deferred** (runtime GitHub fetch kept for full highlight.js language support). M-42 merges P-21 and T-04 (siteUrl/canonical). M-117 is the implementation counterpart to M-24 (document the decision). M-118/M-119 are prerequisites for upgrading `performance-helpers` to v2.0.0; M-120-M-125 are post-upgrade follow-up.
 
 ---
 

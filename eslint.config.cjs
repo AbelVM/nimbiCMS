@@ -13,6 +13,7 @@ module.exports = [
         fetch: 'readonly',
         URL: 'readonly',
         Element: 'readonly',
+        performance: 'readonly',
         __NIMBI_CMS_VERSION__: 'readonly',
         __NIMBI_CMS_MANIFEST__: 'readonly',
         __NIMBI_CMS_HOMEPAGE__: 'readonly',
@@ -57,7 +58,8 @@ module.exports = [
       'unused-imports/no-unused-vars': ['warn', { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' }],
       'no-console': 'off',
       'no-undef': 'error',
-      'nimbi-debug/no-eager-debug': 'warn'
+      'nimbi-debug/no-eager-debug': 'warn',
+      'nimbi-debug/no-empty-catch-without-comment': 'warn'
     }
   }
 ]

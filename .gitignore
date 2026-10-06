@@ -53,8 +53,10 @@ dot/
 bundle-analysis.html
 benchmarks/reports/
 benchmarks/profiles/
-.github/
-.vscode/
 eslint-plugin-nimbi-debug/
 tools/
 verbose/
+
+# CI workflows
+!.github/
+!.github/workflows/

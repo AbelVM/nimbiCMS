@@ -889,6 +889,8 @@ a.nimbi-version-label,
 .nimbi-article {
     
     overflow-x: auto;
+    content-visibility: auto;
+    contain-intrinsic-sizing: auto;
 }
 
 .nimbi-article table,
@@ -1028,4 +1030,15 @@ body {
     width: auto;
     margin: 0;
     object-fit: contain;
+}
+
+/* Respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

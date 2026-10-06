@@ -17,6 +17,7 @@ import {
 } from "./slugState.js";
 import { parseHrefToRoute } from "./utils/urlHelper.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
+import { parseFrontmatter } from "./utils/frontmatter.js";
 import {
   normalizePath,
   trimTrailingSlash,
@@ -214,11 +215,11 @@ export function getLanguages() {
   return availableLanguages;
 }
 
-async function runWithConcurrency(items, worker, concurrency = 4) {
+async function runWithConcurrency(items, worker, concurrency = 4, signal) {
   if (!Array.isArray(items) || items.length === 0) return [];
   const sem = new PowerSemaphore(Math.max(1, Number(concurrency) || 1));
   return Promise.all(
-    items.map((item, idx) => sem.run(() => worker(item, idx))),
+    items.map((item, idx) => sem.run(() => worker(item, idx), { signal })),
   );
 }
 
@@ -238,9 +239,15 @@ function _createSlugPool() {
     size: poolSize,
     minSize: 2,
     autoScale: slugAutoScaleOptions,
+    // Bridge option for performance-helpers v2.0.0 compatibility.
+    // No-op on v1; required on v2 to use the legacy bare-JSON wire protocol
+    // until workers are migrated to decodeMessage/encodeMessage.
+    messageCodec: 'legacy',
+    // Backpressure: cap the task queue to prevent unbounded growth under load.
+    maxQueueLength: 100,
   };
   try {
-    if (typeof process !== "undefined" && process.env?.VITEST) {
+    if (import.meta.env.DEV) {
       poolOpts.debugLevel = 0;
     }
   } catch (_e) {}
@@ -277,6 +284,11 @@ export function teardownSlugWorkerPool() {
     }
     if (typeof pool.terminate === "function") {
       pool.terminate();
+    }
+    // v2.0.0: dispose() releases all resources deterministically.
+    // No-op on v1 (method doesn't exist).
+    if (typeof pool.dispose === "function") {
+      pool.dispose();
     }
   } catch (e) {
     debugWarn("[slugManager] teardownSlugWorkerPool failed", e);
@@ -667,6 +679,11 @@ function _deriveCommonPrefix(paths) {
 
 /**
  * Generate a URL-friendly slug from a text string (memoized LRU).
+ *
+ * NOTE: PowerMemoizer's default `keyResolver` changed in performance-helpers v2.0.0
+ * from `JSON.stringify(args)` to `simpleArgsKey`. We pass an explicit `keyResolver`
+ * here to ensure consistent cache keys across v1 and v2.
+ *
  * @param {string} s - Text to generate a URL-friendly slug from.
  * @returns {string}
  */
@@ -1881,6 +1898,7 @@ export async function buildSearchIndex(
         let title = "";
         let excerpt = "";
         let pageSlug = null;
+        let image = null;
         if (md.isHtml) {
           try {
             const parser = getSharedParser();
@@ -2038,6 +2056,14 @@ export async function buildSearchIndex(
               }
             }
           }
+          // Extract image from frontmatter for sitemap image:image entries
+          try {
+            const { data: fm } = parseFrontmatter(raw);
+            const imgRaw = fm.image || fm.og_image || fm.cover || fm.featured_image;
+            if (imgRaw && String(imgRaw).trim()) {
+              image = String(imgRaw).trim();
+            }
+          } catch (_) {}
           if (indexDepth >= 2) {
             let parentTitle = "";
             try {
@@ -2227,7 +2253,7 @@ export async function buildSearchIndex(
           }
           slug = pageSlug || slugify(title || path);
         }
-        idx.push({ slug, title, excerpt, path });
+        idx.push({ slug, title, excerpt, path, image });
       } catch (err) {
         debugLog(
           "[slugManager] buildSearchIndex: entry processing failed",
