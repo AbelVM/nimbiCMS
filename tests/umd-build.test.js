@@ -4,6 +4,16 @@ import fs from 'fs'
 import { JSDOM } from 'jsdom'
 import vm from 'vm'
 
+function createUMDContext(html = '') {
+  const dom = new JSDOM(html, { runScripts: 'outside-only' })
+  const context = vm.createContext(dom.window)
+  if (typeof context.structuredClone !== 'function') {
+    context.structuredClone =
+      globalThis.structuredClone || ((data) => JSON.parse(JSON.stringify(data)))
+  }
+  return { dom, context }
+}
+
 it('build:umd produces a usable UMD bundle', () => {
   // Run normal build (UMD is now always emitted)
   execSync('npm run build', { stdio: 'inherit' })
@@ -23,8 +33,7 @@ it('build:umd produces a usable UMD bundle', () => {
   expect(hasHljsDynamic).toBe(true)
 
   // Try to execute bundle in a headless DOM to ensure it initializes a global
-  const dom = new JSDOM('', { runScripts: 'outside-only' })
-  const context = vm.createContext(dom.window)
+  const { dom, context } = createUMDContext('')
   const script = new vm.Script(src, { filename: bundlePath })
 
   // Running the bundle may touch DOM APIs; JSDOM provides minimal environment
@@ -46,8 +55,7 @@ it('umd runtime: registerLanguage and theming APIs exist and are callable', asyn
   const bundlePath = 'dist/nimbi-cms.js'
   const src = fs.readFileSync(bundlePath, 'utf8')
 
-  const dom = new JSDOM('<div id="app"></div>', { runScripts: 'outside-only' })
-  const context = vm.createContext(dom.window)
+  const { dom, context } = createUMDContext('<div id="app"></div>')
   const script = new vm.Script(src, { filename: bundlePath })
   script.runInContext(context)
 
@@ -99,8 +107,7 @@ it('umd runtime: bulmaCustomize (local and remote) injects styles/links', async 
   const bundlePath = 'dist/nimbi-cms.js'
   const src = fs.readFileSync(bundlePath, 'utf8')
 
-  const dom = new JSDOM('<div id="app"></div>', { runScripts: 'outside-only' })
-  const context = vm.createContext(dom.window)
+  const { dom, context } = createUMDContext('<div id="app"></div>')
   const script = new vm.Script(src, { filename: bundlePath })
   script.runInContext(context)
 

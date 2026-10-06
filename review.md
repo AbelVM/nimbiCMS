@@ -1410,8 +1410,8 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-92 | ✅ | Pin `marked` version and add integration test | P3 | low | 2h | 0.50 | `marked` pinned to `^18.1.0` in `package.json`; integration tests exist in `tests/markdown.coverage.extra.test.js`. |
 | M-97 | ✅ | Define CSS custom properties with fallbacks | P3 | low | 2h | 0.50 | CSS custom properties defined in `src/styles/nimbi-cms-extra.css` and `src/styles/initial.css` with fallback values. |
 | M-106 | ✅ | Replace custom abort flag with `AbortController` | P3 | low | 2h | 0.50 | Replaced custom abort flags with `AbortController`/`AbortSignal` in `src/init.js`, `src/slugManager.js`, and `src/router.js`. |
-| M-107 | ⬜ | Replace `textMetrics` cache with `WeakRef` | P3 | medium | 2h | 0.50 |  |
-| M-108 | ⬜ | Replace manual serialization with `structuredClone` | P3 | low | 2h | 0.50 |  |
+| M-107 | ✅ | Replace `textMetrics` cache with `WeakRef` | P3 | medium | 2h | 0.50 | Cache values in `src/utils/textMetrics.js` now stored via `WeakRef`; GC may reclaim entries under memory pressure while FIFO eviction remains as safety net. |
+| M-108 | ✅ | Replace manual serialization with `structuredClone` | P3 | low | 2h | 0.50 | Replaced `JSON.parse(JSON.stringify(DEFAULT_L10N))` with `structuredClone(DEFAULT_L10N)` in `src/l10nManager.js`; added `structuredClone` polyfill to UMD test vm contexts. |
 | M-109 | ✅ | Add `requestIdleCallback` for slug indexing | P3 | low | 2h | 0.50 | Added `yieldToIdle()` in `src/utils/idle.js` using `requestIdleCallback` with timeout fallback. |
 | M-110 | ✅ | Replace `innerWidth` with `ResizeObserver` | P3 | low | 2h | 0.50 | Replaced `innerWidth` checks with `ResizeObserver` in `src/init.js` for responsive layout computation. |
 | M-85 | ⬜ | Vendor minimal `performance-helpers` subset | P3 | medium | 4h | 0.25 |  |

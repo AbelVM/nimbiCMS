@@ -43,16 +43,33 @@ function makeKey(text) {
 
 /**
  * Store an entry in the internal cache and perform a simple FIFO eviction
- * once `MAX_ENTRIES` is exceeded.
+ * once `MAX_ENTRIES` is exceeded. Values are held via `WeakRef` so the
+ * garbage collector may reclaim them under memory pressure even before the
+ * FIFO limit is reached.
  * @param {string} key
  * @param {TextMetrics} entry
  * @private
  */
 function setCacheEntry(key, entry) {
-  CACHE.set(key, entry);
+  CACHE.set(key, new WeakRef(entry));
   if (CACHE.size > MAX_ENTRIES) {
     const firstKey = CACHE.keys().next().value;
     if (firstKey) CACHE.delete(firstKey);
+  }
+}
+
+/**
+ * Dereference a cached `WeakRef`, returning the cached value if it is still
+ * alive, or `undefined` if it has been garbage collected.
+ * @param {WeakRef<TextMetrics>} ref
+ * @returns {TextMetrics | undefined}
+ * @private
+ */
+function derefCacheEntry(ref) {
+  try {
+    return ref.deref();
+  } catch {
+    return undefined;
   }
 }
 
@@ -79,7 +96,7 @@ function computeWordCount(text) {
  */
 export function getReadingTime(text) {
   const key = makeKey(text);
-  const cached = CACHE.get(key);
+  const cached = derefCacheEntry(CACHE.get(key));
   if (cached?.readingTime) return cached.readingTime;
   const rt = readingTime(text || "");
   const entry = {
@@ -105,7 +122,7 @@ export function getReadingTime(text) {
  */
 export function getTextMetrics(text) {
   const key = makeKey(text);
-  const cached = CACHE.get(key);
+  const cached = derefCacheEntry(CACHE.get(key));
   if (cached) return Object.assign({}, cached);
   const rt = readingTime(text || "");
   const words =

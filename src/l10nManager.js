@@ -9,7 +9,7 @@
 import { DEFAULT_L10N } from "./utils/l10n-defaults.js";
 import { PowerDeadline } from "performance-helpers/powerDeadline";
 
-const L10N = JSON.parse(JSON.stringify(DEFAULT_L10N));
+const L10N = structuredClone(DEFAULT_L10N);
 
 /**
  * @typedef {Object.<string,string>} LocaleDict
