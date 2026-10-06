@@ -235,6 +235,12 @@ const slugAutoScaleOptions = {
 let _slugPool = null;
 
 function _createSlugPool() {
+  // PowerPool options audit (performance-helpers v2.0.0 validation):
+  // v2.0.0 validates constructor options and throws TypeError on
+  // non-numeric `minSize`/`maxSize`/`idleTimeout`. Every size option
+  // here is numeric: `size` is `poolSize` (always a number, from
+  // getWorkerPoolSize()) and `minSize` is the literal 2, so this pool
+  // complies with the v2 validation rules.
   const poolOpts = {
     size: poolSize,
     minSize: 2,
@@ -680,9 +686,16 @@ function _deriveCommonPrefix(paths) {
 /**
  * Generate a URL-friendly slug from a text string (memoized LRU).
  *
- * NOTE: PowerMemoizer's default `keyResolver` changed in performance-helpers v2.0.0
- * from `JSON.stringify(args)` to `simpleArgsKey`. We pass an explicit `keyResolver`
- * here to ensure consistent cache keys across v1 and v2.
+ * NOTE: PowerMemoizer's default `keyResolver` changed in
+ * performance-helpers v2.0.0 from `(...args) => JSON.stringify(args)`
+ * to `simpleArgsKey`. For scalar args (strings, numbers, booleans)
+ * `simpleArgsKey` is ~35% cheaper and produces equivalent keys; for
+ * non-scalar args (objects, arrays) it falls back to `JSON.stringify`,
+ * so non-scalar keys keep the v1 format. We pass an explicit
+ * `keyResolver` here to keep cache keys consistent across v1 and v2
+ * (this memoizer only ever receives a single scalar string arg).
+ * Any future memoizer with non-scalar args that must keep the v1
+ * key format should pass `keyResolver: (...args) => JSON.stringify(args)`.
  *
  * @param {string} s - Text to generate a URL-friendly slug from.
  * @returns {string}

@@ -6,9 +6,19 @@
 /**
  * NOTE: All PowerMemoizer instances below use an explicit `keyResolver`
  * to ensure consistent cache keys across performance-helpers v1 and v2.
- * In v2.0.0, the default `keyResolver` changed from `JSON.stringify(args)`
- * to `simpleArgsKey`. Since all our memoizers use scalar string args,
- * the behavior is equivalent, but we pin the resolver for safety.
+ *
+ * Key format change in performance-helpers v2.0.0: the default
+ * `keyResolver` changed from `(...args) => JSON.stringify(args)` to
+ * `simpleArgsKey`. For scalar arguments (strings, numbers, booleans)
+ * `simpleArgsKey` is ~35% cheaper and produces equivalent keys; for
+ * non-scalar arguments (objects, arrays) it falls back to
+ * `JSON.stringify`, so keys for non-scalar args keep the old format.
+ *
+ * All our memoizers use scalar string args only, so the behavior is
+ * equivalent, but we pin the resolver for safety. If a future
+ * memoizer is added with non-scalar args and must keep the v1 key
+ * format, pass `keyResolver: (...args) => JSON.stringify(args)`
+ * explicitly.
  */
 
 /**

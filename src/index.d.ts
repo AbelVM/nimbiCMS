@@ -276,6 +276,7 @@ export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[
 export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateRobotsTxt(opts: object): string
+export function generateLlmsTxt(opts: object): string
 export function clearSitemapWriteTimer(): any
 export function handleSitemapRequest(opts: any): any
 export function attachSitemapDownloadUI(opts: {filename?: string}): HTMLElement|null

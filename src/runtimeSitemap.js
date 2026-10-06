@@ -962,6 +962,55 @@ export function generateRobotsTxt(opts = {}) {
 }
 
 /**
+ * Generate an llms.txt content string from the runtime search index.
+ * llms.txt is an emerging convention (llmstxt.org) that exposes a
+ * concise, LLM-friendly listing of a site's pages for answer engines.
+ * @param {SitemapJson|Array} json - sitemap JSON (or entries array)
+ * @param {Object} [opts]
+ * @param {string} [opts.name] - site name (defaults to the document title)
+ * @param {string} [opts.description] - optional site description
+ * @returns {string} llms.txt content
+ */
+export function generateLlmsTxt(json, opts = {}) {
+  const entries = Array.isArray(json?.entries)
+    ? json.entries
+    : Array.isArray(json)
+      ? json
+      : [];
+  const base = _getBase().split("?")[0];
+  let name = String(opts?.name ?? "").trim();
+  if (!name) {
+    try {
+      name =
+        typeof document !== "undefined" && document.title
+          ? String(document.title).split(/[|\-–—]/)[0].trim()
+          : "";
+    } catch (_) {}
+  }
+  if (!name) name = "Site";
+  const description = String(opts?.description ?? "").trim();
+  let s = `# ${name}\n`;
+  if (description) s += `\n> ${description}\n`;
+  if (entries.length) s += "\n";
+  for (const e of entries) {
+    try {
+      const title = String(e?.title || e?.slug || "").trim();
+      if (!title) continue;
+      const slug = e?.slug ? String(e.slug) : null;
+      const loc = String(
+        e?.loc ||
+          (slug ? `${base}?page=${encodeURIComponent(slug)}` : base),
+      );
+      const excerpt = e?.excerpt
+        ? `: ${String(e.excerpt).replace(/\s+/g, " ").trim()}`
+        : "";
+      s += `- [${title}](${loc})${excerpt}\n`;
+    } catch (_) {}
+  }
+  return s;
+}
+
+/**
  * Clear any pending sitemap write timer.
  * Safe to call multiple times.
  */
@@ -1077,6 +1126,8 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
           out = generateAtomXml(finalJson);
         else if (mimeType === "text/html") {
           out = _generateHtmlFromJson(finalJson);
+        } else if (mimeType === "text/plain") {
+          out = generateLlmsTxt(finalJson);
         } else out = generateSitemapXml(finalJson);
         _writeXmlToDocument(out, mimeType);
         try {
@@ -1121,6 +1172,8 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
             out = generateAtomXml(p.finalJson);
           else if (p.mimeType === "text/html") {
             out = _generateHtmlFromJson(p.finalJson);
+          } else if (p.mimeType === "text/plain") {
+            out = generateLlmsTxt(p.finalJson);
           } else out = generateSitemapXml(p.finalJson);
 
           try {
@@ -1173,7 +1226,8 @@ export async function handleSitemapRequest(opts = {}) {
     let wantXml = false,
       wantRss = false,
       wantAtom = false,
-      wantHtml = false;
+      wantHtml = false,
+      wantLlms = false;
     try {
       const sp = new URLSearchParams(location.search || "");
       if (sp.has("sitemap")) {
@@ -1191,8 +1245,13 @@ export async function handleSitemapRequest(opts = {}) {
         for (const k of sp.keys()) if (k !== "atom") only = false;
         if (only) wantAtom = true;
       }
+      if (sp.has("llms")) {
+        let only = true;
+        for (const k of sp.keys()) if (k !== "llms") only = false;
+        if (only) wantLlms = true;
+      }
     } catch (_) {}
-    if (!wantXml && !wantRss && !wantAtom) {
+    if (!wantXml && !wantRss && !wantAtom && !wantLlms) {
       const pathname = (location.pathname || "/").replace(/\/\/+/g, "/");
       const name = pathname.split("/").filter(Boolean).pop() || "";
       if (!name) return false;
@@ -1200,7 +1259,9 @@ export async function handleSitemapRequest(opts = {}) {
       wantRss = /^(rss|rss\.xml)$/i.test(name);
       wantAtom = /^(atom|atom\.xml)$/i.test(name);
       wantHtml = /^(sitemap|sitemap\.html)$/i.test(name);
-      if (!wantXml && !wantRss && !wantAtom && !wantHtml) return false;
+      wantLlms = /^llms\.txt$/i.test(name);
+      if (!wantXml && !wantRss && !wantAtom && !wantHtml && !wantLlms)
+        return false;
     }
 
     // Prefer the authoritative live `searchIndex`: always await readiness
@@ -1557,6 +1618,11 @@ export async function handleSitemapRequest(opts = {}) {
         } catch {}
       }
     } catch {}
+
+    if (wantLlms) {
+      _scheduleSitemapWrite(finalJson, "text/plain");
+      return true;
+    }
 
     if (wantRss) {
       const newLen = Array.isArray(finalJson?.entries)

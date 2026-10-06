@@ -459,11 +459,24 @@ function _computeCanonical(page) {
       };
     }
     try {
-      const siteName = getSiteNameFromMeta();
-      if (siteName) {
+      // Publisher: prefer frontmatter `meta.publisher` (string or
+      // { name } object), falling back to the site name from meta tags.
+      let publisherName = "";
+      if (meta.publisher) {
+        publisherName =
+          typeof meta.publisher === "string"
+            ? String(meta.publisher).trim()
+            : meta.publisher?.name
+              ? String(meta.publisher.name).trim()
+              : "";
+      }
+      if (!publisherName) {
+        publisherName = getSiteNameFromMeta();
+      }
+      if (publisherName) {
         json.publisher = {
           "@type": "Organization",
-          name: siteName,
+          name: publisherName,
         };
       }
     } catch (_) {}

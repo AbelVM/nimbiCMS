@@ -30,6 +30,12 @@ const rendererAutoScaleOptions = {
 let _rendererPool = null;
 
 function _createRendererPool() {
+  // PowerPool options audit (performance-helpers v2.0.0 validation):
+  // v2.0.0 validates constructor options and throws TypeError on
+  // non-numeric `minSize`/`maxSize`/`idleTimeout`. Every size option
+  // here is numeric: `size` is `poolSize` (always a number, from
+  // getWorkerPoolSize()) and `minSize` is the literal 2, so this pool
+  // complies with the v2 validation rules.
   const poolOpts = {
     size: poolSize,
     minSize: 2,

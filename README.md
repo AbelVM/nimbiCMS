@@ -60,6 +60,7 @@ nimbiCMS exposes client-side endpoints that generate sitemaps and feeds at runti
 Limitations & crawler advice
 - These endpoints are generated client-side; servers cannot set the HTTP `Content-Type` header for the generated XML. The implementation uses Blob/data URL fallbacks to present XML in browsers, but this is not guaranteed to satisfy all crawlers.
 - For reliable crawler indexing prefer a server-generated `sitemap.xml` (build-time) and list it in `robots.txt`. Use the runtime endpoints for development convenience or for crawlers that execute JavaScript.
+- nimbiCMS is 100% client-rendered: crawlers that do not execute JavaScript see an empty shell for `?page=` URLs. See [the SSR/prerender decision](docs/ssg-prerender.md) for the rationale, SEO implications, and options for adding prerender/SSG later.
 
 ## Installation
 

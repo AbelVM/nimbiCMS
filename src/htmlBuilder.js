@@ -390,10 +390,6 @@ export function createNavTree(t, tree) {
 export function buildTocElement(t, toc, pagePath = "") {
   const aside = document.createElement("aside");
   aside.className = "menu box nimbi-toc-inner is-hidden-mobile";
-  aside.setAttribute("role", "navigation");
-  try {
-    aside.setAttribute("aria-label", t("onThisPage"));
-  } catch (e) {}
   const label = document.createElement("p");
   label.className = "menu-label";
   label.textContent = t("onThisPage");
@@ -464,7 +460,14 @@ export function buildTocElement(t, toc, pagePath = "") {
     debugWarn("[htmlBuilder] buildTocElement failed", err);
   }
 
-  aside.appendChild(ul);
+  // Wrap the TOC list in a <nav> landmark so the table of contents
+  // is exposed as navigation (the <aside> stays a complementary region).
+  const nav = document.createElement("nav");
+  try {
+    nav.setAttribute("aria-label", t("onThisPage"));
+  } catch (e) {}
+  nav.appendChild(ul);
+  aside.appendChild(nav);
   const itemCount = ul.querySelectorAll("li").length;
   if (itemCount <= 1) return null;
   return aside;
@@ -1991,6 +1994,33 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     /* ignore subtitle insertion errors */
   }
 
+  // Semantic landmarks: wrap the article title block in <header> and,
+  // when present, move the byline paragraph (author/date/reading-time)
+  // into a <footer> landmark. The footer stays in position (directly
+  // after the header) so layout is unchanged.
+  try {
+    if (
+      topH1 &&
+      topH1.parentElement &&
+      topH1.parentElement.tagName !== "HEADER"
+    ) {
+      const parent = topH1.parentElement;
+      const header = document.createElement("header");
+      header.className = "nimbi-article-header";
+      parent.insertBefore(header, topH1);
+      header.appendChild(topH1);
+      const byline = header.nextElementSibling;
+      if (byline && byline.classList?.contains("nimbi-article-subtitle")) {
+        const footer = document.createElement("footer");
+        footer.className = "nimbi-article-footer";
+        header.insertAdjacentElement("afterend", footer);
+        footer.appendChild(byline);
+      }
+    }
+  } catch (e) {
+    /* ignore landmark wrapping errors */
+  }
+
   try {
     await rewriteAnchorsWorker(article, contentBase, pagePath);
   } catch (err) {
@@ -2269,6 +2299,11 @@ const anchorAutoScaleOptions = {
   stepDown: 1,
 };
 const _anchorPool = (() => {
+  // PowerPool options audit (performance-helpers v2.0.0 validation):
+  // v2.0.0 validates constructor options and throws TypeError on
+  // non-numeric `minSize`/`maxSize`/`idleTimeout`. Every size option
+  // here is a numeric literal (`size: 2`, `minSize: 2`), so this pool
+  // complies with the v2 validation rules.
   const poolOpts = { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions, messageCodec: 'legacy', maxQueueLength: 100 };
   try {
     if (import.meta.env.DEV) {
