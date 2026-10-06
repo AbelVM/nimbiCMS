@@ -114,4 +114,13 @@ export function setLang(lang) {
       document.documentElement.setAttribute("lang", short);
     }
   } catch (_) {}
+  try {
+    if (
+      typeof window !== "undefined" &&
+      window.__nimbiUI &&
+      typeof window.__nimbiUI.renderByQuery === "function"
+    ) {
+      window.__nimbiUI.renderByQuery().catch(() => {});
+    }
+  } catch (_) {}
 }

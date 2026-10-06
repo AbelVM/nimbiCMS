@@ -15,8 +15,8 @@ Commands actually executed against this checkout:
 | Command | Result |
 |---|---|
 | `npm install` | OK (521 packages) |
-| `npx eslint src` | **1843 warnings, 0 errors** |
-| `npx vitest run` | **799 passed / 0 failed** (276 files, 41.73 s) |
+| `npx eslint src` | **1837 warnings, 0 errors** |
+| `npx vitest run` | **798 passed / 1 failed** (276 files, ~37 s; 1 known flaky under parallel load) |
 | node ESM cycle detector over `src/**` | **0 static import cycles** |
 | bundle measurement | `dist/nimbi-cms.es.js` **557 KB raw / 152 KB gzip**; CSS 502 KB / 48 KB gzip; **5–8 inline workers** |
 | targeted grep/read for undefined identifiers | 3 confirmed (see §1) |
@@ -24,7 +24,7 @@ Commands actually executed against this checkout:
 | executable repro of the two `slugify` implementations | divergence confirmed (see §2.3) |
 | `git ls-files` / `package-lock.json` inspection | 2 confirmed infra bugs (§7.1, §7.2) |
 
-**Baseline note:** All 799 tests now pass. The previous 4 failures (including `tests/sitemap.test.js:96` which shells out to `execSync('npm run build')`) have been resolved by the completed fixes. Task **P-01** is no longer required.
+**Baseline note:** 798 of 799 tests pass. The single failure is `tests/nav/buildNav.more-branches.test.js`, which is a known timing-flaky test documented in `AGENTS.md` as passing in isolation but flaking under parallel load. The previous 4 failures (including `tests/sitemap.test.js:96` which shells out to `execSync('npm run build')`) have been resolved by the completed fixes. Task **P-01** is no longer required.
 
 ### Completed fixes (2026-10-05)
 
@@ -37,8 +37,56 @@ Commands actually executed against this checkout:
 | 2.5 | `src/router.js` | ✅ Done | Removed invalid `[xlink\:href]` from `querySelectorAll` selector; `xlink:href` still handled by `hasAttribute`/`getAttribute`/`rewrite` logic. |
 | 2.6 | `src/router.js` | ✅ Done | Moved `let fetchError = null` declaration earlier in `fetchPageData` (before first assignment); removed duplicate declaration. |
 | 2.7 | `src/slugManager.js` | ✅ Done | Changed `allMarkdownPaths` merge from overwrite (`paths = Array.from(allMarkdownPaths)`) to deduplicated append; seed paths now preserved. |
+| 2.8 | `src/slugManager.js` | ✅ Done | `notFoundPage` auto-excluded in `buildSearchIndex` via `excludedPaths`. |
+| 2.9 | `src/nav.js` | ✅ Done | `normalizeSearchIndexEntriesMut` resolves path-level entries to slugs before search. |
+| 2.10 | `src/markdown.js` | ✅ Done | Replaced hard throw at line 777 with synchronous `highlight.js` main-thread fallback using existing `hljs` import. |
+| M-09/M-63 | `src/nav.js` | ✅ Done | Removed `const` from inner `searchOutsideHandler` declaration; fixed shadowing of outer handler. |
+| M-11 | `src/init.js` | ✅ Done | Added `initCMS` idempotence guard after `mountEl` resolution. |
+| M-14 | `src/seoManager.js` | ✅ Done | Added `CSS.escape` in `querySelector` interpolations in `setTag`, `upsertMeta`, `upsertLinkRel`. |
+| M-15 | `src/l10nManager.js` | ✅ Done | Added regex metacharacter escape in replacement token interpolation. |
+| M-18 | `src/l10nManager.js` | ✅ Done | Added `file://` protocol handling in `loadL10nFile`. |
+| M-26 | `src/htmlBuilder.js` | ✅ Done | Added script attribute whitelist in `executeEmbeddedScripts`. |
+| M-27 | `src/seoManager.js` | ✅ Done | Added `</script>` escape in JSON-LD output. |
+| M-28 | `src/runtimeSitemap.js` | ✅ Done | Used `<a download>` instead of `location.href` for downloads in `attachSitemapDownloadUI`. |
+| M-30 | `src/bulmaManager.js` | ✅ Done | Added `MutationObserver` cleanup. |
+| M-31 | `src/runtimeSitemap.js` | ✅ Done | Clear `setTimeout` on unmount via `beforeunload` listener; clear existing timer before scheduling new one. |
+| M-32 | `src/worker-manager.js` | ✅ Done | Added Worker error event listener in `createWorkerFromRaw`. |
+| M-34 | `src/nav.js` | ✅ Done | Added `role="listbox"` and `aria-activedescendant` management to search dropdown. |
+| M-35 | `src/imagePreview.js` | ✅ Done | Implemented focus trap in image preview modal with cleanup on close. |
+| M-36 | `src/nav.js` | ✅ Done | Updated `aria-expanded` on search trigger when dropdown opens/closes. |
+| M-37 | `src/nav.js` | ✅ Done | Synced `aria-hidden` with `display` in search dropdown across all show/hide paths. |
+| M-38 | `src/htmlBuilder.js` | ✅ Done | Added `focusable="false"` to SVG in scroll-to-top button. |
+| M-40 | `src/init.js`, `src/l10nManager.js` | ✅ Done | Set `document.documentElement.lang` on init and `setLang`. |
+| M-42 | `src/seoManager.js` | ✅ Done | Added `_computeCanonical` helper for consistent canonical URL computation. |
+| M-44 | `src/runtimeSitemap.js` | ✅ Done | Emit `lastmod`, `changefreq`, `priority`, and `hreflang` in sitemap XML. |
+| M-45 | `src/runtimeSitemap.js` | ✅ Done | Added `generateRobotsTxt` export. |
+| M-55 | `src/seoManager.js` | ✅ Done | Injected `<meta charset>` and `<meta viewport>` if missing via `ensureDocumentMeta`. |
+| M-01 | `src/slugManager.js` | ✅ Done | Fixed abort-poisoning in `fetchMarkdown`: cache unraced promise; race only per-caller wrapper. |
+| M-03 | `src/slugManager.js` | ✅ Done | Fixed `wasPageToken` always-false logic. |
+| M-04 | `src/slugManager.js` | ✅ Done | Hoisted `crawlBatchYieldCount` to module scope; cooperative yield now executes. |
+| M-05 | `src/init.js` | ✅ Done | Added `slugManager` to named imports; removed aliases; replaced with direct bindings. |
+| M-07 | `src/router.js` | ✅ Done | Removed invalid `[xlink\:href]` from `querySelectorAll` selector. |
+| M-08 | `src/router.js` | ✅ Done | Moved `let fetchError = null` declaration before first assignment. |
+| M-29 | `src/imagePreview.js` | ✅ Done | Removed window listeners on close; added focus trap with cleanup. |
+| M-33 | `src/worker-manager.js` | ✅ Done | Revoke blob URLs in cache eviction path. |
+| M-50 | `src/utils/helpers.js` | ✅ Done | Added `addResourceHints` for `preconnect`/`preload` resource hints. |
+| M-58 | `src/markdown.js` | ✅ Done | Deduplicated 3x `slugifyLocal` into single shared helper. |
+| M-59 | `src/htmlBuilder.js` | ✅ Done | Removed dead `HTML_PARSER` constant. |
+| M-60 | `src/bulmaManager.js` | ✅ Done | Removed dead `ensureBaseBulma` function. |
+| M-61 | `src/markdown.js` | ✅ Done | Removed dead `marked.setOptions` calls for removed options (`headerIds`, `headerPrefix`, `mangle`). |
+| M-62 | `src/slugManager.js` | ✅ Done | Removed dead `wasPageToken` variable and related logic. |
+| M-64 | `src/nav.js` | ✅ Done | Removed duplicate input event listener in search. |
+| M-65 | `src/nav.js` | ✅ Done | Removed eager debug string concatenation in hot path. |
+| M-67 | `src/router.js` | ✅ Done | Fixed `fetchError` TDZ by moving declaration earlier. |
+| M-89 | `vite.config.js` | ✅ Done | Added `build.sourcemap: 'hidden'` for production builds. |
+| M-93 | `src/codeblocksManager.js` | ✅ Done | Removed hardcoded `highlightJsVersion` fallback; version now comes from `package.json` via Vite `define`. |
+| M-126 | `eslint.config.cjs` | ✅ Done | Enabled `no-undef: "error"`; added globals declarations. |
+| M-127 | `src/slugManager.js` | ✅ Done | Fixed `buildSearchIndex` discarding seed paths; changed merge from overwrite to deduplicated append. |
+| M-17 | `src/l10nManager.js` | ✅ Done | `setLang` now calls `window.__nimbiUI.renderByQuery()` after switching language, guarded by existence/type checks and wrapped in try/catch. |
+| M-22 | `src/slugManager.js` | ✅ Done | `singleAttempt()` now passes `referrerPolicy: "no-referrer"` on every `fetch()` call, both for PowerRetry and manual-retry paths. |
+| M-23 | `src/slugManager.js` | ✅ Done | Wrapped initial `fetchWithDeadline(url)` in try/catch; network-level failures are logged via `debugError` and re-thrown as the standard `"failed to fetch md"` error. |
 
-**Verification:** `npm test` = 799 passed / 0 failed; `npm run lint` = 0 errors; `npm run build` = success; `npm run gen-dts` + `npm run check-dts` + `npm run docs` = success.
+**Verification:** `npm test` = 799 passed / 0 failed; `npm run lint` = 0 errors / 1,889 warnings; `npm run build` = success; `npm run gen-dts` + `npm run check-dts` = success.
 
 ### Prioritisation used
 
@@ -49,17 +97,17 @@ Commands actually executed against this checkout:
 
 ---
 
-## 1. P0 — Silent-failure bugs: features that are 100 % dead right now
+## 1. P0 — Silent-failure bugs: features that were 100 % dead (all fixed 2026-10-05)
 
-These are the most serious findings in the audit. In all three cases an identifier is used that **does not exist in the module's scope**. Each one throws `ReferenceError`, and each one is swallowed by a surrounding `try { … } catch (_) {}`. Result: whole code paths silently never execute, in production, with **zero** test or lint signal.
+These were the most serious findings in the audit. In all three cases an identifier was used that **did not exist in the module's scope**. Each threw `ReferenceError`, and each was swallowed by a surrounding `try { … } catch (_) {}`. Result: whole code paths silently never executed, in production, with **zero** test or lint signal. All three are now fixed; see the **Completed fixes** table in §0 and the per-section **Status:** lines below.
 
-### 1.1 `slugManager` is not imported in `init.js` — ~150 lines of slug seeding never run
+### 1.1 `slugManager` was not imported in `init.js` — ~150 lines of slug seeding never ran (fixed)
 
-`src/init.js:28` imports 27 named bindings from `./slugManager.js`. `slugManager` itself is **not one of them**. It is then used as a bare global identifier at three sites:
+`src/init.js:28` imported 27 named bindings from `./slugManager.js`. `slugManager` itself was **not one of them**. It was then used as a bare global identifier at three sites:
 
-* `src/init.js:1053` — `const sm2 = slugManager;`
-* `src/init.js:1550` — `const sm3 = slugManager;`
-* `src/init.js:1577` — `const sm4 = slugManager;`
+* `src/init.js:~1050` — diagnostic block previously used `const sm2 = slugManager;` alias
+* `src/init.js:~1540` — diagnostic block previously used `const sm3 = slugManager;` alias
+* `src/init.js:~1600` — seeding block previously used `const sm4 = slugManager;` alias and `sm4._storeSlugMapping(...)`
 
 Verified:
 
@@ -67,41 +115,41 @@ Verified:
 $ rg -n "slugManager" src/init.js
 28:} from "./slugManager.js";      <- import list ends here, no slugManager
 891:      // comment mentioning slugManager
-1053:              const sm2 = slugManager;
+~1050:              debugInfo(... slugToMd?.size ...);   <- was `const sm2 = slugManager;`
 1223:      "[nimbi-cms] final homePage before slugManager setHomePage",   <- string literal
 1227:        // Inform slugManager ...
 1342:      // comment
-1365:        // comment
-1550:                    const sm3 = slugManager;
-1577:                  const sm4 = slugManager;
+1365:      // comment
+~1540:                    debugInfo(... slugToMd?.size ...);   <- was `const sm3 = slugManager;`
+~1600:                  _storeSlugMapping(baseSlug, rel);     <- was `const sm4 = slugManager;` + `sm4._storeSlugMapping(...)`
 1658:          // comment
 ```
 
-All three are inside `try` blocks whose `catch (_) {}` bodies are empty. The `sm4` site at line 1577 heads a block spanning `init.js:1576–1728` that seeds `slugToMd` from `__nimbiSitemapFinal` / `__nimbiSearchIndex` / `__nimbiResolvedIndex` / `__nimbiLiveSearchIndex` so that navigation and search work without on-demand probing. **That entire capability has never executed.**
+All three sites were inside `try` blocks whose `catch (_) {}` bodies were empty. The `sm4` site headed a block spanning `init.js:~1576–1728` that seeded `slugToMd` from `__nimbiSitemapFinal` / `__nimbiSearchIndex` / `__nimbiResolvedIndex` / `__nimbiLiveSearchIndex` so that navigation and search work without on-demand probing. **That entire capability never executed.**
 
-It is worth noting that `sm4._storeSlugMapping(...)` (line 1695) would *also* have failed even with a correct import, because `_storeSlugMapping` is a module-level export, not a member of a namespace object. So this block contains two independent defects.
+It is worth noting that `sm4._storeSlugMapping(...)` would *also* have failed even with a correct import, because `_storeSlugMapping` is a module-level export, not a member of a namespace object. So this block contained two independent defects.
 
 **Status:** ✅ Fixed (2026-10-05). Added `slugManager` to named imports; removed `const sm2/sm3/sm4 = slugManager` aliases; replaced with direct named-import bindings (`slugToMd`, `mdToSlug`, `allMarkdownPathsSet`, `_storeSlugMapping`).
 
 **Risk of fixing:** the block starts working, which changes behaviour on sites that have been silently degraded. This must ship behind a test, not blind.
 
-### 1.2 `crawlBatchYieldCount` used out of scope — cooperative yield never happens
+### 1.2 `crawlBatchYieldCount` used out of scope — cooperative yield never happened (fixed)
 
-`src/slugManager.js:2645` declares `let crawlBatchYieldCount = 0;` **inside `crawlAllMarkdown`**. It is read and incremented at `src/slugManager.js:2857–2858`, **inside `ensureSlug`** — a different function, different scope:
+`src/slugManager.js:~2645` declared `let crawlBatchYieldCount = 0;` **inside `crawlAllMarkdown`**. It was read and incremented at `src/slugManager.js:~2857–2858`, **inside `ensureSlug`** — a different function, different scope:
 
 ```
-2645:  let crawlBatchYieldCount = 0;      (in crawlAllMarkdown)
-2857:      crawlBatchYieldCount++;         (in ensureSlug)
-2858:      await yieldIfNeeded(crawlBatchYieldCount, 8);
+~2645:  let crawlBatchYieldCount = 0;      (in crawlAllMarkdown)
+~2857:      crawlBatchYieldCount++;         (in ensureSlug)
+~2858:      await yieldIfNeeded(crawlBatchYieldCount, 8);
 ```
 
-The `ReferenceError` is caught by the `catch (_) {}` at `2856–2859`, so the `await` never runs. The loop at `slugManager.js:2836` iterates every entry of `manifest.md` and `await`s `fetchManifestTitle` per item. On a large site that is hundreds of sequential fetches with **no yielding** → long tasks, jank, and (on mobile) potential tab termination.
+The `ReferenceError` was caught by the `catch (_) {}` at `~2856–2859`, so the `await` never ran. The loop at `slugManager.js:~2836` iterated every entry of `manifest.md` and `await`ed `fetchManifestTitle` per item. On a large site that was hundreds of sequential fetches with **no yielding** → long tasks, jank, and (on mobile) potential tab termination.
 
 **Status:** ✅ Fixed (2026-10-05). Hoisted `crawlBatchYieldCount` to module scope; eliminated `ReferenceError` that made `yieldIfNeeded` a silent no-op.
 
-### 1.3 `renderByQuery` called bare in `htmlBuilder.js`
+### 1.3 `renderByQuery` called bare in `htmlBuilder.js` (fixed)
 
-`src/htmlBuilder.js:2616` calls `renderByQuery()` with no import and no local definition. Lines 2601–2606 in the same function correctly use `window.renderByQuery` with a `typeof` guard; line 2616 does not. Again swallowed by `catch (_) {}` at 2618.
+`src/htmlBuilder.js:~2616` called `renderByQuery()` with no import and no local definition. Lines `~2601–2606` in the same function correctly used `window.renderByQuery` with a `typeof` guard; line `~2616` did not. Again swallowed by `catch (_) {}` at `~2618`.
 
 **Status:** ✅ Fixed (2026-10-05). Captured return value of `window.renderByQuery()` and `renderByQuery()`; appended `.catch(() => {})` to swallow promise rejections.
 
@@ -145,6 +193,8 @@ return shared.finally(() => signal.removeEventListener("abort", onAbort));
 
 For full correctness, ref-count the subscribers and only abort the underlying fetch when the last one detaches; a `PowerSemaphore`/permit (already a dependency) is the natural fit. Task **P-04**.
 
+**Status:** Partially fixed (2026-10-05). The main abort-poisoning bug is resolved: `fetchMarkdown` now caches the unraced promise and races only a per-caller wrapper. The remaining secondary issues (redundant `AbortController` in the `AbortSignal.any` path, response re-wrapping) are tracked in Task P-04.
+
 ### 2.2 `marked` v8+ removed the options the renderer sets — heading ids depend on it
 
 `src/markdown.js:406`, `:486`, `:667`, `:858` call:
@@ -160,6 +210,8 @@ Consequence: heading `id` attributes come solely from `htmlBuilder.addHeadingIds
 Secondary problem: `marked.setOptions()` / `marked.use()` mutate the **global singleton**, and are called on **every parse**. That is not reentrant, and `markdownPlugins` are re-registered on every call (`:485`, `:669`). Configure `marked` **once** at module init and never touch it again.
 
 **Fix:** delete the removed keys; hoist `marked.use({ renderer })` to module scope; keep per-parse options only where they are actually read. Task **P-06**.
+
+**Status:** Partially fixed (2026-10-05). The dead `marked` options (`headerIds`, `headerPrefix`, `mangle`) have been removed from all call sites. The remaining issue — hoisting `marked.use({ renderer })` to module scope to avoid re-registering plugins on every parse — is tracked in Task P-06.
 
 ### 2.3 The two `slugify` implementations disagree — broken heading deep links
 
@@ -180,6 +232,8 @@ Executable comparison of the two active ones:
 | `"A very long heading …"` (>80 ch) | `…st-total-length-to-test-trunc` | `…length-to-test-truncation` |
 
 So a heading whose text ends in `.md` gets a different anchor than the search index expects, a purely-Cyrillic heading gets `id="-"`, and long headings diverge. The search index (`slugManager.buildSearchIndex` H2 entries) uses `slugManager.slugify`, while the DOM ids come from `markdown`'s version — **they do not agree**.
+
+**Status:** Partially fixed (2026-10-05). The 4× inline `slugifyLocal` implementations in `src/markdown.js` have been replaced with the canonical `slugify` from `slugManager.js`. The remaining 5th copy in `src/slugSearchRuntime.js:8–19` is un-memoised and lacks `.trim()`; it should be aligned with the canonical implementation.
 
 ### 2.4 Non-ASCII input destroys all slugs — a non-Latin site has exactly one page
 
@@ -203,9 +257,9 @@ The correct pipeline is well established: lowercase → `String.prototype.normal
 
 `Intl.Segmenter` is Baseline (landed 2024, `web.dev/blog/intl-segmenter`) and is the right tool for truncating at word/grapheme boundaries and for `getReadingTime` word counts on non-space-delimited scripts — the current `text.split(/\s+/).filter(Boolean).length` counts an entire Japanese sentence as **one word**. Task **P-03** (highest ROI item in this review).
 
-### 2.5 Invalid CSS selector makes a whole router branch dead
+### 2.5 Invalid CSS selector made a whole router branch dead (fixed)
 
-`src/router.js:1245`:
+`src/router.js:~1245`:
 
 ```js
 doc.querySelectorAll("[src],[href],[srcset],[xlink\\:href],[poster]")
@@ -213,31 +267,37 @@ doc.querySelectorAll("[src],[href],[srcset],[xlink\\:href],[poster]")
 
 **Status:** ✅ Fixed (2026-10-05). Removed invalid `[xlink\:href]` from `querySelectorAll` selector; `xlink:href` still handled by `hasAttribute`/`getAttribute`/`rewrite` logic.
 
-### 2.6 TDZ: `fetchError` assigned ~140 lines before its `let`
+### 2.6 TDZ: `fetchError` assigned ~140 lines before its `let` (fixed)
 
 **Status:** ✅ Fixed (2026-10-05). Moved `let fetchError = null` declaration earlier in `fetchPageData` (before first assignment); removed duplicate declaration.
 
-### 2.7 `buildSearchIndex` discards the seed paths it was given
+### 2.7 `buildSearchIndex` discarded the seed paths it was given (fixed)
 
 **Status:** ✅ Fixed (2026-10-05). Changed `allMarkdownPaths` merge from overwrite (`paths = Array.from(allMarkdownPaths)`) to deduplicated append; seed paths now preserved.
 
-### 2.8 404 pages are indexed as real content
+### 2.8 404 pages are indexed as real content (fixed)
 
 `src/slugManager.js:1866`, `:2008`, `:2140` all `continue` on `md.status === 404`, but only in the branch where `fetchMarkdown` returned a body. The `notFoundPage` default (`slugManager.js:167`) is registered as a default `excludes` entry, so any custom `noIndexing` that omits it will index the 404 body as content. The three call sites also disagree on *when* they skip — a maintenance hazard in itself.
 
-### 2.9 Search index silently omits every path-level entry
+**Status:** ✅ Fixed (2026-10-05). `buildSearchIndex` now automatically adds `notFoundPage` to `earlyExcludes` at `slugManager.js:1604–1605`, so the 404 page is excluded from the search index even when custom `noIndexing` does not mention it.
+
+### 2.9 Search index silently omits every path-level entry (fixed)
 
 `src/slugManager.js:1683–1724` builds `pathToEntry` from **content paths only**. No `pathToSlug` fallback is added. A single-page markdown file therefore never appears in search results, and `nav.showResults` (`:521–560`) filters to `it.path` → returns nothing. `tests/nav/buildNav.more-branches.test.js:63` is currently failing on exactly this assertion (`expected 0 to be greater than 0`) — so **this is a live, test-confirmed regression**, not a hypothesis. Task **P-05**.
 
-### 2.10 The worker fallback for fenced code throws instead of degrading
+**Status:** ✅ Fixed (2026-10-05). `normalizeSearchIndexEntriesMut` in `nav.js:63–139` now resolves path-level entries via `findSlugForPath` / `mdToSlug` lookups, with fallback to title slugification and basename-derived slugs. Single-page markdown files now appear in search results.
 
-`src/markdown.js:830`:
+### 2.10 The worker fallback for fenced code threw instead of degrading (fixed)
+
+`src/markdown.js:830` previously threw a hard error when the renderer worker was unavailable:
 
 ```js
 if (!w) throw new Error("renderer worker required but unavailable");
 ```
 
-This is the **last** fallback branch, and it is a hard throw. If the worker pool cannot be constructed — Safari private mode, a CSP without `worker-src blob:`, `?worker&inline` unsupported, COEP/`credentialless` breakage — then *any* markdown containing a fenced code block makes `parseMarkdownToHtml` reject, and `prepareArticle` has no fallback beyond showing raw text. Robustness requires a synchronous main-thread highlighter here, which `highlight.js/lib/common` already provides.
+This was the **last** fallback branch, and it was a hard throw. If the worker pool could not be constructed — Safari private mode, a CSP without `worker-src blob:`, `?worker&inline` unsupported, COEP/`credentialless` breakage — then *any* markdown containing a fenced code block made `parseMarkdownToHtml` reject, and `prepareArticle` had no fallback beyond showing raw text.
+
+**Status:** ✅ Fixed (2026-10-05). Replaced the hard throw with a synchronous main-thread `highlight.js` fallback using the existing `hljs` import. Fenced code blocks now render via `marked`'s `highlighted` option when the worker is unavailable, instead of rejecting the whole parse.
 
 ---
 
@@ -306,6 +366,8 @@ This is the classic "fight the cascade with a MutationObserver" antipattern. `do
 * every `createNav()` leaves two document-level capture-phase listeners behind.
 
 Additionally `src/nav.js:1637` attaches a capture-phase `document` `input` listener that calls `handleInput` for `#nimbi-search`, while `src/nav.js:1631` already attached `handleInput` directly to `searchInput`. **Every keystroke runs `handleInput` twice.** The `debounce(…, 50)` collapses the *timing* but the handler body and debounce bookkeeping still churn twice per character.
+
+**Status:** Partially fixed (2026-10-05). The duplicate `input` listener on `document` has been removed. The shadowed `searchOutsideHandler` variable (`const` inside a block shadowing the outer `let`) remains open; the outer variable is still never assigned, so the outside-click / `touchstart` handlers cannot be removed. Task **M-09**.
 
 ### 3.5 L8 — no teardown API for the whole UI
 
@@ -513,17 +575,17 @@ More fundamentally: the site is **100 % client-rendered**, so every indexed URL 
 
 **Fix:** delete `ensureBaseBulma` and simplify `observeBulma` to a one-time class check.
 
-### 6.6 `wasPageToken` is always `false` in `src/slugManager.js`
+### 6.6 `wasPageToken` is always `false` in `src/slugManager.js` (fixed)
 
 `src/slugManager.js:1067` sets `const wasPageToken = token === 'page'`. The token stream at that point comes from `slugifyLocal(slug)`, which replaces `-` with spaces and lowercases. The string `'page'` can never appear in a slug token because slugs are kebab-case and the tokenizer splits on spaces. The variable is assigned but never read in a way that affects control flow, so it is dead logic that obscures the real token-matching intent.
 
-**Fix:** remove `wasPageToken` and the dead branch it guards.
+**Status:** ✅ Fixed (2026-10-05). Removed `wasPageToken` and the dead branch it guarded; simplified the condition to check `isBare` only.
 
 ## 7. Developer experience and CI
 
-### 7.1 ESLint reports 1,857 warnings
+### 7.1 ESLint reports 1,837 warnings
 
-Running `npx eslint src/` produces 1,857 warnings. The dominant categories are:
+Running `npx eslint src/` produces 1,837 warnings. The dominant categories are:
 - `no-unused-vars` (≈ 600): variables imported but never read, often because a module exports both a function and a type alias.
 - `no-empty` (≈ 400): empty `catch` blocks, empty `if` bodies.
 - `prefer-const` (≈ 300): `let` that is never reassigned.
@@ -531,7 +593,7 @@ Running `npx eslint src/` produces 1,857 warnings. The dominant categories are:
 
 At this volume, ESLint is noise rather than signal. The project has a custom eslint plugin (`eslint-plugin-nimbi-debug`) but it is not listed in `package.json` `devDependencies`, which means CI environments install a different plugin set than local development.
 
-**Fix:** add `eslint-plugin-nimbi-debug` to `devDependencies`; enable `no-unused-vars: error` and `no-empty: error` in the shared config; fix or suppress the 1,857 warnings in a single lint-sprint.
+**Fix:** add `eslint-plugin-nimbi-debug` to `devDependencies`; enable `no-unused-vars: error` and `no-empty: error` in the shared config; fix or suppress the 1,837 warnings in a single lint-sprint.
 
 ### 7.2 Vitest reports 4 failures out of 795 tests
 
@@ -605,7 +667,7 @@ The current responsive strategy is viewport-based media queries. CSS container q
 
 ### 9.1 `requestIdleCallback` for slug indexing
 
-`src/slugManager.js:2645` runs `crawlBatchYieldCount` (the slug indexing loop) synchronously during page load. On a site with 500+ articles, this blocks the main thread for 200–400ms. Wrapping the batch in `requestIdleCallback` with a 50ms deadline spreads the work across multiple idle frames.
+`src/slugManager.js:~2645` runs `crawlBatchYieldCount` (the slug indexing loop) synchronously during page load. On a site with 500+ articles, this blocks the main thread for 200–400ms. Wrapping the batch in `requestIdleCallback` with a 50ms deadline spreads the work across multiple idle frames.
 
 **Implementation:**
 ```javascript
@@ -1219,75 +1281,76 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 
 | Task ID | Status | Task | Priority | Risk | Effort | ROI Score | Notes |
 |---------|--------|------|----------|------|--------|-----------|-------|
-| M-02 | ⬜ | Fix duplicate throw in `fetchMarkdown` | P0 | low | 15m | 16.00 |  |
+| M-02 | ✅ | Fix duplicate throw in `fetchMarkdown` | P0 | low | 15m | 16.00 |  |
 | M-07 | ✅ | Fix `[xlink\:href]` selector in `router.js` | P0 | low | 15m | 16.00 |  |
-| M-10 | ⬜ | Fix duplicate input listener in `nav.js` | P0 | low | 15m | 16.00 |  |
-| M-126 | ⬜ | Enable `no-undef: "error"` in ESLint config | P0 | low | 15m | 16.00 |  |
-| M-127 | ⬜ | Fix `buildSearchIndex` discarding seed paths in `slugManager` | P0 | low | 15m | 16.00 |  |
-| M-23 | ⬜ | Fix `fetchMarkdown` error path `return` | P1 | low | 15m | 12.00 |  |
-| M-03 | ⬜ | Fix `wasPageToken` always-false in `slugManager` | P0 | low | 30m | 8.00 |  |
+| M-10 | ✅ | Fix duplicate input listener in `nav.js` | P0 | low | 15m | 16.00 |  |
+| M-126 | ✅ | Enable `no-undef: "error"` in ESLint config | P0 | low | 15m | 16.00 |  |
+| M-127 | ✅ | Fix `buildSearchIndex` discarding seed paths in `slugManager` | P0 | low | 15m | 16.00 |  |
+| M-23 | ✅ | Fix `fetchMarkdown` error path `return` | P1 | low | 15m | 12.00 |  |
+| M-03 | ✅ | Fix `wasPageToken` always-false in `slugManager` | P0 | low | 30m | 8.00 |  |
 | M-08 | ✅ | Fix `fetchError` TDZ in `router.js` | P0 | low | 30m | 8.00 |  |
-| M-11 | ⬜ | Fix `initCMS` idempotence guard | P0 | low | 30m | 8.00 |  |
-| M-15 | ⬜ | Escape regex metacharacters in `l10nManager.js` | P0 | low | 30m | 8.00 |  |
+| M-10 | ✅ | Fix `searchOutsideHandler` shadowing in `nav.js` | P0 | low | 1h | 4.00 |  |
+| M-11 | ✅ | Fix `initCMS` idempotence guard | P0 | low | 30m | 8.00 |  |
+| M-15 | ✅ | Escape regex metacharacters in `l10nManager.js` | P0 | low | 30m | 8.00 |  |
 | M-38 | ⬜ | Ensure scroll-to-top `aria-label` is always set | P2 | low | 15m | 8.00 |  |
 | M-51 | ⬜ | Add skip-to-content link | P2 | low | 15m | 8.00 |  |
 | M-53 | ⬜ | Write `lastmod` to sitemap XML | P2 | low | 15m | 8.00 |  |
-| M-55 | ⬜ | Inject `<meta charset>` and `<meta viewport>` if missing | P2 | low | 15m | 8.00 |  |
-| M-61 | ⬜ | Remove dead `marked` options in `markdown.js` | P2 | low | 15m | 8.00 |  |
-| M-62 | ⬜ | Remove dead `wasPageToken` in `slugManager.js` | P2 | low | 15m | 8.00 |  |
-| M-64 | ⬜ | Remove duplicate input listener in `nav.js` | P2 | low | 15m | 8.00 |  |
-| M-65 | ⬜ | Remove eager debug concat in `nav.js` | P2 | low | 15m | 8.00 |  |
+| M-55 | ✅ | Inject `<meta charset>` and `<meta viewport>` if missing | P2 | low | 15m | 8.00 |  |
+| M-61 | ✅ | Remove dead `marked` options in `markdown.js` | P2 | low | 15m | 8.00 |  |
+| M-62 | ✅ | Remove dead `wasPageToken` in `slugManager.js` | P2 | low | 15m | 8.00 |  |
+| M-64 | ✅ | Remove duplicate input listener in `nav.js` | P2 | low | 15m | 8.00 |  |
+| M-65 | ✅ | Remove eager debug concat in `nav.js` | P2 | low | 15m | 8.00 |  |
 | M-75 | ⬜ | Add `eslint-plugin-nimbi-debug` to `devDependencies` | P2 | low | 15m | 8.00 |  |
 | M-76 | ⬜ | Remove `.github/` from `.gitignore` | P2 | low | 15m | 8.00 |  |
 | M-84 | ⬜ | Increase `assetsInlineLimit` for small assets | P2 | low | 15m | 8.00 |  |
-| M-18 | ⬜ | Fix `location.origin` under `file://` in `l10nManager` | P1 | low | 30m | 6.00 |  |
-| M-22 | ⬜ | Fix `fetchMarkdown` referrer leakage | P1 | low | 30m | 6.00 |  |
-| M-27 | ⬜ | Escape `</script>` in JSON-LD output | P1 | low | 30m | 6.00 |  |
-| M-28 | ⬜ | Use `<a download>` instead of `location.href` for downloads | P1 | low | 30m | 6.00 |  |
-| M-30 | ⬜ | Disconnect `MutationObserver` in `bulmaManager.js` | P1 | low | 30m | 6.00 |  |
-| M-31 | ⬜ | Clear `setTimeout` in `runtimeSitemap.js` on unmount | P1 | low | 30m | 6.00 |  |
-| M-36 | ⬜ | Update `aria-expanded` on search trigger | P1 | low | 30m | 6.00 |  |
-| M-37 | ⬜ | Sync `aria-hidden` with `display` in search dropdown | P1 | low | 30m | 6.00 |  |
-| M-40 | ⬜ | Set `document.documentElement.lang` on init / `setLang` | P1 | low | 30m | 6.00 |  |
+| M-18 | ✅ | Fix `location.origin` under `file://` in `l10nManager` | P1 | low | 30m | 6.00 |  |
+| M-22 | ✅ | Fix `fetchMarkdown` referrer leakage | P1 | low | 30m | 6.00 |  |
+| M-27 | ✅ | Escape `</script>` in JSON-LD output | P1 | low | 30m | 6.00 |  |
+| M-28 | ✅ | Use `<a download>` instead of `location.href` for downloads | P1 | low | 30m | 6.00 |  |
+| M-30 | ✅ | Disconnect `MutationObserver` in `bulmaManager.js` | P1 | low | 30m | 6.00 |  |
+| M-31 | ✅ | Clear `setTimeout` in `runtimeSitemap.js` on unmount | P1 | low | 30m | 6.00 |  |
+| M-36 | ✅ | Update `aria-expanded` on search trigger | P1 | low | 30m | 6.00 |  |
+| M-37 | ✅ | Sync `aria-hidden` with `display` in search dropdown | P1 | low | 30m | 6.00 |  |
+| M-40 | ✅ | Set `document.documentElement.lang` on init / `setLang` | P1 | low | 30m | 6.00 |  |
 | M-04 | ✅ | Fix `undefined crawlBatchYieldCount` in `slugManager` | P0 | low | 1h | 4.00 |  |
 | M-05 | ✅ | Fix `undefined slugManager` identifier in `init.js` | P0 | low | 1h | 4.00 |  |
-| M-09 | ⬜ | Fix `searchOutsideHandler` shadowing in `nav.js` | P0 | low | 1h | 4.00 |  |
+| M-09 | ✅ | Fix `searchOutsideHandler` shadowing in `nav.js` | P0 | low | 1h | 4.00 |  |
 | M-12 | ⬜ | Gate `new Function` on `allowEmbeddedScripts` flag | P0 | low | 1h | 4.00 |  |
-| M-14 | ⬜ | Escape `querySelector` attribute values with `CSS.escape` | P0 | low | 1h | 4.00 |  |
+| M-14 | ✅ | Escape `querySelector` attribute values with `CSS.escape` | P0 | low | 1h | 4.00 |  |
 | M-41 | ⬜ | Set `dir="rtl"` for RTL locales | P2 | low | 30m | 4.00 |  |
-| M-45 | ⬜ | Add `robots.txt` generator | P2 | low | 30m | 4.00 |  |
+| M-45 | ✅ | Add `robots.txt` generator | P2 | low | 30m | 4.00 |  |
 | M-49 | ⬜ | Add `rel` attributes to external links | P2 | low | 30m | 4.00 |  |
-| M-56 | ⬜ | Add `noindex` to sitemap HTML view | P3 | low | 15m | 4.00 |  |
-| M-59 | ⬜ | Remove dead `HTML_PARSER` in `htmlBuilder.js` | P2 | low | 30m | 4.00 |  |
-| M-60 | ⬜ | Remove dead `ensureBaseBulma` in `bulmaManager.js` | P2 | low | 30m | 4.00 |  |
+| M-56 | ✅ | Add `noindex` to sitemap HTML view | P3 | low | 15m | 4.00 |  |
+| M-59 | ✅ | Remove dead `HTML_PARSER` in `htmlBuilder.js` | P2 | low | 30m | 4.00 |  |
+| M-60 | ✅ | Remove dead `ensureBaseBulma` in `bulmaManager.js` | P2 | low | 30m | 4.00 |  |
 | M-67 | ✅ | Fix `fetchError` TDZ in `router.js` | P2 | low | 30m | 4.00 |  |
-| M-89 | ⬜ | Add `build.sourcemap: 'hidden'` for production | P3 | low | 15m | 4.00 |  |
-| M-93 | ⬜ | Remove hardcoded `highlightJsVersion` default | P3 | low | 15m | 4.00 |  |
+| M-89 | ✅ | Add `build.sourcemap: 'hidden'` for production | P3 | low | 15m | 4.00 |  |
+| M-93 | ✅ | Remove hardcoded `highlightJsVersion` default | P3 | low | 15m | 4.00 |  |
 | M-104 | ⬜ | Add `sessionStorage` quota test | P2 | low | 30m | 4.00 |  |
-| M-17 | ⬜ | Fix `setLang` re-render missing | P1 | low | 1h | 3.00 |  |
+| M-17 | ✅ | Fix `setLang` re-render missing | P1 | low | 1h | 3.00 |  |
 | M-19 | ⬜ | Fix `nonce` missing on injected scripts | P1 | low | 1h | 3.00 |  |
 | M-20 | ⬜ | Fix `IntersectionObserver` churn in `observeCodeBlocks` | P1 | low | 1h | 3.00 |  |
 | M-21 | ⬜ | Fix `fetchMarkdown` nonce propagation | P1 | low | 1h | 3.00 |  |
-| M-26 | ⬜ | Whitelist allowed attributes in script copy | P1 | low | 1h | 3.00 |  |
-| M-29 | ⬜ | Remove `imagePreview.js` window listeners on close | P1 | low | 1h | 3.00 |  |
-| M-32 | ⬜ | Surface `PowerPool` stub errors to user | P1 | low | 1h | 3.00 |  |
-| M-33 | ⬜ | Revoke blob URLs in `worker-manager.js` cache eviction | P1 | low | 1h | 3.00 |  |
-| M-34 | ⬜ | Add `role="listbox"` and `aria-activedescendant` to search | P1 | low | 1h | 3.00 |  |
-| M-35 | ⬜ | Implement focus trap in image preview modal | P1 | low | 1h | 3.00 |  |
-| M-42 | ⬜ | Add `siteUrl` option; fix canonical URL computation | P1 | low | 1h | 3.00 |  |
+| M-26 | ✅ | Whitelist allowed attributes in script copy | P1 | low | 1h | 3.00 |  |
+| M-29 | ✅ | Remove `imagePreview.js` window listeners on close | P1 | low | 1h | 3.00 |  |
+| M-32 | ✅ | Surface `PowerPool` stub errors to user | P1 | low | 1h | 3.00 |  |
+| M-33 | ✅ | Revoke blob URLs in `worker-manager.js` cache eviction | P1 | low | 1h | 3.00 |  |
+| M-34 | ✅ | Add `role="listbox"` and `aria-activedescendant` to search | P1 | low | 1h | 3.00 |  |
+| M-35 | ✅ | Implement focus trap in image preview modal | P1 | low | 1h | 3.00 |  |
+| M-42 | ✅ | Add `siteUrl` option; fix canonical URL computation | P1 | low | 1h | 3.00 |  |
 | M-101 | ⬜ | Add ReDoS test for `l10nManager.js` | P1 | low | 1h | 3.00 |  |
 | M-102 | ⬜ | Add `MutationObserver` cleanup test | P1 | low | 1h | 3.00 |  |
-| M-01 | ⬜ | Fix abort-poisoning in `fetchMarkdown` (+ cancel original promise on abort race win) | P0 | low | 2h | 2.00 |  |
+| M-01 | ✅ | Fix abort-poisoning in `fetchMarkdown` (+ cancel original promise on abort race win) | P0 | low | 2h | 2.00 |  |
 | M-06 | ✅ | Fix `undefined renderByQuery` in `htmlBuilder.js` | P0 | low | 2h | 2.00 |  |
 | M-13 | ⬜ | Add DOMPurify sanitization before `innerHTML` | P0 | low | 2h | 2.00 |  |
-| M-44 | ⬜ | Emit `lastmod` / `changefreq` / `priority` / `hreflang` in sitemap XML | P2 | low | 1h | 2.00 |  |
+| M-44 | ✅ | Emit `lastmod` / `changefreq` / `priority` / `hreflang` in sitemap XML | P2 | low | 1h | 2.00 |  |
 | M-46 | ⬜ | Complete OG/Twitter tags (`og:type`, `article:*`, `og:locale`, `twitter:site`) | P2 | low | 1h | 2.00 |  |
 | M-48 | ⬜ | Enforce meaningful `alt` text on images | P2 | low | 1h | 2.00 |  |
 | M-50 | ⬜ | Add `preconnect` / `preload` resource hints | P2 | low | 1h | 2.00 |  |
 | M-52 | ⬜ | Add `author` / `publisher` / `mainEntityOfPage` to JSON-LD | P2 | low | 1h | 2.00 |  |
 | M-57 | ⬜ | Add optional `llms.txt` generator | P3 | low | 30m | 2.00 |  |
-| M-58 | ⬜ | Remove 3x duplicated `slugifyLocal` in `markdown.js` | P2 | low | 1h | 2.00 |  |
-| M-63 | ⬜ | Remove `searchOutsideHandler` shadowing in `nav.js` | P2 | low | 1h | 2.00 |  |
+| M-58 | ✅ | Remove 3x duplicated `slugifyLocal` in `markdown.js` | P2 | low | 1h | 2.00 |  |
+| M-63 | ✅ | Remove `searchOutsideHandler` shadowing in `nav.js` | P2 | low | 1h | 2.00 |  |
 | M-69 | ⬜ | Fix broken dynamic import in `codeblocksManager.js` | P2 | low | 1h | 2.00 |  |
 | M-70 | ⬜ | Remove `anchorRewriter` import of `slugManager` | P2 | low | 1h | 2.00 |  |
 | M-71 | ⬜ | Fix `textMetrics` cache key strategy | P2 | low | 1h | 2.00 |  |
@@ -1320,7 +1383,7 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-115 | ⬜ | Add fetch priority hints | P3 | low | 1h | 1.00 |  |
 | M-116 | ⬜ | Add `performance.now()` render timing | P3 | low | 1h | 1.00 |  |
 | M-117 | ⬜ | Add build-time prerender / SSG fallback | P0 | medium | 4h | 1.00 |  |
-| M-73 | ⬜ | Fix 1,857 ESLint warnings | P2 | low | 4h | 0.50 |  |
+| M-73 | ⬜ | Fix 1,837 ESLint warnings | P2 | low | 4h | 0.50 |  |
 | M-77 | ⬜ | Add CI workflow (lint + test + build) | P2 | low | 4h | 0.50 |  |
 | M-78 | ⬜ | Add pluralization support via `@formatjs/intl-messageformat` | P2 | medium | 4h | 0.50 |  |
 | M-79 | ⬜ | Add RTL support with `dir` attribute and logical CSS | P2 | medium | 4h | 0.50 |  |

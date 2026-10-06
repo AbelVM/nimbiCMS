@@ -1231,10 +1231,10 @@ export let fetchMarkdown = async function (path, base, opts) {
                 ae.name = "AbortError";
                 throw ae;
               }
-              return await fetch(
-                targetUrl,
-                mergedSignal ? { signal: mergedSignal } : undefined,
-              );
+              const fetchOpts = mergedSignal
+                ? { signal: mergedSignal, referrerPolicy: "no-referrer" }
+                : { referrerPolicy: "no-referrer" };
+              return await fetch(targetUrl, fetchOpts);
             };
 
             // Try using PowerRetry when it exists and has a run method.
@@ -1338,7 +1338,19 @@ export let fetchMarkdown = async function (path, base, opts) {
   }
 
   const promise = (async () => {
-    const res = await fetchWithDeadline(url);
+    let res;
+    try {
+      res = await fetchWithDeadline(url);
+    } catch (fetchErr) {
+      try {
+        debugError("fetchMarkdown failed:", () => ({
+          url,
+          status: "fetch-error",
+          error: fetchErr && fetchErr.message ? fetchErr.message : String(fetchErr),
+        }));
+      } catch (e) {}
+      throw new Error("failed to fetch md");
+    }
     if (!res || typeof res.ok !== "boolean" || !res.ok) {
       if (res && res.status === 404) {
         if (typeof notFoundPage === "string" && notFoundPage) {
