@@ -55,7 +55,10 @@ function injectLink(href, attrs = {}) {
           if (!parent) return;
           const last = parent.lastElementChild;
           if (last === l) return;
-          if (moveCount >= 1000) {
+          const currentMoveCount = Number(
+            l.getAttribute("data-bulmaswatch-move-count") || 0,
+          );
+          if (currentMoveCount >= 1000) {
             l.setAttribute("data-bulmaswatch-move-stopped", "1");
             if (observer) {
               try {
@@ -70,8 +73,8 @@ function injectLink(href, attrs = {}) {
           } catch (e) {
             /* ignore */
           }
-          moveCount += 1;
-          l.setAttribute("data-bulmaswatch-move-count", String(moveCount));
+          const newMoveCount = currentMoveCount + 1;
+          l.setAttribute("data-bulmaswatch-move-count", String(newMoveCount));
           moving = false;
         } catch (e) {
           /* ignore */

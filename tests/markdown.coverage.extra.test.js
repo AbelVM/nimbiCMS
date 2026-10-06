@@ -121,4 +121,22 @@ describe('markdown additional coverage', () => {
     const res = md.detectFenceLanguages('```foobarbaz\nconsole.log(1)\n```')
     expect(res.has('foobarbaz')).toBe(true)
   })
+
+  it('handles <script> tags without crashing', async () => {
+    vi.resetModules()
+    const md = await import('../src/markdown.js')
+    const input = '# Hello\n\n<script>alert("xss")</script>\n'
+    const res = await md.parseMarkdownToHtml(input)
+    expect(res).toBeTruthy()
+    expect(res.html).toBeTruthy()
+  })
+
+  it('handles onerror attributes without crashing', async () => {
+    vi.resetModules()
+    const md = await import('../src/markdown.js')
+    const input = '# Hello\n\n<img src="x" onerror="alert(1)">\n'
+    const res = await md.parseMarkdownToHtml(input)
+    expect(res).toBeTruthy()
+    expect(res.html).toBeTruthy()
+  })
 })

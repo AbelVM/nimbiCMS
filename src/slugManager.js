@@ -1194,7 +1194,8 @@ export let fetchMarkdown = async function (path, base, opts) {
           if (
             signal &&
             typeof AbortSignal !== "undefined" &&
-            typeof AbortSignal.any === "function"
+            typeof AbortSignal.any === "function" &&
+            dl.signal instanceof AbortSignal
           ) {
             mergedSignal = AbortSignal.any([signal, dl.signal]);
           } else if (signal && typeof AbortSignal !== "undefined") {

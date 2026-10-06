@@ -41,4 +41,14 @@ describe('l10nManager', () => {
     expect(t('home')).toBe('X Home')
     expect(t('searchPlaceholder')).toBe('X')
   })
+
+  it('handles regex metacharacters in replacement keys without ReDoS', () => {
+    setLang('en')
+    const start = Date.now()
+    // Malicious keys with regex metacharacters should be escaped and
+    // complete quickly without hanging.
+    const result = t('home', { 'a{2,}b': 'value', '(a|b)*': 'other' })
+    expect(result).toBe('Home')
+    expect(Date.now() - start).toBeLessThan(1000)
+  })
 })
