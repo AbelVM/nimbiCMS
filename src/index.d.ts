@@ -408,9 +408,6 @@ export function handleSlugWorkerMessage(msg: object): Promise<object>
 // --- from src/worker/anchorRuntime.js
 
 
-// --- from src/worker/anchorRewriter.js
-
-
 // --- from src/utils/urlHelper.js
 export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): string
 export function parseHrefToRoute(href: string): any

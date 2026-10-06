@@ -24,13 +24,21 @@ const CACHE = new Map();
 const MAX_ENTRIES = 200;
 
 /**
- * Normalize input text into a stable cache key.
+ * Normalize input text into a stable, bounded cache key.
+ * Uses a small non-cryptographic hash plus the text length to keep keys
+ * short while reducing collision risk.
  * @param {string} text
  * @returns {string}
  * @private
  */
 function makeKey(text) {
-  return String(text ?? "");
+  const str = String(text ?? "");
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash + char) | 0;
+  }
+  return `${str.length}:${hash}`;
 }
 
 /**

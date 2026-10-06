@@ -14,6 +14,15 @@ import {
   setImportNegativeCacheTTL,
 } from "./utils/importCache.js";
 
+// Static map of all highlight.js language modules. Vite will emit one chunk
+// per language at build time; imports are resolved statically, so there is
+// no runtime template-literal resolution and no CDN fallback needed for
+// languages that were bundled.
+const HLJS_LANGUAGE_MODULES = import.meta.glob(
+  "../node_modules/highlight.js/lib/languages/*.js",
+  { eager: false },
+);
+
 /**
  * Expose the internal `hljs` (highlight.js core) instance for tests
  * and advanced usage (language registration, theming helpers).
@@ -439,69 +448,82 @@ export async function registerLanguage(name, modulePath) {
                 return null;
               }
             }
+            const globKey = `highlight.js/lib/languages/${candidate}.js`;
+            const loader = HLJS_LANGUAGE_MODULES[globKey];
+            if (loader && typeof loader === "function") {
+              try {
+                return await loader();
+              } catch (_globErr) {
+                // fall through to dynamic import / CDN fallback below
+              }
+            }
+            // Fallback for test environments where vi.mock may register
+            // virtual modules that import.meta.glob cannot see, and for
+            // any language not covered by the static glob bundle.
             try {
               try {
                 return await import(
-                  /* @vite-ignore */ `highlight.js/lib/languages/${candidate}.js`
+                  `highlight.js/lib/languages/${candidate}.js`
                 );
               } catch (_withExt) {
                 return await import(
-                  /* @vite-ignore */ `highlight.js/lib/languages/${candidate}`
+                  `highlight.js/lib/languages/${candidate}`
                 );
               }
             } catch (_localErr) {
-              if (!HIGHLIGHT_JS_VERSION) {
-                return null;
+              // fall through to CDN fallback below
+            }
+            if (!HIGHLIGHT_JS_VERSION) {
+              return null;
+            }
+            try {
+              const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/es/languages/${candidate}.js`;
+              let host = null;
+              try {
+                host = new URL(esmUrl).host;
+              } catch (_) {
+                host = null;
+              }
+              if (_isCdnBlocked(host)) {
+                // Circuit open for this CDN host — skip attempting network import
+              } else {
+                try {
+                  const m = await import(esmUrl);
+                  _noteCdnSuccess(host);
+                  return m;
+                } catch (err) {
+                  _noteCdnFailure(host);
+                }
               }
               try {
-                const esmUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/es/languages/${candidate}.js`;
-                let host = null;
+                const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/lib/languages/${candidate}.js`;
+                let host2 = null;
                 try {
-                  host = new URL(esmUrl).host;
+                  host2 = new URL(moduleUrl).host;
                 } catch (_) {
-                  host = null;
+                  host2 = null;
                 }
-                if (_isCdnBlocked(host)) {
-                  // Circuit open for this CDN host — skip attempting network import
+                if (_isCdnBlocked(host2)) {
+                  // skip
                 } else {
                   try {
-                    const m = await import(esmUrl);
-                    _noteCdnSuccess(host);
-                    return m;
-                  } catch (err) {
-                    _noteCdnFailure(host);
+                    const m2 = await import(moduleUrl);
+                    _noteCdnSuccess(host2);
+                    return m2;
+                  } catch (err2) {
+                    _noteCdnFailure(host2);
+                    return null;
                   }
                 }
-                try {
-                  const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/lib/languages/${candidate}.js`;
-                  let host2 = null;
-                  try {
-                    host2 = new URL(moduleUrl).host;
-                  } catch (_) {
-                    host2 = null;
-                  }
-                  if (_isCdnBlocked(host2)) {
-                    // skip
-                  } else {
-                    try {
-                      const m2 = await import(moduleUrl);
-                      _noteCdnSuccess(host2);
-                      return m2;
-                    } catch (err2) {
-                      _noteCdnFailure(host2);
-                      return null;
-                    }
-                  }
-                } catch (_cdnErr) {
-                  return null;
-                }
-              } catch (_esmErr) {
-                try {
-                  const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/lib/languages/${candidate}.js`;
-                  return await import(moduleUrl);
-                } catch (_cdnErr) {
-                  return null;
-                }
+              } catch (_cdnErr) {
+                return null;
+              }
+            } catch (_esmErr) {
+              try {
+                const moduleUrl = `https://cdn.jsdelivr.net/npm/highlight.js@${HIGHLIGHT_JS_VERSION}/lib/languages/${candidate}.js`;
+                return await import(moduleUrl);
+              } catch (_cdnErr) {
+                return null;
               }
             }
           } catch (err) {
@@ -573,18 +595,7 @@ export function observeCodeBlocks(root) {
     })();
   }
   const aliasMapLocal = HLJS_ALIAS_MAP;
-  const ensureObserver = () => {
-    const observerRoot = effectiveRoot === document ? null : effectiveRoot;
-    if (__hlObserver && __hlObserver.root === observerRoot) return __hlObserver;
-    if (__hlObserver) {
-      try {
-        __hlObserver.disconnect();
-      } catch (err) {
-        debugWarn("[codeblocksManager] observer disconnect failed", err);
-      }
-      __hlObserver = null;
-    }
-    if (typeof IntersectionObserver === "undefined") return null;
+  if (typeof IntersectionObserver !== "undefined" && !__hlObserver) {
     __hlObserver = new IntersectionObserver(
       (entries, obs) => {
         entries.forEach((entry) => {
@@ -701,12 +712,11 @@ export function observeCodeBlocks(root) {
           })();
         });
       },
-      { root: observerRoot, rootMargin: "300px", threshold: 0.1 },
+      { root: null, rootMargin: "300px", threshold: 0.1 },
     );
-    return __hlObserver;
-  };
+  }
 
-  const obs = ensureObserver();
+  const obs = __hlObserver;
   const blocks = effectiveRoot?.querySelectorAll
     ? effectiveRoot.querySelectorAll("pre code")
     : [];
