@@ -1415,7 +1415,7 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-109 | ✅ | Add `requestIdleCallback` for slug indexing | P3 | low | 2h | 0.50 | Added `yieldToIdle()` in `src/utils/idle.js` using `requestIdleCallback` with timeout fallback. |
 | M-110 | ✅ | Replace `innerWidth` with `ResizeObserver` | P3 | low | 2h | 0.50 | Replaced `innerWidth` checks with `ResizeObserver` in `src/init.js` for responsive layout computation. |
 | M-85 | ⬜ | Vendor minimal `performance-helpers` subset | P3 | medium | 4h | 0.25 |  |
-| M-96 | ⬜ | Replace inline styles with CSS classes | P3 | medium | 4h | 0.25 |  |
+| M-96 | ✅ | Replace inline styles with CSS classes | P3 | medium | 4h | 0.25 | Replaced inline styles in `src/init.js`, `src/nav.js`, `src/runtimeSitemap.js` with CSS classes in `src/styles/nimbi-cms-extra.css`; updated 3 tests to use classList assertions. |
 | M-111 | ✅ | Add CSS container queries | P3 | low | 4h | 0.25 | Added container queries in `src/styles/nimbi-cms-extra.css`. |
 | M-112 | ✅ | Add View Transitions API for navigation | P3 | medium | 4h | 0.25 | Implemented in `src/ui.js` with `startViewTransition` wrapper and fallback. |
 | M-113 | ✅ | Add import maps for bare module specifiers | P3 | low | 4h | 0.25 | Added import map in `index.html` and ESM loader shim for browser compatibility. |
