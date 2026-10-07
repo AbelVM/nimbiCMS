@@ -1,0 +1,9 @@
+[**nimbi-cms**](../../../../README.md)
+
+***
+
+[nimbi-cms](../../../../README.md) / [lib/performance-helpers/constants](../README.md) / DEFAULT\_HISTOGRAM\_MAX\_VALUE
+
+# Variable: DEFAULT\_HISTOGRAM\_MAX\_VALUE
+
+> `const` **DEFAULT\_HISTOGRAM\_MAX\_VALUE**: `10000` = `10000`

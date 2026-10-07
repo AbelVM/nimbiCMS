@@ -6,6 +6,6 @@
 
 # Variable: \_logger
 
-> `const` **\_logger**: `PowerLogger`
+> `const` **\_logger**: [`PowerLogger`](../../../lib/performance-helpers/powerLogger/classes/PowerLogger.md)
 
 Shared logger instance (starts disabled at level 0).
