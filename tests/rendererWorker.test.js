@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { u82o } from '../node_modules/performance-helpers/src/helpers/powerBuffer.js'
+import { u82o } from '../src/lib/performance-helpers/powerBuffer.js'
 
 function decodePosted(m) {
   if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {

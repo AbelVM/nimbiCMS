@@ -29,7 +29,7 @@
  * @returns {boolean}
  */
 import { debugWarn } from "./debug.js";
-import { PowerMemoizer } from "performance-helpers/powerCache";
+import { PowerMemoizer } from "../lib/performance-helpers/powerCache.js";
 
 const MEMO_KEY = (arg) => (arg === undefined ? "__undefined" : String(arg));
 const _normalizePathMemo = new PowerMemoizer(

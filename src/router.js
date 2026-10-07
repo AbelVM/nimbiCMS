@@ -36,7 +36,7 @@ import {
   isIndexPathsRefreshed,
   setIndexPathsRefreshed,
 } from "./indexManager.js";
-import { PowerCache } from "performance-helpers/powerCache";
+import { PowerCache } from "./lib/performance-helpers/powerCache.js";
 export let RESOLUTION_CACHE_MAX = 100;
 
 /**

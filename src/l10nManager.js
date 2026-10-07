@@ -7,7 +7,7 @@
  * @module l10nManager
  */
 import { DEFAULT_L10N } from "./utils/l10n-defaults.js";
-import { PowerDeadline } from "performance-helpers/powerDeadline";
+import { PowerDeadline } from "./lib/performance-helpers/powerDeadline.js";
 
 const L10N = structuredClone(DEFAULT_L10N);
 

@@ -3,8 +3,8 @@
  * promise deduplication, backed by PowerCache from performance-helpers.
  * @module utils/importCache
  */
-import { PowerCache } from "performance-helpers/powerCache";
-import { PowerTTLMap } from "performance-helpers/powerTTLMap";
+import { PowerCache } from "../lib/performance-helpers/powerCache.js";
+import { PowerTTLMap } from "../lib/performance-helpers/powerTTLMap.js";
 
 const __importCache = new PowerCache({ maxEntries: 500 });
 const __negativeCache = new PowerTTLMap(0);

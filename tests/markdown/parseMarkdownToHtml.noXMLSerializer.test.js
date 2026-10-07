@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 // Disable HLJS branch so we go through the worker-render path.
 vi.mock('highlight.js/lib/core', () => ({ __esModule: true, default: { getLanguage: () => undefined } }))
 
-vi.mock('performance-helpers/powerPool', () => ({
+vi.mock('../../src/lib/performance-helpers/powerPool.js', () => ({
   PowerPool: class {
     constructor(source, opts) {
       this.workers = [{ worker: { _underlying: {} } }]

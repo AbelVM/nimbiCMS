@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
-import { u82o } from '../node_modules/performance-helpers/src/helpers/powerBuffer.js'
+import { u82o } from '../src/lib/performance-helpers/powerBuffer.js'
 
 // vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
 // throw). These static mocks are file-scoped and active for every test.

@@ -1,7 +1,7 @@
 /**
  * @module worker/slugWorker
  */
-import { u82o, o2u8 } from "performance-helpers/powerBuffer";
+import { u82o, o2u8 } from "../lib/performance-helpers/powerBuffer.js";
 import { buildSearchIndex, crawlForSlug } from "../slugSearchRuntime.js";
 
 function _decodeMsg(data) {

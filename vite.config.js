@@ -67,7 +67,7 @@ function createImportMapPlugin(enabled) {
   }
 }
 
-function createBuildConfig({ mode, shouldAnalyze }) {
+function createBuildConfig({ mode, shouldAnalyze, alias = {} }) {
   const { pkg, highlightJsVersion } = readPackageMetadata()
   const isUmd = mode === 'umd'
   const defineValues = {
@@ -82,6 +82,7 @@ function createBuildConfig({ mode, shouldAnalyze }) {
 
   return defineConfig({
     define: defineValues,
+    resolve: { alias },
     worker: {
       format: 'es',
       rollupOptions: {
@@ -144,6 +145,10 @@ function createBuildConfig({ mode, shouldAnalyze }) {
 }
 
 export default defineConfig(({ command }) => {
+  const alias = {
+    'performance-helpers': path.resolve(__dirname, 'src/lib/performance-helpers')
+  }
+
   if (command !== 'build') {
     return {
       server: {
@@ -152,12 +157,13 @@ export default defineConfig(({ command }) => {
           overlay: false
         }
       },
-      worker: { format: 'es' }
+      worker: { format: 'es' },
+      resolve: { alias }
     }
   }
 
   const shouldAnalyze = !!process.env.ANALYZE
   const mode = process.env.BUILD_TARGET === 'umd' ? 'umd' : 'lib'
 
-  return createBuildConfig({ mode, shouldAnalyze })
+  return createBuildConfig({ mode, shouldAnalyze, alias })
 })

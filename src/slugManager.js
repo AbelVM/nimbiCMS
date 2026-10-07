@@ -27,11 +27,11 @@ import {
 
 import SlugWorker from "./worker/slugWorker.js?worker&inline";
 
-import { PowerCache, PowerMemoizer } from "performance-helpers/powerCache";
-import { PowerDeadline } from "performance-helpers/powerDeadline";
-import { PowerRetry } from "performance-helpers/powerRetry";
-import { PowerPool } from "performance-helpers/powerPool";
-import { PowerSemaphore } from "performance-helpers/powerSemaphore";
+import { PowerCache, PowerMemoizer } from "./lib/performance-helpers/powerCache.js";
+import { PowerDeadline } from "./lib/performance-helpers/powerDeadline.js";
+import { PowerRetry } from "./lib/performance-helpers/powerRetry.js";
+import { PowerPool } from "./lib/performance-helpers/powerPool.js";
+import { PowerSemaphore } from "./lib/performance-helpers/powerSemaphore.js";
 import { debugLog, debugWarn, debugError, isDebug } from "./utils/debug.js";
 import { yieldIfNeeded } from "./utils/idle.js";
 

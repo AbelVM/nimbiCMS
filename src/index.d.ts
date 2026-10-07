@@ -487,3 +487,87 @@ export function getDebugCounters(): Record<string,number>
 export function resetDebugCounters(): any
 
 // --- from src/lib/index.js
+
+// --- from src/lib/performance-helpers/powerTTLMap.js
+
+
+// --- from src/lib/performance-helpers/powerSubscriberSet.js
+export function cleanupWeakRefs(bucket: any): any
+
+
+// --- from src/lib/performance-helpers/powerSemaphore.js
+
+
+// --- from src/lib/performance-helpers/powerRetry.js
+
+
+// --- from src/lib/performance-helpers/powerQueue.js
+
+
+// --- from src/lib/performance-helpers/powerPool.js
+
+
+
+// --- from src/lib/performance-helpers/powerPermitGate.js
+
+
+// --- from src/lib/performance-helpers/powerLogger.js
+
+
+// --- from src/lib/performance-helpers/powerEventBus.js
+
+
+// --- from src/lib/performance-helpers/powerDeadline.js
+
+
+// --- from src/lib/performance-helpers/powerCache.js
+export function simpleArgsKey(...args: any): any
+
+
+
+
+// --- from src/lib/performance-helpers/powerBuffer.js
+export const o2u8: any
+export const u82o: any
+export const o2b: any
+export const b2o: any
+
+// --- from src/lib/performance-helpers/jsdoc-types.js
+
+// --- from src/lib/performance-helpers/constants.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// --- from src/lib/performance-helpers/WorkerAgnostic.js
+export function preloadNode(): Promise<void>
+
+// --- from src/lib/performance-helpers/utils/now.js
+export const nowMs: any
+export function measureSync(fn: Function|any): {result:any, ms:number, start:number, end:number}
+export function measureAsync(fn: Function|Promise|any): Promise<{result:any, ms:number, start:number, end:number}>
+
+// --- from src/lib/performance-helpers/utils/errors.js
+export function normalizeError(err: any, defaultCode: string): {error: true, code: string, message: string, stack: string}
+export function formatErrorObj(errObj: any): string

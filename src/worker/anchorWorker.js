@@ -2,7 +2,7 @@
  * @module worker/anchorWorker
  */
 import { rewriteAnchorsHtml } from "./anchorRuntime.js";
-import { u82o, o2u8 } from "performance-helpers/powerBuffer";
+import { u82o, o2u8 } from "../lib/performance-helpers/powerBuffer.js";
 
 /**
  * Worker entrypoint for rewriting anchor hrefs inside rendered HTML.

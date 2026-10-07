@@ -8,7 +8,7 @@
  */
 import { marked } from "marked";
 import RendererWorker from "./worker/renderer.entry.js?worker&inline";
-import { PowerPool } from "performance-helpers/powerPool";
+import { PowerPool } from "./lib/performance-helpers/powerPool.js";
 import emojimap from "./utils/emojiMap.js";
 import { debugWarn } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
