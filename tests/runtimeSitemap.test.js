@@ -99,7 +99,7 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, writeToDocument: true })
     // wait for the scheduled write to flush (scheduler uses a short timeout)
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)
@@ -126,7 +126,7 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, writeToDocument: true })
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)
     const out = writes.join('')
@@ -157,7 +157,7 @@ describe('runtimeSitemap', () => {
     document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, writeToDocument: true })
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)
     expect(writes.length).toBeGreaterThan(0)

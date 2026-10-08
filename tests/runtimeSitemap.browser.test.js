@@ -32,7 +32,7 @@ test('handleSitemapRequest schedules and writes RSS in browser environment', asy
   // Seed a tiny searchIndex so whenSearchIndexReady/buildSearchIndex resolve quickly
   slugManager._setSearchIndex([{ slug: 's', title: 'S', path: 's.md' }])
 
-  const handled = await runtimeSitemap.handleSitemapRequest({})
+  const handled = await runtimeSitemap.handleSitemapRequest({ writeToDocument: true })
   expect(handled).toBe(true)
 
   // ensure the scheduled write ran and set the rendered marker

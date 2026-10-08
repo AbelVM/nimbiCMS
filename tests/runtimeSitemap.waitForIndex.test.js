@@ -50,7 +50,7 @@ describe('runtimeSitemap waits for index completion', () => {
     document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: finalIndex, waitForIndexMs: 1000 })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: finalIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for scheduled sitemap write to flush
     await new Promise(r => setTimeout(r, 80))
     expect(handled).toBe(true)

@@ -45,7 +45,7 @@ describe('runtimeSitemap RSS/Atom endpoints (extra branches)', () => {
     document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000 })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).to.equal(true)
@@ -69,7 +69,7 @@ describe('runtimeSitemap RSS/Atom endpoints (extra branches)', () => {
     document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000 })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).to.equal(true)

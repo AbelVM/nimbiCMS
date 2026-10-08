@@ -16,7 +16,7 @@ test('handleSitemapRequest skips write when existing rendered sitemap larger', a
   window.__nimbiSitemapFinal = new Array(10)
   slugManager._setSearchIndex([{ slug: 's', title: 'S', path: 's.md' }])
 
-  const handled = await runtimeSitemap.handleSitemapRequest({ waitForIndexMs: 0 })
+  const handled = await runtimeSitemap.handleSitemapRequest({ waitForIndexMs: 0, writeToDocument: true })
   expect(handled).toBe(true)
 
   try { Object.defineProperty(globalThis, 'location', { value: origLocation, configurable: true }) } catch (e) {}

@@ -990,7 +990,9 @@ export function generateLlmsTxt(json, opts = {}) {
     try {
       name =
         typeof document !== "undefined" && document.title
-          ? String(document.title).split(/[|\-–—]/)[0].trim()
+          ? String(document.title)
+              .split(/[|\-–—]/)[0]
+              .trim()
           : "";
     } catch (_) {}
   }
@@ -1005,8 +1007,7 @@ export function generateLlmsTxt(json, opts = {}) {
       if (!title) continue;
       const slug = e?.slug ? String(e.slug) : null;
       const loc = String(
-        e?.loc ||
-          (slug ? `${base}?page=${encodeURIComponent(slug)}` : base),
+        e?.loc || (slug ? `${base}?page=${encodeURIComponent(slug)}` : base),
       );
       const excerpt = e?.excerpt
         ? `: ${String(e.excerpt).replace(/\s+/g, " ").trim()}`
@@ -1127,22 +1128,29 @@ function _createSitemapResponse(finalJson, mimeType, runtimeManifest) {
     runtimeManifest || globalThis?.window?.__nimbiRuntimeManifest || null;
   const generation = manifest?.generation;
   const headers = { "content-type": mimeType };
-  if (Number.isInteger(generation)) headers["x-nimbi-generation"] = String(generation);
+  if (Number.isInteger(generation))
+    headers["x-nimbi-generation"] = String(generation);
   if (typeof manifest?.language === "string" && manifest.language)
     headers["x-nimbi-language"] = manifest.language;
   if (typeof manifest?.contentBase === "string" && manifest.contentBase)
     headers["x-nimbi-content-base"] = manifest.contentBase;
-  let body;
-  if (mimeType === "application/rss+xml") body = generateRssXml(finalJson);
-  else if (mimeType === "application/atom+xml") body = generateAtomXml(finalJson);
-  else if (mimeType === "text/html") body = _generateHtmlFromJson(finalJson);
-  else if (mimeType === "text/plain") body = generateLlmsTxt(finalJson);
-  else body = generateSitemapXml(finalJson);
+  const body = _renderSitemapBody(finalJson, mimeType);
   if (typeof globalThis?.Response === "function")
     return new globalThis.Response(body, {
       headers,
     });
   return body;
+}
+
+// Render the generated sitemap JSON into the body for the requested format.
+// Shared by the Response adapter and the default (non-writing) return path so
+// every consumer receives byte-identical output.
+function _renderSitemapBody(finalJson, mimeType) {
+  if (mimeType === "application/rss+xml") return generateRssXml(finalJson);
+  if (mimeType === "application/atom+xml") return generateAtomXml(finalJson);
+  if (mimeType === "text/html") return _generateHtmlFromJson(finalJson);
+  if (mimeType === "text/plain") return generateLlmsTxt(finalJson);
+  return generateSitemapXml(finalJson);
 }
 
 // Schedule a sitemap write so multiple concurrent calls don't race and
@@ -1252,7 +1260,13 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
  * @param {boolean} [opts.returnResponse=false] - return a Response/string without writing to the document
  * @param {string|URL} [opts.url] - request URL for host adapters without browser location
  * @param {Object} [opts.runtimeManifest] - runtime identity for host responses
- * @returns {Promise<boolean|Response|string>} true when written, or generated output in response mode
+ * @param {boolean} [opts.writeToDocument=false] - opt in to replacing the live
+ *   application document with the generated output. Disabled by default so
+ *   programmatic callers can never destroy a mounted CMS; the browser
+ *   `/?sitemap` endpoint opts in explicitly through `initCMS`.
+ * @returns {Promise<boolean|Response|string>} `true` when a document write was
+ *   scheduled, a `Response` in `returnResponse` mode, or the generated body
+ *   string in the default non-writing mode
  */
 export async function handleSitemapRequest(opts = {}) {
   try {
@@ -1598,12 +1612,9 @@ export async function handleSitemapRequest(opts = {}) {
 
     // Generate JSON using the gathered index
     const json = await generateSitemapJson(
-      Object.assign(
-        {},
-        opts,
-        opts.url ? { baseUrl: requestUrl.href } : {},
-        { index: idx },
-      ),
+      Object.assign({}, opts, opts.url ? { baseUrl: requestUrl.href } : {}, {
+        index: idx,
+      }),
     );
 
     // Debug: log the final entries deduped by base slug (strip anchors)
@@ -1663,16 +1674,17 @@ export async function handleSitemapRequest(opts = {}) {
           : [],
     });
 
+    const mimeType = wantRss
+      ? "application/rss+xml"
+      : wantAtom
+        ? "application/atom+xml"
+        : wantLlms
+          ? "text/plain"
+          : wantHtml
+            ? "text/html"
+            : "application/xml";
+
     if (opts.returnResponse) {
-      const mimeType = wantRss
-        ? "application/rss+xml"
-        : wantAtom
-          ? "application/atom+xml"
-          : wantLlms
-            ? "text/plain"
-            : wantHtml
-              ? "text/html"
-              : "application/xml";
       return _createSitemapResponse(finalJson, mimeType, opts.runtimeManifest);
     }
 
@@ -1685,96 +1697,20 @@ export async function handleSitemapRequest(opts = {}) {
       }
     } catch {}
 
-    if (wantLlms) {
-      _scheduleSitemapWrite(finalJson, "text/plain");
-      return true;
-    }
+    // Document replacement is opt-in. Programmatic callers (hosts, tests,
+    // other runtimes) receive the generated body instead of having the live
+    // application document destroyed. The browser `/?sitemap` endpoint opts
+    // in explicitly through `initCMS`.
+    if (opts.writeToDocument === true) {
+      if (wantLlms) {
+        _scheduleSitemapWrite(finalJson, "text/plain");
+        return true;
+      }
 
-    if (wantRss) {
-      const newLen = Array.isArray(finalJson?.entries)
-        ? finalJson.entries.length
-        : 0;
-      let existingRenderedLen = -1;
-      try {
-        if (
-          typeof window !== "undefined" &&
-          Array.isArray(window.__nimbiSitemapFinal) &&
-          typeof window.__nimbiSitemapRenderedAt === "number"
-        )
-          existingRenderedLen = window.__nimbiSitemapFinal.length;
-      } catch {}
-      if (existingRenderedLen > newLen) {
-        try {
-          debugLog(
-            "[runtimeSitemap] skip RSS write: existing rendered sitemap larger",
-            existingRenderedLen,
-            newLen,
-          );
-        } catch {}
-        return true;
-      }
-      _scheduleSitemapWrite(finalJson, "application/rss+xml");
-      return true;
-    }
-    if (wantAtom) {
-      const newLen = Array.isArray(finalJson?.entries)
-        ? finalJson.entries.length
-        : 0;
-      let existingRenderedLen = -1;
-      try {
-        if (
-          typeof window !== "undefined" &&
-          Array.isArray(window.__nimbiSitemapFinal) &&
-          typeof window.__nimbiSitemapRenderedAt === "number"
-        )
-          existingRenderedLen = window.__nimbiSitemapFinal.length;
-      } catch {}
-      if (existingRenderedLen > newLen) {
-        try {
-          debugLog(
-            "[runtimeSitemap] skip Atom write: existing rendered sitemap larger",
-            existingRenderedLen,
-            newLen,
-          );
-        } catch {}
-        return true;
-      }
-      _scheduleSitemapWrite(finalJson, "application/atom+xml");
-      return true;
-    }
-    if (wantXml) {
-      const newLen = Array.isArray(finalJson?.entries)
-        ? finalJson.entries.length
-        : 0;
-      let existingRenderedLen = -1;
-      try {
-        if (
-          typeof window !== "undefined" &&
-          Array.isArray(window.__nimbiSitemapFinal) &&
-          typeof window.__nimbiSitemapRenderedAt === "number"
-        )
-          existingRenderedLen = window.__nimbiSitemapFinal.length;
-      } catch {}
-      if (existingRenderedLen > newLen) {
-        try {
-          debugLog(
-            "[runtimeSitemap] skip XML write: existing rendered sitemap larger",
-            existingRenderedLen,
-            newLen,
-          );
-        } catch {}
-        return true;
-      }
-      _scheduleSitemapWrite(finalJson, "application/xml");
-      return true;
-    }
-
-    if (wantHtml) {
-      try {
-        const entriesForHtml = Array.isArray(finalJson?.entries)
-          ? finalJson.entries
-          : [];
-        const newLen = entriesForHtml.length;
+      if (wantRss) {
+        const newLen = Array.isArray(finalJson?.entries)
+          ? finalJson.entries.length
+          : 0;
         let existingRenderedLen = -1;
         try {
           if (
@@ -1787,22 +1723,107 @@ export async function handleSitemapRequest(opts = {}) {
         if (existingRenderedLen > newLen) {
           try {
             debugLog(
-              "[runtimeSitemap] skip HTML write: existing rendered sitemap larger",
+              "[runtimeSitemap] skip RSS write: existing rendered sitemap larger",
               existingRenderedLen,
               newLen,
             );
           } catch {}
           return true;
         }
-        _scheduleSitemapWrite(finalJson, "text/html");
+        _scheduleSitemapWrite(finalJson, "application/rss+xml");
         return true;
-      } catch (e) {
-        debugWarn("[runtimeSitemap] render HTML failed", e);
-        return false;
+      }
+      if (wantAtom) {
+        const newLen = Array.isArray(finalJson?.entries)
+          ? finalJson.entries.length
+          : 0;
+        let existingRenderedLen = -1;
+        try {
+          if (
+            typeof window !== "undefined" &&
+            Array.isArray(window.__nimbiSitemapFinal) &&
+            typeof window.__nimbiSitemapRenderedAt === "number"
+          )
+            existingRenderedLen = window.__nimbiSitemapFinal.length;
+        } catch {}
+        if (existingRenderedLen > newLen) {
+          try {
+            debugLog(
+              "[runtimeSitemap] skip Atom write: existing rendered sitemap larger",
+              existingRenderedLen,
+              newLen,
+            );
+          } catch {}
+          return true;
+        }
+        _scheduleSitemapWrite(finalJson, "application/atom+xml");
+        return true;
+      }
+      if (wantXml) {
+        const newLen = Array.isArray(finalJson?.entries)
+          ? finalJson.entries.length
+          : 0;
+        let existingRenderedLen = -1;
+        try {
+          if (
+            typeof window !== "undefined" &&
+            Array.isArray(window.__nimbiSitemapFinal) &&
+            typeof window.__nimbiSitemapRenderedAt === "number"
+          )
+            existingRenderedLen = window.__nimbiSitemapFinal.length;
+        } catch {}
+        if (existingRenderedLen > newLen) {
+          try {
+            debugLog(
+              "[runtimeSitemap] skip XML write: existing rendered sitemap larger",
+              existingRenderedLen,
+              newLen,
+            );
+          } catch {}
+          return true;
+        }
+        _scheduleSitemapWrite(finalJson, "application/xml");
+        return true;
+      }
+
+      if (wantHtml) {
+        try {
+          const entriesForHtml = Array.isArray(finalJson?.entries)
+            ? finalJson.entries
+            : [];
+          const newLen = entriesForHtml.length;
+          let existingRenderedLen = -1;
+          try {
+            if (
+              typeof window !== "undefined" &&
+              Array.isArray(window.__nimbiSitemapFinal) &&
+              typeof window.__nimbiSitemapRenderedAt === "number"
+            )
+              existingRenderedLen = window.__nimbiSitemapFinal.length;
+          } catch {}
+          if (existingRenderedLen > newLen) {
+            try {
+              debugLog(
+                "[runtimeSitemap] skip HTML write: existing rendered sitemap larger",
+                existingRenderedLen,
+                newLen,
+              );
+            } catch {}
+            return true;
+          }
+          _scheduleSitemapWrite(finalJson, "text/html");
+          return true;
+        } catch (e) {
+          debugWarn("[runtimeSitemap] render HTML failed", e);
+          return false;
+        }
       }
     }
 
-    return false;
+    // Default non-writing mode: return the generated body so the host can
+    // serve it from an isolated endpoint. The live document is never
+    // mutated, so a mounted CMS survives sitemap/feed generation.
+    return _renderSitemapBody(finalJson, mimeType);
   } catch (e) {
     debugWarn("[runtimeSitemap] handleSitemapRequest failed", e);
     return false;
@@ -1833,11 +1854,12 @@ export function attachSitemapDownloadUI(mount, opts = {}) {
         try {
           const a = document.createElement("a");
           a.href = url;
-          a.download = String(opts?.filename || "sitemap.json")
-            .replace(/\\/g, "_")
-            .replace(/[^A-Za-z0-9_.-]/g, "_")
-            .replace(/^_+/, "")
-            .replace(/_+$/, "") || "sitemap.json";
+          a.download =
+            String(opts?.filename || "sitemap.json")
+              .replace(/\\/g, "_")
+              .replace(/[^A-Za-z0-9_.-]/g, "_")
+              .replace(/^_+/, "")
+              .replace(/_+$/, "") || "sitemap.json";
           a.className = "nimbi-sitemap-download";
           document.body.appendChild(a);
           a.click();

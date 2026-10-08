@@ -47,6 +47,24 @@ export { ensureBulma, setStyle, setThemeVars } from "./bulmaManager.js";
 export { t, loadL10nFile, setLang } from "./l10nManager.js";
 
 /**
+ * Runtime sitemap/feed APIs re-exported for host adapters.
+ *
+ * `handleSitemapRequest({ returnResponse: true, url })` lets a service
+ * worker, edge function, or build script serve `sitemap.xml`, `rss.xml`,
+ * `atom.xml`, `sitemap.html`, and `llms.txt` from an isolated endpoint
+ * without ever touching the live application document.
+ */
+export {
+  handleSitemapRequest,
+  exposeSitemapGlobals,
+  generateSitemapJson,
+  generateSitemapXml,
+  generateRssXml,
+  generateAtomXml,
+  generateLlmsTxt,
+} from "./runtimeSitemap.js";
+
+/**
  * `initCMS` is the package default export and the primary initialization
  * entrypoint for host pages.
  */

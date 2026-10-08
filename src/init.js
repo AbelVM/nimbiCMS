@@ -390,6 +390,17 @@ export async function initCMS(options = {}) {
     await destroyPromise;
     destroyPromise = null;
   }
+
+  // Create the AbortController before anything else registers a listener.
+  // Every runtime-scoped listener (error reporting, UI, navigation, timers)
+  // is wired to this signal so a single `abort()` releases them all. This
+  // must happen before the first `await` and before any `addEventListener`
+  // call, otherwise those calls observe `null` and throw.
+  cmsAbortController =
+    typeof window !== "undefined"
+      ? new AbortController()
+      : { signal: { abort: () => {} } };
+
   try {
     clearFetchCache();
     clearListCaches();
@@ -1702,6 +1713,11 @@ setStyle(defaultStyle);
                     contentBase,
                     indexDepth,
                     noIndexing,
+                    // The browser `/?sitemap` endpoint is the only caller
+                    // allowed to replace the document, and only while
+                    // `exposeSitemap` remains enabled. Every other caller
+                    // receives the generated body instead.
+                    writeToDocument: exposeSitemap !== false,
                   });
                   if (handled) return;
                 }
