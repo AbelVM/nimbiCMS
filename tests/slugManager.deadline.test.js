@@ -1,7 +1,7 @@
 import { it, expect, vi } from 'vitest'
 
 const created = []
-vi.mock('../src/lib/performance-helpers/powerDeadline.js', () => {
+vi.mock('performance-helpers/powerDeadline', () => {
   return {
     PowerDeadline: class {
       constructor(opts) {

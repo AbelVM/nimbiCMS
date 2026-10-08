@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
-import { u82o } from '../../src/lib/performance-helpers/powerBuffer.js'
+import { u82o } from 'performance-helpers/powerBuffer'
 
 function decodePosted(m) {
   if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {

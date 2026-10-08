@@ -5,7 +5,7 @@
  */
 
 import { debugWarn } from "./utils/debug.js";
-import { PowerCache } from "./lib/performance-helpers/powerCache.js";
+import { PowerCache } from "performance-helpers/powerCache";
 
 /**
  * Convenience helper that builds a `Blob` URL from a raw worker source string

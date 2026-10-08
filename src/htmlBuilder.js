@@ -38,7 +38,7 @@ import { buildCosmeticUrl, parseHrefToRoute } from "./utils/urlHelper.js";
 import { markNotFound } from "./seoManager.js";
 import { debugWarn, debugInfo, isDebugLevel } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
-import { PowerSemaphore } from "./lib/performance-helpers/powerSemaphore.js";
+import { PowerSemaphore } from "performance-helpers/powerSemaphore";
 import { rafThrottle, scheduleDOMWrite } from "./utils/events.js";
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
@@ -63,7 +63,7 @@ function fullCosmetic(page, anchor = null) {
 }
 import { registerThemedElement } from "./bulmaManager.js";
 import AnchorWorker from "./worker/anchorWorker.js?worker&inline";
-import { PowerPool } from "./lib/performance-helpers/powerPool.js";
+import { PowerPool } from "performance-helpers/powerPool";
 
 async function runWithConcurrency(items, worker, concurrency = 4, signal) {
   if (!Array.isArray(items) || items.length === 0) return [];

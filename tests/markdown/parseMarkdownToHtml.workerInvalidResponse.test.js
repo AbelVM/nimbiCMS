@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('highlight.js/lib/core', () => ({ __esModule: true, default: { getLanguage: () => undefined } }))
 
 // Force worker response to be invalid (missing `html`) by mocking PowerPool.
-vi.mock('../../src/lib/performance-helpers/powerPool.js', () => ({
+vi.mock('performance-helpers/powerPool', () => ({
   PowerPool: class {
     constructor(source, opts) {
       this.workers = [{ worker: { _underlying: {} } }]

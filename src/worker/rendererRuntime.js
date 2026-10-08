@@ -6,7 +6,7 @@ import {
   clearImportCache,
   setImportNegativeCacheTTL,
 } from "../utils/importCache.js";
-import { u82o, o2u8 } from "../lib/performance-helpers/powerBuffer.js";
+import { u82o, o2u8 } from "performance-helpers/powerBuffer";
 import hljsCore from "highlight.js/lib/core";
 
 const marked =

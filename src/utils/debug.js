@@ -11,7 +11,7 @@
  * @module utils/debug
  * @see ./init.js
  */
-import { PowerLogger } from "../lib/performance-helpers/powerLogger.js";
+import { PowerLogger } from "performance-helpers/powerLogger";
 
 /** Shared logger instance (starts disabled at level 0). */
 export const _logger = new PowerLogger(0);

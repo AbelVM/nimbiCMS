@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { o2u8, u82o } from '../../src/lib/performance-helpers/powerBuffer.js'
+import { o2u8, u82o } from 'performance-helpers/powerBuffer'
 
 describe('worker anchorWorker protocol branches', () => {
   let handler

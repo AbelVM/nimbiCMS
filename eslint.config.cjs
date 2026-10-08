@@ -64,18 +64,5 @@ module.exports = [
       'nimbi-debug/no-eager-debug': 'warn',
       'nimbi-debug/no-empty-catch-without-comment': 'warn'
     }
-  },
-  {
-    files: ['src/lib/performance-helpers/**/*.js'],
-    languageOptions: {
-      globals: {
-        require: 'readonly',
-        self: 'readonly',
-        global: 'readonly',
-        Buffer: 'readonly',
-        TextEncoder: 'readonly',
-        TextDecoder: 'readonly'
-      }
-    }
   }
 ]

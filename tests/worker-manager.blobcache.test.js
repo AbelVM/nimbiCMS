@@ -1,5 +1,5 @@
 import { createWorkerFromRaw } from '../src/worker-manager.js'
-import { PowerCache } from '../src/lib/performance-helpers/powerCache.js'
+import { PowerCache } from 'performance-helpers/powerCache'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 describe('createWorkerFromRaw blob URL cache eviction', () => {
