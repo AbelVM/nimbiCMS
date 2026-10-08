@@ -6,7 +6,7 @@
 import { PowerCache } from "performance-helpers/powerCache";
 import { PowerTTLMap } from "performance-helpers/powerTTLMap";
 
-const __importCache = new PowerCache({ maxEntries: 500 });
+const __importCache = new PowerCache({ maxEntries: 500, policy: "slru" });
 const __negativeCache = new PowerTTLMap(0);
 let __IMPORT_NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000;
 

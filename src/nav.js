@@ -29,9 +29,9 @@ import {
   allMarkdownPathsSet,
   searchIndex,
   _setSearchIndex,
+  buildSearchIndex as authoritativeBuildSearchIndex,
 } from "./slugManager.js";
 import {
-  buildSearchIndex as runtimeBuildSearchIndex,
   buildSearchIndexWorker as runtimeBuildSearchIndexWorker,
 } from "./slugSearchRuntime.js";
 import { handleSitemapRequest } from "./runtimeSitemap.js";
@@ -476,7 +476,7 @@ export async function buildNav(
         const buildFn =
           typeof globalBuild === "function"
             ? globalBuild
-             : runtimeBuildSearchIndex;
+            : authoritativeBuildSearchIndex;
         const workerFn =
           typeof globalWorker === "function"
             ? globalWorker
@@ -487,6 +487,14 @@ export async function buildNav(
         } catch (_) {}
         try {
           if (navigationPage) seeds.push(navigationPage);
+        } catch (_) {}
+        try {
+          for (const link of linkEls || []) {
+            const href = link?.getAttribute?.("href") || "";
+            if (/\.(?:md|html?)($|[?#])/i.test(href)) {
+              seeds.push(href.split(/[?#]/)[0]);
+            }
+          }
         } catch (_) {}
         if (searchIndexMode === "lazy" && typeof workerFn === "function") {
           try {
@@ -502,7 +510,20 @@ export async function buildNav(
                   _setSearchIndex(r);
                 } catch (e) {}
               } catch (e) {}
-              return r;
+              if (typeof buildFn !== "function") return r;
+              try {
+                const fallback = await buildFn(
+                  contentBase,
+                  indexDepth,
+                  noIndexing,
+                  seeds.length ? seeds : undefined,
+                );
+                return Array.isArray(fallback) && fallback.length > r.length
+                  ? fallback
+                  : r;
+              } catch (_) {
+                return r;
+              }
             }
           } catch (e) {
             debugWarn("[nimbi-cms] worker builder threw", e);
@@ -606,8 +627,8 @@ export async function buildNav(
           if (!Array.isArray(idx) || !idx.length) return;
           const filteredNow = idx.filter(
             (e) =>
-              (e.title && e.title.toLowerCase().includes(qnow)) ||
-              (e.excerpt && e.excerpt.toLowerCase().includes(qnow)),
+              String(e.title ?? '').toLowerCase().includes(qnow) ||
+              String(e.excerpt ?? '').toLowerCase().includes(qnow),
           );
           // filteredNow computed above
           if (!filteredNow || !filteredNow.length) return;
@@ -1626,26 +1647,51 @@ export async function buildNav(
           return;
         }
         try {
-          await ensureSearchIndex();
-
-          let idx = await searchIndexPromise;
+          let idx = window.__nimbiResolvedIndex;
           if (!Array.isArray(idx) || !idx.length) {
-            if (Array.isArray(window.__nimbiSearchIndex) && window.__nimbiSearchIndex.length) {
-              idx = window.__nimbiSearchIndex;
-            } else if (
-              Array.isArray(window.__nimbiResolvedIndex) &&
-              window.__nimbiResolvedIndex.length
-            ) {
-              idx = window.__nimbiResolvedIndex;
-            }
+            await ensureSearchIndex();
+            idx = await searchIndexPromise;
           }
-          const filtered = Array.isArray(idx)
+          const availableIndexes = [
+            idx,
+            window.__nimbiSearchIndex,
+            window.__nimbiResolvedIndex,
+            window.__nimbiLiveSearchIndex,
+          ].filter(
+            (candidate) =>
+              Array.isArray(candidate) &&
+              (!Array.isArray(idx) || candidate.length > idx.length),
+          );
+          if (availableIndexes.length) {
+            idx = availableIndexes.reduce((largest, candidate) =>
+              candidate.length > largest.length ? candidate : largest,
+            );
+          }
+          let filtered = Array.isArray(idx)
             ? idx.filter(
                 (e) =>
-                  (e.title && e.title.toLowerCase().includes(q)) ||
-                  (e.excerpt && e.excerpt.toLowerCase().includes(q)),
+                  String(e.title ?? '').toLowerCase().includes(q) ||
+                  String(e.excerpt ?? '').toLowerCase().includes(q),
               )
             : [];
+          if (!filtered.length) {
+            for (const candidate of [
+              window.__nimbiSearchIndex,
+              window.__nimbiResolvedIndex,
+              window.__nimbiLiveSearchIndex,
+            ]) {
+              if (!Array.isArray(candidate)) continue;
+              const matches = candidate.filter(
+                (e) =>
+                  String(e.title ?? '').toLowerCase().includes(q) ||
+                  String(e.excerpt ?? '').toLowerCase().includes(q),
+              );
+              if (matches.length) {
+                filtered = matches;
+                break;
+              }
+            }
+          }
           showResults(filtered.slice(0, 10));
         } catch (err) {
           searchIndexPromise = null;

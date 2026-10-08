@@ -208,7 +208,7 @@ export function watchForColdHashRoute(parsed: {type:string,page:string,anchor?:s
 export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
 export function getLanguages(): string[]
-export function teardownSlugWorkerPool(): void
+export function teardownSlugWorkerPool(): Promise<void>
 export function _storeSlugMapping(slug: string, rel: string): void
 export function storeSlugMapping(slug: string, rel: string): void
 export const slugResolvers: any
@@ -303,7 +303,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array|string[]|{value
 
 
 // --- from src/markdown.js
-export function teardownRendererWorkerPool(): void
+export function teardownRendererWorkerPool(): Promise<void>
 export const _sendToRenderer: any
 export function streamParseMarkdown(opts: {chunkSize?:number}): Promise<void>
 export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<string,string>): Promise<Set<string>>
@@ -347,7 +347,7 @@ export function preScanHtmlSlugs(opts: any): Promise<void>
 export function preMapMdSlugs(opts: any): Promise<void>
 export function executeEmbeddedScripts(article: any, allowEmbeddedScripts: boolean): void
 export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): void
-export function teardownAnchorWorkerPool(): void
+export function teardownAnchorWorkerPool(): Promise<void>
 
 
 

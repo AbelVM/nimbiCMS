@@ -2462,25 +2462,25 @@ export function initAnchorWorker() {
 
 /**
  * Tear down the anchor worker pool.
- * @returns {void}
+ * @returns {Promise<void>}
  */
 export function teardownAnchorWorkerPool() {
   const pool = _anchorPool;
-  if (!pool) return;
+  if (!pool) return Promise.resolve();
   try {
-    if (typeof pool.drain === "function") {
-      pool.drain().catch(() => {});
-    }
-    if (typeof pool.terminate === "function") {
-      pool.terminate();
-    }
-    // v2.0.0: dispose() releases all resources deterministically.
-    // No-op on v1 (method doesn't exist).
-    if (typeof pool.dispose === "function") {
-      pool.dispose();
-    }
+    const asyncDispose = pool[Symbol.asyncDispose];
+    if (typeof asyncDispose === "function")
+      return Promise.resolve(asyncDispose.call(pool)).catch(() => {});
+    const drained =
+      typeof pool.drain === "function" ? Promise.resolve(pool.drain()) : Promise.resolve();
+    return drained
+      .catch(() => {})
+      .then(() => {
+        if (typeof pool.terminate === "function") pool.terminate();
+      });
   } catch (e) {
     debugWarn("[htmlBuilder] teardownAnchorWorkerPool failed", e);
+    return Promise.resolve();
   }
 }
 

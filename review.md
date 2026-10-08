@@ -1565,7 +1565,7 @@ Workers announce native structured-clone support at startup via `postMessage(ann
 
 **Consequence:** Upgrading to v2.0.0 without migrating workers will cause every `postMessage`/`onmessage` exchange to fail with a protocol version error or silent JSON parse failure. This is a **P0** blocker.
 
-**v2 migration path:** `PowerPool` supports `messageCodec: 'legacy'` as a bridge mode. Workers can be migrated one at a time using `announceCapabilities()` / `decodeInbound()` from `powerMessageCodec`.
+**v2 migration path:** Workers use `announceCapabilities()` / `decodeInbound()` with the negotiated protocol. Legacy codec configuration is intentionally excluded.
 
 ### 25.1 Current nimbiCMS usage of performance-helpers v1
 
@@ -1580,107 +1580,87 @@ Workers announce native structured-clone support at startup via `postMessage(ann
 | `PowerDeadline` | `l10nManager.js`, `slugManager.js` | Fetch with deadline |
 | `PowerRetry` | `slugManager.js` | Retry for `fetchMarkdown` |
 
-### 25.2 New v2 helpers directly applicable to nimbiCMS
+### 25.2 New v2 helpers reviewed for nimbiCMS
 
-#### 25.2.1 `PowerEventLoopMonitor` — event loop health during rendering
+#### 25.2.1 `PowerEventLoopMonitor` — deferred pending a measurable signal
 
-**Current gap:** nimbiCMS has no visibility into event loop stalls during markdown rendering or slug crawling. A 30 s stall in `parseMarkdownToHtml` or `buildSearchIndex` is invisible today.
+**Decision:** Defer. There is no current stall threshold, debug consumer, or telemetry path that would make these samples actionable. Add it only with a measured render-stall symptom and a destination for the metrics.
 
 **v2 opportunity:** `PowerEventLoopMonitor` measures timer drift as event loop unavailability. It reports `blockedMs`, `droppedSamples`, `coverage`, and `utilizationSince(previous)`.
 
-**Specific use:** Monitor the renderer worker pool's main-thread fallback path (`markdown.js:375-463` per-chunk parsing). If the event loop is blocked >10 ms during streaming, emit a debug warning.
+**Reconsider when:** profiling shows main-thread fallback stalls or a supported metrics sink is introduced.
 
-**Effort:** Low. One `new PowerEventLoopMonitor({ intervalMs: 20 })` in `markdown.js`, read `stats()` in the existing debug path.
+#### 25.2.2 `PowerCrossLock` — not applicable to current ownership
 
-#### 25.2.2 `PowerCrossLock` — cross-worker fair mutex
-
-**Current gap:** `PowerSemaphore` limits concurrency **inside one thread**. Every instance is independent, so two workers each get their own permits. There is no cross-worker mutual exclusion.
+**Decision:** Do not add. `slugToMd` and `mdToSlug` are main-thread state; workers receive task data and do not mutate those maps. A cross-worker lock would add coordination without protecting shared memory.
 
 **v2 opportunity:** `PowerCrossLock` uses the platform's Web Locks (`navigator.locks` or `node:worker_threads.locks`) for one lock, one queue, FIFO, visible to every worker and thread.
 
-**Specific use:** Coordinate access to shared `slugToMd`/`mdToSlug` maps during concurrent anchor rewriting (`htmlBuilder.js:rewriteAnchors`). Currently these maps are mutated without any cross-worker coordination.
+**Reconsider when:** a shared worker-side store or shared mutable backing state is introduced.
 
-**Effort:** Medium. Requires checking `hasCrossWorkerLocks()` first; falls back gracefully on platforms without lock managers.
+#### 25.2.3 `PowerGCRA` — deferred pending an origin policy
 
-#### 25.2.3 `PowerGCRA` — precise rate limiting for fetches
-
-**Current gap:** `fetchMarkdown` in `slugManager.js` uses `PowerRetry` for transient errors but has no rate limiting. A burst of 404s or 503s hits the origin as fast as the pool allows.
+**Decision:** Defer. Fetch concurrency is already bounded, identical URLs are single-flight deduplicated, and negative caching suppresses repeated failures. No origin-specific rate policy or observed stampede currently exists.
 
 **v2 opportunity:** `PowerGCRA` is an O(1) Generic Cell Rate Algorithm with exact `retryAfter()` and `tryReserve()`.
 
-**Specific use:** Wrap `fetchMarkdown` with a `PowerGCRA({ rate: 10, per: 1000, burst: 20 })` to cap fetch rate during index building. The exact `retryAfter()` can be passed to `setTimeout` or `PowerRetry`.
-
-**Effort:** Low. One `PowerGCRA` instance in `slugManager.js`, check `tryConsume()` before each `fetch()`.
+**Reconsider when:** an origin contract supplies rate limits or measurements show origin pressure despite the existing concurrency and cache controls.
 
 #### 25.2.4 `PowerMessageCodec` / `createFrameDecoder` — streaming frame decode
 
-**Current gap:** nimbiCMS workers exchange bare JSON objects via `postMessage`. There is no framing, no versioning, and no streaming decode for large payloads.
+**Status:** Implemented for the worker request/response path with negotiated native envelopes and framed-message decoding. `createFrameDecoder` remains unused because workers use `postMessage`, not arbitrary byte streams.
 
 **v2 opportunity:** `PowerMessageCodec` provides versioned binary framing with `encodeMessage`/`decodeMessage`/`createFrameDecoder`. `createFrameDecoder` is an incremental frame decoder over arbitrary byte streams with `maxFrameBytes` ceiling.
 
-**Specific use:** Migrate workers to use `encodeMessage`/`decodeMessage` for type-safe, versioned messages. Use `createFrameDecoder` in any future streaming worker protocol.
-
-**Effort:** Medium. Requires updating all 4 workers + `TestWorker` + pool construction. See §25.0 for the blocker.
+**Future use:** Consider `createFrameDecoder` only if a streaming byte protocol is added.
 
 #### 25.2.5 `PowerCache.invalidate(predicate)` / `evict(count)` / policy `'slru'`
 
-**Current gap:** `fetchCache` in `slugManager.js:948` and `__importCache` in `utils/importCache.js:9` use plain LRU. There is no way to evict by predicate or use SLRU for better hit rates on sequential scans.
+**Decision:** Partially applied. `__importCache` now uses SLRU. The runtime caches already expose explicit clear functions, and no content-base-keyed entries require predicate invalidation.
 
 **v2 opportunity:** `PowerCache.invalidate(predicate)` evicts entries matching a predicate. Policy `'slru'` gives better hit rates for access patterns with a hot segment (recent imports) and a cold segment (older imports). `stats().staleServes` and `rejectedAdmission` provide observability.
 
-**Specific use:** Switch `__importCache` to `policy: 'slru'`. Use `invalidate(key => key.startsWith('http://'))` to evict remote imports on content base change.
-
-**Effort:** Low. Constructor option change in `utils/importCache.js`.
+**Reconsider when:** cache entries become partitioned by content base and need selective invalidation.
 
 #### 25.2.6 `PowerPool.maxQueueLength` — backpressure on worker pools
 
-**Current gap:** All three `PowerPool` instances (`markdown.js`, `htmlBuilder.js`, `slugManager.js`) have no queue limit. Under load, tasks queue without bound.
+**Status:** Implemented. All three pools use `maxQueueLength: 100`.
 
 **v2 opportunity:** `PowerPool.maxQueueLength` caps the task queue. When full, tasks are refused immediately.
 
-**Specific use:** Add `maxQueueLength: 100` to all three pools. In `markdown.js`, refuse new render requests when the pool is saturated rather than queuing indefinitely.
-
-**Effort:** Low. One option per pool.
+**Reconsider when:** workload measurements show that the fixed cap needs tuning or a caller-specific rejection policy.
 
 #### 25.2.7 `PowerPool.drain({ timeout, maxDrainWaiters })` — graceful shutdown
 
-**Current gap:** `teardownRendererWorkerPool` and `teardownSlugWorkerPool` terminate workers immediately via `entry.worker.terminate()`. In-flight tasks are abandoned.
+**Status:** Implemented. Teardown prefers async disposal and otherwise drains before termination.
 
 **v2 opportunity:** `PowerPool.drain({ timeout, maxDrainWaiters })` waits for in-flight tasks to complete before tearing down.
 
-**Specific use:** Replace `teardownRendererWorkerPool` with `_rendererPool.drain({ timeout: 5000 })` before terminating. Same for `teardownSlugWorkerPool`.
+**Reconsider when:** teardown telemetry shows that the current drain timeout needs tuning.
 
-**Effort:** Low. Replace terminate loop with `drain()` + `dispose()`.
+#### 25.2.8 `PowerRetry.hedgeDelay` / `PowerRetryBudget` — reviewed and deferred
 
-#### 25.2.8 `PowerRetry.hedgeDelay` / `PowerRetryBudget` — bounded retry traffic
-
-**Current gap:** `fetchMarkdown` in `slugManager.js:1244-1265` uses `PowerRetry` with `attempts: 3` but no hedge delay or budget. Under high concurrency, retries can stampede.
+**Decision:** Do not hedge HTTP fetches: duplicate requests can amplify origin load. Defer a retry budget because concurrency, single-flight deduplication, and negative caching already bound retry pressure, with no measured retry storm.
 
 **v2 opportunity:** `hedgeDelay` sends a second request after a delay if the first is slow. `PowerRetryBudget` bounds total retry traffic across concurrent requests.
 
-**Specific use:** Add `hedgeDelay: 200` to the `PowerRetry` instance in `fetchMarkdown`. Use `PowerRetryBudget` to cap concurrent retries during index building.
-
-**Effort:** Low. Option additions in `slugManager.js:1246`.
+**Reconsider when:** retry telemetry demonstrates pressure that the existing controls do not contain and an origin-safe budget is defined.
 
 #### 25.2.9 `AbortSignal` on `PowerSemaphore.acquire` — cancellable concurrency
 
-**Current gap:** `runWithConcurrency` in `htmlBuilder.js:67-73` and `slugManager.js:211-217` creates a `PowerSemaphore` but provides no way to cancel pending acquisitions. If a page is torn down mid-rewrite, permits are leaked.
+**Status:** Implemented. `runWithConcurrency` forwards an optional `AbortSignal` to semaphore runs.
 
 **v2 opportunity:** `PowerSemaphore.acquire({ signal })` accepts an `AbortSignal` to cancel a pending acquisition.
 
-**Specific use:** Pass `signal` from the page lifecycle to `sem.run(() => worker(item, idx), { signal })`.
+**Reconsider when:** a caller needs stronger lifecycle cancellation than the existing signal propagation.
 
-**Effort:** Low. Add `signal` option to `runWithConcurrency` callers.
+#### 25.2.10 `PowerEventLoopMonitor` + `PowerPool.autoScale` — deferred pending measurements
 
-#### 25.2.10 `PowerEventLoopMonitor` + `PowerPool.autoScale` — adaptive scaling with loop awareness
-
-**Current gap:** `PowerPool.autoScale` in `markdown.js:19-26` and `slugManager.js:220-227` scales based on task latency only. It does not account for event loop health.
+**Decision:** Defer. Latency-based autoscaling is present, but there is no measured event-loop saturation signal to justify a second control input.
 
 **v2 opportunity:** `PowerEventLoopMonitor.utilizationSince(previous)` provides per-interval event loop utilization. This can be fed into `autoScale` as an additional signal.
 
-**Specific use:** Create a monitor in `markdown.js`, read `utilizationSince()` before each auto-scale decision, and suppress scale-up when the loop is saturated.
-
-**Effort:** Medium. Requires integrating monitor readings into the existing auto-scale callback.
+**Reconsider when:** event-loop utilization is measured and correlates with harmful scale-up decisions.
 
 ### 25.3 New v2 helpers NOT applicable to nimbiCMS
 
@@ -1707,19 +1687,19 @@ These v2 helpers solve problems nimbiCMS does not have:
 |---|---|---|---|
 | `maxQueueLength` | `PowerPool` | **Yes** | Backpressure on all 3 worker pools |
 | `drain({ timeout, maxDrainWaiters })` | `PowerPool` | **Yes** | Graceful worker teardown |
-| `idempotencyTtlMs` ledger | `PowerPool` | **Yes** | Deduplicate concurrent worker requests |
+| `idempotencyTtlMs` ledger | `PowerPool` | No | No reusable idempotency keys are carried by worker requests |
 | `messageCodec: 'negotiated'` | `PowerPool` | **After migration** | Native structured-clone speedup |
 | `encodeNativeEnvelope` | `PowerMessageCodec` | **After migration** | Avoid double-clone on native posts |
-| `invalidate(predicate)` / `evict(count)` | `PowerCache` | **Yes** | Predicate-based import cache eviction |
-| `policy: 'slru'` | `PowerCache` | **Yes** | Better hit rate for import cache |
-| `stats().staleServes` | `PowerCache` | **Yes** | Observability into stale-while-revalidate |
-| `maxInflightRefreshes` | `PowerCache` | **Yes** | Prevent cache stampede on content base change |
+| `invalidate(predicate)` / `evict(count)` | `PowerCache` | Deferred | Explicit cache clear paths are sufficient |
+| `policy: 'slru'` | `PowerCache` | Done | Applied to import cache |
+| `stats().staleServes` | `PowerCache` | Deferred | No stale-refresh workload or metrics consumer |
+| `maxInflightRefreshes` | `PowerCache` | Deferred | Imports do not refresh stale values |
 | `AbortSignal` on acquire | `PowerSemaphore` | **Yes** | Cancel pending semaphore acquisitions on teardown |
-| `hedgeDelay` / `PowerRetryBudget` | `PowerRetry` | **Yes** | Bounded retry traffic during index building |
+| `hedgeDelay` / `PowerRetryBudget` | `PowerRetry` | Deferred/rejected | Hedging duplicates HTTP traffic; no measured retry storm requires a budget |
 | `dispose()` / `[Symbol.dispose]` | All resource classes | **Yes** | Deterministic cleanup in teardown paths |
-| `blockedMs` / `droppedSamples` / `coverage` | `PowerEventLoopMonitor` | **Yes** | Event loop observability during rendering |
-| `utilizationSince(previous)` | `PowerEventLoopMonitor` | **Yes** | Per-interval loop utilization for auto-scale |
-| `tryReserve()` / exact `retryAfter(n)` | `PowerGCRA` | **Yes** | Precise rate limiting for fetches |
+| `blockedMs` / `droppedSamples` / `coverage` | `PowerEventLoopMonitor` | Deferred | No measured stall signal or metrics consumer |
+| `utilizationSince(previous)` | `PowerEventLoopMonitor` | Deferred | No measured autoscale gap |
+| `tryReserve()` / exact `retryAfter(n)` | `PowerGCRA` | Deferred | No origin-rate policy or observed fetch stampede |
 | `hasEqual` width budget / `compareFn` | `PowerCache` | **Low** | Better equality for complex cache keys |
 | `staleTtl` bound | `PowerCache` | **Low** | Cap stale-while-revalidate window |
 | `allowStale` / `getOrFetch` / `fetchMethod` | `PowerCache` | **Low** | Stale-while-revalidate pattern for imports |
@@ -1740,70 +1720,11 @@ These v2 helpers solve problems nimbiCMS does not have:
 
 ### 25.5 Summary: v2.0.0 enhancement roadmap for nimbiCMS
 
-#### P0 — Must fix before v2 upgrade
-
-| Action | Files affected | Effort |
-|---|---|---|
-| Migrate all 4 workers + `TestWorker` to `PowerMessageCodec` framed protocol | `anchorWorker.js`, `slugWorker.js`, `rendererRuntime.js`, `anchorRewriter.js`, `tests/setup.js` | Medium |
-| Add `messageCodec: 'legacy'` to all 3 `PowerPool` instances as intermediate step | `markdown.js`, `htmlBuilder.js`, `slugManager.js` | Low |
-
-#### P1 — High ROI, low effort (v2-only, requires upgrade)
-
-These items require v2.0.0 APIs that do not exist in the currently pinned `^1.0.3`. They cannot be implemented against v1.
-
-| Action | Files affected | Effort | Benefit |
-|---|---|---|---|
-| Add `PowerEventLoopMonitor` to `markdown.js` | `markdown.js` | Low | Visibility into render stalls |
-| Add `PowerGCRA` rate limiting to `fetchMarkdown` | `slugManager.js` | Low | Prevent origin stampede |
-| Switch `__importCache` to `policy: 'slru'` | `utils/importCache.js` | Low | Better import cache hit rate |
-| Add `maxQueueLength` to all 3 `PowerPool` instances | `markdown.js`, `htmlBuilder.js`, `slugManager.js` | Low | Backpressure safety valve |
-| Replace `terminate()` with `drain({ timeout, maxDrainWaiters })` in teardown | `markdown.js`, `slugManager.js` | Low | Graceful worker shutdown |
-| Add `AbortSignal` to `runWithConcurrency` | `htmlBuilder.js`, `slugManager.js` | Low | Cancel pending work on teardown |
-| Add `hedgeDelay` to `PowerRetry` in `fetchMarkdown` | `slugManager.js` | Low | Reduce tail latency on slow fetches |
-
-#### P1 — High ROI, low effort (backward-compatible with v1.0.3)
-
-These items use APIs that already exist in `performance-helpers` v1.0.3 and can be implemented immediately.
-
-| Action | Files affected | Effort | Benefit |
-|---|---|---|---|
-| Replace manual worker termination with `pool.drain()` + `pool.terminate()` in teardown | `markdown.js`, `slugManager.js` | Low | Graceful worker shutdown using pool's own logic |
-| Use `[Symbol.dispose]()` / `[Symbol.asyncDispose]()` in teardown paths | `markdown.js`, `slugManager.js`, `worker-manager.js` | Low | Standard TC39 Explicit Resource Management pattern |
-
-#### P2 — Medium ROI, medium effort
-
-| Action | Files affected | Effort | Benefit |
-|---|---|---|---|
-| Migrate workers to `messageCodec: 'negotiated'` for native carrier | 4 workers + pool files | Medium | ~2× faster worker messaging |
-| Add `PowerCrossLock` for cross-worker slug map coordination | `htmlBuilder.js`, `slugManager.js` | Medium | Safe concurrent slug map mutation |
-| Integrate `PowerEventLoopMonitor` into `autoScale` decisions | `markdown.js`, `slugManager.js` | Medium | Loop-aware pool scaling |
-| Add `PowerCache.invalidate(predicate)` for content base changes | `utils/importCache.js`, `slugManager.js` | Medium | Targeted cache eviction |
-
-#### P3 — Low ROI, future consideration
-
-| Action | Files affected | Effort | Benefit |
-|---|---|---|---|
-| Add `PowerRetryBudget` to bound concurrent retries | `slugManager.js` | Low | Prevent retry stampede |
-| Use `PowerCache.maxInflightRefreshes` for import cache | `utils/importCache.js` | Low | Prevent cache stampede |
-| Add `PowerCache.staleTtl` for stale-while-revalidate | `utils/importCache.js` | Low | Serve stale during refreshes |
-| Use `PowerPool.idempotencyTtlMs` for deduplication | `markdown.js`, `slugManager.js` | Low | Deduplicate concurrent identical requests |
-| Add `PowerEventLoopMonitor` stats to debug output | `utils/debug.js` | Low | Event loop metrics in debug logs |
+The migration items are complete. The remaining v2 capabilities are conditional enhancements, not upgrade blockers: event-loop monitoring, GCRA, retry budgets, and cache refresh controls require a measured workload or an explicit operational policy before they should be introduced. HTTP hedging and cross-worker locking are rejected for the current ownership and request model.
 
 ### 25.6 Recommended dependency strategy
 
-**Do not upgrade to v2.0.0 until the worker migration is complete.**
-
-1. **Now:** Pin `performance-helpers` to `^1.0.3` (already done). Implement backward-compatible P1 enhancements from §25.5 against v1 APIs:
-   - Replace manual worker termination with `pool.drain()` + `pool.terminate()` in teardown paths
-   - Use `[Symbol.dispose]()` / `[Symbol.asyncDispose]()` in teardown paths
-2. **Intermediate:** Add `messageCodec: 'legacy'` to all 3 pools. This is a no-op on v1 but required for v2 compatibility.
-3. **Migration:** Migrate workers one at a time:
-   - Start with `anchorRewriter.js` (simplest worker)
-   - Then `rendererRuntime.js`
-   - Then `slugWorker.js`
-   - Finally `anchorWorker.js`
-   - Update `TestWorker` in `tests/setup.js` last
-4. **Upgrade:** Only after all 4 workers + test stub are migrated, upgrade to v2.0.0 and switch pools to `messageCodec: 'negotiated'`. Then implement the remaining P1 enhancements that require v2 APIs.
+`performance-helpers@2.0.0` is installed and the worker migration is complete. Keep optional helpers evidence-driven; do not add legacy codec configuration as an intermediate step.
 
 ### 25.7 Detailed v2.0.0 new helpers inventory
 
@@ -1812,9 +1733,9 @@ For reference, the complete list of new helpers in v2.0.0:
 | Helper | Category | Applicable |
 |---|---|---|
 | `PowerCron` | Scheduler | No |
-| `PowerCrossLock` | Concurrency | **Yes** |
-| `PowerEventLoopMonitor` | Observability | **Yes** |
-| `PowerGCRA` | Rate limiter | **Yes** |
+| `PowerCrossLock` | Concurrency | No — no shared worker-side state |
+| `PowerEventLoopMonitor` | Observability | Deferred — no measured signal or consumer |
+| `PowerGCRA` | Rate limiter | Deferred — no origin-rate policy |
 | `PowerMessageCodec` | Transport | **Yes** (migration) |
 | `PowerRealtimeHub` | Pub/sub | No |
 | `PowerWebSocketClient` | WebSocket | No |
@@ -1836,7 +1757,7 @@ For reference, the complete list of new helpers in v2.0.0:
 | `PowerThrottle` (per-call `{ now }`) | Rate limiting | No |
 | `PowerSlidingWindow` (per-call `{ now }`) | Rate limiting | No |
 | `PowerBackpressure` (adaptive AIMD) | Flow control | Low |
-| `PowerRetryBudget` | Resilience | **Yes** |
+| `PowerRetryBudget` | Resilience | Deferred — existing fetch controls bound pressure |
 | `PowerTimedCache` (delegates) | Cache | No |
 
 ### 25.8 Detailed v2.0.0 new features on existing helpers
@@ -1845,22 +1766,22 @@ For reference, the complete list of new helpers in v2.0.0:
 |---|---|---|
 | `maxQueueLength` | `PowerPool` | **Yes** — backpressure |
 | `drain({ timeout, maxDrainWaiters })` | `PowerPool` | **Yes** — graceful teardown |
-| `idempotencyTtlMs` ledger | `PowerPool` | **Yes** — deduplication |
+| `idempotencyTtlMs` ledger | `PowerPool` | Not applicable — no reusable idempotency keys |
 | `messageCodec: 'negotiated'` | `PowerPool` | **After migration** — speedup |
 | `encodeNativeEnvelope` | `PowerMessageCodec` | **After migration** — avoid double-clone |
-| `invalidate(predicate)` / `evict(count)` | `PowerCache` | **Yes** — predicate eviction |
-| `policy: 'slru'` | `PowerCache` | **Yes** — better hit rate |
+| `invalidate(predicate)` / `evict(count)` | `PowerCache` | Deferred — explicit clear paths are sufficient |
+| `policy: 'slru'` | `PowerCache` | **Done** — applied to import cache |
 | `stats().staleServes` / `rejectedAdmission` | `PowerCache` | **Yes** — observability |
-| `maxInflightRefreshes` | `PowerCache` | **Yes** — prevent stampede |
-| `staleTtl` bound | `PowerCache` | Low — cap stale window |
+| `maxInflightRefreshes` | `PowerCache` | Deferred — imports do not refresh |
+| `staleTtl` bound | `PowerCache` | Not applicable — imported modules are immutable |
 | `allowStale` / `getOrFetch` / `fetchMethod` | `PowerCache` | Low — stale-while-revalidate |
 | `seed` for TinyLFU | `PowerCache` | Low — better admission |
 | `AbortSignal` on acquire | `PowerSemaphore` | **Yes** — cancellable concurrency |
-| `hedgeDelay` / `PowerRetryBudget` | `PowerRetry` | **Yes** — bounded retries |
+| `hedgeDelay` / `PowerRetryBudget` | `PowerRetry` | Deferred/rejected — no duplicate HTTP requests; no measured retry storm |
 | `dispose()` / `[Symbol.dispose]` | All resource classes | **Yes** — deterministic cleanup |
-| `blockedMs` / `droppedSamples` / `coverage` | `PowerEventLoopMonitor` | **Yes** — loop observability |
-| `utilizationSince(previous)` | `PowerEventLoopMonitor` | **Yes** — per-interval utilization |
-| `tryReserve()` / exact `retryAfter(n)` | `PowerGCRA` | **Yes** — precise rate limiting |
+| `blockedMs` / `droppedSamples` / `coverage` | `PowerEventLoopMonitor` | Deferred — no metrics consumer |
+| `utilizationSince(previous)` | `PowerEventLoopMonitor` | Deferred — no measured autoscale gap |
+| `tryReserve()` / exact `retryAfter(n)` | `PowerGCRA` | Deferred — no origin-rate policy |
 | `hasEqual` width budget / `compareFn` | `PowerCache` | Low — better equality |
 | `encodeCacheLimit` / `encodeCacheByteLimit` | `PowerPool` | Low — bound encode cache |
 | `pool:idle` event | `PowerPool` | Low — observability |
@@ -1893,25 +1814,25 @@ For reference, the complete list of new helpers in v2.0.0:
 
 | Priority | Status | Action | Files affected | API available in v1 |
 |---|---|---|---|---|
-| **P0** | Pending | Add `messageCodec: 'legacy'` to all 3 `PowerPool` instances OR migrate workers to `decodeMessage`/`encodeMessage` | `htmlBuilder.js`, `slugManager.js`, `markdown.js`, 4 worker files | No (v2-only) |
-| **P0** | Pending | Update `TestWorker` in `tests/setup.js` to handle framed replies | `tests/setup.js` | No (v2-only) |
-| **P1** | ✅ Done | Replace manual worker termination with `pool.drain()` + `pool.terminate()` in teardown | `markdown.js`, `slugManager.js` | **Yes** — `drain()` and `terminate()` exist in v1 |
-| **P1** | Pending | Use `[Symbol.dispose]()` / `[Symbol.asyncDispose]()` in teardown paths | `markdown.js`, `slugManager.js`, `worker-manager.js` | **Yes** — both symbols exist in v1 |
-| **P1** | Pending | Add `PowerEventLoopMonitor` to `markdown.js` for render stall visibility | `markdown.js` | No (v2-only) |
-| **P1** | Pending | Add `PowerGCRA` rate limiting to `fetchMarkdown` | `slugManager.js` | No (v2-only) |
-| **P1** | Pending | Switch `__importCache` to `policy: 'slru'` | `utils/importCache.js` | No (v2-only) |
-| **P1** | Pending | Add `maxQueueLength` to all 3 `PowerPool` instances | `markdown.js`, `htmlBuilder.js`, `slugManager.js` | No (v2-only) |
-| **P1** | Pending | Add `AbortSignal` to `runWithConcurrency` | `htmlBuilder.js`, `slugManager.js` | No (v2-only) |
-| **P1** | Pending | Add `hedgeDelay` to `PowerRetry` in `fetchMarkdown` | `slugManager.js` | No (v2-only) |
-| **P2** | Pending | Migrate workers to `messageCodec: 'negotiated'` for native carrier | 4 workers + pool files | No (v2-only) |
-| **P2** | Pending | Add `PowerCrossLock` for cross-worker slug map coordination | `htmlBuilder.js`, `slugManager.js` | No (v2-only) |
-| **P2** | Pending | Integrate `PowerEventLoopMonitor` into `autoScale` decisions | `markdown.js`, `slugManager.js` | No (v2-only) |
-| **P2** | Pending | Add `PowerCache.invalidate(predicate)` for content base changes | `utils/importCache.js`, `slugManager.js` | No (v2-only) |
-| **P3** | Pending | Add `PowerRetryBudget` to bound concurrent retries | `slugManager.js` | No (v2-only) |
-| **P3** | Pending | Use `PowerCache.maxInflightRefreshes` for import cache | `utils/importCache.js` | No (v2-only) |
-| **P3** | Pending | Add `PowerCache.staleTtl` for stale-while-revalidate | `utils/importCache.js` | No (v2-only) |
-| **P3** | Pending | Use `PowerPool.idempotencyTtlMs` for deduplication | `markdown.js`, `slugManager.js` | No (v2-only) |
-| **P3** | Pending | Add `PowerEventLoopMonitor` stats to debug output | `utils/debug.js` | No (v2-only) |
+| **P0** | ✅ Done | Migrate all pools and workers to modern negotiated/native/framed message codecs | `htmlBuilder.js`, `slugManager.js`, `markdown.js`, 4 worker files | No (v2-only) |
+| **P0** | ✅ Done | Update `TestWorker` in `tests/setup.js` to handle modern inbound and framed replies | `tests/setup.js` | No (v2-only) |
+| **P1** | ✅ Done | Drain pools before termination, using `[Symbol.asyncDispose]()` when available | `markdown.js`, `slugManager.js`, `htmlBuilder.js` | **Yes** — `drain()` and `terminate()` exist in v1 |
+| **P1** | Skipped | Do not add `PowerEventLoopMonitor` without a measured render-stall signal or metrics consumer | `markdown.js` | No (v2-only) |
+| **P1** | Skipped | Do not add `PowerGCRA` without an origin-rate policy or observed fetch stampede | `slugManager.js` | No (v2-only) |
+| **P1** | ✅ Done | Switch `__importCache` to `policy: 'slru'` | `utils/importCache.js` | No (v2-only) |
+| **P1** | ✅ Done | Add `maxQueueLength` to all 3 `PowerPool` instances | `markdown.js`, `htmlBuilder.js`, `slugManager.js` | No (v2-only) |
+| **P1** | ✅ Done | Add `AbortSignal` to `runWithConcurrency` | `htmlBuilder.js`, `slugManager.js` | No (v2-only) |
+| **P1** | ✅ Done | Update `PowerRetry` construction to v2 option names | `slugManager.js` | No (v2-only) |
+| **P1** | Skipped | Do not add `hedgeDelay` to HTTP fetches; duplicate requests could amplify origin load | `slugManager.js` | No (v2-only) |
+| **P2** | ✅ Done | Migrate workers to `messageCodec: 'negotiated'` for native carrier | 4 workers + pool files | No (v2-only) |
+| **P2** | Skipped | Do not add `PowerCrossLock`; slug data is coordinated on the main thread, not shared across workers | `htmlBuilder.js`, `slugManager.js` | No (v2-only) |
+| **P2** | Skipped | Do not feed `PowerEventLoopMonitor` into autoscaling without a measured stall signal | `markdown.js`, `slugManager.js` | No (v2-only) |
+| **P2** | Skipped | Do not add cache invalidation for content-base changes; the relevant runtime caches already expose explicit clear paths | `utils/importCache.js`, `slugManager.js` | No (v2-only) |
+| **P3** | Skipped | Do not add `PowerRetryBudget`; fetch concurrency, deduplication, and negative caching already bound retry pressure | `slugManager.js` | No (v2-only) |
+| **P3** | Skipped | Do not configure `PowerCache.maxInflightRefreshes`; imports use single-flight loading and do not refresh stale values | `utils/importCache.js` | No (v2-only) |
+| **P3** | Skipped | Do not configure `PowerCache.staleTtl`; imported modules are immutable for the process lifetime | `utils/importCache.js` | No (v2-only) |
+| **P3** | Skipped | Do not configure `PowerPool.idempotencyTtlMs`; pool requests do not carry reusable idempotency keys | `markdown.js`, `slugManager.js` | No (v2-only) |
+| **P3** | Skipped | Do not add event-loop metrics to debug output without a consumer for those measurements | `utils/debug.js` | No (v2-only) |
 
-**Recommended approach:** Pin `performance-helpers` to `^1.0.3` until the worker migration is complete. Implement the backward-compatible P1 enhancements now. The task "Replace manual worker termination with `pool.drain()` + `pool.terminate()` in teardown" is complete. Then add `messageCodec: 'legacy'` to all pools as an intermediate step, then migrate workers one at a time. Do not upgrade to v2.0.0 until all 4 workers and the test stub are migrated. Only after upgrading to v2.0.0 can the remaining P1/P2/P3 enhancements be implemented.
+**Current status:** `performance-helpers@2.0.0` is installed and the migration is complete. All worker pools use the modern `messageCodec: 'negotiated'` path, workers announce native capability and decode modern inbound messages, the test worker handles native/framed traffic, and `PowerRetry` uses v2 option names. Legacy codecs are intentionally not used. Optional features are marked skipped when the current runtime has no corresponding shared state, refresh workload, idempotency key, or measured performance signal.
 

@@ -5,6 +5,9 @@ describe('nav search branches', () => {
   afterEach(() => {
     delete globalThis.buildSearchIndex
     delete globalThis.buildSearchIndexWorker
+    delete window.__nimbiResolvedIndex
+    delete window.__nimbiSearchIndex
+    delete window.__nimbiLiveSearchIndex
     document.body.innerHTML = ''
   })
 
@@ -73,5 +76,42 @@ describe('nav search branches', () => {
     await new Promise((r) => setTimeout(r, 250))
 
     expect(document.querySelector('.nimbi-search-no-results')).toBeTruthy()
+  })
+
+  it('keeps the fuller index when the lazy worker returns a partial index', async () => {
+    const navbarWrap = document.createElement('header')
+    const container = document.createElement('main')
+    document.body.appendChild(navbarWrap)
+    document.body.appendChild(container)
+
+    globalThis.buildSearchIndexWorker = vi.fn(async () => ([
+      { slug: 'partial', path: 'partial.md', title: 'Partial' }
+    ]))
+    globalThis.buildSearchIndex = vi.fn(async () => ([
+      { slug: 'function-addhook', path: 'docs/hookManager/functions/addHook.md', title: 'addHook' },
+      { slug: 'hook-manager', path: 'docs/hookManager/README.md', title: 'Hook Manager' }
+    ]))
+
+    const { navbar } = await buildNav(
+      navbarWrap,
+      container,
+      '<a href="?page=home">Home</a>',
+      'http://example.com/content/',
+      'home',
+      (k) => k,
+      () => {},
+      true,
+      'lazy',
+      3
+    )
+
+    const input = navbar.querySelector('#nimbi-search')
+    input.value = 'hook'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise((r) => setTimeout(r, 250))
+
+    expect(globalThis.buildSearchIndex).toHaveBeenCalled()
+    expect(document.querySelectorAll('.nimbi-search-result').length).toBeGreaterThanOrEqual(2)
+    expect(document.body.textContent).toContain('addHook')
   })
 })

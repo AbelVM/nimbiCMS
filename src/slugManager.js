@@ -245,9 +245,7 @@ function _createSlugPool() {
     size: poolSize,
     minSize: 2,
     autoScale: slugAutoScaleOptions,
-    // Bridge option for performance-helpers v2.0.0 compatibility.
-    // Use negotiated codec so workers can announce native structured-clone
-    // support and the pool can use native envelopes when available.
+    // Negotiate native structured-clone envelopes with the workers.
     messageCodec: 'negotiated',
     // Backpressure: cap the task queue to prevent unbounded growth under load.
     maxQueueLength: 100,
@@ -278,26 +276,26 @@ function _getSlugPool() {
  * Explicitly terminate and clear the slug worker pool.
  * Uses the pool's own drain/terminate logic so in-flight tasks get a
  * chance to complete before workers are torn down.
- * @returns {void}
+ * @returns {Promise<void>}
  */
 export function teardownSlugWorkerPool() {
   const pool = _slugPool;
   _slugPool = null;
-  if (!pool) return;
+  if (!pool) return Promise.resolve();
   try {
-    if (typeof pool.drain === "function") {
-      pool.drain().catch(() => {});
-    }
-    if (typeof pool.terminate === "function") {
-      pool.terminate();
-    }
-    // v2.0.0: dispose() releases all resources deterministically.
-    // No-op on v1 (method doesn't exist).
-    if (typeof pool.dispose === "function") {
-      pool.dispose();
-    }
+    const asyncDispose = pool[Symbol.asyncDispose];
+    if (typeof asyncDispose === "function")
+      return Promise.resolve(asyncDispose.call(pool)).catch(() => {});
+    const drained =
+      typeof pool.drain === "function" ? Promise.resolve(pool.drain()) : Promise.resolve();
+    return drained
+      .catch(() => {})
+      .then(() => {
+        if (typeof pool.terminate === "function") pool.terminate();
+      });
   } catch (e) {
     debugWarn("[slugManager] teardownSlugWorkerPool failed", e);
+    return Promise.resolve();
   }
 }
 
@@ -631,6 +629,7 @@ export function _setSearchIndex(arr) {
       searchIndex = [];
     }
     if (!Array.isArray(arr)) return;
+    if (searchIndex.length > arr.length) return;
     try {
       searchIndex.length = 0;
       for (const it of arr) searchIndex.push(it);
@@ -1272,9 +1271,10 @@ export let fetchMarkdown = async function (path, base, opts) {
             if (typeof PowerRetry === "function") {
               try {
                 const retry = new PowerRetry({
-                  attempts: attempts,
-                  factor: 2,
-                  minDelay: 50,
+                  maxAttempts: attempts,
+                  backoff: "exponential",
+                  baseDelay: 50,
+                  jitter: false,
                 });
                 if (typeof retry.run === "function") {
                   return await retry.run(async () => {
@@ -2285,6 +2285,7 @@ export async function buildSearchIndex(
       });
       try {
         if (!Array.isArray(searchIndex)) searchIndex = [];
+        if (searchIndex.length > finalIdx.length) return searchIndex;
         searchIndex.length = 0;
         for (const it of finalIdx) searchIndex.push(it);
       } catch (e) {
@@ -2331,6 +2332,7 @@ export async function buildSearchIndex(
       debugLog("[slugManager] filtering index by excludes failed", err);
       try {
         if (!Array.isArray(searchIndex)) searchIndex = [];
+        if (searchIndex.length > idx.length) return searchIndex;
         searchIndex.length = 0;
         for (const it of idx) searchIndex.push(it);
       } catch (e) {

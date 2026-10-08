@@ -8,7 +8,8 @@ vi.mock('../src/slugManager.js', () => {
     slugify: (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9\- ]/g, '').replace(/ /g, '-'),
     slugToMd,
     mdToSlug,
-    fetchMarkdown: vi.fn()
+    fetchMarkdown: vi.fn(),
+    buildSearchIndex: vi.fn().mockResolvedValue([])
   }
 })
 
@@ -52,7 +53,7 @@ describe('nav search and interaction branches', () => {
     // showResults should have added content
     expect(results).toBeTruthy()
     // ensure search result anchors use canonical `?page=` hrefs
-    const firstAnchor = results.querySelector('.panel-block') || results.querySelector('a')
+    const firstAnchor = results.querySelector('a[href]')
     expect(firstAnchor).toBeTruthy()
     expect(firstAnchor.getAttribute('href')).toContain('?page=find')
     // cleanup

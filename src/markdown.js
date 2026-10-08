@@ -40,9 +40,7 @@ function _createRendererPool() {
     size: poolSize,
     minSize: 2,
     autoScale: rendererAutoScaleOptions,
-    // Bridge option for performance-helpers v2.0.0 compatibility.
-    // Use negotiated codec so workers can announce native structured-clone
-    // support and the pool can use native envelopes when available.
+    // Negotiate native structured-clone envelopes with the workers.
     messageCodec: 'negotiated',
     // Backpressure: cap the task queue to prevent unbounded growth under load.
     maxQueueLength: 100,
@@ -79,26 +77,26 @@ function _getRendererPool() {
  * Explicitly terminate and clear the renderer worker pool.
  * Uses the pool's own drain/terminate logic so in-flight tasks get a
  * chance to complete before workers are torn down.
- * @returns {void}
+ * @returns {Promise<void>}
  */
 export function teardownRendererWorkerPool() {
   const pool = _rendererPool;
   _rendererPool = null;
-  if (!pool) return;
+  if (!pool) return Promise.resolve();
   try {
-    if (typeof pool.drain === "function") {
-      pool.drain().catch(() => {});
-    }
-    if (typeof pool.terminate === "function") {
-      pool.terminate();
-    }
-    // v2.0.0: dispose() releases all resources deterministically.
-    // No-op on v1 (method doesn't exist).
-    if (typeof pool.dispose === "function") {
-      pool.dispose();
-    }
+    const asyncDispose = pool[Symbol.asyncDispose];
+    if (typeof asyncDispose === "function")
+      return Promise.resolve(asyncDispose.call(pool)).catch(() => {});
+    const drained =
+      typeof pool.drain === "function" ? Promise.resolve(pool.drain()) : Promise.resolve();
+    return drained
+      .catch(() => {})
+      .then(() => {
+        if (typeof pool.terminate === "function") pool.terminate();
+      });
   } catch (e) {
     debugWarn("[markdown] teardownRendererWorkerPool failed", e);
+    return Promise.resolve();
   }
 }
 
