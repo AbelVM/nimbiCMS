@@ -88,6 +88,7 @@
   "unpkg": "dist/nimbi-cms.js",
   "sideEffects": [
     "**/*.css",
+    "src/utils/domPurify.js",
     "dist/nimbi-cms.es.js",
     "dist/nimbi-cms.cjs.js",
     "dist/nimbi-cms.js"

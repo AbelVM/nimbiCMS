@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { o2u8, u82o } from 'performance-helpers/powerBuffer'
 
 describe('worker anchorWorker protocol branches', () => {
   let handler
@@ -15,15 +14,15 @@ describe('worker anchorWorker protocol branches', () => {
     vi.restoreAllMocks()
   })
 
-  it('supports PowerPool binary request/response with correlationId', async () => {
-    const payload = o2u8({
+  it('supports PowerPool negotiated request/response with correlationId', async () => {
+    const payload = {
       type: 'rewriteAnchors',
       correlationId: 'cid-1',
       html: '<a href="foo.md">x</a>',
       contentBase: 'http://example.com/content/',
       pagePath: '',
       snapshot: { allowProbe: false, homeSlug: '_home', pathToSlug: { 'foo.md': 'foo' } }
-    })
+    }
 
     const promise = new Promise((resolve) => {
       globalThis.postMessage = (msg) => resolve(msg)
@@ -31,9 +30,8 @@ describe('worker anchorWorker protocol branches', () => {
 
     await handler({ data: payload })
     const sent = await promise
-    const decoded = u82o(sent)
-    expect(decoded.correlationId).toBe('cid-1')
-    expect(decoded.response && decoded.response.html).toContain('?page=foo')
+    expect(sent.correlationId).toBe('cid-1')
+    expect(sent.response && sent.response.html).toContain('?page=foo')
   })
 
   it('returns legacy error object when rewrite throws', async () => {

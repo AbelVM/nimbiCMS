@@ -2304,7 +2304,7 @@ const _anchorPool = (() => {
   // non-numeric `minSize`/`maxSize`/`idleTimeout`. Every size option
   // here is a numeric literal (`size: 2`, `minSize: 2`), so this pool
   // complies with the v2 validation rules.
-  const poolOpts = { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions, messageCodec: 'legacy', maxQueueLength: 100 };
+  const poolOpts = { size: 2, minSize: 2, autoScale: anchorAutoScaleOptions, messageCodec: 'negotiated', maxQueueLength: 100 };
   try {
     if (import.meta.env.DEV) {
       poolOpts.debugLevel = 0;

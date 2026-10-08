@@ -1,13 +1,22 @@
 import * as _markedModule from "marked";
-import DOMPurify from "dompurify";
+import { getDOMPurify } from "../utils/domPurify.js";
 import { parseFrontmatter } from "../utils/frontmatter.js";
 import {
   importUrlWithCache,
   clearImportCache,
   setImportNegativeCacheTTL,
 } from "../utils/importCache.js";
-import { u82o, o2u8 } from "performance-helpers/powerBuffer";
+import { decodeInbound, announceCapabilities } from "performance-helpers/powerMessageCodec";
 import hljsCore from "highlight.js/lib/core";
+
+// Announce native structured-clone support so PowerPool can use native
+// envelopes when available. Guarded for test environments where `postMessage`
+// may not be the worker-style single-argument form yet.
+try {
+  if (typeof postMessage === "function") {
+    postMessage(announceCapabilities({ native: true }));
+  }
+} catch (_) {}
 
 const marked =
   (_markedModule && (_markedModule.marked || _markedModule)) || undefined;
@@ -248,7 +257,7 @@ function detectLanguagesMessage(id, mdText, supported) {
 async function renderMarkdownResult(md, idCounts = new Map()) {
   const { content, data } = parseFrontmatter(md || "");
   await ensureHljs().catch(() => {});
-  const parsed = postProcessHtml(DOMPurify.sanitize(marked.parse(content)), idCounts);
+  const parsed = postProcessHtml(getDOMPurify()(marked.parse(content)), idCounts);
   return { html: parsed.html, meta: data || {}, toc: parsed.toc };
 }
 
@@ -260,7 +269,7 @@ async function streamMarkdownResult(msg, onChunk) {
   const sections = _splitIntoSections(content, chunkSize);
   const idCounts = new Map();
   for (let i = 0; i < sections.length; i++) {
-    const rendered = postProcessHtml(DOMPurify.sanitize(marked.parse(sections[i])), idCounts);
+    const rendered = postProcessHtml(getDOMPurify()(marked.parse(sections[i])), idCounts);
     onChunk({
       id,
       type: "chunk",
@@ -283,24 +292,19 @@ function sendWorkerMessage(payload, transfer) {
 
 export function attachRendererWorker(target = globalThis) {
   const handler = async (ev) => {
-    let msg;
-    try {
-      msg = u82o(ev.data);
-    } catch (_) {}
-    msg = msg || ev.data || {};
-    const { correlationId } = msg;
+    const decoded = decodeInbound(ev.data);
+    const msg = decoded.value;
+    const correlationId = decoded.correlationId ?? msg.correlationId;
     const reply = (result) => {
       if (correlationId != null) {
-        const u8 = o2u8({ correlationId, response: result });
-        sendWorkerMessage(u8, [u8.buffer]);
+        sendWorkerMessage({ correlationId, response: result });
       } else {
         sendWorkerMessage({ id: msg.id, result });
       }
     };
     const replyErr = (error) => {
       if (correlationId != null) {
-        const u8 = o2u8({ correlationId, response: { error: String(error) } });
-        sendWorkerMessage(u8, [u8.buffer]);
+        sendWorkerMessage({ correlationId, response: { error: String(error) } });
       } else {
         sendWorkerMessage({ id: msg.id, error: String(error) });
       }
@@ -309,10 +313,7 @@ export function attachRendererWorker(target = globalThis) {
       if (msg?.type === "register") {
         const result = await registerLanguageMessage(msg?.name, msg?.url);
         if (correlationId != null) reply(result);
-        else {
-          const u8 = o2u8(result);
-          sendWorkerMessage(u8, [u8.buffer]);
-        }
+        else sendWorkerMessage(result);
         return;
       }
       if (msg?.type === "detect") {

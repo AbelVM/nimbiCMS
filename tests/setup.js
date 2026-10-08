@@ -5,7 +5,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { parseFrontmatter } from '../src/utils/frontmatter.js'
 import * as slugMgr from '../src/slugManager.js'
-import { u82o } from 'performance-helpers/powerBuffer'
+import { decodeInbound } from 'performance-helpers/powerMessageCodec'
 
 // Provide build-time defines expected by source modules during tests.
 if (typeof globalThis.__HIGHLIGHT_JS_VERSION__ === 'undefined') {
@@ -30,17 +30,14 @@ if (typeof globalThis.Worker === 'undefined') {
       if (i >= 0) this._listeners[type].splice(i, 1)
     }
     postMessage(msg) {
-      // Handles PowerPool binary protocol (Uint8Array via o2u8) as well as
-      // legacy plain-object messages. PowerPool sends binary; test utilities
-      // that construct FakeWorkers send plain objects.
+      // Handles PowerPool negotiated protocol (native envelopes, framed v2,
+      // and legacy bare JSON) via decodeInbound, as well as plain-object
+      // messages from test utilities.
       try {
         const handle = async () => {
-          // Decode PowerPool binary payload when present
-          let data = msg || {}
-          if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
-            try { data = u82o(data) } catch (_) { data = {} }
-          }
-          const { correlationId } = data
+          const decoded = decodeInbound(msg || {})
+          const data = decoded.value
+          const correlationId = decoded.correlationId ?? data.correlationId
 
           // Respond helper — PowerPool accepts plain {correlationId, response}
           const sendResponse = (result) => {

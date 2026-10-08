@@ -75,7 +75,7 @@ function hello(){
   </section>
 
   <script>
-    const api = window.nimbiCMS || window.nimbiCms || null
+    let api = window.nimbiCMS || window.nimbiCms || null
 
     const themeSel = document.getElementById('themeSel');
     const bulmaSel = document.getElementById('bulma');
@@ -147,6 +147,9 @@ function hello(){
     hlSel.addEventListener('change', applySettings);
 
     (async function init() {
+      if (!api) {
+        try { api = await import('nimbi-cms') } catch (e) { console.warn(e) }
+      }
       try {
         const mount = document.querySelector('.nimbi-mount')
         const theme = (mount && mount.getAttribute && mount.getAttribute('data-theme')) || document.documentElement.getAttribute('data-theme')

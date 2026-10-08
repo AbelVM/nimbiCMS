@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
-import { u82o } from 'performance-helpers/powerBuffer'
 
 // vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
 // throw). These static mocks are file-scoped and active for every test.
@@ -11,9 +10,6 @@ vi.mock('marked', () => ({ marked: { parse: (s) => `<p>${String(s ?? '')}</p>`, 
 vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => ({ default: { registerLanguage: () => {}, getLanguage: () => false } }), { virtual: true })
 
 function decodePosted(m) {
-  if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
-    try { return u82o(m) } catch (_) {}
-  }
   return m
 }
 

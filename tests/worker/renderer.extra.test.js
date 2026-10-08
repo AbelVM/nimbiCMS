@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
-import { u82o } from 'performance-helpers/powerBuffer'
 
 // vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
 // throw). The factory is static, so it is safe to keep active for the whole
@@ -10,9 +9,6 @@ import { u82o } from 'performance-helpers/powerBuffer'
 vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
 
 function decodePosted(m) {
-  if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
-    try { return u82o(m) } catch (_) {}
-  }
   return m
 }
 

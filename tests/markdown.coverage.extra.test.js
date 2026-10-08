@@ -27,6 +27,17 @@ describe('markdown additional coverage', () => {
     vi.resetModules()
     const origDOMParser = global.DOMParser
     try {
+      // Mock getDOMPurify so it does not create its own internal DOMParser.
+      // This keeps the test focused on the shared-DOMParser / TOC path.
+      const mockSanitize = (html) => html
+      vi.doMock('../src/utils/domPurify.js', async () => {
+        const actual = await vi.importActual('../src/utils/domPurify.js')
+        return {
+          ...actual,
+          getDOMPurify: () => mockSanitize,
+        }
+      })
+
       class SimpleDOMParser {
         parseFromString(html) {
           const doc = {}

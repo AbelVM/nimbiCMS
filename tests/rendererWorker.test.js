@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { u82o } from 'performance-helpers/powerBuffer'
 
 function decodePosted(m) {
-  if (m instanceof Uint8Array || (ArrayBuffer.isView && ArrayBuffer.isView(m))) {
-    try { return u82o(m) } catch (_) {}
-  }
   return m
 }
 

@@ -246,9 +246,9 @@ function _createSlugPool() {
     minSize: 2,
     autoScale: slugAutoScaleOptions,
     // Bridge option for performance-helpers v2.0.0 compatibility.
-    // No-op on v1; required on v2 to use the legacy bare-JSON wire protocol
-    // until workers are migrated to decodeMessage/encodeMessage.
-    messageCodec: 'legacy',
+    // Use negotiated codec so workers can announce native structured-clone
+    // support and the pool can use native envelopes when available.
+    messageCodec: 'negotiated',
     // Backpressure: cap the task queue to prevent unbounded growth under load.
     maxQueueLength: 100,
   };

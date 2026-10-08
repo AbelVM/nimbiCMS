@@ -472,6 +472,9 @@ export function parseFrontmatter(md: string): {content:string, data: Record<stri
 
 // --- from src/utils/emojiMap.js
 
+// --- from src/utils/domPurify.js
+export function getDOMPurify(): any
+
 // --- from src/utils/debug.js
 export function setDebugLevel(level: any): any
 export const _logger: any

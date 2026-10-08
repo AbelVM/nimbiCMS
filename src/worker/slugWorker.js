@@ -1,38 +1,39 @@
 /**
  * @module worker/slugWorker
  */
-import { u82o, o2u8 } from "performance-helpers/powerBuffer";
+import { decodeInbound, announceCapabilities } from "performance-helpers/powerMessageCodec";
 import { buildSearchIndex, crawlForSlug } from "../slugSearchRuntime.js";
 
-function _decodeMsg(data) {
-  try {
-    return u82o(data);
-  } catch (_) {
-    return data || {};
+// Announce native structured-clone support so PowerPool can use native
+// envelopes when available. Guarded for test environments where `postMessage`
+// may not be the worker-style single-argument form yet.
+try {
+  if (typeof postMessage === "function") {
+    postMessage(announceCapabilities({ native: true }));
   }
-}
+} catch (_) {}
 
 /**
  * Worker `onmessage` handler for slug-related background tasks.
- * Accepts both plain objects (legacy) and binary Uint8Array payloads (PowerPool protocol).
+ * Uses `decodeInbound` to handle native envelopes, framed v2 messages,
+ * and legacy bare JSON transparently.
  * @param {MessageEvent} ev - Message event; `ev.data` should be the request.
  * @returns {Promise<void>} Posts `{correlationId, response}` (PowerPool) or `{id, result}` (legacy).
  */
 onmessage = async (ev) => {
-  const msg = _decodeMsg(ev.data);
-  const { correlationId } = msg;
+  const decoded = decodeInbound(ev.data);
+  const msg = decoded.value;
+  const correlationId = decoded.correlationId ?? msg.correlationId;
   const _reply = (result) => {
     if (correlationId != null) {
-      const u8 = o2u8({ correlationId, response: result });
-      postMessage(u8, [u8.buffer]);
+      postMessage({ correlationId, response: result });
     } else {
       postMessage({ id: msg.id, result });
     }
   };
   const _replyErr = (error) => {
     if (correlationId != null) {
-      const u8 = o2u8({ correlationId, response: { error: String(error) } });
-      postMessage(u8, [u8.buffer]);
+      postMessage({ correlationId, response: { error: String(error) } });
     } else {
       postMessage({ id: msg.id, error: String(error) });
     }

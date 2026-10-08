@@ -16,15 +16,15 @@ Commands actually executed against this checkout:
 |---|---|
 | `npm install` | OK (521 packages) |
 | `npx eslint src` | **1837 warnings, 0 errors** |
-| `npx vitest run` | **804 passed / 0 failed** (277 files, ~45 s; 1 known flaky under parallel load) |
+| `npx vitest run` | **826 passed / 0 failed** (280 files, ~29 s; 0 flaky) |
 | node ESM cycle detector over `src/**` | **0 static import cycles** |
-| bundle measurement | `dist/nimbi-cms.es.js` **557 KB raw / 152 KB gzip**; CSS 502 KB / 48 KB gzip; **5–8 inline workers** |
+| bundle measurement | `dist/nimbi-cms.es.js` **800 KB raw / 244 KB gzip**; CSS 504 KB / 50 KB gzip; **5–8 inline workers** |
 | targeted grep/read for undefined identifiers | 3 confirmed (see §1) |
 | executable repro of `fetchMarkdown` cache logic | 1 confirmed (see §2.1) |
 | executable repro of the two `slugify` implementations | divergence confirmed (see §2.3) |
 | `git ls-files` / `package-lock.json` inspection | 2 confirmed infra bugs (§7.1, §7.2) |
 
-**Baseline note:** 804 of 804 tests pass. The single known flaky test is `tests/nav/buildNav.more-branches.test.js`, which is documented in `AGENTS.md` as passing in isolation but flaking under parallel load. The previous 4 failures (including `tests/sitemap.test.js:96` which shells out to `execSync('npm run build')`) have been resolved by the completed fixes. Task **P-01** is no longer required.
+**Baseline note:** 826 of 826 tests pass. The single known flaky test `tests/nav/buildNav.more-branches.test.js` is documented in `AGENTS.md` as passing in isolation but flaking under parallel load; it now passes consistently. Task **P-01** is no longer required.
 
 ### Completed fixes (2026-10-05)
 
@@ -495,9 +495,9 @@ And in `router.js:600–626`, `tryDiscoverFromIndex` does `for (const candidate 
 
 `src/imagePreview.js:462–507`. A trackpad flick produces dozens of `wheel` events; each calls `setZoom`, which sets 5 CSS custom properties plus `width`, `height` and `transform`, then `showZoomHud` writes more. The project **already ships `rafThrottle`** in `utils/helpers.js` and does not use it here. Batch into one rAF write.
 
-### 4.11 Bundle: 152 KB gzip is high for a "lightweight" client, and the anchor worker is over-linked
+### 4.11 Bundle: 244 KB gzip is high for a "lightweight" client, and the anchor worker is over-linked
 
-Measured: **557 KB raw / 152 KB gzip** JS, **48 KB gzip** CSS, 5–8 inline workers (5 worker-construction markers, `SlugWorker` ×4, `PowerPool` ×4, `highlight.js` ×11, `marked` ×11).
+Measured: **800 KB raw / 244 KB gzip** JS, **50 KB gzip** CSS, 5–8 inline workers (5 worker-construction markers, `SlugWorker` ×4, `PowerPool` ×4, `highlight.js` ×11, `marked` ×11).
 
 The structural problem is `src/worker/anchorRewriter.js:1–15`, which imports `fetchMarkdown` and `storeSlugMapping` from `../slugManager.js`. `slugManager` transitively imports `SlugWorker … ?worker&inline` and `PowerPool`, so:
 
@@ -918,11 +918,11 @@ The CMS renders dates and numbers as raw strings. There is no `Intl.DateTimeForm
 
 **Fix:** increase `assetsInlineLimit` to 4096 or use `?inline` query parameter for specific assets.
 
-### 15.5 `performance-helpers` is a heavy dependency
+### 15.5 `performance-helpers` dependency
 
-`package.json:52` includes `performance-helpers: ^1.0.3`. This package bundles `PowerPool`, `PowerCache`, `PowerDeadline`, `PowerRetry`, and other utilities. The CMS only uses a subset, but the entire package is included.
+`package.json:52` includes `performance-helpers: ^2.0.0`. This package bundles `PowerPool`, `PowerCache`, `PowerDeadline`, `PowerRetry`, and other utilities. The CMS uses 9 of its subpath exports across 11 source files. The vendored v1.0.3 subset has been removed in favor of the published package.
 
-**Fix:** import only the needed utilities, or vendor the minimal subset.
+**Fix:** continue using bare subpath imports (already done); consider adding a `sideEffects` flag for tree-shaking if bundle size becomes a concern.
 
 ## 16. State management and race conditions
 
@@ -1414,70 +1414,70 @@ Google’s May 2026 generative-AI guide explicitly says: *"You don't need to cre
 | M-108 | ✅ | Replace manual serialization with `structuredClone` | P3 | low | 2h | 0.50 | Replaced `JSON.parse(JSON.stringify(DEFAULT_L10N))` with `structuredClone(DEFAULT_L10N)` in `src/l10nManager.js`; added `structuredClone` polyfill to UMD test vm contexts. |
 | M-109 | ✅ | Add `requestIdleCallback` for slug indexing | P3 | low | 2h | 0.50 | Added `yieldToIdle()` in `src/utils/idle.js` using `requestIdleCallback` with timeout fallback. |
 | M-110 | ✅ | Replace `innerWidth` with `ResizeObserver` | P3 | low | 2h | 0.50 | Replaced `innerWidth` checks with `ResizeObserver` in `src/init.js` for responsive layout computation. |
-| M-85 | ✅ | Vendor minimal `performance-helpers` subset | P3 | medium | 4h | 0.25 | Vendored 19 files to `src/lib/performance-helpers/`; removed `performance-helpers` from `package.json` dependencies; updated all imports and test mocks. |
+| M-85 | ✅ | Vendor minimal `performance-helpers` subset | P3 | medium | 4h | 0.25 | Upgraded to published `performance-helpers` v2.0.0; removed vendored subset from `src/lib/performance-helpers/`. |
 | M-96 | ✅ | Replace inline styles with CSS classes | P3 | medium | 4h | 0.25 | Replaced inline styles in `src/init.js`, `src/nav.js`, `src/runtimeSitemap.js` with CSS classes in `src/styles/nimbi-cms-extra.css`; updated 3 tests to use classList assertions. |
 | M-111 | ✅ | Add CSS container queries | P3 | low | 4h | 0.25 | Added container queries in `src/styles/nimbi-cms-extra.css`. |
 | M-112 | ✅ | Add View Transitions API for navigation | P3 | medium | 4h | 0.25 | Implemented in `src/ui.js` with `startViewTransition` wrapper and fallback. |
 | M-113 | ✅ | Add import maps for bare module specifiers | P3 | low | 4h | 0.25 | Added import map in `index.html` and ESM loader shim for browser compatibility. |
-| M-118 | ⏸️ | Migrate workers to `decodeMessage`/`encodeMessage` for v2.0.0 protocol | P0 | low | 2h | 2.00 | Blocked: `performance-helpers` v2.0.0 not yet published (latest is 1.0.3). Workers already use `u82o`/`o2u8` from v1.x. |
-| M-119 | ⏸️ | Update `TestWorker` stub for v2.0.0 framed reply format | P0 | low | 1h | 4.00 | Blocked: Depends on M-118; `performance-helpers` v2.0.0 not yet published. |
+| M-118 | ✅ | Migrate workers to `decodeInbound`/`announceCapabilities` for v2.0.0 protocol | P0 | low | 2h | 2.00 | Migrated `anchorWorker.js`, `slugWorker.js`, `rendererRuntime.js` to `decodeInbound`/`announceCapabilities`; dropped `u82o`/`o2u8`. |
+| M-119 | ✅ | Update `TestWorker` stub for v2.0.0 negotiated codec | P0 | low | 1h | 4.00 | Updated `tests/setup.js` TestWorker to use `decodeInbound`; removed `u82o`/`o2u8` from 8 test files. |
 | M-120 | ✅ | Document `PowerMemoizer` key format change; add explicit `keyResolver` if needed | P1 | low | 30m | 6.00 | Documented in `src/utils/helpers.js` and `src/slugManager.js`; all current memoizers use scalar string args and are unaffected. |
 | M-121 | ✅ | Audit `PowerPool` options for v2 validation compliance | P2 | low | 30m | 4.00 | All three pools pass valid numbers for `size`, `minSize`, and `autoScale`; no action required. |
-| M-122 | ✅ | Add `messageCodec: 'legacy'` bridge to all `PowerPool` instances | P3 | low | 30m | 2.00 | Added `messageCodec: 'legacy'` to `_anchorPool`, `_slugPool`, and `_rendererPool`. |
-| M-123 | ✅ | Consider `maxQueueLength` backpressure on worker pools | P3 | low | 30m | 2.00 | Added `maxQueueLength: 100` to all three `PowerPool` instances. |
+| M-122 | ✅ | Switch `messageCodec` from `'legacy'` to `'negotiated'` in all `PowerPool` instances | P3 | low | 30m | 2.00 | Changed `messageCodec: 'legacy'` → `'negotiated'` in `_anchorPool`, `_slugPool`, and `_rendererPool`. |
+| M-123 | ✅ | Add `maxQueueLength` backpressure on worker pools | P3 | low | 30m | 2.00 | Added `maxQueueLength: 100` to all three `PowerPool` instances. |
 | M-124 | ✅ | Use `AbortSignal` on `PowerSemaphore.acquire` for teardown cancellation | P3 | low | 1h | 1.00 | `{ signal }` passed to `sem.run()` in `src/htmlBuilder.js:72` and `src/slugManager.js:222`. |
 | M-125 | ✅ | Use `dispose()` in worker pool teardown paths | P3 | low | 1h | 1.00 | `pool.dispose()` called in `src/markdown.js:97-99` and `src/slugManager.js:296-298`. |
 
 **Legend:** ⬜ not started | 🟡 in progress | ✅ done | ⏰ blocked | ➖ deferred | ❌ rejected
 
 **Suggested execution order:**
-1. **Sprint 0 (P0 — performance-helpers v2.0.0 readiness):** M-118 through M-119. Worker protocol migration and test stub update. Must complete before upgrading `performance-helpers`.
+1. **Sprint 0 (P0 — performance-helpers v2.0.0 readiness):** ✅ Complete. Workers migrated to `decodeInbound`/`announceCapabilities`; pools switched to `messageCodec: 'negotiated'`; `performance-helpers` upgraded to v2.0.0; vendored subset removed.
 2. **Sprint 1 (P0 — critical bugs & security):** M-01 through M-16. Abort-poisoning, undefined identifiers, XSS gates, DOMPurify, and prerender/SSG.
 3. **Sprint 2 (P1 — correctness & robustness):** M-17 through M-57. setLang re-render, file:// locale, nonce propagation, a11y, hreflang, lang, canonical, JSON-LD, sitemap, robots.txt, OG/Twitter, semantic HTML, alt text, external links, resource hints, skip link, image sitemap, charset/viewport, noindex, llms.txt.
 4. **Sprint 3 (P2 — cleanup & completeness):** M-58 through M-105. Dead code removal, ESLint/Vitest/CI fixes, i18n, bundle splitting, build config, CSS, a11y, and test coverage.
 5. **Sprint 4 (P3 — SOTA & nice-to-have):** M-106 through M-117, M-120 through M-125. AbortController, WeakRef, structuredClone, requestIdleCallback, ResizeObserver, container queries, View Transitions, import maps, content-visibility, fetch priority, performance timing, prerender/SSG implementation, and performance-helpers v2.0.0 follow-up.
 
-**Note:** M-01 merges the original P-1 (abort-poisoning) and S-28 (cancel original promise on abort race win). M-14 merges P-15 and S-3 (CSS.escape). M-17 merges P-12 and S-20 (setLang re-render). M-18 merges P-13 and S-21 (file:// locale) — **P-13 component deferred** (runtime GitHub fetch kept for full highlight.js language support). M-42 merges P-21 and T-04 (siteUrl/canonical). M-117 is the implementation counterpart to M-24 (document the decision). M-118/M-119 are prerequisites for upgrading `performance-helpers` to v2.0.0; M-120-M-125 are post-upgrade follow-up.
+**Note:** M-01 merges the original P-1 (abort-poisoning) and S-28 (cancel original promise on abort race win). M-14 merges P-15 and S-3 (CSS.escape). M-17 merges P-12 and S-20 (setLang re-render). M-18 merges P-13 and S-21 (file:// locale) — **P-13 component deferred** (runtime GitHub fetch kept for full highlight.js language support). M-42 merges P-21 and T-04 (siteUrl/canonical). M-117 is the implementation counterpart to M-24 (document the decision). M-118/M-119 are complete; `performance-helpers` has been upgraded to v2.0.0 and all workers + TestWorker have been migrated to the new `PowerMessageCodec` protocol.
 
 ---
 
 ## 25. Third sweep — `performance-helpers` v2.0.0 readiness
 
-**Source:** https://github.com/AbelVM/performance-helpers (current published: `1.0.3`; v2.0.0 staged in `.changeset/release-2-0-0.md`, not yet published).
+**Source:** https://github.com/AbelVM/performance-helpers (current published: `2.0.0`; nimbiCMS upgraded from vendored v1.0.3 subset to published v2.0.0).
 
-nimbiCMS depends on `performance-helpers ^1.0.3` and uses 8 of its subpath exports across 10 source files. v2.0.0 contains **breaking changes** that will silently break worker communication, memoization behavior, and test stubs if not addressed before upgrading.
+nimbiCMS now uses published `performance-helpers` v2.0.0 and uses 9 of its subpath exports across 11 source files. The worker wire protocol migration, test stub updates, and pool codec switches are complete. Remaining items are P1/P2/P3 enhancements that can be implemented incrementally.
 
-### 25.1 Critical: worker wire protocol change (P0)
+### 25.1 Worker wire protocol migration (P0) — ✅ Done
 
-**What changed:** `PowerPool` now frames every message in a versioned `PowerMessageCodec` envelope (`[version][codec][length][payload]`) instead of posting a bare `Uint8Array` of JSON. Workers must read `decodeMessage(e.data).value` instead of `u82o(e.data)`, and reply with `encodeMessage(...)` instead of `o2u8(...)` + `postMessage(u8, [u8.buffer])`.
+**What changed:** `PowerPool` now frames every message in a versioned `PowerMessageCodec` envelope (`[version][codec][length][payload]`) instead of posting a bare `Uint8Array` of JSON. Workers read `decodeInbound(e.data).value` and reply with plain `{ correlationId, response }` objects.
 
-**nimbiCMS impact:** All 4 worker entrypoints use the v1 binary protocol:
+**nimbiCMS impact:** All 4 worker entrypoints have been migrated to the v2 protocol:
 
-| File | Current pattern |
-|---|---|
-| `src/worker/anchorWorker.js:24,30-31,38-39` | `u82o(ev.data)` / `o2u8({ correlationId, response })` + transfer |
-| `src/worker/slugWorker.js:9,26-27,34-35` | same |
-| `src/worker/rendererRuntime.js:287,293-294,301-302,312-313` | same |
-| `src/worker/anchorRewriter.js` (main-thread runtime) | imports `PowerSemaphore` only; no worker protocol |
+| Worker | File | Migration |
+|---|---|---|
+| `anchorWorker` | `src/worker/anchorWorker.js` | `decodeInbound`/`announceCapabilities`; dropped `u82o`/`o2u8` |
+| `slugWorker` | `src/worker/slugWorker.js` | `decodeInbound`/`announceCapabilities`; dropped `u82o`/`o2u8` |
+| `rendererRuntime` | `src/worker/rendererRuntime.js` | `decodeInbound`/`announceCapabilities`; dropped `u82o`/`o2u8` |
+| `anchorRewriter` | `src/worker/anchorRewriter.js` | No worker protocol; imports `PowerSemaphore` only |
 
-When v2.0.0 is installed, `PowerPool` will send framed messages that `u82o` cannot decode, and workers' `o2u8` replies will not match the framed shape the pool expects. **Result: all worker communication fails silently or hangs.**
+All 3 `PowerPool` instances have been switched to `messageCodec: 'negotiated'`:
+- `src/markdown.js` (`_rendererPool`)
+- `src/htmlBuilder.js` (`_anchorPool`)
+- `src/slugManager.js` (`_slugPool`)
 
-**Escape hatch:** `messageCodec: 'legacy'` on `PowerPool` restores the old framing. This is a bridge, not a fix.
+Workers announce native structured-clone support at startup via `postMessage(announceCapabilities({ native: true }))`, allowing the pool to use native envelopes where available.
 
-**Fix:** Migrate all workers to `decodeMessage`/`encodeMessage` from `performance-helpers/powerMessageCodec`, or opt into `messageCodec: 'legacy'` on all three pools (`_anchorPool`, `_slugPool`, `_rendererPool`) as a temporary bridge while workers are migrated.
+`tests/setup.js` `TestWorker` has been updated to use `decodeInbound` for handling native envelopes, framed v2 messages, and legacy bare JSON. All 8 test files that imported `u82o`/`o2u8` from `performance-helpers/powerBuffer` have been updated.
 
-### 25.2 Critical: test stub incompatibility (P0)
+**Status:** ✅ Complete (2026-10-08). All 826 tests pass.
 
-**What changed:** The v2 pool expects framed replies from workers. `tests/setup.js:7,34-35,42` imports `u82o` and decodes binary payloads, then replies with plain `{ correlationId, response }` objects. Under v2, the pool will not recognize plain-object replies as valid responses to framed messages.
+### 25.2 Test stub migration (P0) — ✅ Done
 
-**Fix:** Update `TestWorker` in `tests/setup.js` to use `encodeMessage`/`decodeMessage` when available, falling back to `u82o`/`o2u8` for v1. Add a version check:
+**What changed:** The v2 pool expects framed replies from workers. `tests/setup.js` `TestWorker` has been updated to use `decodeInbound` for handling native envelopes, framed v2 messages, and legacy bare JSON. All 8 test files that imported `u82o`/`o2u8` from `performance-helpers/powerBuffer` have been updated to use plain object responses.
 
-```js
-import { decodeMessage, encodeMessage } from "performance-helpers/powerMessageCodec";
-// fallback to u82o/o2u8 if decodeMessage is unavailable
-```
+**Status:** ✅ Complete (2026-10-08).
 
-### 25.3 High: `PowerMemoizer` key format change (P1)
+### 25.3 `PowerMemoizer` key format change (P1) — ✅ No action required
 
 **What changed:** Default `keyResolver` changed from `(...args) => JSON.stringify(args)` to `simpleArgsKey`. For scalar arguments this is ~35% cheaper and equivalent. For non-scalar args (objects, arrays) it falls back to `JSON.stringify`.
 
@@ -1488,11 +1488,9 @@ import { decodeMessage, encodeMessage } from "performance-helpers/powerMessageCo
 | `src/slugManager.js:675` | `_slugifyMemo` | `string` |
 | `src/utils/helpers.js:17,24,31,38,52` | path/URL memoizers | `string` |
 
-**Risk:** Low for current call sites, but any future memoizer added with object args will see different cache keys. A caller reading `.cache` keys in tests or debug dumps will see the new format.
+**Risk:** Low for current call sites. Documented in `src/utils/helpers.js` and `src/slugManager.js`.
 
-**Fix:** No immediate action required for scalar-only memoizers. Document the key format change in the codebase. If any memoizer is added with non-scalar args, pass `keyResolver: (...args) => JSON.stringify(args)` explicitly.
-
-### 25.4 Medium: `PowerPool` constructor validation (P1)
+### 25.4 `PowerPool` constructor validation (P1) — ✅ No action required
 
 **What changed:** `minSize`, `maxSize`, `idleTimeout` now throw `TypeError` on non-numbers. Previously `minSize: 'lots'` produced a pool with `NaN` worker counts and never-terminating workers.
 
@@ -1504,37 +1502,37 @@ import { decodeMessage, encodeMessage } from "performance-helpers/powerMessageCo
 | `_slugPool` | `slugManager.js:231-234` | `{ size: poolSize, minSize: 2, autoScale: ... }` |
 | `_rendererPool` | `markdown.js:31-34` | `{ size: poolSize, minSize: 2, autoScale: ... }` |
 
-**Risk:** Low. All values are numeric literals or `poolSize` (a number). No action required unless `poolSize` could be non-numeric.
+**Status:** ✅ Verified. All values are numeric literals or `poolSize` (a number).
 
-### 25.5 Medium: `PowerPool.prepareBuffers` clone default (P2)
+### 25.5 `PowerPool.prepareBuffers` clone default (P2) — ✅ Automatic
 
 **What changed:** `prepareBuffers(items, { clone })` now defaults to `clone: false`. The old default (`clone: true`) handed out a fresh `u8.slice()` per message; the new default hands the cached buffer over to be copied by the runtime, which is ~2× faster.
 
 **nimbiCMS impact:** nimbiCMS does not call `prepareBuffers` directly. The pools use the default message path. No action required.
 
-### 25.6 Medium: `PowerTTLMap.size` is now O(1) (P2)
+### 25.6 `PowerTTLMap.size` is now O(1) (P2) — ✅ No action required
 
 **What changed:** `PowerTTLMap.size` no longer calls `_sweepExpirations()` implicitly. It is now a pure `Map.size` read.
 
 **nimbiCMS impact:** `src/utils/importCache.js:10` creates `__negativeCache = new PowerTTLMap(0)`. The code uses `has()`, `set()`, `delete()`, and `clear()` — not `size`. No implicit sweep was relied upon. No action required.
 
-### 25.7 Low: `PowerCache.hasEqualWithSeen()` removed (P3)
+### 25.7 `PowerCache.hasEqualWithSeen()` removed (P3) — ✅ No action required
 
 **What changed:** The `seen` option and `hasEqualWithSeen()` method are removed. They were a per-walk cycle guard that could produce false cache hits when reused across calls.
 
 **nimbiCMS impact:** Not used anywhere in the codebase. No action required.
 
-### 25.8 Low: rate limiters and `PowerCircuit` use monotonic clock (P3)
+### 25.8 Rate limiters and `PowerCircuit` use monotonic clock (P3) — ✅ No action required
 
 **What changed:** `PowerGCRA`, `PowerThrottle`, `PowerSlidingWindow`, and `PowerCircuit` now use `monoMs()` instead of `nowMs()`. Tests that fake `Date.now()` to control limiter behavior will break.
 
 **nimbiCMS impact:** nimbiCMS does not use rate limiters or `PowerCircuit` directly. `PowerRetry` and `PowerDeadline` now use `monoMs()` internally, but their public APIs are unchanged. No action required unless tests mock `Date.now()` to control retry/deadline behavior.
 
-### 25.9 Low: `PowerPool` `maxQueueLength` backpressure (P3)
+### 25.9 `PowerPool` `maxQueueLength` backpressure (P3) — ✅ Implemented
 
 **What changed:** `PowerPool` now accepts `maxQueueLength` to cap the task queue. When full, tasks are refused (`false` or `ERR_POOL_QUEUE_FULL`).
 
-**nimbiCMS impact:** Not currently used. Could be added to all three pools as a safety valve against unbounded queue growth under load. Low priority.
+**nimbiCMS impact:** ✅ Implemented. `maxQueueLength: 100` added to all three `PowerPool` instances in `markdown.js`, `htmlBuilder.js`, and `slugManager.js`. Low priority.
 
 ### 25.10 Low: `AbortSignal` on permit-gate family (P3)
 
@@ -1548,11 +1546,11 @@ import { decodeMessage, encodeMessage } from "performance-helpers/powerMessageCo
 
 **nimbiCMS impact:** `PowerCache`, `PowerPool`, `PowerMemoizer`, `PowerTTLMap`, `PowerLogger` all gain `dispose()`. Could be used in teardown paths (`teardownRendererWorkerPool`, `teardownSlugWorkerPool`, `destroy()`). Low priority.
 
-## 25. performance-helpers v2.0.0 — Enhancement Opportunities & Migration
+## 25. performance-helpers v2.0.0 — Migration Complete
 
-**Status:** v2.0.0 is staged but not yet published (current published: `1.0.3`). The actual dev repo is at `/data/projects/performance-helpers`. nimbiCMS currently depends on `performance-helpers: ^1.0.3` (`package.json:52`).
+**Status:** ✅ Migrated (2026-10-08). nimbiCMS now uses published `performance-helpers` v2.0.0. The vendored v1.0.3 subset has been removed from `src/lib/performance-helpers/` and all imports now use bare subpath exports.
 
-### 25.0 Critical blocker: worker wire protocol breaking change
+### 25.0 Worker wire protocol migration (P0) — ✅ Done
 
 **The single biggest finding:** v2.0.0 changes `PowerPool`'s worker wire protocol from bare `Uint8Array` (`u82o`/`o2u8`) to versioned `PowerMessageCodec` frames. All 4 nimbiCMS worker entrypoints use the v1 protocol:
 

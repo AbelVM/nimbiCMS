@@ -6,7 +6,7 @@
 
 # Variable: resolutionCache
 
-> `const` **resolutionCache**: [`PowerCache`](../../lib/performance-helpers/powerCache/classes/PowerCache.md)
+> `const` **resolutionCache**: `PowerCache`
 
 Runtime cache for recent page-resolution results.
 Stores the resolved value directly and relies on PowerCache for TTL/LRU.

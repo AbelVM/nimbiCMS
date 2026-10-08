@@ -14,7 +14,7 @@ import { debugWarn } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import { getWorkerPoolSize } from "./utils/helpers.js";
 import { slugify } from "./slugManager.js";
-import DOMPurify from "dompurify";
+import { getDOMPurify } from "./utils/domPurify.js";
 
 const poolSize = getWorkerPoolSize();
 
@@ -41,9 +41,9 @@ function _createRendererPool() {
     minSize: 2,
     autoScale: rendererAutoScaleOptions,
     // Bridge option for performance-helpers v2.0.0 compatibility.
-    // No-op on v1; required on v2 to use the legacy bare-JSON wire protocol
-    // until workers are migrated to decodeMessage/encodeMessage.
-    messageCodec: 'legacy',
+    // Use negotiated codec so workers can announce native structured-clone
+    // support and the pool can use native envelopes when available.
+    messageCodec: 'negotiated',
     // Backpressure: cap the task queue to prevent unbounded growth under load.
     maxQueueLength: 100,
   };
@@ -489,7 +489,7 @@ export async function parseMarkdownToHtml(md) {
     } catch (e) {
       debugWarn("[markdown] apply plugins failed", e);
     }
-    const html = DOMPurify.sanitize(marked.parse(content));
+    const html = getDOMPurify()(marked.parse(content));
     try {
       const parser = getSharedParser();
       if (parser) {
@@ -654,7 +654,7 @@ export async function parseMarkdownToHtml(md) {
         );
       } catch (e) {}
       marked.setOptions({ gfm: true });
-      let html = DOMPurify.sanitize(marked.parse(content));
+      let html = getDOMPurify()(marked.parse(content));
       const heads = [];
       const used = new Set();
       html = html.replace(
@@ -735,7 +735,7 @@ export async function parseMarkdownToHtml(md) {
             }
           },
         });
-let html = DOMPurify.sanitize(marked.parse(content));
+let html = getDOMPurify()(marked.parse(content));
         try {
           html = html.replace(
             /<pre><code>([\s\S]*?)<\/code><\/pre>/g,
@@ -839,7 +839,7 @@ let html = DOMPurify.sanitize(marked.parse(content));
           }
         },
       });
-const html = DOMPurify.sanitize(marked.parse(content));
+const html = getDOMPurify()(marked.parse(content));
       return { html, meta: data || {} };
     } catch (e) {
       throw new Error("renderer worker required but unavailable");
