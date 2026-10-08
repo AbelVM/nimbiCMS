@@ -53,4 +53,21 @@ describe('fetchMarkdown caching and dedupe', () => {
     await expect(s.fetchMarkdown('b.md', '/', { force: true })).rejects.toThrow(/failed to fetch md/)
     expect(calls).toBe(2)
   })
+
+  it('invalidates the same URL when the runtime generation changes', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1
+      return { ok: true, text: async () => `generation:${calls}` }
+    }))
+    window.__nimbiRuntimeManifest = { generation: 1, language: 'en' }
+    const s = await import('../src/slugManager.js')
+    s.clearFetchCache()
+
+    await expect(s.fetchMarkdown('c.md', '/', { force: true })).resolves.toMatchObject({ raw: 'generation:1' })
+    window.__nimbiRuntimeManifest = { generation: 2, language: 'en' }
+    await expect(s.fetchMarkdown('c.md', '/', { force: true })).resolves.toMatchObject({ raw: 'generation:2' })
+    expect(calls).toBe(2)
+    expect(s.getFetchCacheDiagnostics()).toMatchObject({ fetchEntries: 2, maxEntries: 2000 })
+  })
 })

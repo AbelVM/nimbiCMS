@@ -45,6 +45,7 @@ import { notFoundPage } from "./slugManager.js";
  * @property {string} initialDocumentTitle - Document title at initialization
  * @property {Function} runHooks - Hook runner function provided by `hookManager`
  * @property {boolean} [allowEmbeddedScripts=false] - Opt-in to execute embedded scripts in rendered content. Enable only for trusted markdown sources.
+ * @property {string[]} [embeddedScriptOrigins=[]] - Additional origins allowed for external embedded scripts.
  *
  * @typedef {Object} UIReturn
  * @property {() => Promise<void>} renderByQuery - Render current page based on URL query.
@@ -72,6 +73,7 @@ import { notFoundPage } from "./slugManager.js";
     initialDocumentTitle,
     runHooks,
     allowEmbeddedScripts = false,
+    embeddedScriptOrigins = [],
     signal,
   } = opts || {};
   if (!contentWrap || !(contentWrap instanceof HTMLElement)) {
@@ -92,6 +94,7 @@ import { notFoundPage } from "./slugManager.js";
   // render should run once the active render completes.
   let _isRendering = false;
   let _queuedRender = false;
+  let _queuedRenderWaiters = [];
 
   // Helper to clear an element's children with modern API when available.
   function _clearElement(el) {
@@ -143,7 +146,23 @@ import { notFoundPage } from "./slugManager.js";
    * @param {string|null|undefined} hashAnchor - Optional anchor to scroll to after render.
    * @returns {Promise<void>}
    */
-  async function renderPage(raw, hashAnchor) {
+  async function renderPage(raw, hashAnchor, expectedHref) {
+    const expectedRoute = expectedHref
+      ? parseHrefToRoute(expectedHref)
+      : null;
+    const routeIsCurrent = () =>
+      !expectedRoute ||
+      (() => {
+        try {
+          const currentRoute = parseHrefToRoute(location.href);
+          return (
+            currentRoute?.page === expectedRoute?.page &&
+            currentRoute?.anchor === expectedRoute?.anchor
+          );
+        } catch (_) {
+          return location.href === expectedHref;
+        }
+      })();
     let data, pagePath, anchor;
     try {
       ({ data, pagePath, anchor } = await fetchPageData(raw, contentBase));
@@ -174,9 +193,11 @@ import { notFoundPage } from "./slugManager.js";
       try {
         if (!notFoundPage && navWrap) _clearElement(navWrap);
       } catch (err) {}
+      if (!routeIsCurrent()) return;
       renderNotFound(contentWrap, t, e);
       return;
     }
+    if (!routeIsCurrent()) return;
     if (!anchor && hashAnchor) anchor = hashAnchor;
 
     try {
@@ -184,14 +205,6 @@ import { notFoundPage } from "./slugManager.js";
     } catch (_) {
       debugWarn("[nimbi-cms] scrollToAnchorOrTop failed", _);
     }
-    try {
-      _clearElement(contentWrap);
-    } catch (e) {
-      try {
-        contentWrap.innerHTML = "";
-      } catch (_) {}
-    }
-
     const preparedKey = `${String(pagePath ?? "")}|||${_pageContentSignature(data)}`;
     const preparedCached = _cacheGetPrepared(preparedKey);
 
@@ -215,6 +228,7 @@ import { notFoundPage } from "./slugManager.js";
         anchor,
         contentBase,
       ));
+      if (!routeIsCurrent()) return;
       _cacheSetPrepared(preparedKey, {
         articleTemplate: article.cloneNode(true),
         tocTemplate: toc ? toc.cloneNode(true) : null,
@@ -224,31 +238,7 @@ import { notFoundPage } from "./slugManager.js";
       });
     }
 
-    applyPageMeta(
-      t,
-      initialDocumentTitle,
-      parsed,
-      toc,
-      article,
-      pagePath,
-      anchor,
-      topH1,
-      h1Text,
-      slugKey,
-      data,
-    );
-
-    try {
-      _clearElement(navWrap);
-    } catch (e) {
-      try {
-        navWrap.innerHTML = "";
-      } catch (_) {}
-    }
-    if (toc) {
-      navWrap.appendChild(toc);
-      attachTocClickHandler(toc);
-    }
+    if (!routeIsCurrent()) return;
 
     try {
       await runHooks("transformHtml", {
@@ -264,6 +254,27 @@ import { notFoundPage } from "./slugManager.js";
       });
     } catch (e) {
       debugWarn("[nimbi-cms] transformHtml hooks failed", e);
+    }
+    if (!routeIsCurrent()) return;
+
+    const activeElement = document.activeElement;
+    const shouldFocusMain =
+      activeElement === document.body ||
+      contentWrap.contains(activeElement) ||
+      navWrap.contains(activeElement);
+
+    const nextMain = document.createElement("main");
+    nextMain.className = "nimbi-main";
+    nextMain.appendChild(article);
+    if (toc) attachTocClickHandler(toc);
+    try {
+      contentWrap.replaceChildren(nextMain);
+      navWrap.replaceChildren(...(toc ? [toc] : []));
+    } catch (e) {
+      _clearElement(contentWrap);
+      _clearElement(navWrap);
+      contentWrap.appendChild(nextMain);
+      if (toc) navWrap.appendChild(toc);
     }
 
     // Ensure skip-to-content link exists for keyboard accessibility
@@ -287,18 +298,27 @@ import { notFoundPage } from "./slugManager.js";
       }
     } catch (_) {}
 
-    // Wrap article in <main> for semantic HTML landmarks
+    // Focus the newly committed semantic landmark after replacement.
     try {
-      let mainEl = contentWrap.querySelector("main.nimbi-main");
-      if (!mainEl) {
-        mainEl = document.createElement("main");
-        mainEl.className = "nimbi-main";
-        contentWrap.appendChild(mainEl);
+      if (shouldFocusMain && routeIsCurrent()) {
+        nextMain.tabIndex = -1;
+        nextMain.focus({ preventScroll: true });
       }
-      mainEl.appendChild(article);
-    } catch (_) {
-      contentWrap.appendChild(article);
-    }
+    } catch (_) {}
+
+    applyPageMeta(
+      t,
+      initialDocumentTitle,
+      parsed,
+      toc,
+      article,
+      pagePath,
+      anchor,
+      topH1,
+      h1Text,
+      slugKey,
+      data,
+    );
 
     try {
       observeCodeBlocks(article);
@@ -307,7 +327,7 @@ import { notFoundPage } from "./slugManager.js";
     }
 
     try {
-      executeEmbeddedScripts(article, allowEmbeddedScripts);
+      executeEmbeddedScripts(article, allowEmbeddedScripts, embeddedScriptOrigins);
     } catch (e) {
       debugWarn("[nimbi-cms] executeEmbeddedScripts failed", e);
     }
@@ -368,11 +388,12 @@ import { notFoundPage } from "./slugManager.js";
         ? performance.now()
         : null;
     // Prevent concurrent renders: if a render is already in progress, mark
-    // that another render is desired and return. When the active render
-    // completes it will re-run `renderByQuery` to pick up the latest URL.
+    // that another render is desired and wait for it to finish.
     if (_isRendering) {
       _queuedRender = true;
-      return;
+      return new Promise((resolve) => {
+        _queuedRenderWaiters.push(resolve);
+      });
     }
     _isRendering = true;
     try {
@@ -429,13 +450,13 @@ import { notFoundPage } from "./slugManager.js";
       if (typeof document.startViewTransition === "function") {
         try {
           await document.startViewTransition(async () => {
-            await renderPage(raw, hashAnchor);
+            await renderPage(raw, hashAnchor, location.href);
           }).finished;
         } catch {
           // View transition was skipped or failed; DOM state is still valid.
         }
       } else {
-        await renderPage(raw, hashAnchor);
+        await renderPage(raw, hashAnchor, location.href);
       }
     } catch (e) {
       debugWarn("[nimbi-cms] renderByQuery failed", e);
@@ -451,6 +472,11 @@ import { notFoundPage } from "./slugManager.js";
           const duration = renderEnd - renderStart;
           if (typeof window !== "undefined" && window.__nimbiRenderTimings) {
             window.__nimbiRenderTimings.push(duration);
+            if (window.__nimbiRenderTimings.length > 50)
+              window.__nimbiRenderTimings.splice(
+                0,
+                window.__nimbiRenderTimings.length - 50,
+              );
           }
         } catch (_) {}
       }
@@ -463,6 +489,9 @@ import { notFoundPage } from "./slugManager.js";
           /* ignore re-run errors */
         }
       }
+      const waiters = _queuedRenderWaiters;
+      _queuedRenderWaiters = [];
+      for (const resolve of waiters) resolve();
     }
   }
 
@@ -476,6 +505,40 @@ import { notFoundPage } from "./slugManager.js";
 
   addEventListener(window, "popstate", renderByQuery);
   addEventListener(window, "hashchange", renderByQuery);
+
+  const updateConnectionState = (online) => {
+    try {
+      document.documentElement.dataset.nimbiConnection = online
+        ? "online"
+        : "offline";
+      document.dispatchEvent(
+        new CustomEvent("nimbi.connectionchange", {
+          detail: { online },
+        }),
+      );
+    } catch (e) {
+      debugWarn("[nimbi-cms] connection state update failed", e);
+    }
+  };
+  updateConnectionState(typeof navigator === "undefined" || navigator.onLine !== false);
+  addEventListener(window, "online", () => updateConnectionState(true));
+  addEventListener(window, "offline", () => updateConnectionState(false));
+
+  const updateVisibilityState = () => {
+    try {
+      const state = document.visibilityState === "hidden" ? "hidden" : "visible";
+      document.documentElement.dataset.nimbiVisibility = state;
+      document.dispatchEvent(
+        new CustomEvent("nimbi.visibilitychange", {
+          detail: { state, hidden: state === "hidden" },
+        }),
+      );
+    } catch (e) {
+      debugWarn("[nimbi-cms] visibility state update failed", e);
+    }
+  };
+  updateVisibilityState();
+  addEventListener(document, "visibilitychange", updateVisibilityState);
 
   /**
    * Compute the sessionStorage key used to persist scroll position

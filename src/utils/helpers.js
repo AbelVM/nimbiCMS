@@ -118,6 +118,20 @@ export function isExternalLink(href) {
  */
 export const normalizePath = (p) => _normalizePathMemo.run(p);
 
+export function getBaseName(path) {
+  return String(path ?? "").replace(/^.*\//, "");
+}
+
+export function getLastPathSegments(path, count = 2) {
+  try {
+    const parts = String(path ?? "").split("/").filter(Boolean);
+    if (!parts.length) return "";
+    return parts.slice(-Math.max(1, Math.min(count, parts.length))).join("/");
+  } catch (_) {
+    return String(path ?? "");
+  }
+}
+
 /**
  * Remove one or more trailing slashes from a URL or path.  This is handy
  * when composing base paths to avoid the dreaded `//` sequence.

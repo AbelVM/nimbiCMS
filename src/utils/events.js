@@ -5,7 +5,7 @@
 export function debounce(fn, wait = 150, options = {}) {
   let timer = null;
   const leading = !!options.leading;
-  return function debounced(...args) {
+  function debounced(...args) {
     const ctx = this;
     if (timer) clearTimeout(timer);
     if (leading && !timer) {
@@ -21,14 +21,19 @@ export function debounce(fn, wait = 150, options = {}) {
         } catch (e) {}
       }
     }, wait);
+  }
+  debounced.cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
   };
+  return debounced;
 }
 
 export function rafThrottle(fn) {
   let scheduled = false;
   let pendingArgs = null;
   let pendingCtx = null;
-  return function throttled(...args) {
+  function throttled(...args) {
     pendingArgs = args;
     pendingCtx = this;
     if (scheduled) return;
@@ -60,7 +65,13 @@ export function rafThrottle(fn) {
     } else {
       setTimeout(tick, 16);
     }
+  }
+  throttled.cancel = () => {
+    scheduled = false;
+    pendingArgs = null;
+    pendingCtx = null;
   };
+  return throttled;
 }
 
 function createRafBatcher() {
@@ -68,7 +79,8 @@ function createRafBatcher() {
   let scheduled = false;
   return function schedule(fn) {
     if (typeof fn !== "function") return;
-    queue.push(fn);
+    const entry = { fn, cancelled: false };
+    queue.push(entry);
     if (scheduled) return;
     scheduled = true;
     if (typeof requestAnimationFrame === "function") {
@@ -76,9 +88,9 @@ function createRafBatcher() {
         scheduled = false;
         const q = queue.slice(0);
         queue.length = 0;
-        for (const f of q) {
+        for (const entry of q) {
           try {
-            f();
+            if (!entry.cancelled) entry.fn();
           } catch (e) {}
         }
       });
@@ -87,13 +99,14 @@ function createRafBatcher() {
         scheduled = false;
         const q = queue.slice(0);
         queue.length = 0;
-        for (const f of q) {
+        for (const entry of q) {
           try {
-            f();
+            if (!entry.cancelled) entry.fn();
           } catch (e) {}
         }
       }, 0);
     }
+    return { cancel: () => { entry.cancelled = true; } };
   };
 }
 

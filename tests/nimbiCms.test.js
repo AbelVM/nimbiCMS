@@ -44,14 +44,13 @@ describe('hook subsystem and init validation', () => {
 
 describe('initCMS option handling', () => {
     it('accepts homePage as .md or .html and falls back to _home.md', async () => {
-      makeAppContainer()
       global.fetch = vi.fn(async (url) => ({ ok: true, text: () => Promise.resolve('# home') }))
       // .md
-      await expect(initCMS({ el: '#app', homePage: 'welcome.md' })).resolves.toBeUndefined()
+      await expect(initCMS({ el: makeAppContainer(), homePage: 'welcome.md' })).resolves.toBeUndefined()
       // .html
-      await expect(initCMS({ el: '#app', homePage: 'index.html' })).resolves.toBeUndefined()
+      await expect(initCMS({ el: makeAppContainer(), homePage: 'index.html' })).resolves.toBeUndefined()
       // fallback
-      await expect(initCMS({ el: '#app' })).resolves.toBeUndefined()
+      await expect(initCMS({ el: makeAppContainer() })).resolves.toBeUndefined()
     })
 
     it('throws if homePage is invalid', async () => {
@@ -99,15 +98,14 @@ describe('initCMS option handling', () => {
   })
 
   it('respect cacheTtlMinutes option and defaults', async () => {
-    makeAppContainer()
     slugMgr.clearFetchCache()
     global.fetch = vi.fn(async (url) => ({ ok: true, text: () => Promise.resolve('# home') }))
     // default should be 5 minutes
-    await initCMS({ el: '#app', searchIndex: false })
+    await initCMS({ el: makeAppContainer(), searchIndex: false })
     expect(router.RESOLUTION_CACHE_TTL).toBe(5 * 60 * 1000)
 
     // override explicitly
-    await initCMS({ el: '#app', searchIndex: false, cacheTtlMinutes: 1 })
+    await initCMS({ el: makeAppContainer(), searchIndex: false, cacheTtlMinutes: 1 })
     expect(router.RESOLUTION_CACHE_TTL).toBe(1 * 60 * 1000)
   })
 

@@ -26,6 +26,7 @@ import {
 } from "./codeblocksManager.js";
 import {
   buildPageUrl,
+  getLastPathSegments,
   isExternalLink,
   normalizePath,
   safe,
@@ -64,6 +65,11 @@ function fullCosmetic(page, anchor = null) {
 import { registerThemedElement } from "./bulmaManager.js";
 import AnchorWorker from "./worker/anchorWorker.js?worker&inline";
 import { PowerPool } from "performance-helpers/powerPool";
+import {
+  recordWorkerFallback,
+  registerWorkerPool,
+  unregisterWorkerPool,
+} from "./utils/workerPoolDiagnostics.js";
 
 async function runWithConcurrency(items, worker, concurrency = 4, signal) {
   if (!Array.isArray(items) || items.length === 0) return [];
@@ -139,13 +145,41 @@ function resolveActualPagePath(pagePath) {
   return pagePath;
 }
 
-function getLastPathSegments(path, count = 2) {
+let resolvedIndexEntriesCache = null;
+let resolvedIndexMapCache = null;
+let slugPathIndexVersion = -1;
+let slugPathIndexCache = null;
+
+function getSlugPathIndex() {
   try {
-    const parts = String(path ?? "").split("/").filter(Boolean);
-    if (!parts.length) return "";
-    return parts.slice(-Math.max(1, Math.min(count, parts.length))).join("/");
-  } catch (e) {
-    return String(path ?? "");
+    const version = slugToMd?._nimbiVersion ?? slugToMd?.size ?? 0;
+    if (slugPathIndexCache && slugPathIndexVersion === version)
+      return slugPathIndexCache;
+    const index = new Map();
+    for (const [slug, mapped] of slugToMd || []) {
+      const paths = [];
+      if (typeof mapped === "string") paths.push(mapped);
+      else if (mapped && typeof mapped === "object") {
+        if (typeof mapped.default === "string") paths.push(mapped.default);
+        if (mapped.langs && typeof mapped.langs === "object") {
+          for (const path of Object.values(mapped.langs)) {
+            if (typeof path === "string") paths.push(path);
+          }
+        }
+      }
+      for (const path of paths) {
+        const baseName = path.replace(/^.*\//, "");
+        const suffix = getLastPathSegments(path, 2);
+        for (const key of [path, baseName, suffix]) {
+          if (key && !index.has(key)) index.set(key, slug);
+        }
+      }
+    }
+    slugPathIndexVersion = version;
+    slugPathIndexCache = index;
+    return index;
+  } catch (_) {
+    return null;
   }
 }
 
@@ -159,6 +193,7 @@ function getResolvedIndexPathToSlug() {
       entries = window.__nimbiSitemapJson.entries;
     }
     if (!Array.isArray(entries)) return null;
+    if (entries === resolvedIndexEntriesCache) return resolvedIndexMapCache;
 
     const map = new Map();
     for (const item of entries) {
@@ -180,10 +215,14 @@ function getResolvedIndexPathToSlug() {
         if (!map.has(path)) map.set(path, slug);
         const baseName = String(path).replace(/^.*\//, "");
         if (baseName && !map.has(baseName)) map.set(baseName, slug);
+        const suffix = getLastPathSegments(path, 2);
+        if (suffix && !map.has(suffix)) map.set(suffix, slug);
       } catch (_) {
         continue;
       }
     }
+    resolvedIndexEntriesCache = entries;
+    resolvedIndexMapCache = map;
     return map;
   } catch (_) {
     return null;
@@ -203,6 +242,8 @@ function getSlugForRelativePath(rel) {
   try {
     if (resolvedIndexMap?.has?.(rel)) return resolvedIndexMap.get(rel);
     if (baseName && resolvedIndexMap?.has?.(baseName)) return resolvedIndexMap.get(baseName);
+    const suffix = getLastPathSegments(rel, 2);
+    if (suffix && resolvedIndexMap?.has?.(suffix)) return resolvedIndexMap.get(suffix);
   } catch (err) {}
   const relSuffix = getLastPathSegments(rel, 2);
   try {
@@ -213,12 +254,6 @@ function getSlugForRelativePath(rel) {
       if (!mappedPath) continue;
       if (mappedPath === rel || mappedPath === baseName) return slug;
       if (mappedPath.endsWith(`/${relSuffix}`)) return slug;
-    }
-    if (resolvedIndexMap) {
-      for (const [path, slug] of resolvedIndexMap.entries()) {
-        if (path === rel || path === baseName) return slug;
-        if (String(path).endsWith(`/${relSuffix}`)) return slug;
-      }
     }
   } catch (err) {}
   return null;
@@ -2040,10 +2075,15 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
  * This should be called after the `article` is appended to the document
  * so that scripts which query the DOM find their target elements.
  * @param {HTMLElement} article - Article element containing script tags.
- * @param {boolean} [allowEmbeddedScripts=false] - When true, execute inline scripts via `new Function` and inject external scripts. When false, strip all script tags.
+ * @param {boolean} [allowEmbeddedScripts=false] - When true, execute inline scripts via `new Function` and inject allowlisted external scripts. When false, strip all script tags.
+ * @param {string[]} [embeddedScriptOrigins=[]] - Additional origins allowed for external scripts. Same-origin scripts are always allowed.
  * @returns {void}
  */
-export function executeEmbeddedScripts(article, allowEmbeddedScripts = false) {
+export function executeEmbeddedScripts(
+  article,
+  allowEmbeddedScripts = false,
+  embeddedScriptOrigins = [],
+) {
   if (!article || !article.querySelectorAll) return;
   try {
     const scripts = Array.from(article.querySelectorAll("script"));
@@ -2057,6 +2097,24 @@ export function executeEmbeddedScripts(article, allowEmbeddedScripts = false) {
     }
     for (const s of scripts) {
       try {
+        if (s.src) {
+          const sourceUrl = new URL(s.src, document.baseURI);
+          const allowedOrigins = new Set(
+            Array.isArray(embeddedScriptOrigins)
+              ? embeddedScriptOrigins.map((origin) => String(origin).replace(/\/$/, ""))
+              : [],
+          );
+          if (
+            sourceUrl.origin !== window.location.origin &&
+            !allowedOrigins.has(sourceUrl.origin)
+          ) {
+            s.parentNode?.removeChild(s);
+            debugWarn("[htmlBuilder] blocked external embedded script", {
+              origin: sourceUrl.origin,
+            });
+            continue;
+          }
+        }
         const newScript = document.createElement("script");
         const allowedAttrs = new Set([
           "src",
@@ -2298,7 +2356,7 @@ const anchorAutoScaleOptions = {
   stepUp: 1,
   stepDown: 1,
 };
-const _anchorPool = (() => {
+function _createAnchorPool() {
   // PowerPool options audit (performance-helpers v2.0.0 validation):
   // v2.0.0 validates constructor options and throws TypeError on
   // non-numeric `minSize`/`maxSize`/`idleTimeout`. Every size option
@@ -2311,7 +2369,7 @@ const _anchorPool = (() => {
     }
   } catch (_e) {}
   try {
-    return new PowerPool(AnchorWorker, poolOpts);
+    return registerWorkerPool("anchor", new PowerPool(AnchorWorker, poolOpts));
   } catch (e) {
     return {
       workers: [],
@@ -2320,7 +2378,14 @@ const _anchorPool = (() => {
       },
     };
   }
-})();
+}
+
+let _anchorPool = null;
+
+function _getAnchorPool() {
+  if (!_anchorPool) _anchorPool = _createAnchorPool();
+  return _anchorPool;
+}
 
 function _resolveSlugForWorkerPath(candidate) {
   if (!candidate) return null;
@@ -2337,30 +2402,13 @@ function _resolveSlugForWorkerPath(candidate) {
     const baseName = String(candidate).replace(/^.*\//, "");
     if (baseName && resolvedIndexMap?.has?.(baseName)) return resolvedIndexMap.get(baseName);
   } catch (_) {}
-  const candidateSuffix = getLastPathSegments(candidate, 2);
   try {
-    for (const [slug, mapped] of slugToMd || []) {
-      if (mapped === candidate) return slug;
-      const baseName = String(candidate).replace(/^.*\//, "");
-      if (mapped === baseName) return slug;
-      if (typeof mapped === "string") {
-        if (mapped.endsWith(`/${candidateSuffix}`)) return slug;
-      } else if (mapped && typeof mapped === "object") {
-        if (mapped.default === candidate || mapped.default === baseName)
-          return slug;
-        if (mapped.default && mapped.default.endsWith(`/${candidateSuffix}`))
-          return slug;
-        const langs =
-          mapped.langs && typeof mapped.langs === "object"
-            ? Object.values(mapped.langs)
-            : [];
-        if (langs.includes(candidate) || langs.includes(baseName)) return slug;
-        for (const langPath of langs) {
-          if (typeof langPath === "string" && langPath.endsWith(`/${candidateSuffix}`))
-            return slug;
-        }
-      }
-    }
+    const baseName = String(candidate).replace(/^.*\//, "");
+    const slugPathIndex = getSlugPathIndex();
+    if (slugPathIndex?.has(candidate)) return slugPathIndex.get(candidate);
+    if (slugPathIndex?.has(baseName)) return slugPathIndex.get(baseName);
+    const candidateSuffix = getLastPathSegments(candidate, 2);
+    if (slugPathIndex?.has(candidateSuffix)) return slugPathIndex.get(candidateSuffix);
     if (resolvedIndexMap) {
       for (const [path, slug] of resolvedIndexMap.entries()) {
         const baseName = String(candidate).replace(/^.*\//, "");
@@ -2457,7 +2505,7 @@ function _buildAnchorWorkerSnapshot(article, contentBase, pagePath) {
  * @returns {Worker|null}
  */
 export function initAnchorWorker() {
-  return _anchorPool.workers?.[0]?.worker?._underlying ?? null;
+  return _getAnchorPool().workers?.[0]?.worker?._underlying ?? null;
 }
 
 /**
@@ -2466,7 +2514,9 @@ export function initAnchorWorker() {
  */
 export function teardownAnchorWorkerPool() {
   const pool = _anchorPool;
+  _anchorPool = null;
   if (!pool) return Promise.resolve();
+  unregisterWorkerPool("anchor", pool);
   try {
     const asyncDispose = pool[Symbol.asyncDispose];
     if (typeof asyncDispose === "function")
@@ -2485,7 +2535,7 @@ export function teardownAnchorWorkerPool() {
 }
 
 function _sendToAnchorWorker(msg) {
-  return _anchorPool
+  return _getAnchorPool()
     .postMessage(msg, undefined, { awaitResponse: true, timeout: 2000 })
     .then((result) => {
       if (result && typeof result === "object" && result.error)
@@ -2574,10 +2624,13 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   }
 
   if (shouldRetryWithMainThread) {
+    const fallbackStartedAt = Date.now();
     try {
       await rewriteAnchors(article, contentBase, pagePath);
     } catch (err) {
       debugWarn("[htmlBuilder] main-thread fallback after worker rewrite failed", err);
+    } finally {
+      recordWorkerFallback("anchor-main-thread", Date.now() - fallbackStartedAt);
     }
   }
 }

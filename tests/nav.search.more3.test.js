@@ -78,14 +78,15 @@ describe('nav search branches', () => {
     expect(document.querySelector('.nimbi-search-no-results')).toBeTruthy()
   })
 
-  it('keeps the fuller index when the lazy worker returns a partial index', async () => {
+  it('uses the worker index without rebuilding it on the main thread', async () => {
     const navbarWrap = document.createElement('header')
     const container = document.createElement('main')
     document.body.appendChild(navbarWrap)
     document.body.appendChild(container)
 
     globalThis.buildSearchIndexWorker = vi.fn(async () => ([
-      { slug: 'partial', path: 'partial.md', title: 'Partial' }
+      { slug: 'function-addhook', path: 'docs/hookManager/functions/addHook.md', title: 'addHook' },
+      { slug: 'hook-manager', path: 'docs/hookManager/README.md', title: 'Hook Manager' }
     ]))
     globalThis.buildSearchIndex = vi.fn(async () => ([
       { slug: 'function-addhook', path: 'docs/hookManager/functions/addHook.md', title: 'addHook' },
@@ -110,8 +111,43 @@ describe('nav search branches', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 250))
 
-    expect(globalThis.buildSearchIndex).toHaveBeenCalled()
+    expect(globalThis.buildSearchIndex).not.toHaveBeenCalled()
     expect(document.querySelectorAll('.nimbi-search-result').length).toBeGreaterThanOrEqual(2)
     expect(document.body.textContent).toContain('addHook')
+  })
+
+  it('ranks exact and title-prefix matches before excerpt matches', async () => {
+    const navbarWrap = document.createElement('header')
+    const container = document.createElement('main')
+    document.body.appendChild(navbarWrap)
+    document.body.appendChild(container)
+
+    globalThis.buildSearchIndexWorker = vi.fn(async () => ([
+      { slug: 'excerpt', title: 'Reference', excerpt: 'Hook details' },
+      { slug: 'prefix', title: 'Hook guide', excerpt: '' },
+      { slug: 'exact', title: 'Hook', excerpt: '' }
+    ]))
+
+    const { navbar } = await buildNav(
+      navbarWrap,
+      container,
+      '<a href="?page=home">Home</a>',
+      'http://example.com/content/',
+      'home',
+      (k) => k,
+      () => {},
+      true,
+      'lazy',
+      3
+    )
+
+    const input = navbar.querySelector('#nimbi-search')
+    input.value = 'hook'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise((r) => setTimeout(r, 250))
+
+    const titles = [...document.querySelectorAll('.nimbi-search-result div')]
+      .map((element) => element.textContent)
+    expect(titles.slice(0, 3)).toEqual(['Hook', 'Hook guide', 'Reference'])
   })
 })

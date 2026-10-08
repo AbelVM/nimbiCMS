@@ -36,7 +36,7 @@ import {
 } from "./slugSearchRuntime.js";
 import { handleSitemapRequest } from "./runtimeSitemap.js";
 import { debugLog, debugWarn } from "./utils/debug.js";
-import { debounce, scheduleDOMWrite } from "./utils/events.js";
+import { debounce } from "./utils/events.js";
 
 function safeGet(mod, name) {
   try {
@@ -238,6 +238,7 @@ export async function buildNav(
   let resultsContainer = null;
   let searchOutsideHandler = null;
   let indexedCountLog = false;
+  let searchGeneration = 0;
   // one-time guard so we only trigger sitemap build once when spinner removal fires
   let sitemapTriggered = false;
   let resolvedIndexForSitemap = null;
@@ -510,20 +511,7 @@ export async function buildNav(
                   _setSearchIndex(r);
                 } catch (e) {}
               } catch (e) {}
-              if (typeof buildFn !== "function") return r;
-              try {
-                const fallback = await buildFn(
-                  contentBase,
-                  indexDepth,
-                  noIndexing,
-                  seeds.length ? seeds : undefined,
-                );
-                return Array.isArray(fallback) && fallback.length > r.length
-                  ? fallback
-                  : r;
-              } catch (_) {
-                return r;
-              }
+              return r;
             }
           } catch (e) {
             debugWarn("[nimbi-cms] worker builder threw", e);
@@ -549,6 +537,8 @@ export async function buildNav(
           } catch (e) {}
           try {
             searchControl && searchControl.classList.remove("is-loading");
+            searchControl && searchControl.setAttribute("aria-busy", "false");
+            resultsContainer && resultsContainer.setAttribute("aria-busy", "false");
           } catch (e) {}
         }
       }
@@ -686,12 +676,10 @@ export async function buildNav(
                 /* ignore per-item failures */
               }
             });
-            scheduleDOMWrite(() => {
-              try {
-                resultsEl.classList.remove("is-hidden");
-                resultsEl.appendChild(panel);
-              } catch (e) {}
-            });
+            try {
+              resultsEl.classList.remove("is-hidden");
+              resultsEl.appendChild(panel);
+            } catch (e) {}
           } catch (e) {
             /* ignore panel render failures */
           }
@@ -1129,12 +1117,13 @@ export async function buildNav(
     } catch (_) {}
   }
 
-  const burger = document.createElement("a");
+  const burger = document.createElement("button");
   burger.className = "navbar-burger";
-  burger.setAttribute("role", "button");
+  burger.type = "button";
   burger.setAttribute("aria-label", "menu");
   burger.setAttribute("aria-expanded", "false");
   const targetId = "nimbi-navbar-menu";
+  burger.setAttribute("aria-controls", targetId);
   burger.dataset.target = targetId;
   burger.innerHTML =
     '<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>';
@@ -1173,6 +1162,11 @@ export async function buildNav(
       } catch (err) {
         debugWarn("[nimbi-cms] navbar burger toggle failed", err);
       }
+    });
+    burger.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      closeMobileMenu();
+      burger.focus();
     });
   } catch (err) {
     debugWarn("[nimbi-cms] burger event binding failed", err);
@@ -1217,6 +1211,9 @@ export async function buildNav(
         searchInput.setAttribute("aria-autocomplete", "list");
       } catch (e) {}
       try {
+        searchInput.setAttribute("aria-expanded", "false");
+      } catch (e) {}
+      try {
         searchInput.setAttribute("role", "combobox");
       } catch (e) {}
     } catch (e) {}
@@ -1226,7 +1223,10 @@ export async function buildNav(
 
     searchControl = document.createElement("div");
     searchControl.className = "control";
-    if (searchIndexMode === "eager") searchControl.classList.add("is-loading");
+    if (searchIndexMode === "eager") {
+      searchControl.classList.add("is-loading");
+      searchControl.setAttribute("aria-busy", "true");
+    }
     searchControl.setAttribute("aria-live", "polite");
     searchControl.appendChild(searchInput);
     searchItem.appendChild(searchControl);
@@ -1237,7 +1237,6 @@ export async function buildNav(
 
     const trigger = document.createElement("div");
     trigger.className = "dropdown-trigger";
-    trigger.setAttribute("aria-expanded", "false");
     trigger.appendChild(searchItem);
 
     const dropdownMenu = document.createElement("div");
@@ -1251,6 +1250,10 @@ export async function buildNav(
     dropdownContent.setAttribute("aria-hidden", "true");
     dropdownContent.setAttribute("aria-live", "polite");
     dropdownContent.setAttribute("aria-relevant", "all");
+    dropdownContent.setAttribute(
+      "aria-busy",
+      searchIndexMode === "eager" ? "true" : "false",
+    );
 
     resultsContainer = dropdownContent;
 
@@ -1280,7 +1283,10 @@ export async function buildNav(
           const prev = dropdownContent.querySelector(
             ".nimbi-search-result.is-selected",
           );
-          if (prev) prev.classList.remove("is-selected");
+          if (prev) {
+            prev.classList.remove("is-selected");
+            prev.setAttribute("aria-selected", "false");
+          }
           const all = dropdownContent.querySelectorAll(".nimbi-search-result");
           if (!all || !all.length) {
             selectedIndex = -1;
@@ -1300,6 +1306,7 @@ export async function buildNav(
           const el = all[i];
           if (el) {
             el.classList.add("is-selected");
+            el.setAttribute("aria-selected", "true");
             selectedIndex = i;
             try {
               el.scrollIntoView({ block: "nearest" });
@@ -1351,7 +1358,7 @@ export async function buildNav(
             try {
               dropdown.classList.remove("is-active");
               try {
-                trigger.setAttribute("aria-expanded", "false");
+                searchInput.setAttribute("aria-expanded", "false");
               } catch (e) {}
             } catch (e) {}
             try {
@@ -1429,16 +1436,12 @@ export async function buildNav(
                 ? t("searchNoResults")
                 : "No results";
             panel.appendChild(p);
-            scheduleDOMWrite(() => {
-              try {
-                dropdownContent.appendChild(panel);
-              } catch (e) {}
-            });
+            dropdownContent.appendChild(panel);
           } catch (e) {}
           if (dropdown) {
             dropdown.classList.add("is-active");
             try {
-              trigger.setAttribute("aria-expanded", "true");
+              searchInput.setAttribute("aria-expanded", "true");
             } catch (e) {}
             try {
               document.documentElement.classList.add("nimbi-search-open");
@@ -1465,7 +1468,7 @@ export async function buildNav(
         const panel = document.createElement("div");
         panel.className = "panel nimbi-search-panel";
         const frag = document.createDocumentFragment();
-        items.forEach((it) => {
+        items.forEach((it, index) => {
           if (it.parentTitle) {
             const heading = document.createElement("p");
             heading.textContent = it.parentTitle;
@@ -1475,9 +1478,11 @@ export async function buildNav(
           }
           const a = document.createElement("a");
           a.className = "panel-block nimbi-search-result";
+          a.id = `nimbi-search-result-${index}`;
+          a.setAttribute("role", "option");
+          a.setAttribute("aria-selected", "false");
           const _t = resolveEntryTarget(it);
           a.href = buildPageUrl(_t.page, _t.hash);
-          a.setAttribute("role", "button");
           try {
             if (it.path && typeof it.path === "string") {
               try {
@@ -1583,11 +1588,7 @@ export async function buildNav(
           frag.appendChild(a);
         });
         panel.appendChild(frag);
-        scheduleDOMWrite(() => {
-          try {
-            dropdownContent.appendChild(panel);
-          } catch (e) {}
-        });
+          dropdownContent.appendChild(panel);
       } catch (e) {
         /* ignore render errors */
       }
@@ -1617,6 +1618,7 @@ export async function buildNav(
 
     if (searchInput) {
       const handleInput = debounce(async () => {
+        const generation = ++searchGeneration;
         const domInput =
           searchInput ||
           (typeof navbar !== "undefined" && navbar && navbar.querySelector
@@ -1650,8 +1652,10 @@ export async function buildNav(
           let idx = window.__nimbiResolvedIndex;
           if (!Array.isArray(idx) || !idx.length) {
             await ensureSearchIndex();
+            if (generation !== searchGeneration) return;
             idx = await searchIndexPromise;
           }
+          if (generation !== searchGeneration) return;
           const availableIndexes = [
             idx,
             window.__nimbiSearchIndex,
@@ -1692,6 +1696,18 @@ export async function buildNav(
               }
             }
           }
+          filtered.sort((left, right) => {
+            const rank = (entry) => {
+              const title = String(entry.title ?? '').toLowerCase();
+              const excerpt = String(entry.excerpt ?? '').toLowerCase();
+              if (title === q) return 0;
+              if (title.startsWith(q)) return 1;
+              if (title.split(/\s+/).some((word) => word.startsWith(q))) return 2;
+              if (title.includes(q)) return 3;
+              return excerpt.includes(q) ? 4 : 5;
+            };
+            return rank(left) - rank(right);
+          });
           showResults(filtered.slice(0, 10));
         } catch (err) {
           searchIndexPromise = null;
@@ -1702,6 +1718,7 @@ export async function buildNav(
 
       try {
         searchInput.addEventListener("input", handleInput);
+        signal?.addEventListener("abort", handleInput.cancel, { once: true });
       } catch (e) {
         /* ignore attach failures in constrained env */
       }
@@ -2149,7 +2166,12 @@ export async function buildNav(
     debugWarn("[nimbi-cms] build navbar failed", e);
   }
 
-  return { navbar, linkEls };
+  return {
+    navbar,
+    linkEls,
+    manifest:
+      typeof window !== "undefined" ? window.__nimbiRuntimeManifest ?? null : null,
+  };
 }
 
 try {

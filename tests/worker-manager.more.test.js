@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createWorkerFromRaw } from '../src/worker-manager.js'
+import { createWorkerFromRaw, disposeWorkerBlobUrlCache, getWorkerDiagnostics } from '../src/worker-manager.js'
 
 describe('worker-manager additional branches', () => {
   let origWorker
@@ -74,5 +74,22 @@ describe('worker-manager additional branches', () => {
     expect(a).toBeTruthy()
     expect(b).toBeTruthy()
     expect(createObjectURL).toHaveBeenCalledTimes(1)
+  })
+
+  it('revokes all cached blob URLs when disposed', () => {
+    const createObjectURL = vi.fn((blob) => `blob:${createObjectURL.mock.calls.length}`)
+    const revokeObjectURL = vi.fn()
+    globalThis.URL = { createObjectURL, revokeObjectURL }
+    globalThis.Blob = class {}
+    globalThis.Worker = class {}
+
+    createWorkerFromRaw('worker-a')
+    createWorkerFromRaw('worker-b')
+    disposeWorkerBlobUrlCache()
+
+    expect(revokeObjectURL).toHaveBeenCalledTimes(2)
+    expect(createWorkerFromRaw._blobUrlCache).toBeUndefined()
+    expect(getWorkerDiagnostics().blobUrlsCreated).toBeGreaterThanOrEqual(2)
+    expect(getWorkerDiagnostics().blobUrlsRevoked).toBeGreaterThanOrEqual(2)
   })
 })

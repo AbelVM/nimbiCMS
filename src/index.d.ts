@@ -182,6 +182,8 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 // --- from src/worker-manager.js
+export function disposeWorkerBlobUrlCache(): void
+
 
 
 // --- from src/version.js
@@ -198,6 +200,7 @@ export const allMarkdownPathsSet: Set<string>
 
 
 // --- from src/slugSearchRuntime.js
+export function clearSearchIndexCache(): any
 
 
 
@@ -220,14 +223,16 @@ export function uniqueSlug(base: string, existing: Set<string>): string
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
 export function unescapeMarkdown(s: string): string
-export const negativeFetchCache: any
-export function setFetchNegativeCacheTTL(ms: any): any
+export function getFetchCacheDiagnostics(): {fetchEntries:number, negativeEntries:number, maxEntries:number}
+export const negativeFetchCache: Map<string, number>
+export function setFetchNegativeCacheTTL(ms: number): void
 export function setFetchCacheMaxSize(n: number): any
 export function setFetchCacheTTL(ms: number): any
 export function setNegativeFetchCacheMaxSize(n: number): any
 export function setFetchConcurrency(n: number): void
 export function getFetchConcurrency(): number
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): void
+export function clearCrawlCache(): void
 export function getSearchIndex(): any
 export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}): Promise<Array>
 export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}): Promise<Array>
@@ -278,12 +283,13 @@ export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]):
 export function generateRobotsTxt(opts: object): string
 export function generateLlmsTxt(opts: object): string
 export function clearSitemapWriteTimer(): any
-export function handleSitemapRequest(opts: any): any
 export function attachSitemapDownloadUI(opts: {filename?: string}): HTMLElement|null
 export function exposeSitemapGlobals(opts: any): any
 
+
 // --- from src/router.js
 export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array|string[]|{values:()=>Iterable}): void
+export function disposeResolutionCachePurge(): void
 
 
 
@@ -330,7 +336,7 @@ export function setLang(lang: string): void
 export function parseInitOptionsFromQuery(queryString: string): any
 export const currentHighlightTheme: string
 export const initialDocumentTitle: string
-export function destroy(): void
+export function destroy(): Promise<void>
 
 
 // --- from src/indexManager.js
@@ -345,7 +351,7 @@ export function attachImagePreview(opts: any): void
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(opts: any): Promise<void>
 export function preMapMdSlugs(opts: any): Promise<void>
-export function executeEmbeddedScripts(article: any, allowEmbeddedScripts: boolean): void
+export function executeEmbeddedScripts(opts: any): void
 export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): void
 export function teardownAnchorWorkerPool(): Promise<void>
 
@@ -415,6 +421,12 @@ export function handleSlugWorkerMessage(msg: object): Promise<object>
 // --- from src/worker/anchorRuntime.js
 
 
+// --- from src/utils/workerPoolDiagnostics.js
+
+
+
+
+
 // --- from src/utils/urlHelper.js
 export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): string
 export function parseHrefToRoute(href: string): any
@@ -430,6 +442,12 @@ export function getSharedParser(): DOMParser|null
 export function setSharedParser(parser: DOMParser|null): void
 export function resetSharedParser(): void
 
+// --- from src/utils/runtimeManifest.js
+
+
+// --- from src/utils/performanceDiagnostics.js
+
+
 // --- from src/utils/l10n-defaults.js
 export const DEFAULT_L10N: Record<string, L10nEntry>
 
@@ -444,6 +462,7 @@ export function yieldToEventLoop(): Promise<void>
 export function yieldIfNeeded(iteration: number, threshold: number): Promise<void>
 
 // --- from src/utils/helpers.js
+export function getBaseName(path: any): string
 export const normalizePath: any
 export const trimTrailingSlash: any
 export const ensureTrailingSlash: any
@@ -458,6 +477,7 @@ export function safe(fn: any): string
 export const encodeURL: any
 export const decodeHtmlEntities: any
 export const getWorkerPoolSize: any
+
 
 
 

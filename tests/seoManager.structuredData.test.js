@@ -98,7 +98,8 @@ describe('seoManager structured data', () => {
     )
     const el = document.getElementById('nimbi-jsonld')
     const parsed = JSON.parse(el.textContent || '{}')
-    expect(parsed.publisher).toEqual({ '@type': 'Organization', name: 'nimbiCMS' })
+    expect(parsed.publisher).toMatchObject({ '@type': 'Organization', name: 'nimbiCMS' })
+    expect(parsed.publisher['@id']).toContain('#organization')
     siteMeta.remove()
   })
 
@@ -117,6 +118,43 @@ describe('seoManager structured data', () => {
       '@type': 'WebPage',
       '@id': expect.stringContaining('?page='),
     })
+  })
+
+  it('adds stable page/site entities and validated breadcrumbs', () => {
+    document.documentElement.lang = 'en'
+    const siteMeta = document.createElement('meta')
+    siteMeta.setAttribute('name', 'site-name')
+    siteMeta.setAttribute('content', 'nimbiCMS')
+    document.head.appendChild(siteMeta)
+    setStructuredData(
+      {
+        meta: {
+          title: 'Guide',
+          breadcrumbs: [
+            { name: 'Docs', url: 'https://example.com/docs' },
+            { name: 'Guide' },
+            null,
+          ],
+        },
+      },
+      '/docs/guide',
+      null,
+      null,
+      null,
+      'Site',
+    )
+    const parsed = JSON.parse(document.getElementById('nimbi-jsonld').textContent || '{}')
+    expect(parsed['@id']).toContain('#webpage')
+    expect(parsed.inLanguage).toBe('en')
+    expect(parsed.isPartOf).toMatchObject({ '@type': 'WebSite', name: 'nimbiCMS' })
+    expect(parsed.breadcrumb).toEqual({
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Docs', item: 'https://example.com/docs' },
+        { '@type': 'ListItem', position: 2, name: 'Guide' },
+      ],
+    })
+    siteMeta.remove()
   })
 
   it('escapes </script> in JSON-LD textContent', () => {

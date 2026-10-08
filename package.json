@@ -37,13 +37,16 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.js\"",
     "a11y:scan": "node scripts/a11y-runner.js",
+    "seo:inspect": "node scripts/inspect-seo.mjs",
     "gen-dts": "node scripts/gen-dts.js",
     "prepare": "npm run build && npm run gen-dts && npm run docs",
     "check-dts": "node node_modules/typescript7/bin/tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck --ignoreConfig",
     "type-test": "npx tsd",
     "docs": "typedoc --options typedoc.json",
-    "benchmark": "node scripts/benchmark-cdp.js",
-    "benchmark:lighthouse": "node benchmarks/benchmark-lighthouse.js"
+    "benchmark": "npm run benchmark:lighthouse",
+    "benchmark:lighthouse": "node benchmarks/benchmark-lighthouse.js",
+    "benchmark:content": "node benchmarks/benchmark-content.js",
+    "check:bundle": "node scripts/check-bundle.cjs"
   },
   "dependencies": {
     "bulma": "^1.0.4",

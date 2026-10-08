@@ -22,6 +22,7 @@ describe('slugSearchRuntime direct branches', () => {
   })
 
   it('buildSearchIndex crawls directories, parses md/html and heading entries', async () => {
+    window.__nimbiRuntimeManifest = { generation: 7, language: 'en' }
     global.fetch = vi.fn(async (url) => {
       const u = asUrl(url)
       if (/\/content\/$/.test(u)) {
@@ -42,6 +43,7 @@ describe('slugSearchRuntime direct branches', () => {
     expect(slugs).toContain('b-title')
     expect(slugs.some((s) => s.includes('::a-section'))).toBe(true)
     expect(slugs.some((s) => s.includes('::b-section'))).toBe(true)
+    expect(idx.manifest).toEqual(window.__nimbiRuntimeManifest)
   })
 
   it('buildSearchIndex discovers markdown links when raw markdown is fetched from seed paths', async () => {
@@ -167,6 +169,27 @@ describe('slugSearchRuntime direct branches', () => {
 
     expect(a).toEqual(b)
     expect(global.fetch.mock.calls.filter((c) => /\/content\/$/.test(asUrl(c[0]))).length).toBe(1)
+  })
+
+  it('clears cached search state between content generations', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (/\/content-a\/$/.test(asUrl(url))) return mkRes(true, '<a href="old.md">Old</a>')
+      if (/\/content-a\/old\.md$/.test(asUrl(url))) return mkRes(true, '# Old')
+      return mkRes(false, '')
+    })
+
+    const runtime = await import('../src/slugSearchRuntime.js')
+    await runtime.buildSearchIndex('/content-a/', 1)
+    runtime.clearSearchIndexCache()
+    global.fetch = vi.fn(async (url) => {
+      if (/\/content-b\/$/.test(asUrl(url))) return mkRes(true, '<a href="new.md">New</a>')
+      if (/\/content-b\/new\.md$/.test(asUrl(url))) return mkRes(true, '# New')
+      return mkRes(false, '')
+    })
+
+    const next = await runtime.buildSearchIndex('/content-b/', 1)
+    expect(next.map((entry) => entry.slug)).toContain('new')
+    expect(next.map((entry) => entry.slug)).not.toContain('old')
   })
 
   it('crawlForSlug falls back to candidate files and crawl discovery', async () => {

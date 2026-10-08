@@ -183,6 +183,19 @@ npm ci
 npm run dev
 ```
 
+### Verification
+
+The CI workflow runs the same core checks used locally:
+
+```bash
+npm run lint
+npm run test
+npm run build
+npm run gen-dts
+npm run check-dts
+npm run a11y:scan
+```
+
 ---
 
 ## Configuration
@@ -226,6 +239,7 @@ npm run dev
 | `fetchConcurrency` | `number` / `'auto'` | `'auto'` | Max simultaneous network requests. |
 | `exposeSitemap` | `boolean` | `true` | Expose runtime sitemap at `/?sitemap`. |
 | `allowEmbeddedScripts` | `boolean` | `false` | **Security-sensitive.** Allow scripts in Markdown/HTML. Only enable for fully trusted content. |
+| `embeddedScriptOrigins` | `string[]` | `[]` | Additional origins permitted for external embedded scripts; same-origin scripts are allowed when embedded scripts are enabled. |
 
 > **Tip:** All options can also be set via URL parameters when `allowUrlPathOverrides: true` is enabled. For security, this is off by default.
 
@@ -255,6 +269,30 @@ When enabled, nimbiCMS exposes these client-side endpoints:
 - `/?atom` — Atom 1.0 feed
 
 > **Note:** These are generated in the browser. For maximum crawler compatibility, also generate a server-side `sitemap.xml` and list it in `robots.txt`.
+
+### Content Security Policy
+
+For strict CSP, serve content from an allowed `connect-src` origin, allow
+module workers created from Blob URLs with `worker-src blob:`, and permit the
+runtime's stylesheet sources with `style-src`. Hosts that
+inject a nonce into runtime-created inline scripts or styles can pass it with
+`setCspNonce(nonce)` before calling `initCMS`.
+
+For server or edge adapters, call `handleSitemapRequest({ returnResponse: true })`
+to receive sitemap/feed output without the browser document writer.
+
+Run `npm run seo:inspect -- https://example.com/` to check deployed status,
+title, robots, canonical, hreflang, JSON-LD, manifest, sitemap, and internal
+links. Pass `--max-links=N` to increase the bounded cold-link probe count from
+the default of 20.
+
+### Answer-oriented content
+
+For answer-engine-friendly content, put the direct answer in visible Markdown
+near the start of the page, use a descriptive heading and short supporting
+paragraphs, and link claims to first-party or authoritative sources. Keep
+source links visible to readers; structured data may describe the page but
+must not contain claims absent from the rendered content.
 
 ---
 
@@ -354,6 +392,12 @@ nimbiCMS works seamlessly with GitHub Pages and the GitHub web editor.
 </body>
 </html>
 ```
+
+For crawler support, publish a host-level `robots.txt` with a `Sitemap:` URL
+and generate `sitemap.xml` from `handleSitemapRequest({ returnResponse: true })`
+in the deployment adapter. The browser runtime cannot create files at the
+static host root. Configure the host's 404 response to serve `index.html`, and
+keep the CMS `notFoundPage` for in-app missing content.
 
 ### Editing content
 

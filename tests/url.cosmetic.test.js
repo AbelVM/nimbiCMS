@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { parseHrefToRoute } from '../src/utils/urlHelper.js'
+import { buildCosmeticUrl, parseHrefToRoute, toCanonicalHref } from '../src/utils/urlHelper.js'
 
 describe('Cosmetic URLs', () => {
   it('parses cosmetic hash-style URL into slug and anchor and params', () => {
@@ -21,5 +21,17 @@ describe('Cosmetic URLs', () => {
     expect(parsed.page).to.equal('another-slug')
     expect(parsed.anchor).to.equal('anchorA')
     expect(parsed.params).to.match(/bar=baz/)
+  })
+
+  it('converts clean paths to canonical routes without losing anchors or params', () => {
+    expect(toCanonicalHref('/docs/getting-started#install?lang=en')).to.equal(
+      '?page=docs%2Fgetting-started&lang=en#install',
+    )
+  })
+
+  it('does not copy the page parameter into cosmetic route params', () => {
+    expect(buildCosmeticUrl('docs/getting-started', 'install', '?page=ignored&lang=en')).to.equal(
+      '#/docs/getting-started#install?lang=en',
+    )
   })
 })

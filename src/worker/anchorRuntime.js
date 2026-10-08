@@ -1,25 +1,12 @@
 import { getSharedParser } from "../utils/sharedDomParser.js";
-
-function normalizePath(path) {
-  return String(path ?? "").replace(/^[./]+/, "");
-}
-
-function trimTrailingSlash(value) {
-  return String(value ?? "").replace(/\/+$/, "");
-}
-
-function ensureTrailingSlash(value) {
-  return trimTrailingSlash(value) + "/";
-}
-
-function isExternalHref(href) {
-  const value = String(href ?? "");
-  return (
-    /^(https?:)?\/\//.test(value) ||
-    value.startsWith("mailto:") ||
-    value.startsWith("tel:")
-  );
-}
+import {
+  ensureTrailingSlash,
+  getBaseName,
+  getLastPathSegments,
+  isExternalLink,
+  normalizePath,
+  trimTrailingSlash,
+} from "../utils/helpers.js";
 
 function buildPageUrl(page, hash = null) {
   const encodedPage = encodeURIComponent(String(page ?? ""));
@@ -59,10 +46,6 @@ function createParser() {
   return new DOMParser();
 }
 
-function getBaseName(path) {
-  return String(path ?? "").replace(/^.*\//, "");
-}
-
 function getSnapshotReverseMap(pathToSlug) {
   const reverse = new Map();
   try {
@@ -89,16 +72,6 @@ function resolveActualPagePath(pagePath, snapshot) {
   }
 }
 
-function getLastPathSegments(path, count = 2) {
-  try {
-    const parts = String(path ?? "").split("/").filter(Boolean);
-    if (!parts.length) return "";
-    return parts.slice(-Math.max(1, Math.min(count, parts.length))).join("/");
-  } catch (_) {
-    return String(path ?? "");
-  }
-}
-
 function getSlugForRelativePath(rel, pathToSlug) {
   if (!rel || !pathToSlug) return null;
   try {
@@ -107,20 +80,23 @@ function getSlugForRelativePath(rel, pathToSlug) {
   const baseName = getBaseName(rel);
   try {
     if (baseName && pathToSlug.has(baseName)) return pathToSlug.get(baseName);
-  } catch (_) {}
-  const relSuffix = getLastPathSegments(rel, 2);
-  try {
-    for (const [key, slug] of pathToSlug.entries()) {
-      if (!key || !slug) continue;
-      if (key === rel || key === baseName) return slug;
-      if (String(key).endsWith(`/${relSuffix}`)) return slug;
-    }
+    const suffix = getLastPathSegments(rel, 2);
+    if (suffix && pathToSlug.has(suffix)) return pathToSlug.get(suffix);
   } catch (_) {}
   return null;
 }
 
 function getSnapshotMap(snapshot) {
-  return new Map(Object.entries(snapshot?.pathToSlug || {}));
+  const map = new Map();
+  for (const [path, slug] of Object.entries(snapshot?.pathToSlug || {})) {
+    if (!path || !slug) continue;
+    if (!map.has(path)) map.set(path, slug);
+    const baseName = getBaseName(path);
+    if (baseName && !map.has(baseName)) map.set(baseName, slug);
+    const suffix = getLastPathSegments(path, 2);
+    if (suffix && !map.has(suffix)) map.set(suffix, slug);
+  }
+  return map;
 }
 
 function rememberMapping(pathToSlug, learnedMappings, path, slug) {
@@ -219,7 +195,7 @@ export async function rewriteAnchorsHtml(
         if (anchor?.closest?.("h1,h2,h3,h4,h5,h6")) continue;
       } catch (_) {}
       const href = anchor.getAttribute("href") || "";
-      if (!href || isExternalHref(href)) continue;
+      if (!href || isExternalLink(href)) continue;
 
       try {
         if ((href.startsWith("?") || href.includes("?")) && pagePath) {

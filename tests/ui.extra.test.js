@@ -71,6 +71,83 @@ describe('createUI focused branches', () => {
     expect(runHooks).toHaveBeenCalled()
   })
 
+  it('moves focus to the new main landmark after a focused route change', async () => {
+    const oldLink = document.createElement('a')
+    oldLink.href = '?page=old'
+    oldLink.textContent = 'Old page'
+    contentWrap.appendChild(oldLink)
+    oldLink.focus()
+    router.fetchPageData.mockResolvedValue({ data: { raw: '#next' }, pagePath: 'next.md', anchor: null })
+    htmlBuilder.prepareArticle.mockResolvedValue({
+      article: document.createElement('article'),
+      parsed: {},
+      toc: null,
+      topH1: false,
+      h1Text: null,
+      slugKey: null,
+    })
+
+    const ui = createUI({ contentWrap, navWrap, container, t: (s)=>s, contentBase: '/content/', homePage: 'home', initialDocumentTitle: 'T', runHooks })
+    await ui.renderByQuery()
+
+    expect(document.activeElement).toBe(contentWrap.querySelector('main.nimbi-main'))
+  })
+
+  it('waits for queued navigation to render after an active render', async () => {
+    let releaseFirst
+    let fetchCount = 0
+    router.fetchPageData.mockImplementation(async (raw) => {
+      fetchCount += 1
+      if (fetchCount === 1) {
+        await new Promise((resolve) => {
+          releaseFirst = resolve
+        })
+      }
+      return { data: { raw }, pagePath: `${raw}.md`, anchor: null }
+    })
+    htmlBuilder.prepareArticle.mockImplementation(async (t, data) => {
+      const article = document.createElement('article')
+      article.textContent = data.raw
+      return { article, parsed: {}, toc: null, topH1: false, h1Text: null, slugKey: null }
+    })
+
+    const ui = createUI({ contentWrap, navWrap, container, t: (s)=>s, contentBase: '/content/', homePage: 'home', initialDocumentTitle: 'T', runHooks })
+    const firstRender = ui.renderByQuery()
+    await Promise.resolve()
+    history.pushState({}, '', '?page=next')
+    const queuedRender = ui.renderByQuery()
+
+    let queuedFinished = false
+    queuedRender.then(() => { queuedFinished = true })
+    await Promise.resolve()
+    expect(queuedFinished).toBe(false)
+
+    releaseFirst()
+    await Promise.all([firstRender, queuedRender])
+    expect(contentWrap.querySelector('article').textContent).toBe('next')
+    expect(fetchCount).toBe(2)
+    history.replaceState({}, '', '/')
+  })
+
+  it('keeps rendering when preparation normalizes the route URL', async () => {
+    history.replaceState({}, '', '?page=next')
+    router.fetchPageData.mockResolvedValue({ data: { raw: '#next' }, pagePath: 'next.md', anchor: null })
+    htmlBuilder.prepareArticle.mockImplementation(async (t, data) => {
+      history.replaceState({ page: 'next' }, '', '/#/next')
+      const article = document.createElement('article')
+      article.textContent = data.raw
+      return { article, parsed: {}, toc: null, topH1: false, h1Text: null, slugKey: null }
+    })
+
+    const ui = createUI({ contentWrap, navWrap, container, t: (s)=>s, contentBase: '/content/', homePage: 'home', initialDocumentTitle: 'T', runHooks })
+    await ui.renderByQuery()
+
+    expect(router.fetchPageData).toHaveBeenCalled()
+    expect(htmlBuilder.prepareArticle).toHaveBeenCalled()
+    expect(contentWrap.querySelector('article').textContent).toBe('#next')
+    history.replaceState({}, '', '/')
+  })
+
   it('does not execute embedded scripts by default', async () => {
     router.fetchPageData.mockResolvedValue({ data: { raw: '#x' }, pagePath: 'p.md', anchor: null })
     const articleEl = document.createElement('article')
@@ -80,7 +157,7 @@ describe('createUI focused branches', () => {
     await ui.renderByQuery()
 
     expect(htmlBuilder.executeEmbeddedScripts).toHaveBeenCalledTimes(1)
-    expect(htmlBuilder.executeEmbeddedScripts).toHaveBeenCalledWith(expect.anything(), false)
+    expect(htmlBuilder.executeEmbeddedScripts).toHaveBeenCalledWith(expect.anything(), false, [])
   })
 
   it('executes embedded scripts when allowEmbeddedScripts is true', async () => {

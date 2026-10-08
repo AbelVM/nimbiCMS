@@ -41,4 +41,32 @@ describe('initCMS homePage derivation from navigation', () => {
     buildNavSpy.mockRestore()
     createUISpy.mockRestore()
   })
+
+  it('rejects a second initialization on the same mount element', async () => {
+    vi.resetModules()
+    global.fetch = vi.fn(async () => ({ ok: true, text: () => Promise.resolve('# Home') }))
+
+    const nav = await import('../src/nav.js')
+    const buildNavSpy = vi.spyOn(nav, 'buildNav').mockResolvedValue({ navbar: document.createElement('div'), linkEls: [] })
+    const ui = await import('../src/ui.js')
+    const createUISpy = vi.spyOn(ui, 'createUI').mockReturnValue({ renderByQuery: async () => {} })
+
+    await initCMS({ el: '#app', searchIndex: false })
+    await expect(initCMS({ el: '#app', searchIndex: false })).rejects.toThrow(/already called/i)
+
+    buildNavSpy.mockRestore()
+    createUISpy.mockRestore()
+  })
+
+  it('hands off cleanly to a second connected mount', async () => {
+    vi.resetModules()
+    global.fetch = vi.fn(async () => ({ ok: true, text: () => Promise.resolve('# Home') }))
+    const secondMount = document.createElement('div')
+    document.body.appendChild(secondMount)
+
+    await initCMS({ el: '#app', searchIndex: false })
+    await expect(initCMS({ el: secondMount, searchIndex: false })).resolves.toBeUndefined()
+    expect(document.querySelector('#app > section')).toBeNull()
+  })
+
 })

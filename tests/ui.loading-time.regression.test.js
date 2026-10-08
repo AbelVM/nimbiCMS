@@ -255,6 +255,35 @@ describe('ui loading-time regressions', () => {
     expect(htmlBuilder.prepareArticle).toHaveBeenCalledTimes(2)
   })
 
+  it('discards a page result when the URL changes before preparation', async () => {
+    history.replaceState({}, '', '/')
+    router.fetchPageData.mockImplementation(() => delayResolve({
+      data: { raw: '# stale' },
+      pagePath: 'stale.md',
+      anchor: null
+    }, 10))
+
+    const ui = createUI({
+      contentWrap,
+      navWrap,
+      container,
+      t: (s) => s,
+      contentBase: '/content/',
+      homePage: 'home.md',
+      initialDocumentTitle: 'T',
+      runHooks: async () => {}
+    })
+
+    const render = ui.renderByQuery()
+    history.pushState({}, '', '?page=next')
+    await vi.advanceTimersByTimeAsync(10)
+    await render
+
+    expect(htmlBuilder.prepareArticle).not.toHaveBeenCalled()
+    expect(contentWrap.textContent).toBe('')
+    history.replaceState({}, '', '/')
+  })
+
   it('popstate during active render queues one transition within expected budget', async () => {
     let fetchCall = 0
     router.fetchPageData.mockImplementation(() => {

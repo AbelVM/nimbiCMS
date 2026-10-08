@@ -23,6 +23,10 @@ describe('urlHelper canonical/cosmetic parsing', () => {
     expect(s).toBe('?page=slug&x=1#anchor')
   })
 
+  it('preserves absolute external document links', () => {
+    expect(toCanonicalHref('https://other.example/docs/getting-started')).toBe('https://other.example/docs/getting-started')
+  })
+
   it('buildCosmeticUrl builds cosmetic urls and strips page param', () => {
     const out = buildCosmeticUrl('slug', 'anchor', '?foo=1&page=slug&bar=2')
     expect(out.startsWith('#/slug')).toBeTruthy()

@@ -26,7 +26,7 @@ describe('htmlBuilder late helper branches', () => {
 
     const article = document.createElement('article')
     article.innerHTML = '<script src="https://cdn.example.com/a.js"></script>'
-    executeEmbeddedScripts(article)
+    executeEmbeddedScripts(article, true, ['https://cdn.example.com'])
 
     expect(article.querySelectorAll('script').length).toBe(0)
     expect(document.querySelectorAll('script[src="https://cdn.example.com/a.js"]').length).toBe(1)

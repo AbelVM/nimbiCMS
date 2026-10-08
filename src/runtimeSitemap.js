@@ -20,6 +20,8 @@ import { getSharedParser } from "./utils/sharedDomParser.js";
 import { debugLog, debugWarn } from "./utils/debug.js";
 import { yieldIfNeeded } from "./utils/idle.js";
 
+const sitemapBlobRevokeTimers = new Set();
+
 /**
  * Sitemap entry object.
  * @typedef {{
@@ -43,8 +45,12 @@ import { yieldIfNeeded } from "./utils/idle.js";
  * @typedef {{generatedAt:string, entries:Array<SitemapEntry>}} SitemapJson
  */
 
-function _getBase() {
+function _getBase(baseUrl) {
   try {
+    if (baseUrl) {
+      const url = new URL(baseUrl, "http://localhost/");
+      return `${url.origin}${url.pathname.replace(/[^/]*$/, "") || "/"}`;
+    }
     if (typeof location?.pathname === "string") {
       return String(location.origin + location.pathname.split("?")[0]);
     }
@@ -146,6 +152,7 @@ function makeEntryFromIndexItem(baseNoQs, it) {
  * @param {string} [opts.homePage]
  * @param {string} [opts.navigationPage]
  * @param {string} [opts.notFoundPage]
+ * @param {string|URL} [opts.baseUrl] - base URL used for generated locations
  * @returns {Promise<SitemapJson>} sitemap JSON object
  */
 export async function generateSitemapJson(opts = {}) {
@@ -157,7 +164,7 @@ export async function generateSitemapJson(opts = {}) {
     notFoundPage,
   } = opts || {};
 
-  const base = _getBase().split("?")[0];
+  const base = _getBase(opts.baseUrl).split("?")[0];
   const baseNoQs = base;
 
   // Prefer the live module `searchIndex` object used by the search UI.
@@ -1021,6 +1028,8 @@ export function clearSitemapWriteTimer() {
       window.__nimbiSitemapWriteTimer = null;
       window.__nimbiSitemapPendingWrite = null;
     }
+    for (const timer of sitemapBlobRevokeTimers) clearTimeout(timer);
+    sitemapBlobRevokeTimers.clear();
   } catch (_) {}
 }
 
@@ -1050,11 +1059,13 @@ function _writeXmlToDocument(xml, mimeType = "application/xml") {
             window.open(blobUrl, "_self");
           } catch (_) {}
         }
-        setTimeout(() => {
+        const revokeTimer = setTimeout(() => {
           try {
             URL.revokeObjectURL(blobUrl);
           } catch (_) {}
+          sitemapBlobRevokeTimers.delete(revokeTimer);
         }, 5000);
+        sitemapBlobRevokeTimers.add(revokeTimer);
       }
     } catch (_) {}
   } catch (e) {
@@ -1109,6 +1120,29 @@ function _generateHtmlFromJson(finalJson) {
   } catch (_) {
     return "<!doctype html><html><body><pre>failed to render sitemap</pre></body></html>";
   }
+}
+
+function _createSitemapResponse(finalJson, mimeType, runtimeManifest) {
+  const manifest =
+    runtimeManifest || globalThis?.window?.__nimbiRuntimeManifest || null;
+  const generation = manifest?.generation;
+  const headers = { "content-type": mimeType };
+  if (Number.isInteger(generation)) headers["x-nimbi-generation"] = String(generation);
+  if (typeof manifest?.language === "string" && manifest.language)
+    headers["x-nimbi-language"] = manifest.language;
+  if (typeof manifest?.contentBase === "string" && manifest.contentBase)
+    headers["x-nimbi-content-base"] = manifest.contentBase;
+  let body;
+  if (mimeType === "application/rss+xml") body = generateRssXml(finalJson);
+  else if (mimeType === "application/atom+xml") body = generateAtomXml(finalJson);
+  else if (mimeType === "text/html") body = _generateHtmlFromJson(finalJson);
+  else if (mimeType === "text/plain") body = generateLlmsTxt(finalJson);
+  else body = generateSitemapXml(finalJson);
+  if (typeof globalThis?.Response === "function")
+    return new globalThis.Response(body, {
+      headers,
+    });
+  return body;
 }
 
 // Schedule a sitemap write so multiple concurrent calls don't race and
@@ -1215,12 +1249,26 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
  * Handle runtime requests for sitemap/rss/atom/html. When run in a
  * browser context this may write the generated XML/HTML to the document.
  * @param {Object} [opts] - options forwarded from init (contentBase, indexDepth, noIndexing, index, etc.)
- * @returns {Promise<boolean>} true when the request was handled (output written)
+ * @param {boolean} [opts.returnResponse=false] - return a Response/string without writing to the document
+ * @param {string|URL} [opts.url] - request URL for host adapters without browser location
+ * @param {Object} [opts.runtimeManifest] - runtime identity for host responses
+ * @returns {Promise<boolean|Response|string>} true when written, or generated output in response mode
  */
 export async function handleSitemapRequest(opts = {}) {
   try {
-    if (typeof document === "undefined" || typeof location === "undefined")
+    let requestUrl;
+    try {
+      if (opts.url) {
+        requestUrl = new URL(opts.url, "http://localhost/");
+      } else if (typeof location !== "undefined") {
+        requestUrl = location;
+      } else {
+        requestUrl = { pathname: "/", search: "", href: "http://localhost/" };
+      }
+    } catch (_) {
       return false;
+    }
+    if (!opts.returnResponse && typeof document === "undefined") return false;
 
     // Detect requested format
     let wantXml = false,
@@ -1229,7 +1277,7 @@ export async function handleSitemapRequest(opts = {}) {
       wantHtml = false,
       wantLlms = false;
     try {
-      const sp = new URLSearchParams(location.search || "");
+      const sp = new URLSearchParams(requestUrl.search || "");
       if (sp.has("sitemap")) {
         let only = true;
         for (const k of sp.keys()) if (k !== "sitemap") only = false;
@@ -1252,7 +1300,7 @@ export async function handleSitemapRequest(opts = {}) {
       }
     } catch (_) {}
     if (!wantXml && !wantRss && !wantAtom && !wantLlms) {
-      const pathname = (location.pathname || "/").replace(/\/\/+/g, "/");
+      const pathname = (requestUrl.pathname || "/").replace(/\/\/+/g, "/");
       const name = pathname.split("/").filter(Boolean).pop() || "";
       if (!name) return false;
       wantXml = /^(sitemap|sitemap\.xml)$/i.test(name);
@@ -1550,7 +1598,12 @@ export async function handleSitemapRequest(opts = {}) {
 
     // Generate JSON using the gathered index
     const json = await generateSitemapJson(
-      Object.assign({}, opts, { index: idx }),
+      Object.assign(
+        {},
+        opts,
+        opts.url ? { baseUrl: requestUrl.href } : {},
+        { index: idx },
+      ),
     );
 
     // Debug: log the final entries deduped by base slug (strip anchors)
@@ -1609,6 +1662,19 @@ export async function handleSitemapRequest(opts = {}) {
           ? json.entries
           : [],
     });
+
+    if (opts.returnResponse) {
+      const mimeType = wantRss
+        ? "application/rss+xml"
+        : wantAtom
+          ? "application/atom+xml"
+          : wantLlms
+            ? "text/plain"
+            : wantHtml
+              ? "text/html"
+              : "application/xml";
+      return _createSitemapResponse(finalJson, mimeType, opts.runtimeManifest);
+    }
 
     try {
       if (typeof window !== "undefined") {

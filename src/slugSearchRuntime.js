@@ -2,7 +2,15 @@ import * as slugManagerRuntime from "./slugManager.js";
 import { parseFrontmatter } from "./utils/frontmatter.js";
 
 let _indexPromise = null;
+let _indexPromiseKey = null;
 let _cachedIndex = [];
+
+/** Clear generation-scoped search state before a new runtime starts. */
+export function clearSearchIndexCache() {
+  _indexPromise = null;
+  _indexPromiseKey = null;
+  _cachedIndex = [];
+}
 
 const DEFAULT_MAX_CRAWL_QUEUE = 1000;
 const DEFAULT_CONCURRENCY = 4;
@@ -273,7 +281,16 @@ export async function buildSearchIndex(
   noIndexing = undefined,
   seedPaths = undefined,
 ) {
-  if (_indexPromise) return _indexPromise;
+  const language = globalThis?.window?.__nimbiRuntimeManifest?.language || "";
+  const key = JSON.stringify([
+    _toAbsoluteBase(contentBase),
+    Number(indexDepth) || 1,
+    Array.isArray(noIndexing) ? noIndexing.map(_sanitizePath).sort() : [],
+    Array.isArray(seedPaths) ? seedPaths.map(_sanitizePath).sort() : [],
+    language,
+  ]);
+  if (_indexPromise && _indexPromiseKey === key) return _indexPromise;
+  _indexPromiseKey = key;
   _indexPromise = (async () => {
     const excludes = Array.isArray(noIndexing)
       ? new Set(noIndexing.map((p) => _sanitizePath(p)))
@@ -341,13 +358,24 @@ export async function buildSearchIndex(
     });
 
     _cachedIndex = entries;
+    const manifest = globalThis?.window?.__nimbiRuntimeManifest;
+    if (manifest && Number.isInteger(manifest.generation)) {
+      Object.defineProperty(_cachedIndex, "manifest", {
+        value: manifest,
+        enumerable: false,
+        configurable: true,
+      });
+    }
     return _cachedIndex;
   })();
 
   try {
     return await _indexPromise;
   } finally {
-    _indexPromise = null;
+    if (_indexPromiseKey === key) {
+      _indexPromise = null;
+      _indexPromiseKey = null;
+    }
   }
 }
 

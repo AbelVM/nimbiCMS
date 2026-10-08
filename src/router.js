@@ -163,9 +163,6 @@ export const resolutionCache = new PowerCache({
   defaultTTL: RESOLUTION_CACHE_TTL > 0 ? RESOLUTION_CACHE_TTL : Infinity,
 });
 
-// Kick off the periodic lazy-sweep timer when TTL is enabled by default.
-_scheduleResolutionCachePurge();
-
 function _isLegacyResolutionRecord(record) {
   return (
     !!record &&
@@ -274,6 +271,16 @@ export function _purgeExpiredEntries() {
       resolutionCache.delete(k);
     }
   }
+}
+
+/**
+ * Stop the legacy-record TTL sweep for the current runtime.
+ * @returns {void}
+ */
+export function disposeResolutionCachePurge() {
+  if (_resolutionCachePurgeTimerId === null) return;
+  clearInterval(_resolutionCachePurgeTimerId);
+  _resolutionCachePurgeTimerId = null;
 }
 
 /**
@@ -543,7 +550,11 @@ export async function fetchPageData(raw, contentBase) {
 
   const lang =
     typeof l10n !== "undefined" && l10n.currentLang ? l10n.currentLang : "";
-  const cacheKey = `${raw}|||${lang}`;
+  let cacheScope = String(contentBase ?? "");
+  try {
+    cacheScope = new URL(cacheScope, typeof location !== "undefined" ? location.href : "http://localhost/").href;
+  } catch (_) {}
+  const cacheKey = `${raw}|||${lang}|||${cacheScope}`;
   const cached = resolutionCacheGet(cacheKey);
   if (cached) {
     resolved = cached.resolved;

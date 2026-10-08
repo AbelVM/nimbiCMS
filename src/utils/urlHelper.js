@@ -147,11 +147,18 @@ export function parseHrefToRoute(href) {
       return { type: "cosmetic", page: slug, anchor, params };
     }
 
+    let pathAnchor = u.hash ? u.hash.replace(/^#/, "") : "";
+    let pathParams = u.search ? u.search.replace(/^\?/, "") : "";
+    if (pathAnchor.includes("?")) {
+      const parts = pathAnchor.split("?");
+      pathAnchor = parts.shift() || "";
+      pathParams = [pathParams, parts.join("?")].filter(Boolean).join("&");
+    }
     return {
       type: "path",
       page: (u.pathname || "").replace(/^\//, "") || null,
-      anchor: u.hash ? u.hash.replace(/^#/, "") : null,
-      params: u.search ? u.search.replace(/^\?/, "") : "",
+      anchor: pathAnchor || null,
+      params: pathParams,
     };
   } catch (e) {
     return { type: "unknown", page: href, anchor: null, params: "" };
@@ -167,6 +174,16 @@ export function parseHrefToRoute(href) {
  */
 export function toCanonicalHref(href) {
   try {
+    const rawHref = String(href ?? "");
+    const baseHref =
+      typeof location !== "undefined" ? location.href : "http://localhost/";
+    const parsedHref = new URL(rawHref, baseHref);
+    const isAbsoluteExternal =
+      /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(rawHref) &&
+      parsedHref.origin !== new URL(baseHref).origin;
+    const isSupportedExternalRoute =
+      parsedHref.searchParams.has("page") || parsedHref.hash.startsWith("#/");
+    if (isAbsoluteExternal && !isSupportedExternalRoute) return rawHref;
     const r = parseHrefToRoute(href);
     if (r && r.type === "canonical") {
       let out = "?page=" + encodeURIComponent(r.page || "");

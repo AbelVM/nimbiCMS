@@ -48,7 +48,7 @@ describe('htmlBuilder additional branches', () => {
     const s = document.createElement('script')
     s.textContent = 'window.__testInlineExecuted = 123'
     article.appendChild(s)
-    executeEmbeddedScripts(article, true)
+    executeEmbeddedScripts(article, true, ['https://example.com'])
     expect(window.__testInlineExecuted).toBe(123)
     expect(article.querySelector('script')).toBeNull()
     delete window.__testInlineExecuted
@@ -65,6 +65,18 @@ describe('htmlBuilder additional branches', () => {
     executeEmbeddedScripts(article, false)
     expect(window.__testShouldNotRun).toBeUndefined()
     expect(article.querySelector('script')).toBeNull()
+  })
+
+  it('blocks non-same-origin external scripts without an allowlist entry', () => {
+    const article = document.createElement('article')
+    const script = document.createElement('script')
+    script.src = 'https://example.com/x.js'
+    article.appendChild(script)
+
+    executeEmbeddedScripts(article, true)
+
+    expect(article.querySelector('script')).toBeNull()
+    expect(document.querySelector('script[src="https://example.com/x.js"]')).toBeNull()
   })
 
   it('executeEmbeddedScripts preserves nonce attribute when allowEmbeddedScripts is true', () => {

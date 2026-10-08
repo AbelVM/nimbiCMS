@@ -16,7 +16,7 @@ describe('router extra branches', () => {
   it('throws when single candidate is index.html and fallback is prevented', async () => {
     const raw = 'home'
     // cache the resolution so resolved becomes 'index.html' while originalRaw remains non-explicit
-    const cacheKey = `${raw}|||${currentLang}`
+    const cacheKey = `${raw}|||${currentLang}|||${new URL('/content/', location.href).href}`
     router.resolutionCache.set(cacheKey, { value: { resolved: 'index.html', anchor: null }, ts: Date.now() })
     await expect(router.fetchPageData(raw, '/content/')).rejects.toThrow('Unknown slug: index.html fallback prevented')
   })

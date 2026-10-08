@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import initCMS from '../src/nimbi-cms.js'
+import { destroy } from '../src/init.js'
+import { getCspNonce } from '../src/utils/helpers.js'
 
 describe('initCMS additional sanitization branches', () => {
   let origFetch
@@ -25,5 +27,16 @@ describe('initCMS additional sanitization branches', () => {
 
   it('rejects unsafe navigationPage with parent traversal', async () => {
     await expect(initCMS({ el: '#app', searchIndex: false, navigationPage: '../_navigation.md' })).rejects.toThrow(TypeError)
+  })
+
+  it('clears a previous runtime CSP nonce when omitted', async () => {
+    await initCMS({ el: '#app', searchIndex: false, cspNonce: 'runtime-a' })
+    expect(getCspNonce()).toBe('runtime-a')
+    await destroy()
+
+    document.body.innerHTML = '<div id="app"></div>'
+    await initCMS({ el: '#app', searchIndex: false })
+    expect(getCspNonce()).toBeNull()
+    await destroy()
   })
 })

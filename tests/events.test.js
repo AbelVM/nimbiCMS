@@ -37,6 +37,25 @@ describe('events utilities', () => {
     expect(spy).toHaveBeenLastCalledWith('c')
   })
 
+  it('cancels pending debounce and DOM writes', () => {
+    vi.useFakeTimers()
+    const spy = vi.fn()
+    const d = debounce(spy, 100)
+    d()
+    d.cancel()
+    vi.advanceTimersByTime(100)
+    expect(spy).not.toHaveBeenCalled()
+
+    const calls = []
+    const rafCallbacks = []
+    originalRAF = globalThis.requestAnimationFrame
+    globalThis.requestAnimationFrame = (cb) => { rafCallbacks.push(cb); return rafCallbacks.length }
+    const pending = scheduleDOMWrite(() => calls.push(1))
+    pending.cancel()
+    rafCallbacks.shift()()
+    expect(calls).toEqual([])
+  })
+
   it('rafThrottle calls immediately and replays latest args on following frame', () => {
     originalRAF = globalThis.requestAnimationFrame
     const rafCallbacks = []

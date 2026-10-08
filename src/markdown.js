@@ -10,12 +10,18 @@ import { marked } from "marked";
 import RendererWorker from "./worker/renderer.entry.js?worker&inline";
 import { PowerPool } from "performance-helpers/powerPool";
 import emojimap from "./utils/emojiMap.js";
-import { debugWarn } from "./utils/debug.js";
+import { debugWarn, debugInfo, incrementCounter } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import { getWorkerPoolSize } from "./utils/helpers.js";
 import { slugify } from "./slugManager.js";
 import { getDOMPurify } from "./utils/domPurify.js";
+import {
+  recordWorkerFallback,
+  registerWorkerPool,
+  unregisterWorkerPool,
+} from "./utils/workerPoolDiagnostics.js";
 
+const MAX_WORKER_MARKDOWN_BYTES = 2 * 1024 * 1024;
 const poolSize = getWorkerPoolSize();
 
 const rendererAutoScaleOptions = {
@@ -55,7 +61,7 @@ function _createRendererPool() {
     }
   } catch (_e) {}
   try {
-    return new PowerPool(RendererWorker, poolOpts);
+    return registerWorkerPool("renderer", new PowerPool(RendererWorker, poolOpts));
   } catch (e) {
     // If construction throws for some reason, fall back to a minimal
     // stub that preserves the runtime API used by this module.
@@ -83,6 +89,7 @@ export function teardownRendererWorkerPool() {
   const pool = _rendererPool;
   _rendererPool = null;
   if (!pool) return Promise.resolve();
+  unregisterWorkerPool("renderer", pool);
   try {
     const asyncDispose = pool[Symbol.asyncDispose];
     if (typeof asyncDispose === "function")
@@ -294,7 +301,8 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
   // worker event semantics reliably. Otherwise prefer worker streaming.
   if (
     !import.meta.env.DEV &&
-    typeof w?.postMessage === "function"
+    typeof w?.postMessage === "function" &&
+    body.length <= MAX_WORKER_MARKDOWN_BYTES
   ) {
     return new Promise((resolve, reject) => {
       const id = String(Math.random());
@@ -374,6 +382,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
   }
 
   // Fallback: parse per-chunk on main thread and emit as before.
+  const fallbackStartedAt = Date.now();
   const sections = _splitIntoSections(body, chunkSize);
   const parser = getSharedParser();
   const idCounts = new Map();
@@ -461,6 +470,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
       cb(htmlOut, info);
     } catch (e) {}
   }
+  recordWorkerFallback("renderer-main-thread", Date.now() - fallbackStartedAt);
 }
 
 /**
@@ -470,7 +480,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
  * @param {string} [md] - Markdown source string to convert; falsy values are treated as an empty string.
  * @returns {Promise<ParseResult>} Promise resolving to the parsed HTML, metadata, and table-of-contents.
  */
-export async function parseMarkdownToHtml(md) {
+async function _parseMarkdownToHtml(md) {
   if (markdownPlugins?.length) {
     let { content, data } = parseFrontmatter(md || "");
     try {
@@ -950,6 +960,32 @@ const html = getDOMPurify()(marked.parse(content));
     return { html, meta: res.meta || {}, toc };
   } catch (e) {
     return { html: res.html, meta: res.meta || {}, toc: res.toc || [] };
+  }
+}
+
+/**
+ * Parse Markdown while recording coarse duration diagnostics.
+ * @param {string} [md]
+ * @returns {Promise<ParseResult>}
+ */
+export async function parseMarkdownToHtml(md) {
+  const start =
+    typeof performance?.now === "function" ? performance.now() : Date.now();
+  try {
+    return await _parseMarkdownToHtml(md);
+  } finally {
+    const end =
+      typeof performance?.now === "function" ? performance.now() : Date.now();
+    const duration = Math.max(0, end - start);
+    incrementCounter("markdownParse");
+    incrementCounter(
+      duration < 10
+        ? "markdownParseDurationLt10ms"
+        : duration < 50
+          ? "markdownParseDurationLt50ms"
+          : "markdownParseDurationGe50ms",
+    );
+    debugInfo("[markdown] parse duration", { duration });
   }
 }
 

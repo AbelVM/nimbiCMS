@@ -31,6 +31,11 @@ import { PowerCache, PowerMemoizer } from "performance-helpers/powerCache";
 import { PowerDeadline } from "performance-helpers/powerDeadline";
 import { PowerRetry } from "performance-helpers/powerRetry";
 import { PowerPool } from "performance-helpers/powerPool";
+import {
+  recordWorkerFallback,
+  registerWorkerPool,
+  unregisterWorkerPool,
+} from "./utils/workerPoolDiagnostics.js";
 import { PowerSemaphore } from "performance-helpers/powerSemaphore";
 import { debugLog, debugWarn, debugError, isDebug } from "./utils/debug.js";
 import { yieldIfNeeded } from "./utils/idle.js";
@@ -131,6 +136,11 @@ function _notifyColdRouteWatchers(slug, rel) {
             const rec = { slug: key, token: tok, rel: String(rel ?? "") };
             try {
               gh.__nimbiColdRouteResolved.push(rec);
+              if (gh.__nimbiColdRouteResolved.length > 50)
+                gh.__nimbiColdRouteResolved.splice(
+                  0,
+                  gh.__nimbiColdRouteResolved.length - 50,
+                );
             } catch (_) {}
             try {
               gh?.dispatchEvent?.(
@@ -152,9 +162,11 @@ function _notifyColdRouteWatchers(slug, rel) {
 // when a new slug key is added. Use the Map prototype methods to avoid
 // recursive calls and preserve `instanceof Map` behavior for consumers.
 try {
+  slugToMd._nimbiVersion = 0;
   slugToMd.set = function (k, v) {
     const existed = Map.prototype.has.call(this, k);
     const res = Map.prototype.set.call(this, k, v);
+    this._nimbiVersion += 1;
     try {
       if (!existed) {
         const relStr =
@@ -165,6 +177,10 @@ try {
       }
     } catch (_) {}
     return res;
+  };
+  slugToMd.clear = function () {
+    Map.prototype.clear.call(this);
+    this._nimbiVersion += 1;
   };
 } catch (_) {}
 
@@ -256,7 +272,7 @@ function _createSlugPool() {
     }
   } catch (_e) {}
   try {
-    return new PowerPool(SlugWorker, poolOpts);
+    return registerWorkerPool("slug", new PowerPool(SlugWorker, poolOpts));
   } catch (e) {
     return {
       workers: [],
@@ -282,6 +298,7 @@ export function teardownSlugWorkerPool() {
   const pool = _slugPool;
   _slugPool = null;
   if (!pool) return Promise.resolve();
+  unregisterWorkerPool("slug", pool);
   try {
     const asyncDispose = pool[Symbol.asyncDispose];
     if (typeof asyncDispose === "function")
@@ -305,6 +322,28 @@ function _slugShouldLog() {
   } catch (_e) {
     return false;
   }
+}
+
+function _fetchDiagnostic(url, response, error) {
+  if (error) {
+    return {
+      kind: error.name === "AbortError" ? "aborted" : "network-error",
+      url,
+      error: error.message || String(error),
+    };
+  }
+  const contentType =
+    typeof response?.headers?.get === "function"
+      ? response.headers.get("content-type") || ""
+      : "";
+  return {
+    kind: response?.ok ? "invalid-response" : "http-error",
+    url,
+    status: response?.status,
+    statusText: response?.statusText,
+    redirected: response?.redirected === true,
+    contentType,
+  };
 }
 
 /**
@@ -657,6 +696,8 @@ export function _setSearchIndex(arr) {
 export const listSlugCache = new Map();
 /** @type {Set<string>} */
 export const listPathsFetched = new Set();
+/** @type {Map<string,string|null>} */
+export const crawlCache = new Map();
 
 /**
  * Clear caches used for directory list -> slug mappings and path fetch
@@ -729,6 +770,8 @@ export const slugify = (s) => _slugifyMemo.run(s);
  * @returns {void} - No return value.
  */
 export function setContentBase(contentBase) {
+  clearListCaches();
+  clearCrawlCache();
   slugToMd.clear();
   mdToSlug.clear();
   setAllMarkdownPaths([]);
@@ -983,12 +1026,34 @@ export function clearFetchCache() {
 }
 
 /**
+ * Return bounded diagnostics for the runtime-owned Markdown caches.
+ * @returns {{fetchEntries:number, negativeEntries:number, maxEntries:number}}
+ */
+export function getFetchCacheDiagnostics() {
+  return {
+    fetchEntries: Number(fetchCache.size) || 0,
+    negativeEntries: Number(negativeFetchCache.size) || 0,
+    maxEntries: Number(fetchCache.maxEntries) || 0,
+  };
+}
+
+/**
  * Short-term negative cache for failed fetches. Maps absolute URL -> expiresAt (ms).
  * When a URL is present and not expired, `fetchMarkdown` will reject immediately
  * without issuing a network request.
  * @type {Map<string, number>}
  */
 export const negativeFetchCache = new PowerCache({ maxEntries: 2000 });
+
+function getFetchCacheKey(url) {
+  try {
+    const manifest = globalThis?.window?.__nimbiRuntimeManifest;
+    if (manifest && Number.isInteger(manifest.generation)) {
+      return `${url}|||generation:${manifest.generation}|||language:${manifest.language || ""}`;
+    }
+  } catch (_) {}
+  return url;
+}
 
 let NEGATIVE_CACHE_TTL_MS = 60 * 1000; // 1 minute default
 
@@ -1215,9 +1280,8 @@ export let fetchMarkdown = async function (path, base, opts) {
     // caller-provided signal with the deadline signal and ensure caller
     // aborts cancel the underlying fetch. This keeps control local and
     // avoids depending on a static `run` implementation.
-    try {
-      if (typeof PowerDeadline === "function") {
-        const dl = new PowerDeadline({ timeout: timeoutMs });
+    if (typeof PowerDeadline === "function") {
+        const dl = new PowerDeadline({ totalTimeout: timeoutMs });
         let mergedSignal = dl.signal;
         try {
           if (
@@ -1250,52 +1314,48 @@ export let fetchMarkdown = async function (path, base, opts) {
         // failing and allowing the negative cache to record the URL.
         // Prefer PowerRetry when available; otherwise fall back to a
         // small manual retry loop with exponential backoff.
-        try {
-          return await dl.run(async () => {
+        return await dl.run(async (deadlineSignal) => {
+            const requestSignal = deadlineSignal || signal || dl.signal;
             const attempts = 3; // initial + 2 retries
             // Helper that performs a single fetch attempt and treats
             // 5xx responses as retryable failures.
             const singleAttempt = async () => {
-              if (mergedSignal?.aborted) {
+              if (requestSignal?.aborted) {
                 const ae = new Error("aborted");
                 ae.name = "AbortError";
                 throw ae;
               }
-              const fetchOpts = mergedSignal
-                ? { signal: mergedSignal, referrerPolicy: "no-referrer" }
+              const fetchOpts = requestSignal
+                ? { signal: requestSignal, referrerPolicy: "no-referrer" }
                 : { referrerPolicy: "no-referrer" };
               return await fetch(targetUrl, fetchOpts);
             };
 
             // Try using PowerRetry when it exists and has a run method.
             if (typeof PowerRetry === "function") {
-              try {
-                const retry = new PowerRetry({
-                  maxAttempts: attempts,
-                  backoff: "exponential",
-                  baseDelay: 50,
-                  jitter: false,
+              const retry = new PowerRetry({
+                maxAttempts: attempts,
+                backoff: "exponential",
+                baseDelay: 50,
+                jitter: false,
+              });
+              if (typeof retry.run === "function") {
+                return await retry.run(async () => {
+                  const r = await singleAttempt();
+                  if (r && typeof r.status === "number" && r.status >= 500) {
+                    const re = new Error("server error");
+                    re.status = r.status;
+                    throw re;
+                  }
+                  return r;
                 });
-                if (typeof retry.run === "function") {
-                  return await retry.run(async () => {
-                    const r = await singleAttempt();
-                    if (r && typeof r.status === "number" && r.status >= 500) {
-                      const re = new Error("server error");
-                      re.status = r.status;
-                      throw re;
-                    }
-                    return r;
-                  });
-                }
-              } catch (_) {
-                // fall through to manual retry below
               }
             }
 
             // Manual retry loop (safe fallback).
             let lastErr;
             for (let i = 0; i < attempts; i++) {
-              if (mergedSignal?.aborted) {
+              if (requestSignal?.aborted) {
                 const ae = new Error("aborted");
                 ae.name = "AbortError";
                 throw ae;
@@ -1324,10 +1384,8 @@ export let fetchMarkdown = async function (path, base, opts) {
                 throw lastErr;
               }
             }
-          });
-        } catch (_) {}
-      }
-    } catch (_) {}
+        }, signal ? { signal } : undefined);
+    }
 
     // Final fallback: use AbortSignal.timeout when available
     let mergedSignal = signal || null;
@@ -1356,16 +1414,17 @@ export let fetchMarkdown = async function (path, base, opts) {
     );
   };
 
+  const cacheKey = getFetchCacheKey(url);
   try {
-    const neg = negativeFetchCache.get(url);
+    const neg = negativeFetchCache.get(cacheKey);
     if (neg && neg > Date.now()) {
       return Promise.reject(new Error("failed to fetch md"));
     }
-    if (neg) negativeFetchCache.delete(url);
+    if (neg) negativeFetchCache.delete(cacheKey);
   } catch (_) {}
 
-  if (fetchCache.has(url)) {
-    return fetchCache.get(url);
+  if (fetchCache.has(cacheKey)) {
+    return fetchCache.get(cacheKey);
   }
 
   const promise = (async () => {
@@ -1374,11 +1433,9 @@ export let fetchMarkdown = async function (path, base, opts) {
       res = await fetchWithDeadline(url);
     } catch (fetchErr) {
       try {
-        debugError("fetchMarkdown failed:", () => ({
-          url,
-          status: "fetch-error",
-          error: fetchErr && fetchErr.message ? fetchErr.message : String(fetchErr),
-        }));
+        debugError("fetchMarkdown failed:", () =>
+          _fetchDiagnostic(url, null, fetchErr),
+        );
       } catch (e) {}
       throw new Error("failed to fetch md");
     }
@@ -1415,18 +1472,14 @@ export let fetchMarkdown = async function (path, base, opts) {
         if (status === 404) {
           try {
             debugWarn("fetchMarkdown failed (404):", () => ({
-              url,
-              status,
-              statusText: res ? res.statusText : undefined,
+              ..._fetchDiagnostic(url, res),
               body: body.slice(0, 200),
             }));
           } catch (e) {}
         } else {
           try {
             debugError("fetchMarkdown failed:", () => ({
-              url,
-              status,
-              statusText: res ? res.statusText : undefined,
+              ..._fetchDiagnostic(url, res),
               body: body.slice(0, 200),
             }));
           } catch (e) {}
@@ -1462,7 +1515,10 @@ export let fetchMarkdown = async function (path, base, opts) {
         debugLog("[slugManager] fetching fallback 404 failed", _ee);
       }
       if (_slugShouldLog())
-        debugError("fetchMarkdown: server returned HTML for .md request", url);
+        debugError("fetchMarkdown: invalid content type for .md request", () => ({
+          ..._fetchDiagnostic(url, res),
+          expected: "text/markdown or text/plain",
+        }));
       throw new Error("failed to fetch md");
     }
 
@@ -1470,7 +1526,7 @@ export let fetchMarkdown = async function (path, base, opts) {
   })();
 
   // Cache the promise so concurrent callers share the same underlying fetch.
-  fetchCache.set(url, promise);
+  fetchCache.set(cacheKey, promise);
 
   // If the caller provided an AbortSignal, wire it to the returned promise
   // so that aborting the signal rejects the caller-visible promise with
@@ -1520,15 +1576,15 @@ export let fetchMarkdown = async function (path, base, opts) {
           err.code === "EDEADLINE")
       ) {
         try {
-          fetchCache.delete(url);
+          fetchCache.delete(cacheKey);
         } catch (_) {}
         throw err;
       }
       try {
-        negativeFetchCache.set(url, Date.now() + NEGATIVE_CACHE_TTL_MS);
+        negativeFetchCache.set(cacheKey, Date.now() + NEGATIVE_CACHE_TTL_MS);
       } catch (_) {}
       try {
-        fetchCache.delete(url);
+        fetchCache.delete(cacheKey);
       } catch (_) {}
       throw err;
     });
@@ -1549,11 +1605,12 @@ export function setFetchMarkdown(fn) {
 }
 
 /**
- * Cache used by `crawlForSlug` to memoize results keyed by decoded slug.
- * Values are the resolved path string or `null` when not found.
- * @type {Map<string,string|null>}
+ * Clear slug-crawl results when the content source or runtime changes.
+ * @returns {void} - No return value.
  */
-export const crawlCache = new Map();
+export function clearCrawlCache() {
+  crawlCache.clear();
+}
 
 /**
  * Remove code blocks, inline code, and HTML comments from markdown
@@ -2420,10 +2477,14 @@ export async function whenSearchIndexReady(opts = {}) {
           } catch (_) {}
         }
       } catch (_) {}
+      const fallbackStartedAt = Date.now();
       try {
         await buildSearchIndex(contentBase, indexDepth, noIndexing, seedPaths);
         return searchIndex;
-      } catch (_) {}
+      } catch (_) {
+      } finally {
+        recordWorkerFallback("slug-main-thread", Date.now() - fallbackStartedAt);
+      }
     }
 
     const start = Date.now();

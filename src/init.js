@@ -8,6 +8,9 @@
 
 import {
   fetchMarkdown,
+  clearFetchCache,
+  clearListCaches,
+  clearCrawlCache,
   setContentBase,
   setNotFoundPage,
   setLanguages,
@@ -31,10 +34,14 @@ import * as markdown from "./markdown.js";
 import { teardownRendererWorkerPool } from "./markdown.js";
 import { teardownSlugWorkerPool } from "./slugManager.js";
 import { teardownAnchorWorkerPool } from "./htmlBuilder.js";
+import { disposeWorkerBlobUrlCache } from "./worker-manager.js";
 import { refreshIndexPaths } from "./indexManager.js";
 import { buildNav } from "./nav.js";
 import * as runtimeSitemap from "./runtimeSitemap.js";
-import { awaitSearchIndex as awaitSearchIndexRuntime } from "./slugSearchRuntime.js";
+import {
+  awaitSearchIndex as awaitSearchIndexRuntime,
+  clearSearchIndexCache,
+} from "./slugSearchRuntime.js";
 import { createUI } from "./ui.js";
 import { parseHrefToRoute } from "./utils/urlHelper.js";
 import {
@@ -53,6 +60,8 @@ import {
   registerThemedElement,
 } from "./bulmaManager.js";
 import { setDebugLevel, debugWarn, debugInfo } from "./utils/debug.js";
+import { startPerformanceDiagnostics } from "./utils/performanceDiagnostics.js";
+import { createRuntimeManifest } from "./utils/runtimeManifest.js";
 
 /**
  * Parse well-known `initCMS` options from the current page URL's query
@@ -113,9 +122,12 @@ import { setDebugLevel, debugWarn, debugInfo } from "./utils/debug.js";
  * @property {boolean} [skipRootReadme]
  * @property {boolean} [allowUrlPathOverrides]
  * @property {boolean} [allowEmbeddedScripts]
+ * @property {string[]} [embeddedScriptOrigins]
  * @property {Object} [seoMap]
  * @property {Object} [manifest]
  * @property {boolean} [exposeSitemap]
+ * @property {boolean} [performanceDiagnostics]
+ * @property {(record:Object) => void} [onRuntimeError]
  *
  * @param {string} [queryString] optional query string (for tests); defaults to window.location.search
  * @returns {ParsedInitOptions} - Parsed options object containing any recognized and parsed query parameters.
@@ -300,6 +312,38 @@ export let initialDocumentTitle = "";
  * @type {AbortController|null}
  */
 let cmsAbortController = null;
+let destroyPromise = null;
+let cmsMountEl = null;
+let runtimeInstanceSequence = 0;
+let currentRuntimeId = null;
+let disposePerformanceDiagnostics = () => {};
+const runtimeTimeouts = new Set();
+
+function scheduleRuntimeTimeout(fn, delay, signal = cmsAbortController?.signal) {
+  const id = setTimeout(() => {
+    runtimeTimeouts.delete(id);
+    if (signal?.aborted) return;
+    fn();
+  }, delay);
+  runtimeTimeouts.add(id);
+  return id;
+}
+
+function clearRuntimeTimeouts() {
+  for (const id of runtimeTimeouts) clearTimeout(id);
+  runtimeTimeouts.clear();
+}
+
+function setRecoveryState(state, error = null) {
+  try {
+    if (typeof window === "undefined") return;
+    window.__nimbiRecoveryState = {
+      state,
+      generation: currentRuntimeId,
+      error: error ? String(error?.message || error).slice(0, 2000) : null,
+    };
+  } catch (_) {}
+}
 
 /**
  * Initialize the CMS in a host page.
@@ -313,6 +357,7 @@ let cmsAbortController = null;
  *   URL query parameters. This is disabled by default for security; enabling
  *   it should only be done by trusted host pages.
  * @param {boolean} [options.allowEmbeddedScripts=false] - when `true`, executes embedded scripts from rendered markdown/html via `new Function(...)`. This is security-sensitive and should only be enabled for fully trusted content sources.
+ * @param {(record:Object) => void} [options.onRuntimeError] - optional bounded runtime diagnostic callback.
  * @param {string|Element} options.el - mount point selector or element
  * @param {string} [options.contentPath='/content'] - URL path to content
  * @param {number} [options.crawlMaxQueue=1000] - maximum directory queue length for slug crawling (see docs)
@@ -340,6 +385,17 @@ export async function initCMS(options = {}) {
   if (!options || typeof options !== "object") {
     throw new TypeError("initCMS(options): options must be an object");
   }
+  setRecoveryState("loading");
+  if (destroyPromise) {
+    await destroyPromise;
+    destroyPromise = null;
+  }
+  try {
+    clearFetchCache();
+    clearListCaches();
+    clearCrawlCache();
+    clearSearchIndexCache();
+  } catch (_) {}
 
   const queryOpts = parseInitOptionsFromQuery();
   if (
@@ -368,6 +424,19 @@ export async function initCMS(options = {}) {
     }
   }
   const finalOptions = Object.assign({}, queryOpts, options);
+  if (
+    finalOptions.manifest != null &&
+    (typeof finalOptions.manifest !== "object" ||
+      Array.isArray(finalOptions.manifest))
+  ) {
+    throw new TypeError("initCMS(options): manifest must be a plain object");
+  }
+  if (
+    finalOptions.onRuntimeError != null &&
+    typeof finalOptions.onRuntimeError !== "function"
+  ) {
+    throw new TypeError("initCMS(options): onRuntimeError must be a function");
+  }
   try {
     if (Object.prototype.hasOwnProperty.call(finalOptions, "debugLevel")) {
       setDebugLevel(finalOptions.debugLevel);
@@ -404,6 +473,7 @@ export async function initCMS(options = {}) {
     notFoundPage = null,
     navigationPage = "_navigation.md",
     allowEmbeddedScripts = false,
+    embeddedScriptOrigins = [],
     exposeSitemap = true,
     cspNonce = null,
   } = finalOptions;
@@ -513,7 +583,10 @@ export async function initCMS(options = {}) {
   } catch (e) {
     if (e instanceof Error && /already called/.test(e.message)) throw e;
   }
-
+  if (cmsMountEl && cmsMountEl !== mountEl && cmsMountEl.isConnected) {
+    await destroy();
+    destroyPromise = null;
+  }
   if (typeof contentPath !== "string" || !contentPath.trim()) {
     throw new TypeError(
       'initCMS(options): "contentPath" must be a non-empty string when provided',
@@ -658,6 +731,30 @@ export async function initCMS(options = {}) {
   }
 
   if (
+    !Array.isArray(embeddedScriptOrigins) ||
+    embeddedScriptOrigins.some((origin) => {
+      if (typeof origin !== "string" || !origin.trim()) return true;
+      try {
+        const parsed = new URL(origin);
+        return (
+          !/^https?:$/.test(parsed.protocol) ||
+          parsed.username !== "" ||
+          parsed.password !== "" ||
+          parsed.pathname !== "/" ||
+          parsed.search !== "" ||
+          parsed.hash !== ""
+        );
+      } catch (_) {
+        return true;
+      }
+    })
+  ) {
+    throw new TypeError(
+      'initCMS(options): "embeddedScriptOrigins" must contain only absolute http(s) origins',
+    );
+  }
+
+  if (
     finalOptions.fetchConcurrency != null &&
     (typeof finalOptions.fetchConcurrency !== "number" ||
       !Number.isInteger(finalOptions.fetchConcurrency) ||
@@ -719,7 +816,7 @@ export async function initCMS(options = {}) {
       addResourceHints();
     } catch (e) {}
     try {
-      if (cspNonce) setCspNonce(cspNonce);
+      setCspNonce(cspNonce || null);
     } catch (e) {}
     // Preload critical external resources (highlight.js theme CSS)
     try {
@@ -737,6 +834,25 @@ export async function initCMS(options = {}) {
       if (typeof window !== "undefined") {
         if (!window.__nimbiRenderingErrors__)
           window.__nimbiRenderingErrors__ = [];
+        const runtimeId = currentRuntimeId;
+        const redactDiagnosticValue = (value) =>
+          String(value)
+            .replace(/([?&](?:token|key|secret|password|auth)[^=]*=)[^&]*/gi, "$1[redacted]")
+            .replace(/([?&][^#\s=]+)=([^&#\s]*)/g, "$1=[redacted]")
+            .replace(/#.*$/, "#");
+        const recordRuntimeError = (record) => {
+          const boundedRecord = { ...record, runtimeId };
+          for (const key of ["message", "reason", "filename", "stack"]) {
+            if (boundedRecord[key] != null)
+              boundedRecord[key] = redactDiagnosticValue(boundedRecord[key]).slice(0, 2000);
+          }
+          window.__nimbiRenderingErrors__.push(boundedRecord);
+          if (window.__nimbiRenderingErrors__.length > 50)
+            window.__nimbiRenderingErrors__.splice(0, window.__nimbiRenderingErrors__.length - 50);
+          try {
+            finalOptions.onRuntimeError?.({ ...boundedRecord });
+          } catch (_) {}
+        };
         window.addEventListener("error", function (ev) {
           try {
             const rec = {
@@ -751,7 +867,7 @@ export async function initCMS(options = {}) {
             try {
               debugWarn("[nimbi-cms] runtime error", rec.message);
             } catch (_) {}
-            window.__nimbiRenderingErrors__.push(rec);
+            recordRuntimeError(rec);
           } catch (_) {}
         }, { signal: cmsAbortController.signal });
         window.addEventListener("unhandledrejection", function (ev) {
@@ -764,9 +880,9 @@ export async function initCMS(options = {}) {
             try {
               debugWarn("[nimbi-cms] unhandledrejection", rec.reason);
             } catch (_) {}
-            window.__nimbiRenderingErrors__.push(rec);
+            recordRuntimeError(rec);
           } catch (_) {}
-        });
+        }, { signal: cmsAbortController.signal });
       }
     } catch (e) {}
     try {
@@ -797,6 +913,7 @@ export async function initCMS(options = {}) {
 
       const container = document.createElement("div");
       container.className = "container nimbi-cms";
+      container.tabIndex = 0;
       try {
       } catch (e) {
         debugWarn("[nimbi-cms] container style setup failed", e);
@@ -1327,6 +1444,17 @@ setStyle(defaultStyle);
   // All UI and navigation event listeners will be wired to this signal
   // so that a single `abort()` call removes them all.
   cmsAbortController = typeof window !== "undefined" ? new AbortController() : { signal: { abort: () => {} } };
+  currentRuntimeId = ++runtimeInstanceSequence;
+  setRecoveryState("loading");
+  const runtimeManifest = createRuntimeManifest({
+    generation: currentRuntimeId,
+    contentBase,
+    language: currentLang,
+    source: finalOptions.manifest ?? null,
+  });
+  disposePerformanceDiagnostics = finalOptions.performanceDiagnostics === true
+    ? startPerformanceDiagnostics(cmsAbortController.signal)
+    : () => {};
 
   const ui = createUI({
     contentWrap,
@@ -1339,25 +1467,32 @@ setStyle(defaultStyle);
     initialDocumentTitle,
     runHooks,
     allowEmbeddedScripts,
+    embeddedScriptOrigins,
     signal: cmsAbortController.signal,
   });
       try {
         if (typeof window !== "undefined") {
           try {
             window.__nimbiUI = ui;
+            window.__nimbiRuntimeId = currentRuntimeId;
+            window.__nimbiRuntimeManifest = runtimeManifest;
             // Initialize render timing collection
             if (!window.__nimbiRenderTimings) {
               window.__nimbiRenderTimings = [];
             }
           } catch (_) {}
-          window.addEventListener("nimbi.coldRouteResolved", function (ev) {
-            ui?.renderByQuery?.().catch((e) => {
-              debugWarn?.(
-                "[nimbi-cms] renderByQuery failed for cold-route event",
-                e,
-              );
-            });
-          });
+          window.addEventListener(
+            "nimbi.coldRouteResolved",
+            function () {
+              ui?.renderByQuery?.().catch((e) => {
+                debugWarn?.(
+                  "[nimbi-cms] renderByQuery failed for cold-route event",
+                  e,
+                );
+              });
+            },
+            { signal: cmsAbortController.signal },
+          );
           const q = Array.isArray(window.__nimbiColdRouteResolved)
             ? window.__nimbiColdRouteResolved.slice()
             : null;
@@ -1909,7 +2044,7 @@ setStyle(defaultStyle);
               }
             };
             try {
-              setTimeout(reveal, 3000);
+              scheduleRuntimeTimeout(reveal, 3000);
             } catch (e) {
               reveal();
             }
@@ -1951,6 +2086,7 @@ setStyle(defaultStyle);
               window.addEventListener(type, showOnce, {
                 once: true,
                 passive: true,
+                signal: cmsAbortController?.signal,
               });
             } catch (e) {
               try {
@@ -1971,9 +2107,13 @@ setStyle(defaultStyle);
       }
     })();
   } catch (err) {
+    setRecoveryState("failed", err);
     renderInitError(err);
     throw err;
   }
+  mountEl._nimbiCmsInitialized = true;
+  cmsMountEl = mountEl;
+  setRecoveryState("ready");
 }
 
 /**
@@ -1982,57 +2122,62 @@ setStyle(defaultStyle);
  *
  * Safe to call multiple times; subsequent calls are no-ops.
  *
- * @returns {void}
+ * @returns {Promise<void>}
  */
 export function destroy() {
-  try {
-    if (typeof window !== "undefined") {
-      try {
+  if (destroyPromise) return destroyPromise;
+  destroyPromise = (async () => {
+    if (typeof router.disposeResolutionCachePurge === "function") {
+      router.disposeResolutionCachePurge();
+    }
+    try {
+      if (typeof window !== "undefined") {
         window.__nimbiUI = null;
-      } catch (_) {}
-      try {
         window.__nimbiRenderingErrors__ = null;
-      } catch (_) {}
-      try {
         window.__nimbiRenderTimings = null;
-      } catch (_) {}
-    }
-  } catch (_) {}
+        window.__nimbiRuntimeId = null;
+        setRecoveryState("idle");
+      }
+    } catch (_) {}
 
-  // Abort all pending fetches and remove signal-bound listeners
-  try {
-    if (typeof cmsAbortController !== "undefined" && cmsAbortController) {
-      cmsAbortController.abort();
-    }
-  } catch (_) {}
+    try {
+      if (cmsAbortController) cmsAbortController.abort();
+    } catch (_) {}
+    clearRuntimeTimeouts();
+    try {
+      if (typeof runtimeSitemap.clearSitemapWriteTimer === "function") {
+        runtimeSitemap.clearSitemapWriteTimer();
+      }
+    } catch (_) {}
+    try {
+      disposePerformanceDiagnostics();
+      disposePerformanceDiagnostics = () => {};
+    } catch (_) {}
 
-  // Terminate worker pools
-  try {
-    teardownRendererWorkerPool();
-  } catch (_) {}
-  try {
-    teardownSlugWorkerPool();
-  } catch (_) {}
-  try {
-    teardownAnchorWorkerPool();
-  } catch (_) {}
+    await Promise.all([
+      teardownRendererWorkerPool(),
+      teardownSlugWorkerPool(),
+      teardownAnchorWorkerPool(),
+    ]);
+    disposeWorkerBlobUrlCache();
 
-  // Clear resolution cache
-  try {
-    if (typeof router._clearIndexCache === "function") {
-      router._clearIndexCache();
-    }
-  } catch (_) {}
+    try {
+      if (typeof router._clearIndexCache === "function") router._clearIndexCache();
+    } catch (_) {}
 
-  // Remove DOM elements created by the CMS
-  try {
-    if (typeof document !== "undefined") {
-      const skipLink = document.querySelector(".nimbi-skip-link");
-      if (skipLink) skipLink.remove();
-      const scrollTop = document.querySelector(".nimbi-scroll-top");
-      if (scrollTop) scrollTop.remove();
-      const main = document.querySelector("main.nimbi-main");
-      if (main) main.remove();
-    }
-  } catch (_) {}
+    try {
+      if (typeof document !== "undefined") {
+        document.querySelector(".nimbi-skip-link")?.remove();
+        document.querySelector(".nimbi-scroll-top")?.remove();
+        document.querySelector(".nimbi-mount > section")?.remove();
+      }
+    } catch (_) {}
+
+    try {
+      currentRuntimeId = null;
+      if (cmsMountEl) cmsMountEl._nimbiCmsInitialized = false;
+      cmsMountEl = null;
+    } catch (_) {}
+  })();
+  return destroyPromise;
 }

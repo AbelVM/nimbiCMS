@@ -11,6 +11,11 @@
  * @returns {Promise<void>}
  */
 export function yieldToEventLoop() {
+  if (typeof globalThis.scheduler?.yield === "function") {
+    try {
+      return globalThis.scheduler.yield();
+    } catch (e) {}
+  }
   if (typeof requestIdleCallback === "function") {
     return new Promise((resolve) => {
       try {

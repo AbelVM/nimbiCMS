@@ -42,6 +42,18 @@ Raw reports are saved to `benchmarks/reports/`:
 npm run benchmark:lighthouse
 ```
 
+Measure indexing across 100, 1,000, and 10,000 generated Markdown pages with:
+
+```bash
+npm run benchmark:content
+```
+
+Check generated JavaScript bundle budgets with:
+
+```bash
+npm run build && npm run check:bundle
+```
+
 The script will:
 
 1. Start a local server on a random free port

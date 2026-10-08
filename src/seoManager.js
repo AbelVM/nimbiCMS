@@ -79,6 +79,22 @@ function upsertMeta(attrName, attrValue, content) {
   tag.setAttribute("content", content);
 }
 
+function replaceMetaValues(attrName, attrValue, values) {
+  const escapedAttrValue =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(attrValue))
+      : String(attrValue);
+  document
+    .querySelectorAll(`meta[${attrName}="${escapedAttrValue}"]`)
+    .forEach((tag) => tag.remove());
+  for (const value of values) {
+    const tag = document.createElement("meta");
+    tag.setAttribute(attrName, attrValue);
+    tag.setAttribute("content", String(value));
+    document.head.appendChild(tag);
+  }
+}
+
 function upsertLinkRel(rel, href) {
   try {
     if (!rel) return;
@@ -120,6 +136,18 @@ function _isRtlLang(lang) {
   }
 }
 
+function _validLanguageTags(langs) {
+  if (!Array.isArray(langs)) return [];
+  const valid = new Set();
+  for (const lang of langs) {
+    try {
+      const tag = new Intl.Locale(String(lang)).toString();
+      if (tag.toLowerCase() !== "x-default") valid.add(tag);
+    } catch (_) {}
+  }
+  return [...valid];
+}
+
 /**
  * Emit hreflang `<link rel="alternate">` tags for every configured
  * available language plus an `x-default` fallback. Each tag points to
@@ -131,7 +159,10 @@ function _isRtlLang(lang) {
 export function setHreflangTags(pageSlug) {
   try {
     if (typeof document === "undefined" || !document.head) return;
-    const langs = getLanguages();
+    document
+      .querySelectorAll('link[rel="alternate"][hreflang]')
+      .forEach((el) => el.remove());
+    const langs = _validLanguageTags(getLanguages());
     if (!Array.isArray(langs) || langs.length === 0) return;
 
     try {
@@ -146,17 +177,10 @@ export function setHreflangTags(pageSlug) {
         ? `${base}?page=${encodeURIComponent(slug)}`
         : base;
 
-      // Remove any previously emitted hreflang links to avoid duplicates
-      try {
-        const existing = document.querySelectorAll(
-          'link[rel="alternate"][hreflang]',
-        );
-        existing.forEach((el) => el.remove());
-      } catch (_) {}
-
       for (const lang of langs) {
         try {
-          const href = `${baseUrl}&lang=${encodeURIComponent(String(lang))}`;
+          const separator = baseUrl.includes("?") ? "&" : "?";
+          const href = `${baseUrl}${separator}lang=${encodeURIComponent(String(lang))}`;
           const link = document.createElement("link");
           link.setAttribute("rel", "alternate");
           link.setAttribute("hreflang", String(lang));
@@ -236,14 +260,15 @@ function setOgTwitter(
     const locale = String(lang).replace("-", "_").toLowerCase();
     upsertMeta("property", "og:locale", locale);
     // og:locale:alternate — one per available language
-    const langs = getLanguages();
+    const langs = _validLanguageTags(getLanguages());
     if (Array.isArray(langs) && langs.length > 0) {
-      for (const l of langs) {
-        try {
-          const altLocale = String(l).replace("-", "_").toLowerCase();
-          upsertMeta("property", "og:locale:alternate", altLocale);
-        } catch (_) {}
-      }
+      replaceMetaValues(
+        "property",
+        "og:locale:alternate",
+        langs.map((l) => String(l).replace("-", "_").toLowerCase()),
+      );
+    } else {
+      replaceMetaValues("property", "og:locale:alternate", []);
     }
   } catch (_) {}
   // article:published_time / article:modified_time
@@ -442,13 +467,28 @@ function _computeCanonical(page) {
     }
 
     const pageType = _inferPageType(pagePath, meta);
+    const pageId = canonical ? `${canonical}#webpage` : `${location.href}#webpage`;
+    const siteName = getSiteNameFromMeta() || initialDocumentTitle || "";
     const json = {
       "@context": "https://schema.org",
       "@type": pageType,
+      "@id": pageId,
       headline: title || "",
       description: description || "",
       url: canonical || location.href.split("#")[0],
     };
+    try {
+      const language = meta.inLanguage || document.documentElement.lang;
+      if (language) json.inLanguage = String(language);
+      if (siteName) {
+        json.isPartOf = {
+          "@type": "WebSite",
+          "@id": `${location.origin}#website`,
+          name: siteName,
+          url: location.origin,
+        };
+      }
+    } catch (_) {}
     if (image) json.image = String(image);
     if (meta.date) json.datePublished = meta.date;
     if (meta.dateModified) json.dateModified = meta.dateModified;
@@ -476,6 +516,7 @@ function _computeCanonical(page) {
       if (publisherName) {
         json.publisher = {
           "@type": "Organization",
+          "@id": `${location.origin}#organization`,
           name: publisherName,
         };
       }
@@ -483,8 +524,24 @@ function _computeCanonical(page) {
     if (canonical) {
       json.mainEntityOfPage = {
         "@type": "WebPage",
-        "@id": canonical,
+        "@id": pageId,
       };
+    }
+    if (Array.isArray(meta.breadcrumbs) && meta.breadcrumbs.length) {
+      const items = meta.breadcrumbs
+        .filter((item) => item && item.name)
+        .map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: String(item.name),
+          ...(item.url ? { item: String(item.url) } : {}),
+        }));
+      if (items.length) {
+        json.breadcrumb = {
+          "@type": "BreadcrumbList",
+          itemListElement: items,
+        };
+      }
     }
 
     const id = "nimbi-jsonld";
@@ -532,6 +589,14 @@ export function setSeoMap(map) {
 export function injectSeoForPage(page, initialDocumentTitle = "") {
   try {
     if (!page) return;
+    const runtimeManifest =
+      typeof window !== "undefined" ? window.__nimbiRuntimeManifest : null;
+    if (runtimeManifest && Number.isInteger(runtimeManifest.generation)) {
+      document.documentElement?.setAttribute(
+        "data-nimbi-generation",
+        String(runtimeManifest.generation),
+      );
+    }
     const meta = seoMap?.[page]
       ? seoMap[page]
       : typeof window !== "undefined" && window.__SEO_MAP?.[page]
