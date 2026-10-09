@@ -441,17 +441,17 @@ verdict for each so neither audit is orphaned.
 | G-014 AbortSignal on semaphore acquire | ✅ | `runWithConcurrency` already forwards the signal. |
 | G-015 Decouple anchor worker | ✅ | **Already done — the audit's premise no longer holds.** It cited `src/worker/anchorRewriter.js:1-15` importing `slugManager`, but that module was deleted (confirmed by RC7/G-031). Verified the current worker graph: `anchorWorker.js` imports only `anchorRuntime.js` and `powerMessageCodec`; `anchorRuntime.js` imports only `sharedDomParser`, `slugify`, `helpers`, `stripContentBasePrefix`, and `concurrency`. No `slugManager`, no worker factories, no caches. |
 | G-016 hljs build-time generation | ⏰ | Deferred. **Not architecturally incompatible** — unlike G-023 this concerns nimbiCMS's *own* Vite build (generating `supportedLanguages.json` from the highlight.js package), not the user's content, so it adds no step for users. Deferred because the project deliberately keeps the runtime fetch for "no rebuild needed"; the offline/CSP tradeoff is real but is a product decision, not a defect. |
-| G-017 `import.meta.glob` for hljs languages | ⬜ | Not started. P1. |
+| G-017 `import.meta.glob` for hljs languages | ⬜ | **Premise verified real; not started.** `codeblocksManager.js:444-449` imports language definitions with `/* @vite-ignore */` and a template literal, so Vite emits no chunk and the runtime specifier resolves against the document URL, which 404s in a browser. Every non-core language therefore falls through to `cdn.jsdelivr.net` (lines 471/492/506). Architecturally permissible — this concerns nimbiCMS's own Vite build, not user content. Substantial: ~190 code-split chunks plus a name-to-loader map, and it needs a bundle-size measurement before adopting. Best treated as its own change. |
 | G-018 `bulmaManager` observer disconnect | ✅ | **Done.** Observers are now tracked in a module-level `_bulmaHeadObservers` set and disconnected by a new `disconnectBulmaObservers()`, wired into `destroy()`. Also fixed the broken reuse logic: it stored the literal string `"1"` in `data-bulmaswatch-observer` and then queried for an element carrying that value, which resolved to the link itself rather than an observer — so every call created a fresh observer. The callback now also disconnects when its stylesheet leaves the document, instead of running for the rest of the page lifetime. `injectLink` exported as a test seam. 6 new tests. |
 | G-019 `textMetrics` cache to PowerCache | ❌ | **Not actionable — the audit's three claims are all false, and the proposed change would regress.** Verified empirically: (1) the cache is keyed by `length:hash`, not the full text; (2) values are held via `WeakRef`, so the GC can reclaim them under pressure before the FIFO limit — `PowerCache` holds *strong* references and would make retention worse; (3) the empty-string eviction edge case does not exist — `makeKey` always returns `"N:H"`, which is never falsy, and eviction was exercised 250 times with correct results. The cache is already bounded at 200 entries with FIFO eviction. Added 7 tests pinning the behaviour so a future change is deliberate. |
-| G-020 SEO favicon memoize / selector cache | ⬜ | Not started. P3. |
-| G-021 Image zoom CSS write batching | ⬜ | Not started. P3. |
+| G-020 SEO favicon memoize / selector cache | ❌ | **Premise false — the code does not exist.** No favicon encoding anywhere in `src/`: no `toDataURL`, no `rel="icon"` upsert, no `setFaviconHref`. The only `favicon` references are the navbar *logo* option (`logoOption = "favicon"`, `nav.js:241`/`init.js:474`), which reads an existing href rather than encoding one. Nothing to memoize. |
+| G-021 Image zoom CSS write batching | ⬜ | **Premise verified real; not started.** `imagePreview.js:149` binds a `wheel` handler that calls `setZoom()` (line 450), which performs ~6 `style.setProperty`/`style.width` writes plus `updateZoomLabel()`. A trackpad flick fires `wheel` at 60-120Hz, so that is 6+ unbatched style writes per event. The fix is small and safe — `rafThrottle`/`scheduleDOMWrite` already exist in `utils/events.js`. |
 | G-022 Yield coverage in crawl loops | ✅ | Done as X7 (time-budgeted `createYieldGate`). |
 | G-023 Build-time search index | ❌ | **Architecturally incompatible — rejected.** nimbiCMS is a 100% runtime CMS: README states "No database, no build step, no backend — just Markdown files and a browser", and "nimbiCMS loads content at runtime, so changes appear immediately". A prebuilt `search-index.json` would require every user to run a build step over their own content, which is the exact thing the project exists to avoid. The runtime index build is not an implementation detail to be optimised away — it is the product. |
-| G-024 `Intl.Segmenter` for word counts | ⬜ | Not started. P2. |
-| G-025 Dev perf overlay | ⬜ | Not started. P2. |
+| G-024 `Intl.Segmenter` for word counts | ✅ | **Done.** `computeWordCount` now uses `Intl.Segmenter` with `granularity: 'word'`, counting `isWordLike` segments, and falls back to the whitespace split when unavailable. Fixes the same class of i18n bug as G-002: `split(/\s+/)` counted an entire space-less CJK sentence as one word, so `日本語のページです` reported 1 word and now reports 7. Latin and Cyrillic text are unaffected. 2 new tests. |
+| G-025 Dev perf overlay | ⬜ | Not started. P2. Additive DX feature, not a defect fix. `performanceDiagnostics.js` and `workerPoolDiagnostics.js` already collect the data; this would surface it behind a `?perf=1` flag. |
 | G-026 `prefers-reduced-data`/`reduced-motion` | 🟡 | `prefers-reduced-motion` honoured for View Transitions (X3). `prefers-reduced-data` not addressed. |
-| G-027 `aria-live` for search results | ⬜ | Not started. P2. |
+| G-027 `aria-live` for search results | ✅ | **Already done.** `nav.js:1300` sets `aria-live="polite"` on the search control and `:1321` on the results container. No change needed. |
 | G-028 EventLoopMonitor autoscaling | ⏰ | Deferred. Needs measured saturation first. |
 | G-029 PowerCache stale-while-revalidate | ⏰ | Deferred. No measured need. |
 | G-030 GCRA / retry budgets / hedging | ⏰ | Deferred. |
@@ -554,17 +554,71 @@ Status icons: ✅ done & validated · 🟡 partial · ⬜ not started · ⏰ def
 
 ---
 
-## 12. Recommended next actions
+## 12. Final status and recommended next actions
 
-1. **D4 — unify `buildPageUrl`.** The worker version drops the `baseSearch` merge,
-   which is very likely a live bug of the same class as D1. Small effort, high
-   payoff, and the pattern is now well-established.
-2. **Q1 — promote a narrow subset of empty-catch warnings to errors.** B1 and B2
-   were both invisible because of silent catches. This is the single highest-leverage
-   robustness change.
-3. **R1 + R2 — `buildSearchIndex` efficiency.** The double fetch and O(n²) `taken`
-   Set are the clearest responsiveness wins on large sites.
-4. **DX3 — extract the test rewrite helper.** Six files already broke once during
-   this audit; a shared helper prevents the next occurrence.
-5. **M1 — generation-guard the `window.__nimbi*` globals.** Closes the
-   post-`destroy()` repopulation hole.
+### Ledger status
+
+Counts below combine §11 (the main plan) and §10b (the glyph cross-reference).
+Some items appear in both — for example G-012 is recorded in §10b while its
+implementation is M4 in §11 — so the total exceeds the number of distinct
+pieces of work.
+
+| Status | Count |
+|---|---|
+| ✅ Done | 59 |
+| 🟡 Partial | 5 |
+| ⏰ Deferred | 11 |
+| ➖ Resolved by deletion | 4 |
+| ❌ Rejected | 17 |
+| ⬜ Not started | **3** |
+
+The three ⬜ items are **G-017**, **G-021**, and **G-025** — detailed below. None
+is a defect.
+
+The five 🟡 items are all "implemented but the claimed win did not survive
+measurement" or "real but deliberately not rushed": **X1** (safe half of the
+search-index work done), **G-004** and **G-007** (measured neutral-to-slower at
+default settings), **G-011** (duplication is also an ARIA-contract change), and
+**G-026** (`prefers-reduced-motion` done, `prefers-reduced-data` not).
+
+### What is genuinely left
+
+Only three items are both real and un-started, and none is a defect:
+
+| Item | Priority | Why it remains |
+|---|---|---|
+| **G-021** Image zoom CSS write batching | P3 | Real: ~6 unbatched style writes per `wheel` event. Small, safe fix using the existing `rafThrottle`/`scheduleDOMWrite`. |
+| **G-017** `import.meta.glob` for hljs languages | P1 | Real: non-core languages always fall back to `cdn.jsdelivr.net` because the `@vite-ignore` import 404s. Substantial (~190 chunks) and needs a bundle-size measurement first. |
+| **G-025** Dev perf overlay | P2 | Additive DX feature. The data is already collected by `performanceDiagnostics`/`workerPoolDiagnostics`. |
+
+### Recommended order
+
+1. **G-021** — smallest verified-real win left. One file, existing helper, no
+   contract change.
+2. **G-017** — the only remaining P1. Removes an external CDN dependency for
+   syntax highlighting and tightens CSP, but measure the bundle impact before
+   adopting.
+3. **G-025** — pure DX addition; do it only if there is demand.
+
+### Deliberately not pursued
+
+- **G-009** (triple HTML parse) — real but on the `isHtml` fallback route the
+  primary markdown path never reaches, and the fix changes `parseHtml`'s
+  contract.
+- **G-011** (shared search renderer) — unification is also an ARIA-contract
+  change; needs keyboard-navigation tests written first.
+- **G-023 / S1 / F2** (build-time search index) — architecturally incompatible
+  with a 100% runtime CMS. See §1b.
+- **G-016** (hljs build-time generation) — a product decision about the
+  runtime fetch, not a defect.
+- **G-028 / G-029 / G-030** — deferred pending measured need.
+- **DX5** (`engines.node`) — intentionally stale for semver safety.
+- **WR1 / WR2** — web research and a bundle-size budget.
+
+### The one thing worth doing regardless
+
+**An independent review of the cumulative diff.** This audit touched ~30 source
+files and added ~25 test files across many sessions. The two areas most worth a
+fresh pair of eyes are the `runtimeGlobals` strict/permissive split (subtle
+enough to invite misuse, though now documented at every call site) and the
+`slugManager.js` index-build changes (R1/R2, the largest behavioral edits).
