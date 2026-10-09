@@ -6,7 +6,7 @@
 
 # Function: \_parseHtml()
 
-> **\_parseHtml**(`raw`): [`ParsedPage`](../type-aliases/ParsedPage.md)
+> **\_parseHtml**(`raw`): `ParsedPage`
 
 Parse raw HTML input and return the normalized "parsed" object used by the
 rendering pipeline.
@@ -21,4 +21,4 @@ HTML string to parse
 
 ## Returns
 
-[`ParsedPage`](../type-aliases/ParsedPage.md)
+`ParsedPage`

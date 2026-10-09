@@ -22,7 +22,7 @@ Re-exports [clearRendererImportCache](../rendererRuntime/functions/clearRenderer
 
 ### decodeHtmlEntitiesLocal
 
-Re-exports [decodeHtmlEntitiesLocal](../rendererRuntime/functions/decodeHtmlEntitiesLocal.md)
+Renames and re-exports [decodeHtmlEntities](../../utils/decodeHtmlEntities/functions/decodeHtmlEntities.md)
 
 ***
 

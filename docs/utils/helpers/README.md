@@ -6,15 +6,12 @@
 
 # utils/helpers
 
-Utility helper functions used by the runtime.
-
 ## Functions
 
 - [addPreloadHints](functions/addPreloadHints.md)
 - [addResourceHints](functions/addResourceHints.md)
 - [applyCspNonce](functions/applyCspNonce.md)
 - [buildPageUrl](functions/buildPageUrl.md)
-- [decodeHtmlEntities](functions/decodeHtmlEntities.md)
 - [encodeURL](functions/encodeURL.md)
 - [ensureTrailingSlash](functions/ensureTrailingSlash.md)
 - [getBaseName](functions/getBaseName.md)
@@ -29,3 +26,9 @@ Utility helper functions used by the runtime.
 - [setEagerForAboveFoldImages](functions/setEagerForAboveFoldImages.md)
 - [setLazyload](functions/setLazyload.md)
 - [trimTrailingSlash](functions/trimTrailingSlash.md)
+
+## References
+
+### decodeHtmlEntities
+
+Re-exports [decodeHtmlEntities](../decodeHtmlEntities/functions/decodeHtmlEntities.md)

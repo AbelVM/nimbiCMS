@@ -28,6 +28,7 @@ navigation callbacks into the site header.
 - [createSiteNav](functions/createSiteNav.md)
 - [normalizeSearchIndexEntriesMut](functions/normalizeSearchIndexEntriesMut.md)
 - [safeGet](functions/safeGet.md)
+- [searchEntryMatches](functions/searchEntryMatches.md)
 
 ## References
 

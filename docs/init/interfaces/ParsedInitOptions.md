@@ -8,6 +8,18 @@
 
 ## Properties
 
+### allowEmbeddedScripts?
+
+> `optional` **allowEmbeddedScripts?**: `boolean`
+
+***
+
+### allowUrlPathOverrides?
+
+> `optional` **allowUrlPathOverrides?**: `boolean`
+
+***
+
 ### availableLanguages?
 
 > `optional` **availableLanguages?**: `string`[]
@@ -38,27 +50,39 @@
 
 ***
 
+### crawlMaxQueue?
+
+> `optional` **crawlMaxQueue?**: `number`
+
+***
+
 ### defaultStyle?
 
 > `optional` **defaultStyle?**: `"light"` \| `"dark"` \| `"system"`
 
 ***
 
-### fetchConcurrency?
+### el?
 
-> `optional` **fetchConcurrency?**: `number`
+> `optional` **el?**: `string` \| `Element`
+
+***
+
+### embeddedScriptOrigins?
+
+> `optional` **embeddedScriptOrigins?**: `string`[]
+
+***
+
+### exposeSitemap?
+
+> `optional` **exposeSitemap?**: `boolean`
 
 ***
 
 ### homePage?
 
 > `optional` **homePage?**: `string`
-
-***
-
-### indexDepth?
-
-> `optional` **indexDepth?**: `number`
 
 ***
 
@@ -74,27 +98,43 @@
 
 ***
 
-### navigationPage?
+### manifest?
 
-> `optional` **navigationPage?**: `string`
-
-***
-
-### negativeFetchCacheTTL?
-
-> `optional` **negativeFetchCacheTTL?**: `number`
+> `optional` **manifest?**: `Object`
 
 ***
 
-### noIndexing?
+### markdownExtensions?
 
-> `optional` **noIndexing?**: `string`[]
+> `optional` **markdownExtensions?**: `Record`\<`string`, `unknown`\>[]
 
 ***
 
 ### notFoundPage?
 
 > `optional` **notFoundPage?**: `string` \| `null`
+
+***
+
+### onRuntimeError?
+
+> `optional` **onRuntimeError?**: (`record`) => `void`
+
+#### Parameters
+
+##### record
+
+`Object`
+
+#### Returns
+
+`void`
+
+***
+
+### performanceDiagnostics?
+
+> `optional` **performanceDiagnostics?**: `boolean`
 
 ***
 
@@ -107,3 +147,15 @@
 ### searchIndexMode?
 
 > `optional` **searchIndexMode?**: `"eager"` \| `"lazy"`
+
+***
+
+### seoMap?
+
+> `optional` **seoMap?**: `Object`
+
+***
+
+### skipRootReadme?
+
+> `optional` **skipRootReadme?**: `boolean`

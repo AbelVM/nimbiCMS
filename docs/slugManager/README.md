@@ -10,11 +10,6 @@ Slug and markdown mapping utilities.
 
 Manage slug generation, mapping, and runtime discovery for markdown content.
 
-## Type Aliases
-
-- [FetchResult](type-aliases/FetchResult.md)
-- [SlugEntry](type-aliases/SlugEntry.md)
-
 ## Variables
 
 - [availableLanguages](variables/availableLanguages.md)

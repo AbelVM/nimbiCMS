@@ -36,6 +36,7 @@ blocks for automatic highlighting.
 ## Functions
 
 - [clearLanguageImportCache](functions/clearLanguageImportCache.md)
+- [disposeCodeblocksObserver](functions/disposeCodeblocksObserver.md)
 - [loadSupportedLanguages](functions/loadSupportedLanguages.md)
 - [observeCodeBlocks](functions/observeCodeBlocks.md)
 - [registerLanguage](functions/registerLanguage.md)

@@ -6,6 +6,6 @@
 
 # Variable: slugToMd
 
-> `const` **slugToMd**: `Map`\<`string`, `string` \| [`SlugEntry`](../../slugManager/type-aliases/SlugEntry.md)\>
+> `const` **slugToMd**: `Map`\<`string`, `any`\>
 
 Mapping from slug to markdown path (or localized SlugEntry).

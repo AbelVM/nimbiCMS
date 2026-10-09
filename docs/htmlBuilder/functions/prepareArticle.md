@@ -6,7 +6,7 @@
 
 # Function: prepareArticle()
 
-> **prepareArticle**(`t`, `data`, `pagePath`, `anchor`, `contentBase`): `Promise`\<[`ArticleResult`](../type-aliases/ArticleResult.md)\>
+> **prepareArticle**(`t`, `data`, `pagePath`, `anchor`, `contentBase`): `Promise`\<`ArticleResult`\>
 
 Given a page's fetched data, produce an <article> element, a TOC,
 and slug calculations.  Handles HTML vs Markdown transparently.
@@ -51,6 +51,6 @@ Base URL for resolving links and images.
 
 ## Returns
 
-`Promise`\<[`ArticleResult`](../type-aliases/ArticleResult.md)\>
+`Promise`\<`ArticleResult`\>
 
 - Promise resolving to the `ArticleResult` (article element, parsed data, toc, and slug info).

@@ -6,7 +6,7 @@
 
 # Function: \_parseMarkdown()
 
-> **\_parseMarkdown**(`raw`): `Promise`\<[`ParsedPage`](../type-aliases/ParsedPage.md)\>
+> **\_parseMarkdown**(`raw`): `Promise`\<`ParsedPage`\>
 
 Convert markdown raw text to the normalized parsed object, registering
 any required languages along the way.
@@ -21,4 +21,4 @@ markdown source
 
 ## Returns
 
-`Promise`\<[`ParsedPage`](../type-aliases/ParsedPage.md)\>
+`Promise`\<`ParsedPage`\>

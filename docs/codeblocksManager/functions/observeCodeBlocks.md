@@ -6,17 +6,13 @@
 
 # Function: observeCodeBlocks()
 
-> **observeCodeBlocks**(`root?`): `void`
-
-Observe and lazy-highlight `<pre><code>` blocks, registering languages as needed.
+> **observeCodeBlocks**(`root`): `void`
 
 ## Parameters
 
-### root?
+### root
 
-`ParentNode`
-
-Root node in which to observe code blocks.
+`any`
 
 ## Returns
 

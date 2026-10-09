@@ -17,7 +17,9 @@ helpers for loading remote or local Bulma themes.
 
 ## Functions
 
+- [disconnectBulmaObservers](functions/disconnectBulmaObservers.md)
 - [ensureBulma](functions/ensureBulma.md)
+- [injectLink](functions/injectLink.md)
 - [registerThemedElement](functions/registerThemedElement.md)
 - [setStyle](functions/setStyle.md)
 - [setThemeVars](functions/setThemeVars.md)

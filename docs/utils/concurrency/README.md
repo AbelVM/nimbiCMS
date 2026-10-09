@@ -17,9 +17,3 @@ identically everywhere.
 ## Functions
 
 - [runWithConcurrency](functions/runWithConcurrency.md)
-
-## References
-
-### default
-
-Renames and re-exports [runWithConcurrency](functions/runWithConcurrency.md)

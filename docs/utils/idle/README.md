@@ -12,5 +12,6 @@ available, falling back to `setTimeout(..., 0)`.
 
 ## Functions
 
+- [createYieldGate](functions/createYieldGate.md)
 - [yieldIfNeeded](functions/yieldIfNeeded.md)
 - [yieldToEventLoop](functions/yieldToEventLoop.md)

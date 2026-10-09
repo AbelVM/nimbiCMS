@@ -10,10 +10,15 @@
 
 - [attachRendererWorker](functions/attachRendererWorker.md)
 - [clearRendererImportCache](functions/clearRendererImportCache.md)
-- [decodeHtmlEntitiesLocal](functions/decodeHtmlEntitiesLocal.md)
 - [ensureHljs](functions/ensureHljs.md)
 - [handleWorkerMessage](functions/handleWorkerMessage.md)
 - [handleWorkerMessageStream](functions/handleWorkerMessageStream.md)
 - [importModuleWithCache](functions/importModuleWithCache.md)
 - [setRendererImportNegativeCacheTTL](functions/setRendererImportNegativeCacheTTL.md)
 - [slugifyHeading](functions/slugifyHeading.md)
+
+## References
+
+### decodeHtmlEntitiesLocal
+
+Renames and re-exports [decodeHtmlEntities](../../utils/decodeHtmlEntities/functions/decodeHtmlEntities.md)

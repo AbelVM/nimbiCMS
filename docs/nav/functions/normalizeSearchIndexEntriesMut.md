@@ -6,21 +6,14 @@
 
 # Function: normalizeSearchIndexEntriesMut()
 
-> **normalizeSearchIndexEntriesMut**(`entries`): `any`[]
-
-Normalize resolved search index entries so slugs are homogeneous
-across the app (nav, TOC, search).
+> **normalizeSearchIndexEntriesMut**(`entries`): `any`
 
 ## Parameters
 
 ### entries
 
-`any`[]
-
-Array of index entry objects to normalize.
+`any`
 
 ## Returns
 
-`any`[]
-
-The same array of entries (normalized in-place).
+`any`

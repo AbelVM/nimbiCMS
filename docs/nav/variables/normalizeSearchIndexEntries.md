@@ -6,21 +6,14 @@
 
 # Variable: normalizeSearchIndexEntries
 
-> `const` **normalizeSearchIndexEntries**: (`entries`) => `any`[] = `normalizeSearchIndexEntriesMut`
-
-Normalize resolved search index entries so slugs are homogeneous
-across the app (nav, TOC, search).
+> `const` **normalizeSearchIndexEntries**: (`entries`) => `any` = `normalizeSearchIndexEntriesMut`
 
 ## Parameters
 
 ### entries
 
-`any`[]
-
-Array of index entry objects to normalize.
+`any`
 
 ## Returns
 
-`any`[]
-
-The same array of entries (normalized in-place).
+`any`

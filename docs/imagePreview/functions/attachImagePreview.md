@@ -6,26 +6,19 @@
 
 # Function: attachImagePreview()
 
-> **attachImagePreview**(`root`, `options?`): `void`
-
-Attach image preview behavior to all images within the given root element.
-When an image is clicked, a modal opens and provides zoom/pan controls.
+> **attachImagePreview**(`root`, `__namedParameters?`): `void`
 
 ## Parameters
 
 ### root
 
-`HTMLElement`
+`any`
 
-The DOM element containing images to enhance.
+### \_\_namedParameters?
 
-### options?
+#### zoomStep?
 
-Optional helpers, such as localization.
-
-#### t?
-
-(`key`) => `string`
+`number` = `0.25`
 
 ## Returns
 
