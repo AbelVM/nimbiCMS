@@ -1,5 +1,6 @@
 import * as slugManagerRuntime from "./slugManager.js";
 import { parseFrontmatter } from "./utils/frontmatter.js";
+import { slugify as _slugify } from "./utils/slugify.js";
 
 let _indexPromise = null;
 let _indexPromiseKey = null;
@@ -14,18 +15,6 @@ export function clearSearchIndexCache() {
 
 const DEFAULT_MAX_CRAWL_QUEUE = 1000;
 const DEFAULT_CONCURRENCY = 4;
-
-function _slugify(value) {
-  let slug = String(value ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\- ]/g, "")
-    .replace(/ /g, "-");
-  slug = slug.replace(/(?:-?)(?:md|html)$/g, "");
-  slug = slug.replace(/-+/g, "-");
-  slug = slug.replace(/^-|-$/g, "");
-  if (slug.length > 80) slug = slug.slice(0, 80).replace(/-+$/g, "");
-  return slug;
-}
 
 function _sanitizePath(path) {
   return String(path ?? "").replace(/^[./]+/, "");

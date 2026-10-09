@@ -21,6 +21,9 @@ describe('renderer worker edges', () => {
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
     let rewritten = src.replace(/(^|\n)onmessage\s*=\s*/g, '$1globalThis.onmessage = ')
     rewritten = rewritten.replace("./rendererRuntime.js", "../../src/worker/rendererRuntime.js")
+    // The generated module lives in tests/worker/, so any `../utils/...`
+    // import must be re-rooted at src/ as well.
+    rewritten = rewritten.replace(/"\.\.\/utils\//g, '"../../src/utils/')
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_edge.mjs')
     fs.writeFileSync(tmpPath, rewritten, 'utf8')
     globalThis._rendererEdgeModule = tmpPath

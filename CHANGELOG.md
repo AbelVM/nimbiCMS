@@ -4,6 +4,17 @@ All notable changes to **nimbiCMS** will be documented in this file.
 
 ## Unreleased
 
+- **[FIX]** Create the runtime `AbortController` before any listener registration in `initCMS`, so the `error` and `unhandledrejection` handlers actually attach; previously they dereferenced a `null` controller and the resulting `TypeError` was swallowed, leaving `onRuntimeError` and `__nimbiRenderingErrors__` permanently empty.
+- **[FIX]** Import `toCanonicalHref` in `init.js`, which was called but never imported, silently disabling URL canonicalization at runtime.
+- **[FIX]** Clear the runtime `indexSet` when the slug maps are cleared, so stale content paths cannot survive a `slugToMd.clear()` until the next explicit index refresh.
+- **[FIX]** Replace the module-scope capture-phase `document` `input` listener with an element-scoped listener bound to the runtime signal, so it no longer fires for every input event on the page for the page lifetime and is released on teardown.
+- **[FIX]** Hoist the `navbar` declaration out of its creation site to remove a temporal-dead-zone hazard, since `typeof` does not guard a `const` that has not yet been initialized.
+- **[CHORE]** Unify four divergent `slugify` implementations into a single canonical, memoized `utils/slugify` module shared by the main thread and both workers, so worker-generated slugs resolve against main-thread slug maps.
+- **[CHORE]** Unify the duplicated `_splitIntoSections` implementations into a shared `utils/splitIntoSections` module so streamed and non-streamed rendering produce identical chunk boundaries.
+- **[CHORE]** Extract the duplicated `runWithConcurrency` helper into a shared `utils/concurrency` module.
+- **[CHORE]** Remove unreachable zoom-HUD code from the image preview modal; the target element was never created in either the DOM-built or `innerHTML` fallback path, and the zoom level is already shown by the existing zoom label.
+- **[TEST]** Add cross-context contract suites pinning slug and section-splitting agreement between the main thread and the workers, plus slug-map instrumentation coverage; the full suite passes with 898 tests.
+- **[TEST]** Re-root generated worker-module import rewrites in the renderer test harnesses so new relative imports in `worker/renderer.js` do not break module resolution.
 - **[FIX]** Clear delayed runtime sitemap writes during `destroy()` so sitemap timers cannot outlive the CMS runtime; repeated lifecycle regression coverage now verifies the disposer and empty worker queues.
 - **[CHORE]** Centralize basename and multi-segment path helpers across main-thread and anchor-worker resolution.
 - **[PERF]** Expose reason-labeled renderer, anchor, and slug main-thread fallback counts in worker-pool diagnostics.
@@ -11,7 +22,6 @@ All notable changes to **nimbiCMS** will be documented in this file.
 - **[FIX]** Defer article, navigation, and SEO mutation until route preparation and transform hooks complete for the current URL.
 - **[FIX]** Restore keyboard focus to the committed main landmark after a current route transition when focus belonged to the outgoing CMS content.
 - **[FIX]** Apply route metadata in the same synchronous commit as the prepared article and navigation DOM.
-
 - Added `npm run benchmark:content` for repeatable real-indexer crawl measurements across 100, 1,000, and 10,000 generated Markdown pages with elapsed-time and heap-delta output.
 - **[PERF]** Enforce generous per-size elapsed-time and heap-growth budgets in the content benchmark.
 - **[PERF]** Record feature-detected browser heap usage alongside bounded long-task, LoAF, and Event Timing diagnostics.
@@ -154,3 +164,6 @@ Brand new architecture on top of [performance-helpers](https://abelvm.github.io/
 ## v1.0.0
 
 - First release.
+
+- **[FIX]** Stabilize router TTL cache test under high parallel load by using a longer TTL and asserting the stored value instead of relying on time-based eviction.
+- **[RUNTIME]** Isolate sitemap/feed responses from the live document: `handleSitemapRequest` now defaults to returning the generated body string without calling `document.open/write/close`; opt in to legacy document writes with `writeToDocument: true`. `initCMS` forwards `writeToDocument: exposeSitemap !== false` for the `/?sitemap` URL path. Added `exposeSitemapGlobals` and re-exported sitemap generation helpers (`generateSitemapJson`, `generateSitemapXml`, `generateRssXml`, `generateAtomXml`, `generateLlmsTxt`) from the public entrypoint. `destroy()` clears delayed sitemap writer timers.

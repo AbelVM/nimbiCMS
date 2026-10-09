@@ -101,17 +101,29 @@ function _augmentIndexWithMap(map) {
 
 /**
  * Instrument a map so that any value inserted also populates the index set.
- * @param {MapLike|Map<any, any>} map - A Map-like object whose `set` method will be wrapped.
+ *
+ * `clear` is wrapped as well as `set`: `slugManager` bumps its own
+ * `_nimbiVersion` on `clear`, but without a matching wrapper here the
+ * `indexSet` would keep every path from before the clear and serve stale
+ * entries until the next explicit `refreshIndex()`.
+ * @param {MapLike|Map<any, any>} map - A Map-like object whose `set`/`clear` methods will be wrapped.
  * @returns {void}
  */
 function _trackMap(map) {
   if (!map || typeof map.set !== "function") return;
-  const orig = map.set;
+  const origSet = map.set;
   map.set = function (k, v) {
     if (v && typeof v === "string") indexSet.add(v);
     else if (v?.default) indexSet.add(v.default);
-    return orig.call(this, k, v);
+    return origSet.call(this, k, v);
   };
+  if (typeof map.clear === "function") {
+    const origClear = map.clear;
+    map.clear = function () {
+      indexSet.clear();
+      return origClear.call(this);
+    };
+  }
 }
 
 /** Lazily install tracking wrappers on the slug maps; idempotent. @returns {void} */

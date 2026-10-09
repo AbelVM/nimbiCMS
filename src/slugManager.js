@@ -28,6 +28,7 @@ import {
 import SlugWorker from "./worker/slugWorker.js?worker&inline";
 
 import { PowerCache, PowerMemoizer } from "performance-helpers/powerCache";
+import { slugify } from "./utils/slugify.js";
 import { PowerDeadline } from "performance-helpers/powerDeadline";
 import { PowerRetry } from "performance-helpers/powerRetry";
 import { PowerPool } from "performance-helpers/powerPool";
@@ -36,7 +37,7 @@ import {
   registerWorkerPool,
   unregisterWorkerPool,
 } from "./utils/workerPoolDiagnostics.js";
-import { PowerSemaphore } from "performance-helpers/powerSemaphore";
+import { runWithConcurrency } from "./utils/concurrency.js";
 import { debugLog, debugWarn, debugError, isDebug } from "./utils/debug.js";
 import { yieldIfNeeded } from "./utils/idle.js";
 
@@ -229,14 +230,6 @@ export function setLanguages(list) {
  */
 export function getLanguages() {
   return availableLanguages;
-}
-
-async function runWithConcurrency(items, worker, concurrency = 4, signal) {
-  if (!Array.isArray(items) || items.length === 0) return [];
-  const sem = new PowerSemaphore(Math.max(1, Number(concurrency) || 1));
-  return Promise.all(
-    items.map((item, idx) => sem.run(() => worker(item, idx), { signal })),
-  );
 }
 
 const poolSize = getWorkerPoolSize();
@@ -724,45 +717,18 @@ function _deriveCommonPrefix(paths) {
 }
 
 /**
- * Generate a URL-friendly slug from a text string (memoized LRU).
+ * Generate a URL-friendly slug from a text string.
  *
- * NOTE: PowerMemoizer's default `keyResolver` changed in
- * performance-helpers v2.0.0 from `(...args) => JSON.stringify(args)`
- * to `simpleArgsKey`. For scalar args (strings, numbers, booleans)
- * `simpleArgsKey` is ~35% cheaper and produces equivalent keys; for
- * non-scalar args (objects, arrays) it falls back to `JSON.stringify`,
- * so non-scalar keys keep the v1 format. We pass an explicit
- * `keyResolver` here to keep cache keys consistent across v1 and v2
- * (this memoizer only ever receives a single scalar string arg).
- * Any future memoizer with non-scalar args that must keep the v1
- * key format should pass `keyResolver: (...args) => JSON.stringify(args)`.
+ * Imported from `utils/slugify.js`, the single canonical implementation
+ * shared with the workers, and re-exported so existing consumers of
+ * `slugManager.slugify` keep working. Keeping one implementation
+ * guarantees that a slug produced by the anchor worker resolves against
+ * the maps built on the main thread.
  *
  * @param {string} s - Text to generate a URL-friendly slug from.
  * @returns {string}
  */
-const _slugifyMemo = new PowerMemoizer(
-  function (s) {
-    const MAX_SLUG_LENGTH = 80; // reasonable default to avoid extremely long URLs
-    let slug = String(s ?? "")
-      .toLowerCase()
-      .replace(/[^a-z0-9\- ]/g, "")
-      .replace(/ /g, "-");
-    slug = slug.replace(/(?:-?)(?:md|html)$/, "");
-    slug = slug.replace(/-+/g, "-");
-    slug = slug.replace(/^-|-$/g, "");
-    if (slug.length > MAX_SLUG_LENGTH) {
-      slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, "");
-    }
-    return slug;
-  },
-  {
-    keyResolver: (s) => (s === undefined ? "__undefined" : String(s)),
-    cacheOptions: { maxEntries: 2000 },
-  },
-);
-
-export const slugify = (s) => _slugifyMemo.run(s);
-
+export { slugify };
 /**
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
  * maps and `allMarkdownPaths` relative to that base.

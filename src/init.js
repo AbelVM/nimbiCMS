@@ -43,7 +43,7 @@ import {
   clearSearchIndexCache,
 } from "./slugSearchRuntime.js";
 import { createUI } from "./ui.js";
-import { parseHrefToRoute } from "./utils/urlHelper.js";
+import { parseHrefToRoute, toCanonicalHref } from "./utils/urlHelper.js";
 import {
   normalizePath,
   addResourceHints,
@@ -597,6 +597,12 @@ export async function initCMS(options = {}) {
   if (cmsMountEl && cmsMountEl !== mountEl && cmsMountEl.isConnected) {
     await destroy();
     destroyPromise = null;
+    // `destroy()` releases the previous controller; mint a fresh one so the
+    // rest of this initialization has a live signal to bind listeners to.
+    cmsAbortController =
+      typeof window !== "undefined"
+        ? new AbortController()
+        : { signal: { abort: () => {} } };
   }
   if (typeof contentPath !== "string" || !contentPath.trim()) {
     throw new TypeError(
@@ -1003,7 +1009,22 @@ export async function initCMS(options = {}) {
           ? location.origin
           : "http://localhost";
       // pageRoot is the site-rooted folder for this page (origin + pageDir)
-      const pageRoot = new URL(pageDir, origin).toString();
+      const pageRoot = new URL(pageDir, origin).toString();      try {
+        const currentHref = typeof window !== "undefined" ? window.location.href : "";
+        const canon = toCanonicalHref(currentHref);
+        if (typeof window !== "undefined" && canon && typeof history !== "undefined" && history.replaceState) {
+          try {
+            const basePath = window.location.origin + window.location.pathname;
+            const curFull = basePath + window.location.search + window.location.hash;
+            const wantFull = basePath + (canon.startsWith("?") || canon.startsWith("#") ? canon : "");
+            if (wantFull && wantFull !== curFull) {
+              history.replaceState(history.state || {}, "", canon);
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+
       // '.' and './' are page-relative (same as empty)
       if (cp === "." || cp === "./") cp = "";
 
@@ -1451,10 +1472,8 @@ export async function initCMS(options = {}) {
 setStyle(defaultStyle);
   await ensureBulma(bulmaCustomize, pageDir);
 
-  // Create an AbortController for cleanup on destroy/teardown.
-  // All UI and navigation event listeners will be wired to this signal
-  // so that a single `abort()` call removes them all.
-  cmsAbortController = typeof window !== "undefined" ? new AbortController() : { signal: { abort: () => {} } };
+  // The AbortController is created at the top of `initCMS` (before any
+  // listener registration); only the runtime identity is minted here.
   currentRuntimeId = ++runtimeInstanceSequence;
   setRecoveryState("loading");
   const runtimeManifest = createRuntimeManifest({
@@ -2152,12 +2171,14 @@ export function destroy() {
         window.__nimbiRenderingErrors__ = null;
         window.__nimbiRenderTimings = null;
         window.__nimbiRuntimeId = null;
+        window.__nimbiRuntimeManifest = null;
         setRecoveryState("idle");
       }
     } catch (_) {}
 
     try {
       if (cmsAbortController) cmsAbortController.abort();
+      cmsAbortController = null;
     } catch (_) {}
     clearRuntimeTimeouts();
     try {

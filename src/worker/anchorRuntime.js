@@ -1,5 +1,7 @@
 import { getSharedParser } from "../utils/sharedDomParser.js";
+import { slugifyTitle } from "../utils/slugify.js";
 import {
+  buildPageUrl,
   ensureTrailingSlash,
   getBaseName,
   getLastPathSegments,
@@ -7,21 +9,6 @@ import {
   normalizePath,
   trimTrailingSlash,
 } from "../utils/helpers.js";
-
-function buildPageUrl(page, hash = null) {
-  const encodedPage = encodeURIComponent(String(page ?? ""));
-  return hash
-    ? `?page=${encodedPage}#${encodeURIComponent(String(hash))}`
-    : `?page=${encodedPage}`;
-}
-
-function slugifyTitle(value) {
-  return String(value ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\-\s]+/g, "")
-    .replace(/\s+/g, "-");
-}
 
 function stripContentBasePrefix(rel, contentBasePath) {
   try {
@@ -360,3 +347,6 @@ export async function rewriteAnchorsHtml(
 
   return { html: doc.body.innerHTML, mappings: learnedMappings };
 }
+
+// Re-exported so the shared slug contract can be asserted directly in tests.
+export { slugifyTitle };

@@ -6,7 +6,7 @@
 
 # Function: destroy()
 
-> **destroy**(): `void`
+> **destroy**(): `Promise`\<`void`\>
 
 Tear down the CMS runtime: abort pending fetches, terminate worker pools,
 remove event listeners, and clear DOM elements created during `initCMS`.
@@ -15,4 +15,4 @@ Safe to call multiple times; subsequent calls are no-ops.
 
 ## Returns
 
-`void`
+`Promise`\<`void`\>

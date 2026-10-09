@@ -34,6 +34,9 @@ describe('renderer worker (unit)', () => {
     let rewritten = src.replace(/(^|\n)onmessage\s*=/g, '$1globalThis.onmessage =')
     const nonce = `${Date.now()}_${Math.random().toString(36).slice(2)}`
     rewritten = rewritten.replace('./rendererRuntime.js', `../../src/worker/rendererRuntime.js?test=${nonce}`)
+    // The generated module lives in tests/worker/, so `../utils/...` imports
+    // must be re-rooted at src/ as well.
+    rewritten = rewritten.replace(/"\.\.\/utils\//g, '"../../src/utils/')
 
     const tmpPath = path.resolve(`tests/worker/_renderer_test_module_${Date.now()}_${Math.random().toString(36).slice(2)}.mjs`)
     tmpFiles.push(tmpPath)

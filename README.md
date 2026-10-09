@@ -460,3 +460,31 @@ Bug reports, feature requests, and pull requests are welcome.
 ## License
 
 MIT — see [LICENSE.md](LICENSE.md)
+
+---
+
+### Host adapters (server/edge/service-worker)
+
+For non-browser hosts (e.g. Cloudflare Workers, Vercel Edge, or a service worker that serves a sitemap/feed), you can generate isolated responses without touching the live `document`.
+
+```js
+import { handleSitemapRequest, generateSitemapXml, generateSitemapJson } from 'nimbi-cms'
+// or from nimbi-cms/runtimeSitemap in host-specific builds
+
+async function sitemapHandler(url, index, opts = {}) {
+  // Return a Response without writing to document (default)
+  const response = await handleSitemapRequest({
+    returnResponse: true,
+    url,
+    index,
+    includeAllMarkdown: true,
+    ...opts
+  })
+
+  return response ?? new Response('', { status: 204 })
+}
+```
+
+If you only need the raw body or globals in a browser context (e.g. to inspect or post-process), the default `handleSitemapRequest` returns the generated string and publishes diagnostic globals (`window.__nimbiSitemapJson`, `window.__nimbiSitemapFinal`) without mutating the DOM. To opt into the legacy behavior of writing directly to the current document (e.g. for a simple `/?sitemap` browser view in certain embedded contexts), pass `writeToDocument: true`.
+
+See the TypeScript definitions (`src/index.d.ts`) for full option shapes and the returned types.

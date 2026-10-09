@@ -10,7 +10,7 @@
 
 ### \_splitIntoSections
 
-Re-exports [_splitIntoSections](../rendererRuntime/functions/splitIntoSections.md)
+Renames and re-exports [splitIntoSections](../../utils/splitIntoSections/functions/splitIntoSections.md)
 
 ***
 

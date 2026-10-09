@@ -7,6 +7,8 @@ import {
   setImportNegativeCacheTTL,
 } from "../utils/importCache.js";
 import { decodeInbound, announceCapabilities } from "performance-helpers/powerMessageCodec";
+import { slugify } from "../utils/slugify.js";
+import { splitIntoSections } from "../utils/splitIntoSections.js";
 import hljsCore from "highlight.js/lib/core";
 
 // Announce native structured-clone support so PowerPool can use native
@@ -93,50 +95,10 @@ export function decodeHtmlEntitiesLocal(s) {
   }
 }
 
-export function _splitIntoSections(content, chunkSize) {
-  const txt = String(content ?? "");
-  if (!txt || txt.length <= chunkSize) return [txt];
-  const headingRe = /^#{1,6}\s.*$/gm;
-  const positions = [];
-  let match;
-  while ((match = headingRe.exec(txt)) !== null) positions.push(match.index);
-  if (!positions.length || positions.length < 2) {
-    const out = [];
-    for (let i = 0; i < txt.length; i += chunkSize)
-      out.push(txt.slice(i, i + chunkSize));
-    return out;
-  }
-  const sections = [];
-  if (positions[0] > 0) sections.push(txt.slice(0, positions[0]));
-  for (let i = 0; i < positions.length; i++) {
-    const start = positions[i];
-    const end = i + 1 < positions.length ? positions[i + 1] : txt.length;
-    sections.push(txt.slice(start, end));
-  }
-  const merged = [];
-  let current = "";
-  for (const section of sections) {
-    if (!current && section.length >= chunkSize) {
-      merged.push(section);
-      continue;
-    }
-    if (current.length + section.length <= chunkSize) current += section;
-    else {
-      if (current) merged.push(current);
-      current = section;
-    }
-  }
-  if (current) merged.push(current);
-  return merged;
-}
 
 export function slugifyHeading(s) {
   try {
-    return String(s ?? "")
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\-\s]+/g, "")
-      .replace(/\s+/g, "-");
+    return slugify(s) || "heading";
   } catch (_) {
     return "heading";
   }
@@ -266,7 +228,7 @@ async function streamMarkdownResult(msg, onChunk) {
   const chunkSize = Number(msg.chunkSize) || 64 * 1024;
   const { content, data } = parseFrontmatter(msg.md || "");
   await ensureHljs().catch(() => {});
-  const sections = _splitIntoSections(content, chunkSize);
+  const sections = splitIntoSections(content, chunkSize);
   const idCounts = new Map();
   for (let i = 0; i < sections.length; i++) {
     const rendered = postProcessHtml(getDOMPurify()(marked.parse(sections[i])), idCounts);

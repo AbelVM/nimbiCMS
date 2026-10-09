@@ -236,6 +236,10 @@ export async function buildNav(
   let dropdown = null;
   let dropdownContent = null;
   let resultsContainer = null;
+  // Declared here (not at its creation site further down) so helpers such as
+  // `closeMobileMenu` can reference it without risking a temporal-dead-zone
+  // ReferenceError if they are ever invoked earlier in the build sequence.
+  let navbar = null;
   let searchOutsideHandler = null;
   let indexedCountLog = false;
   let searchGeneration = 0;
@@ -259,24 +263,14 @@ export async function buildNav(
    */
   function closeMobileMenu() {
     try {
-      const burgerEl =
-        typeof navbar !== "undefined" && navbar && navbar.querySelector
-          ? navbar.querySelector(".navbar-burger")
-          : navbarWrap && navbarWrap.querySelector
-            ? navbarWrap.querySelector(".navbar-burger")
-            : typeof document !== "undefined"
-              ? document.querySelector(".navbar-burger")
-              : null;
+      const scope = navbar ?? navbarWrap ?? null;
+      const burgerEl = scope?.querySelector
+        ? scope.querySelector(".navbar-burger")
+        : null;
       const targetId = burgerEl?.dataset?.target ?? null;
       const target = targetId
-        ? typeof navbar !== "undefined" && navbar && navbar.querySelector
-          ? navbar.querySelector(`#${targetId}`) ||
-            document.getElementById(targetId)
-          : navbarWrap && navbarWrap.querySelector
-            ? navbarWrap.querySelector(`#${targetId}`)
-            : typeof document !== "undefined"
-              ? document.getElementById(targetId)
-              : null
+        ? (scope?.querySelector?.(`#${targetId}`) ??
+          document.getElementById(targetId))
         : null;
       if (burgerEl?.classList?.contains("is-active")) {
         try {
@@ -718,7 +712,7 @@ export async function buildNav(
     return searchIndexPromise;
   };
 
-  const navbar = document.createElement("nav");
+  navbar = document.createElement("nav");
   navbar.className = "navbar";
   navbar.setAttribute("role", "navigation");
   navbar.setAttribute("aria-label", "main navigation");
@@ -1722,6 +1716,22 @@ export async function buildNav(
       } catch (e) {
         /* ignore attach failures in constrained env */
       }
+
+      // Reveal the results panel as soon as the user types. This is scoped to
+      // the search input itself and bound to the runtime signal, so it is
+      // released on destroy instead of living for the page lifetime.
+      try {
+        const revealResults = () => {
+          try {
+            if (searchInput?.value) {
+              resultsContainer?.classList?.remove("is-hidden");
+            }
+          } catch (e) {}
+        };
+        addEventListener(searchInput, "input", revealResults);
+      } catch (e) {
+        /* ignore attach failures in constrained env */
+      }
     }
 
     if (searchIndexMode === "eager") {
@@ -2173,25 +2183,6 @@ export async function buildNav(
       typeof window !== "undefined" ? window.__nimbiRuntimeManifest ?? null : null,
   };
 }
-
-try {
-  document.addEventListener(
-    "input",
-    (ev) => {
-      try {
-        if (ev && ev.target && ev.target.id === "nimbi-search") {
-          const r = document.getElementById("nimbi-search-results");
-          if (r && ev.target && ev.target.value) {
-          try {
-            r.classList.remove("is-hidden");
-          } catch (e) {}
-          }
-        }
-      } catch (e) {}
-    },
-    true,
-  );
-} catch (e) {}
 
 // Export internals for unit testing
 const normalizeSearchIndexEntries = normalizeSearchIndexEntriesMut;

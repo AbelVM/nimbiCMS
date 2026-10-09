@@ -30,7 +30,6 @@ workers, and extracting table-of-contents data.
 
 - [\_sendToRenderer](functions/sendToRenderer.md)
 - [\_slugifyLocal](functions/slugifyLocal.md)
-- [\_splitIntoSections](functions/splitIntoSections.md)
 - [addMarkdownExtension](functions/addMarkdownExtension.md)
 - [detectFenceLanguages](functions/detectFenceLanguages.md)
 - [detectFenceLanguagesAsync](functions/detectFenceLanguagesAsync.md)
@@ -42,6 +41,12 @@ workers, and extracting table-of-contents data.
 
 ## References
 
+### \_splitIntoSections
+
+Renames and re-exports [splitIntoSections](../utils/splitIntoSections/functions/splitIntoSections.md)
+
+***
+
 ### slugify
 
-Re-exports [slugify](../slugManager/functions/slugify.md)
+Re-exports [slugify](../utils/slugify/functions/slugify.md)

@@ -1,8 +1,8 @@
 /**
  * @module worker/renderer
  */
+import { splitIntoSections } from "../utils/splitIntoSections.js";
 import {
-  _splitIntoSections,
   attachRendererWorker,
   clearRendererImportCache,
   decodeHtmlEntitiesLocal,
@@ -17,7 +17,8 @@ import {
 attachRendererWorker(globalThis);
 
 export {
-  _splitIntoSections,
+  // Retained under the historical name for existing consumers/tests.
+  splitIntoSections as _splitIntoSections,
   clearRendererImportCache,
   decodeHtmlEntitiesLocal,
   ensureHljs,

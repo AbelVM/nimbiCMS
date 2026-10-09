@@ -14,6 +14,12 @@ Generate sitemap JSON from the runtime search index (or a provided snapshot).
 
 ### opts?
 
+#### baseUrl?
+
+`string` \| `URL`
+
+base URL used for generated locations
+
 #### homePage?
 
 `string`

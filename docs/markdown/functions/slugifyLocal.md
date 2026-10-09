@@ -6,7 +6,7 @@
 
 # Function: \_slugifyLocal()
 
-> **\_slugifyLocal**(`s`): `any`
+> **\_slugifyLocal**(`s`): `string`
 
 ## Parameters
 
@@ -16,4 +16,4 @@
 
 ## Returns
 
-`any`
+`string`

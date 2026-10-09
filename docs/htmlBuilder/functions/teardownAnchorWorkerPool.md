@@ -6,10 +6,10 @@
 
 # Function: teardownAnchorWorkerPool()
 
-> **teardownAnchorWorkerPool**(): `void`
+> **teardownAnchorWorkerPool**(): `Promise`\<`void`\>
 
 Tear down the anchor worker pool.
 
 ## Returns
 
-`void`
+`Promise`\<`void`\>

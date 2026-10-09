@@ -6,7 +6,7 @@
 
 # Function: debounce()
 
-> **debounce**(`fn`, `wait?`, `options?`): (...`args`) => `void`
+> **debounce**(`fn`, `wait?`, `options?`): \{(...`args`): `void`; `cancel`: `void`; \}
 
 DOM / event utilities: debounce, rafThrottle, and a small RAF batcher
 These helpers coalesce rapid events and batch DOM writes using requestAnimationFrame.
@@ -25,4 +25,12 @@ These helpers coalesce rapid events and batch DOM writes using requestAnimationF
 
 ## Returns
 
-(...`args`) => `void`
+\{(...`args`): `void`; `cancel`: `void`; \}
+
+### cancel()
+
+> **cancel**(): `void`
+
+#### Returns
+
+`void`

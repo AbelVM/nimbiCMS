@@ -39,7 +39,7 @@ import { buildCosmeticUrl, parseHrefToRoute } from "./utils/urlHelper.js";
 import { markNotFound } from "./seoManager.js";
 import { debugWarn, debugInfo, isDebugLevel } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
-import { PowerSemaphore } from "performance-helpers/powerSemaphore";
+import { runWithConcurrency } from "./utils/concurrency.js";
 import { rafThrottle, scheduleDOMWrite } from "./utils/events.js";
 // Prefix the current pathname to cosmetic URLs so we replace any existing
 // `?page=` query instead of appending a hash to it.
@@ -70,14 +70,6 @@ import {
   registerWorkerPool,
   unregisterWorkerPool,
 } from "./utils/workerPoolDiagnostics.js";
-
-async function runWithConcurrency(items, worker, concurrency = 4, signal) {
-  if (!Array.isArray(items) || items.length === 0) return [];
-  const sem = new PowerSemaphore(Math.max(1, Number(concurrency) || 1));
-  return Promise.all(
-    items.map((item, idx) => sem.run(() => worker(item, idx), { signal })),
-  );
-}
 
 function _hbWarn(...args) {
   try {

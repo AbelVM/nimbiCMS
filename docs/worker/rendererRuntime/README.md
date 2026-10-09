@@ -8,7 +8,6 @@
 
 ## Functions
 
-- [\_splitIntoSections](functions/splitIntoSections.md)
 - [attachRendererWorker](functions/attachRendererWorker.md)
 - [clearRendererImportCache](functions/clearRendererImportCache.md)
 - [decodeHtmlEntitiesLocal](functions/decodeHtmlEntitiesLocal.md)

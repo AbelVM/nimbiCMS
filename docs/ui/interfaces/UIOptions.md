@@ -40,6 +40,14 @@ Container element where article content is rendered
 
 ***
 
+### embeddedScriptOrigins?
+
+> `optional` **embeddedScriptOrigins?**: `string`[]
+
+Additional origins allowed for external embedded scripts.
+
+***
+
 ### homePage
 
 > **homePage**: `string`

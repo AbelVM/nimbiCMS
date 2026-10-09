@@ -41,6 +41,7 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [awaitSearchIndex](functions/awaitSearchIndex.md)
 - [buildSearchIndex](functions/buildSearchIndex.md)
 - [buildSearchIndexWorker](functions/buildSearchIndexWorker.md)
+- [clearCrawlCache](functions/clearCrawlCache.md)
 - [clearFetchCache](functions/clearFetchCache.md)
 - [clearListCaches](functions/clearListCaches.md)
 - [crawlAllMarkdown](functions/crawlAllMarkdown.md)
@@ -48,6 +49,7 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [crawlForSlugWorker](functions/crawlForSlugWorker.md)
 - [ensureSlug](functions/ensureSlug.md)
 - [fetchMarkdown](functions/fetchMarkdown.md)
+- [getFetchCacheDiagnostics](functions/getFetchCacheDiagnostics.md)
 - [getFetchConcurrency](functions/getFetchConcurrency.md)
 - [getLanguages](functions/getLanguages.md)
 - [getSearchIndex](functions/getSearchIndex.md)
@@ -68,7 +70,6 @@ Manage slug generation, mapping, and runtime discovery for markdown content.
 - [setNegativeFetchCacheMaxSize](functions/setNegativeFetchCacheMaxSize.md)
 - [setNotFoundPage](functions/setNotFoundPage.md)
 - [setSkipRootReadme](functions/setSkipRootReadme.md)
-- [slugify](functions/slugify.md)
 - [storeSlugMapping](functions/storeSlugMapping-1.md)
 - [teardownSlugWorkerPool](functions/teardownSlugWorkerPool.md)
 - [unescapeMarkdown](functions/unescapeMarkdown.md)
@@ -93,6 +94,12 @@ Re-exports [allMarkdownPathsSet](../slugState/variables/allMarkdownPathsSet.md)
 ### mdToSlug
 
 Re-exports [mdToSlug](../slugState/variables/mdToSlug.md)
+
+***
+
+### slugify
+
+Re-exports [slugify](../utils/slugify/functions/slugify.md)
 
 ***
 

@@ -14,6 +14,7 @@ import { debugWarn, debugInfo, incrementCounter } from "./utils/debug.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import { getWorkerPoolSize } from "./utils/helpers.js";
 import { slugify } from "./slugManager.js";
+import { splitIntoSections } from "./utils/splitIntoSections.js";
 import { getDOMPurify } from "./utils/domPurify.js";
 import {
   recordWorkerFallback,
@@ -220,53 +221,6 @@ function _slugifyLocal(s) {
   return slugify(s);
 }
 
-/**
- * Split a markdown `content` string into logical sections suitable for
- * incremental parsing. Prefer splitting at heading boundaries, and fall
- * back to fixed-size slices when headings are scarce.
- * @param {string} content
- * @param {number} chunkSize
- * @returns {string[]}
- */
-function _splitIntoSections(content, chunkSize) {
-  const txt = String(content ?? "");
-  if (!txt || txt.length <= chunkSize) return [txt];
-  const headingRe = /^#{1,6}\s.*$/gm;
-  const positions = [];
-  let m;
-  while ((m = headingRe.exec(txt)) !== null) positions.push(m.index);
-  // If few or no headings, fallback to fixed-size slices
-  if (!positions.length || positions.length < 2) {
-    const out = [];
-    for (let i = 0; i < txt.length; i += chunkSize)
-      out.push(txt.slice(i, i + chunkSize));
-    return out;
-  }
-  const sections = [];
-  // leading intro (before first heading)
-  if (positions[0] > 0) sections.push(txt.slice(0, positions[0]));
-  for (let i = 0; i < positions.length; i++) {
-    const start = positions[i];
-    const end = i + 1 < positions.length ? positions[i + 1] : txt.length;
-    sections.push(txt.slice(start, end));
-  }
-  // merge small sections until chunkSize is reasonably filled
-  const merged = [];
-  let cur = "";
-  for (const s of sections) {
-    if (!cur && s.length >= chunkSize) {
-      merged.push(s);
-      continue;
-    }
-    if (cur.length + s.length <= chunkSize) cur += s;
-    else {
-      if (cur) merged.push(cur);
-      cur = s;
-    }
-  }
-  if (cur) merged.push(cur);
-  return merged;
-}
 
 /**
  * Stream/parse markdown in chunks and call `onChunk` for each rendered
@@ -383,7 +337,7 @@ export async function streamParseMarkdown(md, onChunk, opts = {}) {
 
   // Fallback: parse per-chunk on main thread and emit as before.
   const fallbackStartedAt = Date.now();
-  const sections = _splitIntoSections(body, chunkSize);
+  const sections = splitIntoSections(body, chunkSize);
   const parser = getSharedParser();
   const idCounts = new Map();
 
@@ -1202,7 +1156,7 @@ export async function detectFenceLanguagesAsync(mdText, supportedMap) {
 
 // Export internals for unit testing
 export {
-  _splitIntoSections as _splitIntoSections,
+  splitIntoSections as _splitIntoSections,
   _slugifyLocal as _slugifyLocal,
   slugify,
 };

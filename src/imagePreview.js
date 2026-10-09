@@ -153,8 +153,7 @@ function _createModal() {
       const delta = event.deltaY < 0 ? _zoomStep : -_zoomStep;
       setZoom(_zoom + delta);
       updateZoomLabel();
-      showZoomHud();
-    },
+      },
     { passive: false },
   );
 
@@ -204,49 +203,32 @@ function _createModal() {
   const resetBtn = modal.querySelector("[data-nimbi-preview-reset]");
   const closeBtn = modal.querySelector("[data-nimbi-preview-close]");
   const zoomLabel = modal.querySelector("[data-nimbi-preview-zoom-label]");
-  const zoomHud = modal.querySelector("[data-nimbi-preview-zoom-hud]");
 
   function updateZoomLabel() {
     if (zoomLabel) zoomLabel.textContent = `${Math.round(_zoom * 100)}%`;
   }
-
-  const showZoomHud = () => {
-    if (!zoomHud) return;
-    zoomHud.textContent = `${Math.round(_zoom * 100)}%`;
-    zoomHud.classList.add("visible");
-    clearTimeout(zoomHud._timeout);
-    zoomHud._timeout = setTimeout(
-      () => zoomHud.classList.remove("visible"),
-      800,
-    );
-  };
 
   _updateZoomLabel = updateZoomLabel;
 
   zoomIn.addEventListener("click", () => {
     setZoom(_zoom + _zoomStep);
     updateZoomLabel();
-    showZoomHud();
   });
   zoomOut.addEventListener("click", () => {
     setZoom(_zoom - _zoomStep);
     updateZoomLabel();
-    showZoomHud();
   });
   fitBtn.addEventListener("click", () => {
     fitToScreen();
     updateZoomLabel();
-    showZoomHud();
   });
   originalBtn.addEventListener("click", () => {
     setZoom(1);
     updateZoomLabel();
-    showZoomHud();
   });
   resetBtn.addEventListener("click", () => {
     fitToScreen();
     updateZoomLabel();
-    showZoomHud();
   });
   closeBtn.addEventListener("click", closePreview);
 

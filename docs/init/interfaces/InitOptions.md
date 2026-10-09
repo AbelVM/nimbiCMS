@@ -68,6 +68,12 @@
 
 ***
 
+### embeddedScriptOrigins?
+
+> `optional` **embeddedScriptOrigins?**: `string`[]
+
+***
+
 ### exposeSitemap?
 
 > `optional` **exposeSitemap?**: `boolean`
@@ -107,6 +113,28 @@
 ### notFoundPage?
 
 > `optional` **notFoundPage?**: `string` \| `null`
+
+***
+
+### onRuntimeError?
+
+> `optional` **onRuntimeError?**: (`record`) => `void`
+
+#### Parameters
+
+##### record
+
+`Object`
+
+#### Returns
+
+`void`
+
+***
+
+### performanceDiagnostics?
+
+> `optional` **performanceDiagnostics?**: `boolean`
 
 ***
 

@@ -6,7 +6,7 @@
 
 # Variable: scheduleDOMWrite
 
-> `const` **scheduleDOMWrite**: (`fn`) => `void`
+> `const` **scheduleDOMWrite**: (`fn`) => \{ `cancel`: () => `void`; \} \| `undefined`
 
 ## Parameters
 
@@ -16,4 +16,4 @@
 
 ## Returns
 
-`void`
+\{ `cancel`: () => `void`; \} \| `undefined`

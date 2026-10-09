@@ -11,3 +11,5 @@ Worker utilities.
 ## Functions
 
 - [createWorkerFromRaw](functions/createWorkerFromRaw.md)
+- [disposeWorkerBlobUrlCache](functions/disposeWorkerBlobUrlCache.md)
+- [getWorkerDiagnostics](functions/getWorkerDiagnostics.md)

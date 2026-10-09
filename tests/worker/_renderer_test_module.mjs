@@ -1,8 +1,8 @@
 /**
  * @module worker/renderer
  */
+import { splitIntoSections as _splitIntoSections } from "../../src/utils/splitIntoSections.js";
 import {
-  _splitIntoSections,
   attachRendererWorker,
   clearRendererImportCache,
   decodeHtmlEntitiesLocal,

@@ -262,7 +262,6 @@ export const defaultCrawlMaxQueue: number
 
 
 
-
 // --- from src/seoManager.js
 export function ensureDocumentMeta(): void
 export function setHreflangTags(pageSlug: string): void
@@ -411,7 +410,6 @@ export function handleSlugWorkerMessage(msg: object): Promise<object>
 
 
 
-
 // --- from src/worker/renderer.js
 
 // --- from src/worker/renderer.entry.js
@@ -436,6 +434,16 @@ export function toCanonicalHref(href: string): string
 export function getReadingTime(text: string): any
 export function getTextMetrics(text: string): any
 export function clearTextMetricsCache(): void
+
+// --- from src/utils/splitIntoSections.js
+export function splitIntoSections(content: string, chunkSize: number): string[]
+
+// --- from src/utils/slugify.js
+export const MAX_SLUG_LENGTH: number
+export function slugifyHeading(s: string): string
+export function slugifyTitle(s: string): string
+export function clearSlugifyCache(): void
+
 
 // --- from src/utils/sharedDomParser.js
 export function getSharedParser(): DOMParser|null
@@ -508,5 +516,8 @@ export function debugLog(...args: any): any
 export function incrementCounter(name: string): any
 export function getDebugCounters(): Record<string,number>
 export function resetDebugCounters(): any
+
+// --- from src/utils/concurrency.js
+export function runWithConcurrency(items: any, worker: (item: T, index: number) => Promise<R>|R, concurrency: number, signal: any): Promise<R[]>
 
 // --- from src/lib/index.js

@@ -29,6 +29,7 @@ describe('renderer worker register-success (idempotent)', () => {
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
       let rewritten = src.replace(/(^|\n)onmessage\s*=\s*/g, '$1globalThis.onmessage = ')
       rewritten = rewritten.replace("./rendererRuntime.js", "../../src/worker/rendererRuntime.js")
+    rewritten = rewritten.replace(/"\.\.\/utils\//g, '"../../src/utils/')
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_reg2.mjs')
     fs.writeFileSync(tmpPath, rewritten, 'utf8')
     globalThis._rendererRegModule2 = tmpPath

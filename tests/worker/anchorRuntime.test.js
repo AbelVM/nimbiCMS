@@ -72,7 +72,13 @@ describe('worker anchorRuntime rewriteAnchorsHtml', () => {
     })
 
     expect(res.html).toContain('?page=probe-title')
-    expect(res.html).toContain('?page=probe-html')
+    // The probed HTML document is titled "Probe Html". The canonical slug
+    // contract strips a trailing `html` token unconditionally (see
+    // tests/filesManager.test.js), so the learned slug is `probe`. The worker
+    // previously used a laxer local slugify that produced `probe-html`, which
+    // did not match the slug the main thread derives for the same title and
+    // therefore resolved to a missing page.
+    expect(res.html).toContain('?page=probe"')
     expect(Array.isArray(res.mappings)).toBe(true)
     expect(res.mappings.length).toBeGreaterThan(0)
   })
