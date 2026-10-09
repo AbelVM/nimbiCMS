@@ -445,7 +445,7 @@ verdict for each so neither audit is orphaned.
 | G-018 `bulmaManager` observer disconnect | ✅ | **Done.** Observers are now tracked in a module-level `_bulmaHeadObservers` set and disconnected by a new `disconnectBulmaObservers()`, wired into `destroy()`. Also fixed the broken reuse logic: it stored the literal string `"1"` in `data-bulmaswatch-observer` and then queried for an element carrying that value, which resolved to the link itself rather than an observer — so every call created a fresh observer. The callback now also disconnects when its stylesheet leaves the document, instead of running for the rest of the page lifetime. `injectLink` exported as a test seam. 6 new tests. |
 | G-019 `textMetrics` cache to PowerCache | ❌ | **Not actionable — the audit's three claims are all false, and the proposed change would regress.** Verified empirically: (1) the cache is keyed by `length:hash`, not the full text; (2) values are held via `WeakRef`, so the GC can reclaim them under pressure before the FIFO limit — `PowerCache` holds *strong* references and would make retention worse; (3) the empty-string eviction edge case does not exist — `makeKey` always returns `"N:H"`, which is never falsy, and eviction was exercised 250 times with correct results. The cache is already bounded at 200 entries with FIFO eviction. Added 7 tests pinning the behaviour so a future change is deliberate. |
 | G-020 SEO favicon memoize / selector cache | ❌ | **Premise false — the code does not exist.** No favicon encoding anywhere in `src/`: no `toDataURL`, no `rel="icon"` upsert, no `setFaviconHref`. The only `favicon` references are the navbar *logo* option (`logoOption = "favicon"`, `nav.js:241`/`init.js:474`), which reads an existing href rather than encoding one. Nothing to memoize. |
-| G-021 Image zoom CSS write batching | ⬜ | **Premise verified real; not started.** `imagePreview.js:149` binds a `wheel` handler that calls `setZoom()` (line 450), which performs ~6 `style.setProperty`/`style.width` writes plus `updateZoomLabel()`. A trackpad flick fires `wheel` at 60-120Hz, so that is 6+ unbatched style writes per event. The fix is small and safe — `rafThrottle`/`scheduleDOMWrite` already exist in `utils/events.js`. |
+| G-021 Image zoom CSS write batching | ✅ | **Done.** The `wheel` handler (`imagePreview.js:149`) called `setZoom()` directly, and each call performs a layout read plus ~6 style writes — at 60-120Hz on a trackpad flick that is a forced synchronous layout per event. Added `setZoomThrottled`, a `rafThrottle` wrapper that is leading-edge with trailing coalescing: the first tick applies immediately for responsiveness, and the rest collapse into one call per frame carrying the latest value. Discrete triggers (buttons, keyboard, pinch) still call `setZoom` directly. 4 new tests in `tests/imagePreview.wheelThrottle.test.js`, kept in their own file because the modal is a module singleton and the shared interaction suite leaves state behind. |
 | G-022 Yield coverage in crawl loops | ✅ | Done as X7 (time-budgeted `createYieldGate`). |
 | G-023 Build-time search index | ❌ | **Architecturally incompatible — rejected.** nimbiCMS is a 100% runtime CMS: README states "No database, no build step, no backend — just Markdown files and a browser", and "nimbiCMS loads content at runtime, so changes appear immediately". A prebuilt `search-index.json` would require every user to run a build step over their own content, which is the exact thing the project exists to avoid. The runtime index build is not an implementation detail to be optimised away — it is the product. |
 | G-024 `Intl.Segmenter` for word counts | ✅ | **Done.** `computeWordCount` now uses `Intl.Segmenter` with `granularity: 'word'`, counting `isWordLike` segments, and falls back to the whitespace split when unavailable. Fixes the same class of i18n bug as G-002: `split(/\s+/)` counted an entire space-less CJK sentence as one word, so `日本語のページです` reported 1 word and now reports 7. Latin and Cyrillic text are unaffected. 2 new tests. |
@@ -570,10 +570,10 @@ pieces of work.
 | ⏰ Deferred | 11 |
 | ➖ Resolved by deletion | 4 |
 | ❌ Rejected | 17 |
-| ⬜ Not started | **3** |
+| ⬜ Not started | **2** |
 
-The three ⬜ items are **G-017**, **G-021**, and **G-025** — detailed below. None
-is a defect.
+The two ⬜ items are **G-017** and **G-025** — detailed below. Neither is a
+defect.
 
 The five 🟡 items are all "implemented but the claimed win did not survive
 measurement" or "real but deliberately not rushed": **X1** (safe half of the
@@ -587,18 +587,15 @@ Only three items are both real and un-started, and none is a defect:
 
 | Item | Priority | Why it remains |
 |---|---|---|
-| **G-021** Image zoom CSS write batching | P3 | Real: ~6 unbatched style writes per `wheel` event. Small, safe fix using the existing `rafThrottle`/`scheduleDOMWrite`. |
 | **G-017** `import.meta.glob` for hljs languages | P1 | Real: non-core languages always fall back to `cdn.jsdelivr.net` because the `@vite-ignore` import 404s. Substantial (~190 chunks) and needs a bundle-size measurement first. |
 | **G-025** Dev perf overlay | P2 | Additive DX feature. The data is already collected by `performanceDiagnostics`/`workerPoolDiagnostics`. |
 
 ### Recommended order
 
-1. **G-021** — smallest verified-real win left. One file, existing helper, no
-   contract change.
-2. **G-017** — the only remaining P1. Removes an external CDN dependency for
-   syntax highlighting and tightens CSP, but measure the bundle impact before
-   adopting.
-3. **G-025** — pure DX addition; do it only if there is demand.
+1. **G-017** — the only remaining P1. Removes an external CDN dependency for
+   syntax highlighting and tightens CSP, but ~190 code-split chunks means it
+   needs a bundle-size measurement before adopting.
+2. **G-025** — pure DX addition; do it only if there is demand.
 
 ### Deliberately not pursued
 

@@ -5,6 +5,7 @@
  *
  * @module imagePreview
  */
+import { rafThrottle } from "./utils/events.js";
 
 let _modal = null;
 let _img = null;
@@ -151,8 +152,7 @@ function _createModal() {
       if (!isModalOpen()) return;
       event.preventDefault();
       const delta = event.deltaY < 0 ? _zoomStep : -_zoomStep;
-      setZoom(_zoom + delta);
-      updateZoomLabel();
+      setZoomThrottled(_zoom + delta);
       },
     { passive: false },
   );
@@ -493,6 +493,23 @@ function setZoom(value) {
     _img.classList.remove("is-grabbing");
   }
 }
+
+/**
+ * Frame-throttled `setZoom`, used only by the `wheel` handler.
+ *
+ * A trackpad flick fires `wheel` at 60-120Hz and each `setZoom` performs a
+ * layout read plus several style writes, so calling it per event forces a
+ * synchronous layout on every tick. `rafThrottle` is leading-edge with
+ * trailing coalescing: the first tick applies immediately for responsiveness,
+ * and the rest collapse into one call per frame carrying the latest value.
+ * @type {(value:number) => void}
+ */
+const setZoomThrottled = rafThrottle((value) => {
+  setZoom(value);
+  // `updateZoomLabel` is local to `_createModal`; the module-level reference
+  // is `_updateZoomLabel`, which is a no-op until a modal exists.
+  _updateZoomLabel();
+});
 
 /**
  * Set the zoom level so the image fits within the visible preview area.
