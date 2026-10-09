@@ -433,6 +433,26 @@ verdict for each so neither audit is orphaned.
 | G-031 Confirm dead modules removed | ✅ | Verified absent. |
 | G-032 Hedging HTTP fetches | ❌ | Rejected. Traffic amplification risk. |
 
+## 10c. Regression guards added
+
+Two failure modes from this audit were invisible to every existing gate. Both
+now have a dedicated test, and both were verified to fail when the regression
+is reintroduced.
+
+| Guard | File | Catches |
+|---|---|---|
+| Lint-rule wiring smoke test | `tests/eslint-no-silent-catch.wiring.test.js` | The `no-silent-catch` rule being inert. Its own unit tests import the rule file directly and would still pass, and `npm run lint` would still report zero errors — which is exactly what happened when the plugin registration and ESLint config were both reverted. Loads the rule through the plugin entry point and asserts the config enables it as an error. |
+| Generated-type documentation guard | `tests/dts.typedefs.test.js` | A JSDoc de-duplication pass dropping `@typedef` declarations. `InitOptions` and `ParsedInitOptions` lost their TypeDoc pages while still appearing in the generated `.d.ts`, so every type-level gate stayed green. Cross-checks exported types against source `@typedef` declarations, and flags any doc block containing `@property` with no owning `@typedef`. |
+
+Both were validated by reintroducing the regression and confirming the test
+fails, then restoring.
+
+The type guard allowlists four pre-existing generator-synthesized types
+(`NavItem`, `ThemeStyle`, `PageContext`, `WorkerManager`) that have no source
+declaration. They are identical on the parent commit and out of scope; removing
+an entry from that list without adding a `@typedef` would mean the type became a
+phantom.
+
 ## 11. Implementation plan
 
 Status icons: ✅ done & validated · 🟡 partial · ⬜ not started · ⏰ deferred ·
