@@ -234,8 +234,8 @@ export function getFetchConcurrency(): number
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): void
 export function clearCrawlCache(): void
 export function getSearchIndex(): any
-export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}): Promise<Array>
-export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}): Promise<Array>
+export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}): Promise<any[]>
+export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}): Promise<any[]>
 export const CRAWL_MAX_QUEUE: number
 export const defaultCrawlMaxQueue: number
 
@@ -275,7 +275,7 @@ export function markNotFound(opts: any): any
 
 
 // --- from src/runtimeSitemap.js
-export function generateSitemapJson(opts: object): Promise<SitemapJson>
+export function generateSitemapJson(opts: object): Promise<{generatedAt:string, entries:Array<any>}>
 export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
@@ -287,7 +287,7 @@ export function exposeSitemapGlobals(opts: any): any
 
 
 // --- from src/router.js
-export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array|string[]|{values:()=>Iterable}): void
+export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array<any>|string[]|{values:()=>Iterable<any>}): void
 export function disposeResolutionCachePurge(): void
 
 
@@ -345,7 +345,8 @@ export function setIndexPathsRefreshed(value: boolean): void
 
 
 // --- from src/imagePreview.js
-export function attachImagePreview(opts: any): void
+export function disposeImagePreview(): void
+
 
 // --- from src/htmlBuilder.js
 export function preScanHtmlSlugs(opts: any): Promise<void>
@@ -386,11 +387,14 @@ export function clearLanguageImportCache(): void
 export function setLanguageImportNegativeCacheTTL(ms: number): void
 export function loadSupportedLanguages(url: string): Promise<void>
 export function registerLanguage(name: string, modulePath: string): Promise<boolean>
-export function observeCodeBlocks(root: any): any
+export function disposeCodeblocksObserver(): void
 export function setHighlightTheme(opts: {useCdn?:boolean}): void
 
 
+
 // --- from src/bulmaManager.js
+export function disconnectBulmaObservers(): void
+export function injectLink(opts: any): any
 export function ensureBulma(bulmaCustomize: string, pageDir: string): Promise<void>
 export function setStyle(style: 'light'|'dark'|'system'): void
 export function setThemeVars(vars: Record<string,string>): void
@@ -400,7 +404,6 @@ export function registerThemedElement(el: any): () => void
 export function handleSlugWorkerMessage(msg: object): Promise<object>
 
 // --- from src/worker/rendererRuntime.js
-
 
 
 
@@ -425,6 +428,10 @@ export function handleSlugWorkerMessage(msg: object): Promise<object>
 
 
 
+// --- from src/utils/workQueue.js
+export function createWorkQueue(items: Iterable<any>): {push: Function, shift: Function, take: Function,
+  clear: Function, length: number, size: number, isEmpty: boolean}
+
 // --- from src/utils/urlHelper.js
 export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): string
 export function parseHrefToRoute(href: string): any
@@ -434,6 +441,9 @@ export function toCanonicalHref(href: string): string
 export function getReadingTime(text: string): any
 export function getTextMetrics(text: string): any
 export function clearTextMetricsCache(): void
+
+// --- from src/utils/stripContentBasePrefix.js
+export function stripContentBasePrefix(rel: string, contentBasePath: string): string
 
 // --- from src/utils/splitIntoSections.js
 export function splitIntoSections(content: string, chunkSize: number): string[]
@@ -453,6 +463,19 @@ export function resetSharedParser(): void
 // --- from src/utils/runtimeManifest.js
 
 
+// --- from src/utils/runtimeGlobals.js
+export function claimGeneration(): any
+export function releaseGeneration(): void
+export function activeGeneration(): number|null
+export function isCurrentGeneration(generation: number|null): boolean
+export function isGenerationLive(generation: number|null): boolean
+export function setIfLive(generation: number|null, key: string, value: any): boolean
+export function setIfCurrent(generation: number|null, key: string, value: any): boolean
+export function getGlobal(key: string, fallback: any): any
+export function clearGlobal(key: string): void
+export const MANAGED_GLOBALS: any
+export function clearAllGlobals(): void
+
 // --- from src/utils/performanceDiagnostics.js
 
 
@@ -468,10 +491,10 @@ export function importUrlWithCache(url: string): Promise<any|null>
 // --- from src/utils/idle.js
 export function yieldToEventLoop(): Promise<void>
 export function yieldIfNeeded(iteration: number, threshold: number): Promise<void>
+export function createYieldGate(budgetMs: number): () => Promise<void>
 
 // --- from src/utils/helpers.js
-export function getBaseName(path: any): string
-export const normalizePath: any
+export function normalizePath(p: string): string
 export const trimTrailingSlash: any
 export const ensureTrailingSlash: any
 export function addResourceHints(): any
@@ -483,8 +506,8 @@ export function setEagerForAboveFoldImages(container: any, marginPx: number, deb
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
 export function safe(fn: any): string
 export const encodeURL: any
-export const decodeHtmlEntities: any
 export const getWorkerPoolSize: any
+
 
 
 
@@ -503,6 +526,9 @@ export function parseFrontmatter(md: string): {content:string, data: Record<stri
 // --- from src/utils/domPurify.js
 export function getDOMPurify(): any
 
+// --- from src/utils/decodeHtmlEntities.js
+export function decodeHtmlEntities(s: string): string
+
 // --- from src/utils/debug.js
 export function setDebugLevel(level: any): any
 export const _logger: any
@@ -518,6 +544,6 @@ export function getDebugCounters(): Record<string,number>
 export function resetDebugCounters(): any
 
 // --- from src/utils/concurrency.js
-export function runWithConcurrency(items: any, worker: (item: T, index: number) => Promise<R>|R, concurrency: number, signal: any): Promise<R[]>
+export function runWithConcurrency(items: Iterable<any>, worker: (item: any, index: number) => Promise<any>|any, concurrency: number, signal: any): Promise<Array<any>>
 
 // --- from src/lib/index.js

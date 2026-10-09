@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { normalizeSearchIndexEntries, safeGet, storeSlugMapping } from '../src/nav.js'
+import { normalizeSearchIndexEntries, safeGet, storeSlugMapping, searchEntryMatches } from '../src/nav.js'
 import { allMarkdownPaths, allMarkdownPathsSet, mdToSlug, slugToMd } from '../src/slugManager.js'
 
 describe('nav helper branches', () => {
@@ -46,5 +46,40 @@ describe('nav helper branches', () => {
     expect(normalizeSearchIndexEntries(null)).toBeNull()
     expect(normalizeSearchIndexEntries(undefined)).toBeUndefined()
     expect(() => normalizeSearchIndexEntries([null, 1, 'x', { slug: 'ok' }])).not.toThrow()
+  })
+
+  describe('searchEntryMatches caching', () => {
+    it('matches on cached lowercase title', () => {
+      const entry = { title: 'Hello World', _titleLc: 'hello world' }
+      expect(searchEntryMatches(entry, 'hello')).toBe(true)
+      expect(searchEntryMatches(entry, 'nope')).toBe(false)
+    })
+
+    it('matches on cached lowercase excerpt', () => {
+      const entry = { title: 'A', excerpt: 'Some Excerpt Text', _excerptLc: 'some excerpt text' }
+      expect(searchEntryMatches(entry, 'excerpt')).toBe(true)
+    })
+
+    it('falls back to computing case for un-normalized entries', () => {
+      const entry = { title: 'Hello World', excerpt: 'Body' }
+      expect(searchEntryMatches(entry, 'world')).toBe(true)
+      expect(searchEntryMatches(entry, 'body')).toBe(true)
+      expect(searchEntryMatches(entry, 'missing')).toBe(false)
+    })
+
+    it('handles missing fields and non-objects', () => {
+      expect(searchEntryMatches({}, 'x')).toBe(false)
+      expect(searchEntryMatches(null, 'x')).toBe(false)
+      expect(searchEntryMatches(undefined, 'x')).toBe(false)
+      expect(searchEntryMatches('string', 'x')).toBe(false)
+    })
+
+    it('expects the query to already be lowercased', () => {
+      // The caller lowercases the query once per keystroke; this helper
+      // deliberately does not, so that cost is not paid per entry.
+      const entry = { title: 'MiXeD Case', _titleLc: 'mixed case' }
+      expect(searchEntryMatches(entry, 'mixed')).toBe(true)
+      expect(searchEntryMatches(entry, 'MIXED')).toBe(false)
+    })
   })
 })

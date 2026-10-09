@@ -17,12 +17,11 @@ import { PowerSemaphore } from "performance-helpers/powerSemaphore";
  * Results are returned in input order. An aborted `signal` rejects the
  * pending work rather than leaving promises dangling.
  *
- * @template T, R
- * @param {readonly T[]} items - Items to process.
- * @param {(item: T, index: number) => Promise<R>|R} worker - Async worker.
+ * @param {Iterable<any>} items - Items to process (Array, Set, or any iterable).
+ * @param {(item: any, index: number) => Promise<any>|any} worker - Async worker.
  * @param {number} [concurrency=4] - Maximum simultaneous workers.
  * @param {AbortSignal} [signal] - Optional abort signal.
- * @returns {Promise<R[]>} Results in input order.
+ * @returns {Promise<Array<any>>} Results in input order.
  */
 export async function runWithConcurrency(
   items,
@@ -30,12 +29,15 @@ export async function runWithConcurrency(
   concurrency = 4,
   signal,
 ) {
-  if (!Array.isArray(items) || items.length === 0) return [];
+  // Accept any iterable: callers pass Arrays and Sets interchangeably, and
+  // silently returning [] for a Set would drop the work entirely.
+  const values =
+    items == null ? [] : Array.isArray(items) ? items : Array.from(items);
+  if (values.length === 0) return [];
   const limit = Math.max(1, Number(concurrency) || 1);
   const sem = new PowerSemaphore(limit);
   return Promise.all(
-    items.map((item, idx) => sem.run(() => worker(item, idx), { signal })),
+    values.map((item, idx) => sem.run(() => worker(item, idx), { signal })),
   );
 }
 
-export default runWithConcurrency;

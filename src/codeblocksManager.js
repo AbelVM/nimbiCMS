@@ -461,6 +461,7 @@ export async function registerLanguage(name, modulePath) {
               try {
                 host = new URL(esmUrl).host;
               } catch (_) {
+                // Unparseable CDN URL: no host to circuit-check.
                 host = null;
               }
               if (_isCdnBlocked(host)) {
@@ -471,6 +472,7 @@ export async function registerLanguage(name, modulePath) {
                   _noteCdnSuccess(host);
                   return m;
                 } catch (err) {
+                  // CDN import failed: record it for the circuit breaker.
                   _noteCdnFailure(host);
                 }
               }
@@ -480,6 +482,7 @@ export async function registerLanguage(name, modulePath) {
                 try {
                   host2 = new URL(moduleUrl).host;
                 } catch (_) {
+                  // Unparseable CDN URL: no host to circuit-check.
                   host2 = null;
                 }
                 if (_isCdnBlocked(host2)) {
@@ -525,10 +528,12 @@ export async function registerLanguage(name, modulePath) {
             }
             return true;
           } catch (_e) {
+            // Language registration failed: remember it and try the next.
             lastErr = _e;
           }
         }
       } catch (_e) {
+        // Language registration failed: remember it and try the next.
         lastErr = _e;
       }
     }
@@ -554,6 +559,26 @@ let __hlObserver = null;
  * @param {ParentNode} [root=document] - Root node in which to observe code blocks.
  * @returns {void}
  */
+/**
+ * Disconnect the shared IntersectionObserver and drop its reference.
+ *
+ * The observer unobserves each block as soon as it intersects, but a block
+ * that is never scrolled into view before teardown stays observed, keeping a
+ * detached DOM node alive. `destroy()` calls this so a torn-down runtime
+ * retains nothing.
+ * @returns {void}
+ */
+export function disposeCodeblocksObserver() {
+  try {
+    if (__hlObserver && typeof __hlObserver.disconnect === "function") {
+      __hlObserver.disconnect();
+    }
+  } catch (err) {
+    debugWarn("[codeblocksManager] observer disconnect failed", err);
+  }
+  __hlObserver = null;
+}
+
 export function observeCodeBlocks(root) {
   const effectiveRoot = root?.querySelector
     ? root

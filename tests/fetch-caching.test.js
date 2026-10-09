@@ -68,6 +68,6 @@ describe('fetchMarkdown caching and dedupe', () => {
     window.__nimbiRuntimeManifest = { generation: 2, language: 'en' }
     await expect(s.fetchMarkdown('c.md', '/', { force: true })).resolves.toMatchObject({ raw: 'generation:2' })
     expect(calls).toBe(2)
-    expect(s.getFetchCacheDiagnostics()).toMatchObject({ fetchEntries: 2, maxEntries: 2000 })
+    expect(s.getFetchCacheDiagnostics()).toMatchObject({ fetchEntries: 2, maxEntries: 500 })
   })
 })

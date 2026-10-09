@@ -1,27 +1,4 @@
 /**
- * Utility helper functions used by the runtime.
- * @module utils/helpers
- */
-
-/**
- * NOTE: All PowerMemoizer instances below use an explicit `keyResolver`
- * to ensure consistent cache keys across performance-helpers v1 and v2.
- *
- * Key format change in performance-helpers v2.0.0: the default
- * `keyResolver` changed from `(...args) => JSON.stringify(args)` to
- * `simpleArgsKey`. For scalar arguments (strings, numbers, booleans)
- * `simpleArgsKey` is ~35% cheaper and produces equivalent keys; for
- * non-scalar arguments (objects, arrays) it falls back to
- * `JSON.stringify`, so keys for non-scalar args keep the old format.
- *
- * All our memoizers use scalar string args only, so the behavior is
- * equivalent, but we pin the resolver for safety. If a future
- * memoizer is added with non-scalar args and must keep the v1 key
- * format, pass `keyResolver: (...args) => JSON.stringify(args)`
- * explicitly.
- */
-
-/**
  * Return true if the href points to an external or special link.  This
  * matches absolute URLs and mailto/tel schemes.
  *
@@ -30,6 +7,7 @@
  */
 import { debugWarn } from "./debug.js";
 import { PowerMemoizer } from "performance-helpers/powerCache";
+import { decodeHtmlEntities } from "./decodeHtmlEntities.js";
 
 const MEMO_KEY = (arg) => (arg === undefined ? "__undefined" : String(arg));
 const _normalizePathMemo = new PowerMemoizer(
@@ -67,39 +45,6 @@ const _encodeURLMemo = new PowerMemoizer(
   { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } },
 );
 
-const _decodeHtmlEntitiesMemo = new PowerMemoizer(
-  function (s) {
-    try {
-      if (!s && s !== 0) return "";
-      const str = String(s);
-      const named = {
-        amp: "&",
-        lt: "<",
-        gt: ">",
-        quot: '"',
-        apos: "'",
-        nbsp: " ",
-      };
-      return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, g) => {
-        if (!g) return m;
-        if (g[0] === "#") {
-          try {
-            if (g[1] === "x" || g[1] === "X")
-              return String.fromCharCode(parseInt(g.slice(2), 16));
-            return String.fromCharCode(parseInt(g.slice(1), 10));
-          } catch (e) {
-            return m;
-          }
-        }
-        return named[g] !== undefined ? named[g] : m;
-      });
-    } catch (err) {
-      return String(s ?? "");
-    }
-  },
-  { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } },
-);
-
 export function isExternalLink(href) {
   if (!href || typeof href !== "string") return false;
   return (
@@ -116,7 +61,9 @@ export function isExternalLink(href) {
  * @param {string} p - input path to normalize (remove leading ./ or /)
  * @returns {string}
  */
-export const normalizePath = (p) => _normalizePathMemo.run(p);
+export function normalizePath(p) {
+  return _normalizePathMemo.run(p);
+}
 
 export function getBaseName(path) {
   return String(path ?? "").replace(/^.*\//, "");
@@ -552,7 +499,7 @@ try {
  * @param {string} s
  * @returns {string}
  */
-export const decodeHtmlEntities = (s) => _decodeHtmlEntitiesMemo.run(s);
+export { decodeHtmlEntities };
 
 /**
  * Determine a reasonable worker pool size based on the platform's

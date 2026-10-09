@@ -18,7 +18,12 @@ import {
 import { normalizePath } from "./utils/helpers.js";
 import { getSharedParser } from "./utils/sharedDomParser.js";
 import { debugLog, debugWarn } from "./utils/debug.js";
-import { yieldIfNeeded } from "./utils/idle.js";
+import {
+  activeGeneration,
+  setIfLive,
+  isGenerationLive,
+} from "./utils/runtimeGlobals.js";
+import { yieldIfNeeded, createYieldGate } from "./utils/idle.js";
 
 const sitemapBlobRevokeTimers = new Set();
 
@@ -153,7 +158,7 @@ function makeEntryFromIndexItem(baseNoQs, it) {
  * @param {string} [opts.navigationPage]
  * @param {string} [opts.notFoundPage]
  * @param {string|URL} [opts.baseUrl] - base URL used for generated locations
- * @returns {Promise<SitemapJson>} sitemap JSON object
+ * @returns {Promise<{generatedAt:string, entries:Array<any>}>} sitemap JSON object
  */
 export async function generateSitemapJson(opts = {}) {
   const {
@@ -327,11 +332,10 @@ export async function generateSitemapJson(opts = {}) {
     return false;
   };
   if (Array.isArray(idx) && idx.length) {
-    let idxYieldCount = 0;
+    const yieldGate = createYieldGate();
     for (const it of idx) {
       try {
-        idxYieldCount++;
-        await yieldIfNeeded(idxYieldCount, 64);
+        await yieldGate();
       } catch (_) {}
       try {
         if (!it?.slug) continue;
@@ -375,6 +379,7 @@ export async function generateSitemapJson(opts = {}) {
         }
         entries.push(ent);
       } catch {
+        // Malformed entry: skip it rather than aborting the whole sitemap.
         continue;
       }
     }
@@ -383,11 +388,10 @@ export async function generateSitemapJson(opts = {}) {
   // Optionally add all slugs discoverable from slugToMd / allMarkdownPaths
   if (includeAllMarkdown) {
     try {
-      let allMdYieldCount = 0;
+      const yieldGate = createYieldGate();
       for (const [slug, mdVal] of slugToMd.entries()) {
         try {
-          allMdYieldCount++;
-          await yieldIfNeeded(allMdYieldCount, 128);
+          await yieldGate();
         } catch (_) {}
         try {
           if (!slug) continue;
@@ -491,11 +495,10 @@ export async function generateSitemapJson(opts = {}) {
     // Limit to a reasonable number to avoid blowing up runtime
     const MAX_SOURCE_FETCH = 30;
     let fetched = 0;
-    let sourceYieldCount = 0;
+    const yieldGate = createYieldGate();
     for (const sp of sourcePaths) {
       try {
-        sourceYieldCount++;
-        await yieldIfNeeded(sourceYieldCount, 8);
+        await yieldGate();
       } catch (_) {}
       if (fetched >= MAX_SOURCE_FETCH) break;
       try {
@@ -634,11 +637,10 @@ export async function generateSitemapJson(opts = {}) {
   // Ensure each base slug (strip any '::' anchor) has a page-level entry.
   try {
     const entriesBySlug = new Map();
-    let entriesYieldCount = 0;
+    const yieldGate = createYieldGate();
     for (const e of entries) {
       try {
-        entriesYieldCount++;
-        await yieldIfNeeded(entriesYieldCount, 128);
+        await yieldGate();
       } catch (_) {}
       try {
         if (!e || !e.slug) continue;
@@ -718,11 +720,10 @@ export async function generateSitemapJson(opts = {}) {
   const final = [];
   try {
     const seenFinal = new Set();
-    let finalYieldCount = 0;
+    const yieldGate = createYieldGate();
     for (const e of entries) {
       try {
-        finalYieldCount++;
-        await yieldIfNeeded(finalYieldCount, 128);
+        await yieldGate();
       } catch (_) {}
       try {
         if (!e || !e.slug) continue;
@@ -786,6 +787,7 @@ export async function generateSitemapJson(opts = {}) {
             }
             if (!candidatePath && e.sourcePath) candidatePath = e.sourcePath;
           } catch (_) {
+            // Unreadable mapping: skip this entry.
             continue;
           }
           if (!candidatePath) continue;
@@ -1158,6 +1160,11 @@ function _renderSitemapBody(finalJson, mimeType) {
 // largest pending `finalJson` and performs a single write shortly after
 // the burst of calls completes.
 function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
+  // Captured here rather than in the caller: this helper is also invoked
+  // directly by hosts and tests with no live runtime, and the debounced
+  // callback must compare against the generation that was live when the
+  // write was scheduled.
+  const generation = activeGeneration();
   try {
     if (typeof window === "undefined") {
       // fallback: immediate write
@@ -1172,13 +1179,9 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
           out = generateLlmsTxt(finalJson);
         } else out = generateSitemapXml(finalJson);
         _writeXmlToDocument(out, mimeType);
-        try {
-          if (typeof window !== "undefined") {
-            window.__nimbiSitemapRenderedAt = Date.now();
-            window.__nimbiSitemapJson = finalJson;
-            window.__nimbiSitemapFinal = finalJson.entries || [];
-          }
-        } catch {}
+        setIfLive(generation, "__nimbiSitemapRenderedAt", Date.now());
+        setIfLive(generation, "__nimbiSitemapJson", finalJson);
+        setIfLive(generation, "__nimbiSitemapFinal", finalJson.entries || []);
       } catch (_) {}
       return;
     }
@@ -1205,6 +1208,10 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
       window.__nimbiSitemapWriteTimer = setTimeout(() => {
         try {
           if (typeof window === "undefined") return;
+          // The runtime may have been torn down during the 40ms debounce
+          // window. Skip the write entirely rather than replacing the live
+          // document with content from a dead runtime.
+          if (!isGenerationLive(generation)) return;
           const p = window.__nimbiSitemapPendingWrite;
           if (!p) return;
           let out = null;
@@ -1221,11 +1228,13 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
           try {
             _writeXmlToDocument(out, p.mimeType);
           } catch (e) {}
-          try {
-            window.__nimbiSitemapRenderedAt = Date.now();
-            window.__nimbiSitemapJson = p.finalJson;
-            window.__nimbiSitemapFinal = p.finalJson.entries || [];
-          } catch {}
+          setIfLive(generation, "__nimbiSitemapRenderedAt", Date.now());
+          setIfLive(generation, "__nimbiSitemapJson", p.finalJson);
+          setIfLive(
+            generation,
+            "__nimbiSitemapFinal",
+            p.finalJson.entries || [],
+          );
         } catch (e) {}
         try {
           if (typeof window !== "undefined")
@@ -1269,6 +1278,9 @@ function _scheduleSitemapWrite(finalJson, mimeType = "application/xml") {
  *   string in the default non-writing mode
  */
 export async function handleSitemapRequest(opts = {}) {
+  // Captured once so a sitemap response generated after this runtime is torn
+  // down cannot repopulate the diagnostic globals.
+  const generation = activeGeneration();
   try {
     let requestUrl;
     try {
@@ -1373,6 +1385,7 @@ export async function handleSitemapRequest(opts = {}) {
                   : [];
           }
         } catch (e) {
+          // Index resolution failed: fall back to the supplied index.
           idx =
             Array.isArray(opts.index) && opts.index.length
               ? opts.index
@@ -1389,6 +1402,7 @@ export async function handleSitemapRequest(opts = {}) {
               : [];
       }
     } catch (e) {
+      // Index resolution failed: fall back to the supplied index.
       idx =
         Array.isArray(opts.index) && opts.index.length
           ? opts.index
@@ -1466,6 +1480,7 @@ export async function handleSitemapRequest(opts = {}) {
             });
           }
         } catch (_) {
+          // Index build failed: fall back to the supplied index.
           maybe = null;
         }
         if (Array.isArray(maybe) && maybe.length) {
@@ -1543,10 +1558,12 @@ export async function handleSitemapRequest(opts = {}) {
               rebuildNoIndexing,
             );
           } catch (e) {
+            // Rebuild attempt failed: try the next strategy.
             rebuilt = null;
           }
         }
       } catch (e) {
+        // Rebuild attempt failed: try the next strategy.
         rebuilt = null;
       }
 
@@ -1562,6 +1579,7 @@ export async function handleSitemapRequest(opts = {}) {
             rebuildSeeds.length ? rebuildSeeds : undefined,
           );
         } catch (e) {
+          // Rebuild attempt failed: fall through to the supplied index.
           rebuilt = null;
         }
       }
@@ -1659,6 +1677,7 @@ export async function handleSitemapRequest(opts = {}) {
       try {
         deduped = Array.isArray(json?.entries) ? json.entries.slice(0) : [];
       } catch (_) {
+        // Slice failed: use an empty entry list.
         deduped = [];
       }
     }
@@ -1688,14 +1707,14 @@ export async function handleSitemapRequest(opts = {}) {
       return _createSitemapResponse(finalJson, mimeType, opts.runtimeManifest);
     }
 
-    try {
-      if (typeof window !== "undefined") {
-        try {
-          window.__nimbiSitemapJson = finalJson;
-          window.__nimbiSitemapFinal = deduped;
-        } catch {}
-      }
-    } catch {}
+    // Permissive variant (`setIfLive`): `handleSitemapRequest` and
+    // `generateSitemapJson` are public API invoked directly by hosts and
+    // tests with no initCMS runtime, so a null generation must still
+    // publish. Only a superseded generation is blocked.
+    if (typeof window !== "undefined") {
+      setIfLive(generation, "__nimbiSitemapJson", finalJson);
+      setIfLive(generation, "__nimbiSitemapFinal", deduped);
+    }
 
     // Document replacement is opt-in. Programmatic callers (hosts, tests,
     // other runtimes) receive the generated body instead of having the live
@@ -1895,6 +1914,10 @@ export function attachSitemapDownloadUI(mount, opts = {}) {
  * @returns {Promise<{json:Object,deduped:Array}|null>} generated JSON and deduped entries
  */
 export async function exposeSitemapGlobals(opts = {}) {
+  // Captured here rather than in the caller: this is public API invoked
+  // directly by hosts and tests with no initCMS runtime, so the permissive
+  // variant is required and the generation must be read at call time.
+  const generation = activeGeneration();
   try {
     const waitMs =
       typeof opts.waitForIndexMs === "number" ? opts.waitForIndexMs : Infinity;
@@ -1946,6 +1969,7 @@ export async function exposeSitemapGlobals(opts = {}) {
               const u = new URL(String(e.loc));
               slug = u.searchParams.get("page");
             } catch (_) {
+              // Unparseable loc: no slug to derive from it.
               slug = null;
             }
           }
@@ -1963,6 +1987,7 @@ export async function exposeSitemapGlobals(opts = {}) {
       try {
         deduped = Array.isArray(json?.entries) ? json.entries.slice(0) : [];
       } catch (_) {
+        // Slice failed: use an empty entry list.
         deduped = [];
       }
     }
@@ -1975,14 +2000,8 @@ export async function exposeSitemapGlobals(opts = {}) {
           ? json.entries
           : [],
     });
-    try {
-      if (typeof window !== "undefined") {
-        try {
-          window.__nimbiSitemapJson = finalJson;
-          window.__nimbiSitemapFinal = deduped;
-        } catch {}
-      }
-    } catch {}
+    setIfLive(generation, "__nimbiSitemapJson", finalJson);
+    setIfLive(generation, "__nimbiSitemapFinal", deduped);
 
     return { json: finalJson, deduped };
   } catch (e) {

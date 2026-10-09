@@ -63,7 +63,13 @@ module.exports = [
       'no-console': 'off',
       'no-undef': 'error',
       'nimbi-debug/no-eager-debug': 'warn',
-      'nimbi-debug/no-empty-catch-without-comment': 'warn'
+      'nimbi-debug/no-empty-catch-without-comment': 'warn',
+      // Silent catches did real damage here: a `null` AbortController
+      // dereference and a missing import were both hidden by enclosing
+      // `catch` blocks that discarded the error. Every catch must now log,
+      // rethrow, return a fallback, capture the error, propagate it, or carry
+      // an explanatory comment.
+      'nimbi-debug/no-silent-catch': 'error'
     }
   }
 ]

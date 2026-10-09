@@ -10,6 +10,44 @@
 /** @type {'light'|'dark'|'system'} */
 let currentStyle = "light";
 
+/**
+ * Every MutationObserver created to keep a Bulmaswatch theme stylesheet last
+ * in `<head>`. Tracked here so `destroy()` can disconnect them all; previously
+ * they were only reachable through a broken attribute lookup and survived
+ * teardown, observing `document.head` for the lifetime of the page.
+ * @type {Set<MutationObserver>}
+ */
+const _bulmaHeadObservers = new Set();
+
+/**
+ * Disconnect one head observer and drop it from the registry.
+ * @param {MutationObserver|null} observer
+ * @returns {void}
+ */
+function _disconnectObserver(observer) {
+  try {
+    if (observer && typeof observer.disconnect === "function") {
+      observer.disconnect();
+    }
+  } catch (_) {}
+  _bulmaHeadObservers.delete(observer);
+}
+
+/**
+ * Disconnect every Bulmaswatch head observer.
+ *
+ * Called from `destroy()`. Without this, each observer keeps watching
+ * `document.head` for the lifetime of the page and retains a reference to the
+ * stylesheet link it was moving.
+ * @returns {void}
+ */
+export function disconnectBulmaObservers() {
+  for (const observer of Array.from(_bulmaHeadObservers)) {
+    _disconnectObserver(observer);
+  }
+  _bulmaHeadObservers.clear();
+}
+
 import { debugLog, debugWarn } from "./utils/debug.js";
 import { applyCspNonce } from "./utils/helpers.js";
 
@@ -23,7 +61,9 @@ import { applyCspNonce } from "./utils/helpers.js";
  * @param {Record<string,string>} [attrs] - Optional attributes to set on the link element.
  * @returns {void}
  */
-function injectLink(href, attrs = {}) {
+// Exported for tests: the Bulmaswatch observer lifecycle is only reachable
+// through this helper, and there is no public API that injects a themed link.
+export function injectLink(href, attrs = {}) {
   if (document.querySelector(`link[href="${href}"]`)) return;
   const l = document.createElement("link");
   l.rel = "stylesheet";
@@ -38,22 +78,23 @@ function injectLink(href, attrs = {}) {
         l.getAttribute("data-bulmaswatch-move-count") || 0,
       );
       let moving = false;
+      // The previous implementation tried to reuse an existing observer by
+      // looking one up through a `data-bulmaswatch-observer` attribute, but it
+      // stored the literal string "1" and then queried for an element carrying
+      // that value — which resolved to the link itself, not an observer. Every
+      // call therefore created a fresh observer. Observers are now tracked in
+      // `_bulmaHeadObservers` instead, which is what makes teardown possible.
       let observer = null;
-      try {
-        const existingObserver = l.getAttribute("data-bulmaswatch-observer");
-        if (existingObserver) {
-          observer = document.querySelector(
-            `[data-bulmaswatch-observer="${existingObserver}"]`,
-          );
-        }
-      } catch (e) {
-        observer = null;
-      }
       const observerCallback = () => {
         try {
           if (moving) return;
           const parent = l.parentNode;
-          if (!parent) return;
+          if (!parent) {
+            // The stylesheet was removed (teardown or theme change). Stop
+            // observing rather than running for the rest of the page lifetime.
+            _disconnectObserver(observer);
+            return;
+          }
           const last = parent.lastElementChild;
           if (last === l) return;
           const currentMoveCount = Number(
@@ -61,11 +102,7 @@ function injectLink(href, attrs = {}) {
           );
           if (currentMoveCount >= 1000) {
             l.setAttribute("data-bulmaswatch-move-stopped", "1");
-            if (observer) {
-              try {
-                observer.disconnect();
-              } catch (e) {}
-            }
+            _disconnectObserver(observer);
             return;
           }
           moving = true;
@@ -83,6 +120,7 @@ function injectLink(href, attrs = {}) {
       };
       if (!observer) {
         observer = new MutationObserver(observerCallback);
+        _bulmaHeadObservers.add(observer);
       }
       try {
         observer.observe(document.head, { childList: true });

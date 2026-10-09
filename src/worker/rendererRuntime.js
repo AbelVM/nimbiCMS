@@ -8,6 +8,7 @@ import {
 } from "../utils/importCache.js";
 import { decodeInbound, announceCapabilities } from "performance-helpers/powerMessageCodec";
 import { slugify } from "../utils/slugify.js";
+import { decodeHtmlEntities } from "../utils/decodeHtmlEntities.js";
 import { splitIntoSections } from "../utils/splitIntoSections.js";
 import hljsCore from "highlight.js/lib/core";
 
@@ -65,35 +66,6 @@ const HEADING_CLASSES = {
 
 let hljs = null;
 
-export function decodeHtmlEntitiesLocal(s) {
-  try {
-    if (!s && s !== 0) return "";
-    const str = String(s);
-    const named = {
-      amp: "&",
-      lt: "<",
-      gt: ">",
-      quot: '"',
-      apos: "'",
-      nbsp: " ",
-    };
-    return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, g) => {
-      if (!g) return m;
-      if (g[0] === "#") {
-        try {
-          if (g[1] === "x" || g[1] === "X")
-            return String.fromCharCode(parseInt(g.slice(2), 16));
-          return String.fromCharCode(parseInt(g.slice(1), 10));
-        } catch (_) {
-          return m;
-        }
-      }
-      return named[g] !== undefined ? named[g] : m;
-    });
-  } catch (_) {
-    return String(s ?? "");
-  }
-}
 
 
 export function slugifyHeading(s) {
@@ -122,6 +94,7 @@ export async function ensureHljs() {
   try {
     hljs = hljsCore || null;
   } catch (_) {
+    // highlight.js core unavailable: highlighting stays disabled.
     hljs = null;
   }
   return hljs;
@@ -144,7 +117,7 @@ function postProcessHtml(html, idCounts = new Map()) {
       const level = Number(lvl);
       let text = inner.replace(/<[^>]+>/g, "").trim();
       try {
-        text = decodeHtmlEntitiesLocal(text);
+        text = decodeHtmlEntities(text);
       } catch (_) {}
       let existingId = null;
       const idMatch = (attrs || "").match(/\sid="([^"]+)"/);
@@ -361,3 +334,6 @@ if (marked && typeof marked.setOptions === "function") {
     },
   });
 }
+
+// Retained under the historical name for existing consumers/tests.
+export { decodeHtmlEntities as decodeHtmlEntitiesLocal };

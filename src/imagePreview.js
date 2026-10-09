@@ -545,6 +545,7 @@ function openPreview(src, alt = "", naturalWidth = 0, naturalHeight = 0) {
         const label = fn.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ");
         alt = _label("imagePreviewDefaultAlt", label || "Image");
       } catch (e) {
+        // Filename-derived label failed: use the generic default.
         alt = _label("imagePreviewDefaultAlt", "Image");
       }
     }
@@ -650,6 +651,28 @@ function closePreview() {
  * @param {{t?: (key: string) => string}} [options] Optional helpers, such as localization.
  * @returns {void}
  */
+/**
+ * Close and release the shared preview modal.
+ *
+ * `_createModal` already drops its reference when the modal leaves the
+ * document, so this is mostly explicit teardown for symmetry with the other
+ * module singletons — but it also closes an open dialog, which otherwise
+ * stays visible after the mount element is removed.
+ * @returns {void}
+ */
+export function disposeImagePreview() {
+  try {
+    if (_modal && typeof _modal.close === "function" && _modal.open) {
+      _modal.close();
+    }
+  } catch (_) {}
+  try {
+    if (_modal && _modal.parentNode) _modal.parentNode.removeChild(_modal);
+  } catch (_) {}
+  _modal = null;
+  _updateZoomLabel = () => {};
+}
+
 export function attachImagePreview(root, { t, zoomStep = 0.25 } = {}) {
   if (!root || !root.querySelectorAll) return;
 

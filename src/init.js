@@ -38,12 +38,23 @@ import { disposeWorkerBlobUrlCache } from "./worker-manager.js";
 import { refreshIndexPaths } from "./indexManager.js";
 import { buildNav } from "./nav.js";
 import * as runtimeSitemap from "./runtimeSitemap.js";
+import * as codeblocksManager from "./codeblocksManager.js";
+import * as imagePreview from "./imagePreview.js";
+import * as bulmaManager from "./bulmaManager.js";
 import {
   awaitSearchIndex as awaitSearchIndexRuntime,
   clearSearchIndexCache,
 } from "./slugSearchRuntime.js";
 import { createUI } from "./ui.js";
 import { parseHrefToRoute, toCanonicalHref } from "./utils/urlHelper.js";
+import {
+  claimGeneration,
+  releaseGeneration,
+  clearAllGlobals,
+  setIfCurrent,
+  activeGeneration,
+  isCurrentGeneration,
+} from "./utils/runtimeGlobals.js";
 import {
   normalizePath,
   addResourceHints,
@@ -63,75 +74,6 @@ import { setDebugLevel, debugWarn, debugInfo } from "./utils/debug.js";
 import { startPerformanceDiagnostics } from "./utils/performanceDiagnostics.js";
 import { createRuntimeManifest } from "./utils/runtimeManifest.js";
 
-/**
- * Parse well-known `initCMS` options from the current page URL's query
- * string. Values are converted to the expected types where possible.
- *
- * Supported query params:
- * - `contentPath` (string)
- * - `searchIndex` (boolean: true|false|1|0)
- * - `searchIndexMode` ('eager'|'lazy')
- * - `defaultStyle` ('light'|'dark')
- * - `bulmaCustomize` (string)
- * - `lang` (string)
- * - `l10nFile` (string or 'null')
- * - `cacheTtlMinutes` (number)
- * - `cacheMaxEntries` (integer)
- * - `homePage` (string)
- * - `notFoundPage` (string)
- * - `availableLanguages` (comma-separated list)
- *
- * The returned object contains only keys for params that were present and
- * successfully parsed.
- *
- * @typedef {Object} ParsedInitOptions
- * @property {string} [contentPath]
- * @property {boolean} [searchIndex]
- * @property {'eager'|'lazy'} [searchIndexMode]
- * @property {'light'|'dark'|'system'} [defaultStyle]
- * @property {string} [bulmaCustomize]
- * @property {string} [lang]
- * @property {string|null} [l10nFile]
- * @property {number} [cacheTtlMinutes]
- * @property {number} [cacheMaxEntries]
- * @property {number} [fetchConcurrency]
- * @property {number} [negativeFetchCacheTTL]
- * @property {string} [homePage]
- * @property {string|null} [notFoundPage]
- * @property {string} [navigationPage]
- * @property {string[]} [availableLanguages]
- * @property {number} [indexDepth]
- * @property {string[]} [noIndexing]
- *
- * @typedef {Object} InitOptions
- * @property {string|Element} el
- * @property {string} [contentPath]
- * @property {number} [crawlMaxQueue]
- * @property {boolean} [searchIndex]
- * @property {'eager'|'lazy'} [searchIndexMode]
- * @property {'light'|'dark'|'system'} [defaultStyle]
- * @property {string} [bulmaCustomize]
- * @property {string} [lang]
- * @property {string|null} [l10nFile]
- * @property {number} [cacheTtlMinutes]
- * @property {number} [cacheMaxEntries]
- * @property {Array<Record<string,unknown>>} [markdownExtensions]
- * @property {string[]} [availableLanguages]
- * @property {string} [homePage]
- * @property {string|null} [notFoundPage]
- * @property {boolean} [skipRootReadme]
- * @property {boolean} [allowUrlPathOverrides]
- * @property {boolean} [allowEmbeddedScripts]
- * @property {string[]} [embeddedScriptOrigins]
- * @property {Object} [seoMap]
- * @property {Object} [manifest]
- * @property {boolean} [exposeSitemap]
- * @property {boolean} [performanceDiagnostics]
- * @property {(record:Object) => void} [onRuntimeError]
- *
- * @param {string} [queryString] optional query string (for tests); defaults to window.location.search
- * @returns {ParsedInitOptions} - Parsed options object containing any recognized and parsed query parameters.
- */
 /**
  * Parse URL query string into a normalized `initCMS` options object.
  * Conservative, descriptive helper used by `initCMS` and tests.
@@ -155,6 +97,8 @@ export function parseInitOptionsFromQuery(queryString) {
             ? parsed.params
             : "?" + parsed.params;
       } catch (e) {
+        // Unparseable query string: fall back to no params rather than
+        // aborting initialization.
         qs = "";
       }
     }
@@ -335,46 +279,13 @@ function clearRuntimeTimeouts() {
 }
 
 function setRecoveryState(state, error = null) {
-  try {
-    if (typeof window === "undefined") return;
-    window.__nimbiRecoveryState = {
-      state,
-      generation: currentRuntimeId,
-      error: error ? String(error?.message || error).slice(0, 2000) : null,
-    };
-  } catch (_) {}
+  setIfCurrent(currentRuntimeId, "__nimbiRecoveryState", {
+    state,
+    generation: currentRuntimeId,
+    error: error ? String(error?.message || error).slice(0, 2000) : null,
+  });
 }
 
-/**
- * Initialize the CMS in a host page.
- *
- * Throws a `TypeError` when options are of the wrong type so configuration
- * mistakes are surfaced early (e.g. passing a number for `contentPath`).
- *
- * @param {InitOptions} [options={}] - Initialization options provided by the caller.
- * @param {boolean} [options.allowUrlPathOverrides=false] - advanced opt-in that
- *   allows `contentPath`, `homePage`, and `notFoundPage` to be overridden via
- *   URL query parameters. This is disabled by default for security; enabling
- *   it should only be done by trusted host pages.
- * @param {boolean} [options.allowEmbeddedScripts=false] - when `true`, executes embedded scripts from rendered markdown/html via `new Function(...)`. This is security-sensitive and should only be enabled for fully trusted content sources.
- * @param {(record:Object) => void} [options.onRuntimeError] - optional bounded runtime diagnostic callback.
- * @param {string|Element} options.el - mount point selector or element
- * @param {string} [options.contentPath='/content'] - URL path to content
- * @param {number} [options.crawlMaxQueue=1000] - maximum directory queue length for slug crawling (see docs)
- * @param {boolean} [options.searchIndex=true] - build a client-side search index (adds search box to navbar)
- * @param {('eager'|'lazy')} [options.searchIndexMode='eager'] - when to build the search index
- * @param {('light'|'dark')} [options.defaultStyle='light'] - initial light/dark mode
- * @param {string} [options.bulmaCustomize='none'] - Bulma customization flag
- * @param {string} [options.lang] - UI language code
- * @param {string|null} [options.l10nFile] - path to localization file
- * @param {number} [options.cacheTtlMinutes=5] - resolution cache time‑to‑live in minutes
- * @param {number} [options.cacheMaxEntries] - maximum number of resolution cache entries (defaults to module constant)
- * @param {Array<Record<string,unknown>>} [options.markdownExtensions] - list of marked extensions to register on init
- * @param {string} [options.homePage] - Sets the site’s home page. Can be a `.md` or `.html` file. If not set, the initializer will attempt to derive the home page from the first link in `navigationPage`. The runtime will not automatically fall back to `'_home.md'`.
- * @param {string|null} [options.notFoundPage] - Sets the site's not-found page. Can be a `.md` or `.html` file. If not set, the runtime will render an inline "Not Found" message linking to the configured `homePage` instead of attempting to load `'_404.md'`.
- * @param {boolean} [options.skipRootReadme=false] - when true, the indexer will skip link discovery inside a repository-root `README.md`; set to `false` to treat the root README like other content pages.
- * @returns {Promise<void>} resolves once the initial page has rendered
- */
 /**
  * Initialize the Nimbi CMS runtime on the host page.
  * Conservative wrapper used by consumers to mount UI and start routing.
@@ -592,6 +503,8 @@ export async function initCMS(options = {}) {
       throw new Error("initCMS already called on this element");
     }
   } catch (e) {
+    // Only the duplicate-init sentinel is rethrown; any other failure means
+    // the guard itself could not run, so initialization continues.
     if (e instanceof Error && /already called/.test(e.message)) throw e;
   }
   if (cmsMountEl && cmsMountEl !== mountEl && cmsMountEl.isConnected) {
@@ -852,6 +765,9 @@ export async function initCMS(options = {}) {
         if (!window.__nimbiRenderingErrors__)
           window.__nimbiRenderingErrors__ = [];
         const runtimeId = currentRuntimeId;
+        // Captured so a late error report cannot repopulate the array after
+        // this runtime has been torn down.
+        const generation = activeGeneration();
         const redactDiagnosticValue = (value) =>
           String(value)
             .replace(/([?&](?:token|key|secret|password|auth)[^=]*=)[^&]*/gi, "$1[redacted]")
@@ -863,6 +779,7 @@ export async function initCMS(options = {}) {
             if (boundedRecord[key] != null)
               boundedRecord[key] = redactDiagnosticValue(boundedRecord[key]).slice(0, 2000);
           }
+          if (!isCurrentGeneration(generation)) return;
           window.__nimbiRenderingErrors__.push(boundedRecord);
           if (window.__nimbiRenderingErrors__.length > 50)
             window.__nimbiRenderingErrors__.splice(0, window.__nimbiRenderingErrors__.length - 50);
@@ -931,10 +848,9 @@ export async function initCMS(options = {}) {
       const container = document.createElement("div");
       container.className = "container nimbi-cms";
       container.tabIndex = 0;
-      try {
-      } catch (e) {
-        debugWarn("[nimbi-cms] container style setup failed", e);
-      }
+      // Container styling is applied via CSS classes only; no inline style
+      // setup is required here. The block was previously an empty try/catch
+      // left over from removed code.
 
       const cols = document.createElement("div");
       cols.className = "columns";
@@ -1033,6 +949,7 @@ export async function initCMS(options = {}) {
       try {
         cp = String(cp ?? "").replace(/\\/g, "/");
       } catch (_e) {
+        // Backslash normalization is best-effort; keep the raw value.
         cp = String(cp ?? "");
       }
       if (cp.startsWith("/")) cp = cp.replace(/^\/+/, "");
@@ -1056,22 +973,26 @@ export async function initCMS(options = {}) {
       // Compute contentBase as origin + pageDir + cp (always preserve pageDir/site subpath).
       // This yields: `${location.origin}${location.pathname}${contentPath}` when cp non-empty,
       // or `${location.origin}${location.pathname}` when cp is empty.
+      // `let` rather than `var`: the previous `var` declarations inside the
+      // try blocks leaked to function scope, so a later assignment anywhere
+      // in initCMS could silently change the content base.
+      let contentBase;
       try {
-        if (cp) {
-          var contentBase = new URL(
-            cp,
-            pageRoot.endsWith("/") ? pageRoot : pageRoot + "/",
-          ).toString();
-        } else {
-          var contentBase = pageRoot;
-        }
+        contentBase = cp
+          ? new URL(
+              cp,
+              pageRoot.endsWith("/") ? pageRoot : pageRoot + "/",
+            ).toString()
+          : pageRoot;
       } catch (e) {
         // Fallback: origin + '/' + cp
         try {
-          if (cp) var contentBase = new URL("/" + cp, origin).toString();
-          else var contentBase = new URL(pageDir, origin).toString();
+          contentBase = cp
+            ? new URL("/" + cp, origin).toString()
+            : new URL(pageDir, origin).toString();
         } catch (_e) {
-          var contentBase = origin;
+          // Malformed contentPath: fall back to the bare origin.
+          contentBase = origin;
         }
       }
       // Defer setting the slugManager home page until after we attempt to
@@ -1230,6 +1151,7 @@ export async function initCMS(options = {}) {
                           "",
                         );
                       } catch (_) {
+                        // Unparseable contentBase: no base path to compare.
                         cbPath = "";
                       }
                       if (
@@ -1474,7 +1396,7 @@ setStyle(defaultStyle);
 
   // The AbortController is created at the top of `initCMS` (before any
   // listener registration); only the runtime identity is minted here.
-  currentRuntimeId = ++runtimeInstanceSequence;
+  currentRuntimeId = claimGeneration();
   setRecoveryState("loading");
   const runtimeManifest = createRuntimeManifest({
     generation: currentRuntimeId,
@@ -1503,9 +1425,18 @@ setStyle(defaultStyle);
       try {
         if (typeof window !== "undefined") {
           try {
-            window.__nimbiUI = ui;
-            window.__nimbiRuntimeId = currentRuntimeId;
-            window.__nimbiRuntimeManifest = runtimeManifest;
+            // Strict variant (`setIfCurrent`): these run synchronously
+            // inside initCMS, so `currentRuntimeId` is always a live
+            // generation. Use the strict form for runtime-owned writes so a
+            // future refactor that moves them off the init path fails loudly
+            // rather than silently writing after teardown.
+            setIfCurrent(currentRuntimeId, "__nimbiUI", ui);
+            setIfCurrent(currentRuntimeId, "__nimbiRuntimeId", currentRuntimeId);
+            setIfCurrent(
+              currentRuntimeId,
+              "__nimbiRuntimeManifest",
+              runtimeManifest,
+            );
             // Initialize render timing collection
             if (!window.__nimbiRenderTimings) {
               window.__nimbiRenderTimings = [];
@@ -1589,6 +1520,7 @@ setStyle(defaultStyle);
                   try {
                     rel = normalizePath(String(path ?? ""));
                   } catch (_) {
+                    // normalizePath is best-effort; keep the raw path.
                     rel = String(path ?? "");
                   }
                   const baseName = String(rel ?? "")
@@ -1605,6 +1537,7 @@ setStyle(defaultStyle);
                         baseName.replace(/\.(?:md|html?)$/i, ""),
                       );
                     } catch (_) {
+                      // slugify unavailable: fall back to a naive slug.
                       candidate = String(baseName ?? "")
                         .replace(/\s+/g, "-")
                         .toLowerCase();
@@ -1640,6 +1573,7 @@ setStyle(defaultStyle);
                               new Set(slugToMd.keys()),
                             );
                           } catch (_) {
+                            // Dedupe lookup failed; accept the candidate.
                             slugKeyFinal = candidate;
                           }
                         }
@@ -1866,6 +1800,7 @@ setStyle(defaultStyle);
                             window.__nimbiSearchIndex)) ||
                         null;
                     } catch (_) {
+                      // Search index globals unreadable; treat as absent.
                       resolvedIndex = null;
                     }
                     if (Array.isArray(resolvedIndex) && resolvedIndex.length) {
@@ -1886,6 +1821,7 @@ setStyle(defaultStyle);
                           try {
                             rawPath = String(rawPath);
                           } catch (_) {
+                            // Unstringifiable path; skip this entry.
                             continue;
                           }
 
@@ -1916,10 +1852,12 @@ setStyle(defaultStyle);
                                 rel = normalizePath(u.pathname || "");
                               }
                             } catch (e) {
+                              // URL parse failed; fall back to the raw path.
                               rel = normalizePath(rawPath);
                             }
                           } catch (e) {
-                            rel = normalizePath(rawPath);
+                              // URL parse failed; fall back to the raw path.
+                              rel = normalizePath(rawPath);
                           }
 
                           if (!rel) continue;
@@ -2081,6 +2019,7 @@ setStyle(defaultStyle);
             try {
               scheduleRuntimeTimeout(reveal, 3000);
             } catch (e) {
+              // Scheduler unavailable; reveal immediately.
               reveal();
             }
           } catch (err) {
@@ -2165,14 +2104,44 @@ export function destroy() {
     if (typeof router.disposeResolutionCachePurge === "function") {
       router.disposeResolutionCachePurge();
     }
+    // Release module singletons that hold DOM references. The code-block
+    // observer keeps detached nodes alive for any block that was never
+    // scrolled into view; the image-preview modal can stay open after its
+    // mount element is removed.
+    try {
+      if (typeof codeblocksManager.disposeCodeblocksObserver === "function") {
+        codeblocksManager.disposeCodeblocksObserver();
+      }
+    } catch (_) {}
+    try {
+      if (typeof imagePreview.disposeImagePreview === "function") {
+        imagePreview.disposeImagePreview();
+      }
+    } catch (_) {}
+    // Bulmaswatch theme observers watch `document.head` for the lifetime of
+    // the page and retain the stylesheet link they were moving.
+    try {
+      if (typeof bulmaManager.disconnectBulmaObservers === "function") {
+        bulmaManager.disconnectBulmaObservers();
+      }
+    } catch (_) {}
+    // Release the generation FIRST. Doing this before `clearAllGlobals()`
+    // closes the window where the globals are already null but the generation
+    // is still live, which would let an in-flight async write repopulate them
+    // after teardown — the exact failure mode the generation guard exists to
+    // prevent.
+    try {
+      currentRuntimeId = null;
+      releaseGeneration();
+    } catch (_) {}
+
     try {
       if (typeof window !== "undefined") {
-        window.__nimbiUI = null;
-        window.__nimbiRenderingErrors__ = null;
-        window.__nimbiRenderTimings = null;
-        window.__nimbiRuntimeId = null;
-        window.__nimbiRuntimeManifest = null;
-        setRecoveryState("idle");
+        // Clear every managed debug global, not just the handful listed here
+        // previously, so a torn-down runtime leaves nothing for the next one
+        // to inherit. `__nimbiRecoveryState` is cleared here too; writing an
+        // "idle" state afterwards would repopulate a global we just cleared.
+        clearAllGlobals();
       }
     } catch (_) {}
 
@@ -2210,8 +2179,20 @@ export function destroy() {
       }
     } catch (_) {}
 
+    // Second sweep. The first `clearAllGlobals()` runs before the async
+    // worker teardown above, so an in-flight sitemap or index write that
+    // resolves during that window repopulates a global we already cleared.
+    // The generation guard blocks writes from a *claimed* generation, but the
+    // permissive variant deliberately allows host-driven calls that never
+    // claimed one — so a late call with no generation still gets through.
+    // Clearing again after the awaits closes that window.
     try {
-      currentRuntimeId = null;
+      if (typeof window !== "undefined") clearAllGlobals();
+    } catch (_) {}
+
+    try {
+      // `currentRuntimeId`/generation were already released at the top of
+      // teardown; only the mount bookkeeping remains here.
       if (cmsMountEl) cmsMountEl._nimbiCmsInitialized = false;
       cmsMountEl = null;
     } catch (_) {}

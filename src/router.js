@@ -137,6 +137,7 @@ function _scheduleResolutionCachePurge() {
         RESOLUTION_CACHE_SWEEP_INTERVAL,
       );
     } catch (_e) {
+      // setInterval unavailable: no periodic purge (cache still bounded).
       _resolutionCachePurgeTimerId = null;
     }
   }
@@ -187,7 +188,7 @@ function _enforceResolutionCacheMax() {
  * Add every value from an array or Map-like object to the internal `indexSet`.
  * Used by refreshIndexPaths and map-tracking helpers.
  *
- * @param {Array|string[]|{values:()=>Iterable}} arrOrMap - array or object providing a `values()` iterator.
+ * @param {Array<any>|string[]|{values:()=>Iterable<any>}} arrOrMap - array or object providing a `values()` iterator.
  * @returns {void}
  */
 export function augmentIndexWithAllMarkdownPaths(arrOrMap) {
@@ -329,6 +330,7 @@ async function tryDiscoverFromIndex(decoded, contentBase, signal) {
         ),
       );
     } catch (_) {
+      // Nav anchors unreadable: nothing to seed the index from.
       anchorsForIndex = [];
     }
   }
@@ -513,6 +515,7 @@ export async function fetchPageData(raw, contentBase) {
         ? decodeURIComponent(location.hash.replace(/^#/, ""))
         : null;
     } catch (_e) {
+      // Hash unreadable: no anchor to restore.
       hashAnchor = null;
     }
   }
@@ -613,6 +616,7 @@ export async function fetchPageData(raw, contentBase) {
       originalWasExplicitEarly ||
       explicitResolved;
   } catch (_e) {
+    // Slug-map probe failed: allow candidate probing as a fallback.
     allowCandidateProbing = true;
   }
 
@@ -802,6 +806,7 @@ export async function fetchPageData(raw, contentBase) {
       dec = trimTrailingSlash(dec);
       if (dec && !/\.(md|html?)$/i.test(dec)) requestedSlug = dec;
     } catch (_e) {
+      // Decode failed: no usable requested slug.
       requestedSlug = null;
     }
   }
@@ -858,6 +863,7 @@ export async function fetchPageData(raw, contentBase) {
       originalWasExplicit ||
       explicitResolvedLater;
   } catch (_e) {
+    // Slug-map probe failed: allow candidate probing as a fallback.
     allowCandidateProbing = true;
   }
 
@@ -952,6 +958,8 @@ export async function fetchPageData(raw, contentBase) {
                                 continue;
                               }
                             } catch (_e) {
+                              // Candidate fetch/parse failed: record a slug
+                              // mismatch and try the next candidate.
                               data = null;
                               pagePath = null;
                               fetchError = new Error(
@@ -989,6 +997,8 @@ export async function fetchPageData(raw, contentBase) {
                             continue;
                           }
                         } catch (_e2) {
+                          // Candidate fetch/parse failed: record a slug
+                          // mismatch and try the next candidate.
                           data = null;
                           pagePath = null;
                           fetchError = new Error("slug mismatch for candidate");
@@ -1008,6 +1018,8 @@ export async function fetchPageData(raw, contentBase) {
                     continue;
                   }
                 } catch (_e) {
+                  // Candidate fetch/parse failed: record a slug mismatch
+                  // and try the next candidate.
                   data = null;
                   pagePath = null;
                   fetchError = new Error("slug mismatch for candidate");
@@ -1524,6 +1536,7 @@ export async function fetchPageData(raw, contentBase) {
 
                     rawWithBase = modified;
                   } catch (_) {
+                    // Base-tag rewrite failed: use the unmodified HTML.
                     rawWithBase = raw;
                   }
                   if (!/<base\s+[^>]*>/i.test(rawWithBase)) {

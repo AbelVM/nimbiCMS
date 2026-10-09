@@ -77,6 +77,7 @@ export function buildCosmeticUrl(page, anchor = null, baseSearch = undefined) {
         const s = sp.toString();
         if (s) out += "?" + s;
       } catch (e) {
+        // URLSearchParams unavailable: strip `page` with a regex instead.
         const raw = String(qs ?? "").replace(/^page=[^&]*&?/, "");
         if (raw) out += "?" + raw;
       }

@@ -9,20 +9,8 @@ import {
   normalizePath,
   trimTrailingSlash,
 } from "../utils/helpers.js";
-
-function stripContentBasePrefix(rel, contentBasePath) {
-  try {
-    if (!rel) return rel;
-    const baseTrim = String(contentBasePath ?? "").replace(/^\/+|\/+$/g, "");
-    if (!baseTrim) return String(rel ?? "");
-    let out = String(rel ?? "").replace(/^\/+/, "");
-    const prefix = baseTrim + "/";
-    while (out.startsWith(prefix)) out = out.slice(prefix.length);
-    return out === baseTrim ? "" : out;
-  } catch (_) {
-    return String(rel ?? "");
-  }
-}
+import { stripContentBasePrefix } from "../utils/stripContentBasePrefix.js";
+import { runWithConcurrency } from "../utils/concurrency.js";
 
 function createParser() {
   if (typeof DOMParser === "undefined") return null;
@@ -125,23 +113,6 @@ function extractSlugFromText(raw, isHtml) {
   }
 }
 
-async function runWithConcurrency(items, limit, worker) {
-  const values = Array.from(items || []);
-  if (!values.length) return;
-  const size = Math.max(1, Number(limit) || 1);
-  let index = 0;
-  const runners = Array.from(
-    { length: Math.min(size, values.length) },
-    async () => {
-      while (index < values.length) {
-        const current = values[index];
-        index += 1;
-        await worker(current);
-      }
-    },
-  );
-  await Promise.all(runners);
-}
 
 export async function rewriteAnchorsHtml(
   html,
@@ -289,29 +260,37 @@ export async function rewriteAnchorsHtml(
   }
 
   if (snapshot?.allowProbe) {
-    await runWithConcurrency(pendingMd, 6, async (rel) => {
-      try {
-        const slug = extractSlugFromText(
-          await fetchText(rel, contentBase),
-          false,
-        );
-        if (!slug) return;
-        rememberMapping(pathToSlug, learnedMappings, rel, slug);
-        rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
-      } catch (_) {}
-    });
+    await runWithConcurrency(
+      pendingMd,
+      async (rel) => {
+        try {
+          const slug = extractSlugFromText(
+            await fetchText(rel, contentBase),
+            false,
+          );
+          if (!slug) return;
+          rememberMapping(pathToSlug, learnedMappings, rel, slug);
+          rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
+        } catch (_) {}
+      },
+      6,
+    );
 
-    await runWithConcurrency(pendingHtml, 5, async (rel) => {
-      try {
-        const slug = extractSlugFromText(
-          await fetchText(rel, contentBase),
-          true,
-        );
-        if (!slug) return;
-        rememberMapping(pathToSlug, learnedMappings, rel, slug);
-        rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
-      } catch (_) {}
-    });
+    await runWithConcurrency(
+      pendingHtml,
+      async (rel) => {
+        try {
+          const slug = extractSlugFromText(
+            await fetchText(rel, contentBase),
+            true,
+          );
+          if (!slug) return;
+          rememberMapping(pathToSlug, learnedMappings, rel, slug);
+          rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
+        } catch (_) {}
+      },
+      5,
+    );
   } else {
     for (const rel of pendingMd) {
       const baseName = getBaseName(rel).replace(/\.md$/i, "");

@@ -39,14 +39,78 @@ function stripDocumentExtension(slug) {
 }
 
 /**
+ * Transliteration table for Cyrillic, the most common non-Latin script with a
+ * well-established Latin mapping. Greek, CJK, and Arabic have no comparably
+ * compact table, so those fall through to the hash fallback below.
+ * @private
+ * @type {Record<string,string>}
+ */
+const CYRILLIC_TO_LATIN = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e",
+  ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m",
+  н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u",
+  ф: "f", х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "",
+  ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+};
+
+/**
+ * FNV-1a hash, base36-encoded. Used only as a last-resort fallback when a
+ * title contains no characters that survive slugification at all (CJK,
+ * Arabic, Greek, emoji-only titles), so that every page still gets a stable,
+ * non-empty, collision-resistant slug instead of collapsing to `""`.
+ * @private
+ * @param {string} s
+ * @returns {string}
+ */
+function fnv1aBase36(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    // h * 1677761 with 32-bit wraparound
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/**
+ * Fold a string toward ASCII before the character-class filter runs.
+ *
+ * Three steps, in order:
+ *   1. NFKD decomposition, so precomposed accents split into base + mark
+ *   2. combining-mark removal, which turns "Über" into "Uber"
+ *   3. Cyrillic transliteration, the one non-Latin script with a compact
+ *      and unambiguous Latin mapping
+ *
+ * Everything else (CJK, Arabic, Greek, emoji) is left for the hash fallback.
+ * @private
+ * @param {string} s
+ * @returns {string}
+ */
+function foldToAscii(s) {
+  let out = s;
+  try {
+    out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  } catch (_) {
+    // `normalize` is unavailable in very old engines; the raw string still
+    // slugifies, just without diacritic folding.
+  }
+  // Transliterate Cyrillic. Done after NFKD so uppercase forms are already
+  // lowercased by the caller.
+  out = out.replace(/[\u0400-\u04ff]/g, (ch) => CYRILLIC_TO_LATIN[ch] ?? "");
+  return out;
+}
+
+/**
  * Compute a slug without consulting the memo cache.
  * @private
  * @param {string} s
  * @returns {string}
  */
 function computeSlug(s) {
-  let slug = String(s ?? "")
-    .toLowerCase()
+  const raw = String(s ?? "");
+  // Lowercase BEFORE folding: the transliteration table is keyed on lowercase
+  // Cyrillic, so folding first would drop every uppercase letter.
+  let slug = foldToAscii(raw.toLowerCase())
     .replace(/[^a-z0-9\- ]/g, "")
     .replace(/ /g, "-");
   slug = stripDocumentExtension(slug);
@@ -54,6 +118,17 @@ function computeSlug(s) {
   slug = slug.replace(/^-|-$/g, "");
   if (slug.length > MAX_SLUG_LENGTH) {
     slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, "");
+  }
+  // Last resort: a title containing letters or digits that none of the
+  // folding steps could represent (CJK, Arabic, Greek, emoji-only titles).
+  // Without this every such page on a site collapses to the same empty slug
+  // and navigation, search, and deep links all break.
+  //
+  // Punctuation-only input ("!!!", "---") deliberately does NOT get a hash:
+  // it carries no identity, and hashing it would turn noise into a stable
+  // slug that looks meaningful.
+  if (!slug && /[\p{L}\p{N}]/u.test(raw)) {
+    return fnv1aBase36(raw.trim());
   }
   return slug;
 }

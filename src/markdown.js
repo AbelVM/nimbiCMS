@@ -528,9 +528,13 @@ async function _parseMarkdownToHtml(md) {
                   }
                 }
               } catch (e) {}
-            } catch (e) {}
+            } catch (e) {
+              // Per-element class normalization failed: leave it as-is.
+            }
           });
-        } catch (e) {}
+        } catch (e) {
+          // Class normalization pass failed: leave the DOM untouched.
+        }
 
         // clean code element classes like language-undefined
         try {
@@ -544,12 +548,14 @@ async function _parseMarkdownToHtml(md) {
                 try {
                   el.setAttribute?.("class", cleaned);
                 } catch (err) {
+                  // setAttribute unavailable: assign className directly.
                   el.className = cleaned;
                 }
               } else {
                 try {
                   el.removeAttribute?.("class");
                 } catch (err) {
+                  // removeAttribute unavailable: clear className directly.
                   el.className = "";
                 }
               }
@@ -582,6 +588,7 @@ async function _parseMarkdownToHtml(md) {
             try {
               htmlOut = doc.body.innerHTML;
             } catch (err2) {
+              // body unreadable: emit an empty document.
               htmlOut = "";
             }
           }

@@ -58,8 +58,33 @@ function safeGet(mod, name) {
  * Normalize resolved search index entries so slugs are homogeneous
  * across the app (nav, TOC, search).
  * @param {Array} entries - Array of index entry objects to normalize.
- * @returns {Array} The same array of entries (normalized in-place).
+ * @returns {Array<any>} The same array of entries (normalized in-place).
  */
+/**
+ * Does a search-index entry match the (already lowercased) query?
+ *
+ * Uses the `_titleLc` / `_excerptLc` fields cached by
+ * `normalizeSearchIndexEntriesMut` when present, falling back to computing
+ * them for entries that were never normalized (for example a host-supplied
+ * index that bypassed the normalizer).
+ * @param {{title?:string,excerpt?:string,_titleLc?:string,_excerptLc?:string}} entry
+ * @param {string} q - Lowercased query.
+ * @returns {boolean}
+ */
+function searchEntryMatches(entry, q) {
+  if (!entry || typeof entry !== "object") return false;
+  const title =
+    typeof entry._titleLc === "string"
+      ? entry._titleLc
+      : String(entry.title ?? "").toLowerCase();
+  if (title.includes(q)) return true;
+  const excerpt =
+    typeof entry._excerptLc === "string"
+      ? entry._excerptLc
+      : String(entry.excerpt ?? "").toLowerCase();
+  return excerpt.includes(q);
+}
+
 function normalizeSearchIndexEntriesMut(entries) {
   try {
     if (!Array.isArray(entries)) return entries;
@@ -125,6 +150,7 @@ function normalizeSearchIndexEntriesMut(entries) {
                   ? slugify(raw)
                   : "";
           } catch (_) {
+            // Slugify failed: use the raw token as the canonical slug.
             canonical = raw;
           }
         }
@@ -145,6 +171,17 @@ function normalizeSearchIndexEntriesMut(entries) {
               storeSlugMapping(pageOnly, normalizePath(String(it.path ?? "")));
             } catch (_) {}
           }
+        } catch (_) {}
+
+        // Cache the lowercased searchable fields. The search filter runs on
+        // every keystroke and previously called `toLowerCase()` on the title
+        // and excerpt of every entry each time — two string allocations per
+        // field per entry per keystroke. Precomputing them once at index-build
+        // time removes that from the hot path without changing match
+        // semantics.
+        try {
+          it._titleLc = String(it.title ?? "").toLowerCase();
+          it._excerptLc = String(it.excerpt ?? "").toLowerCase();
         } catch (_) {}
       } catch (_) {}
     });
@@ -304,6 +341,36 @@ export async function buildNav(
         : typeof document !== "undefined"
           ? document.querySelector(".nimbi-content")
           : null;
+
+    // Prefer the native View Transitions API when available: it snapshots the
+    // old and new states and cross-fades them on the compositor, which is
+    // smoother than a CSS opacity transition and does not depend on the
+    // `is-inactive` class being removed on the next frame.
+    const startViewTransition =
+      typeof document !== "undefined"
+        ? document.startViewTransition
+        : null;
+    if (typeof startViewTransition === "function") {
+      try {
+        const transition = startViewTransition.call(document, async () => {
+          const r = renderByQuery?.();
+          if (r && typeof r.then === "function") await r;
+        });
+        // `finished` rejects when the transition is skipped (e.g. another
+        // transition starts first, or the document becomes hidden). That is
+        // not an error worth surfacing.
+        if (transition && typeof transition.finished?.catch === "function") {
+          transition.finished.catch(() => {});
+        }
+        if (transition && typeof transition.ready?.catch === "function") {
+          transition.ready.catch(() => {});
+        }
+        return;
+      } catch (e) {
+        // Fall through to the class-based transition below.
+      }
+    }
+
     try {
       if (contentEl) contentEl.classList.add("is-inactive");
     } catch (e) {}
@@ -404,7 +471,10 @@ export async function buildNav(
         try {
           let found = findSlugForPath(candidatePath);
           if (!found) {
-            // permissive scan of slugToMd values
+            // Permissive scan of slugToMd values. Measured against a cached
+            // suffix index in benchmarks/benchmark-slug-resolution.mjs: the
+            // index build costs more than this scan saves at realistic result
+            // counts, so the scan is retained deliberately.
             try {
               const normCand = String(candidatePath ?? "").replace(/^\/+/, "");
               const candBase2 = normCand.replace(/^.*\//, "");
@@ -439,10 +509,12 @@ export async function buildNav(
               const baseOnly = String(s).replace(/\.(?:md|html?)$/i, "");
               s = slugify(baseOnly || candidatePath);
             } catch (e) {
+              // Basename slugify failed: slugify the candidate path.
               s = slugify(candidatePath);
             }
           }
         } catch (e) {
+          // Slug derivation failed: slugify the candidate path.
           s = slugify(candidatePath);
         }
       }
@@ -545,6 +617,7 @@ export async function buildNav(
           try {
             resolvedIndexForSitemap = Array.isArray(idx) ? idx : null;
           } catch (_) {
+            // Index not array-like: nothing to hand to the sitemap.
             resolvedIndexForSitemap = null;
           }
           // Normalize slugs so external builders cannot inject file/path slugs
@@ -761,6 +834,7 @@ export async function buildNav(
               : null;
         brandItem.href = buildPageUrl(slugCandidate || homePage);
       } catch (ee) {
+        // Slug candidate unusable: link straight to homePage.
         brandItem.href = buildPageUrl(homePage);
       }
       brandItem.textContent = t("home");
@@ -825,6 +899,7 @@ export async function buildNav(
   try {
     logoSrc = await resolveLogoSrc(logoOption);
   } catch (e) {
+    // Logo resolution failed: render the brand without a logo.
     logoSrc = null;
   }
 
@@ -1007,6 +1082,7 @@ export async function buildNav(
                 ? String(a.textContent).trim()
                 : null;
           } catch (_) {
+            // textContent unreadable: no display name for this anchor.
             displayName = null;
           }
           let candidate = null;
@@ -1666,11 +1742,7 @@ export async function buildNav(
             );
           }
           let filtered = Array.isArray(idx)
-            ? idx.filter(
-                (e) =>
-                  String(e.title ?? '').toLowerCase().includes(q) ||
-                  String(e.excerpt ?? '').toLowerCase().includes(q),
-              )
+            ? idx.filter((e) => searchEntryMatches(e, q))
             : [];
           if (!filtered.length) {
             for (const candidate of [
@@ -1679,10 +1751,8 @@ export async function buildNav(
               window.__nimbiLiveSearchIndex,
             ]) {
               if (!Array.isArray(candidate)) continue;
-              const matches = candidate.filter(
-                (e) =>
-                  String(e.title ?? '').toLowerCase().includes(q) ||
-                  String(e.excerpt ?? '').toLowerCase().includes(q),
+              const matches = candidate.filter((e) =>
+                searchEntryMatches(e, q),
               );
               if (matches.length) {
                 filtered = matches;
@@ -1843,6 +1913,7 @@ export async function buildNav(
       try {
         parsedRoute = parseHrefToRoute(String(rawHref ?? ""));
       } catch (_) {
+        // Route parse failed: fall back to raw href handling.
         parsedRoute = null;
       }
       let routePage = null;
@@ -1928,12 +1999,14 @@ export async function buildNav(
                   item.href = buildPageUrl(htmlPath, frag);
                 }
               } catch (ee) {
+                // Cosmetic URL build failed: use the canonical form.
                 item.href = buildPageUrl(htmlPath, frag);
               }
             } else {
               item.href = href;
             }
           } catch (ee) {
+            // Route rewriting failed: keep the original href.
             item.href = href;
           }
         }
@@ -1995,6 +2068,7 @@ export async function buildNav(
                   }
                 }
               } catch (err) {
+                // Mapping validation failed: do not persist it.
                 persistMapping = false;
               }
               if (persistMapping) {
@@ -2189,6 +2263,7 @@ const normalizeSearchIndexEntries = normalizeSearchIndexEntriesMut;
 
 export {
   normalizeSearchIndexEntriesMut,
+  searchEntryMatches,
   normalizeSearchIndexEntries,
   safeGet,
   storeSlugMapping,

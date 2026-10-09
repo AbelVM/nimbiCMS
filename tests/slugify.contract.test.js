@@ -58,10 +58,42 @@ describe("utils/slugify canonical contract", () => {
     expect(slugify("-Leading dash")).toBe("leading-dash");
   });
 
-  it("drops characters outside the slug alphabet", () => {
-    // Non-ASCII letters are removed rather than transliterated, so "Ünïcodé
-    // Tïtle" keeps only the ASCII survivors.
-    expect(slugify("Ünïcodé Tïtle")).toBe("ncod-ttle");
+  it("folds diacritics to their ASCII base letters", () => {
+    // NFKD decomposition plus combining-mark removal, so accented Latin
+    // letters keep their base character instead of being dropped entirely.
+    expect(slugify("Über café")).toBe("uber-cafe");
+    expect(slugify("Ünïcodé Tïtle")).toBe("unicode-title");
+    expect(slugify("naïve résumé")).toBe("naive-resume");
+  });
+
+  it("transliterates Cyrillic to Latin", () => {
+    expect(slugify("Привет мир")).toBe("privet-mir");
+    expect(slugify("Ярославль")).toBe("yaroslavl");
+  });
+
+  it("falls back to a stable hash for scripts with no Latin mapping", () => {
+    // CJK, Arabic, and Greek have no compact transliteration table. Without a
+    // fallback every such page collapses to the same empty slug and
+    // navigation, search, and deep links all break.
+    const cjk = slugify("日本語のページ");
+    expect(cjk).toMatch(/^[a-z0-9]+$/);
+    expect(cjk.length).toBeGreaterThan(0);
+    // Stable: the same input always produces the same slug.
+    expect(slugify("日本語のページ")).toBe(cjk);
+    // Distinct: different titles do not collide.
+    expect(slugify("中文标题")).not.toBe(cjk);
+    expect(slugify("Ελληνικά")).not.toBe(cjk);
+  });
+
+  it("does not hash punctuation-only input", () => {
+    // Punctuation carries no identity, so it must stay empty rather than
+    // becoming a stable slug that looks meaningful.
+    expect(slugify("!!!")).toBe("");
+    expect(slugify("---")).toBe("");
+    expect(slugify("   ")).toBe("");
+  });
+
+  it("drops punctuation and symbols", () => {
     expect(slugify("C++ / C# & F#!")).toBe("c-c-f");
   });
 

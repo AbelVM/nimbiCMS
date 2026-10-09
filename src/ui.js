@@ -30,7 +30,12 @@ import { applyPageMeta } from "./seoManager.js";
 import { attachImagePreview } from "./imagePreview.js";
 import { observeCodeBlocks } from "./codeblocksManager.js";
 import { debugWarn, debugError, incrementCounter } from "./utils/debug.js";
+import {
+  activeGeneration,
+  isGenerationLive,
+} from "./utils/runtimeGlobals.js";
 import { notFoundPage } from "./slugManager.js";
+import { fetchMarkdown, isExternalLink } from "./slugManager.js";
 
 /**
  * Initialize UI rendering helpers for a mounted CMS instance.
@@ -87,7 +92,11 @@ import { notFoundPage } from "./slugManager.js";
     { path: homePage, name: t("home"), isIndex: true, children: [] },
   ]);
   const _preparedPageCache = new Map();
-  const _preparedPageCacheMax = 12;
+  // Halved from 12 to 6: each entry holds a full cloneNode(true) of the
+  // rendered article (plus TOC) DOM subtree, making this the largest DOM
+  // retention in the UI. 6 still covers rapid re-renders and back/forward
+  // revisits of recently viewed pages; a miss falls back to a full re-parse.
+  const _preparedPageCacheMax = 6;
   // Serialize renders to avoid concurrent duplicate rendering when multiple
   // navigation events fire in quick succession (e.g. popstate + script-driven calls).
   // `_isRendering` guards active render; `_queuedRender` signals a subsequent
@@ -271,6 +280,7 @@ import { notFoundPage } from "./slugManager.js";
       contentWrap.replaceChildren(nextMain);
       navWrap.replaceChildren(...(toc ? [toc] : []));
     } catch (e) {
+      // Atomic replaceChildren failed: clear and append individually.
       _clearElement(contentWrap);
       _clearElement(navWrap);
       contentWrap.appendChild(nextMain);
@@ -470,7 +480,17 @@ import { notFoundPage } from "./slugManager.js";
         try {
           const renderEnd = performance.now();
           const duration = renderEnd - renderStart;
-          if (typeof window !== "undefined" && window.__nimbiRenderTimings) {
+          // Permissive variant (`isGenerationLive`): `renderByQuery` is
+          // public API and can be driven by host navigation with no initCMS
+          // runtime, so a null generation must still record timings. Only a
+          // superseded generation is skipped, which is what stops a render
+          // that finishes after teardown from growing a dead runtime's
+          // diagnostics array.
+          if (
+            typeof window !== "undefined" &&
+            window.__nimbiRenderTimings &&
+            isGenerationLive(activeGeneration())
+          ) {
             window.__nimbiRenderTimings.push(duration);
             if (window.__nimbiRenderTimings.length > 50)
               window.__nimbiRenderTimings.splice(
@@ -539,6 +559,107 @@ import { notFoundPage } from "./slugManager.js";
   };
   updateVisibilityState();
   addEventListener(document, "visibilitychange", updateVisibilityState);
+
+  /**
+   * Prefetch markdown for internal navigation links on pointerdown.
+   * This improves INP by starting the fetch ~100-200ms before click.
+   * Cancels on pointercancel/mouseleave to avoid wasted fetches.
+   */
+  const _prefetchControllers = new Map();
+  function _prefetchForLink(link) {
+    try {
+      const href = link.getAttribute?.("href") || "";
+      if (!href) return;
+      if (isExternalLink(href)) return;
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      // Skip if already prefetching this page
+      if (_prefetchControllers.has(parsed.page)) return;
+      const controller = new AbortController();
+      _prefetchControllers.set(parsed.page, controller);
+      // Fire-and-forget prefetch; cache will make subsequent navigation instant
+      fetchMarkdown(parsed.page, contentBase, { signal: controller.signal }).catch(() => {
+        // Ignore prefetch errors (abort, network, etc.)
+      });
+    } catch (_) {
+      // Ignore any prefetch setup errors
+    }
+  }
+  function _cancelPrefetch(page) {
+    const controller = _prefetchControllers.get(page);
+    if (controller) {
+      try {
+        controller.abort();
+      } catch (_) {}
+      _prefetchControllers.delete(page);
+    }
+  }
+  function _cancelAllPrefetches() {
+    for (const controller of _prefetchControllers.values()) {
+      try {
+        controller.abort();
+      } catch (_) {}
+    }
+    _prefetchControllers.clear();
+  }
+  // Delegated pointerdown on document to catch all internal nav links
+  let _pointerdownTarget = null;
+  addEventListener(document, "pointerdown", (ev) => {
+    try {
+      const link = ev.target?.closest?.("a[href]");
+      if (!link) return;
+      const href = link.getAttribute("href") || "";
+      if (!href || isExternalLink(href)) return;
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      _pointerdownTarget = link;
+      _prefetchForLink(link);
+    } catch (_) {}
+  }, { passive: true });
+  // Cancel on pointercancel (gesture taken over by the browser).
+  addEventListener(document, "pointercancel", (ev) => {
+    try {
+      const link = ev.target?.closest?.("a[href]");
+      if (!link) return;
+      const href = link.getAttribute("href") || "";
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      _cancelPrefetch(parsed.page);
+    } catch (_) {}
+  }, { passive: true });
+  // Cancel when the pointer leaves the link. `pointerout` is used rather than
+  // `pointerleave` because `pointerleave` does not bubble, so a delegated
+  // listener on `document` would never receive it. `relatedTarget` is checked
+  // so moving between children inside the same link does not cancel.
+  addEventListener(document, "pointerout", (ev) => {
+    try {
+      const link = ev.target?.closest?.("a[href]");
+      if (!link) return;
+      // Pointer moved to a descendant of the same link: not a real leave.
+      if (ev.relatedTarget && link.contains(ev.relatedTarget)) return;
+      const href = link.getAttribute("href") || "";
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      _cancelPrefetch(parsed.page);
+    } catch (_) {}
+  }, { passive: true });
+  // Also cancel if pointerup happens on a different element (drag off link)
+  addEventListener(document, "pointerup", (ev) => {
+    try {
+      if (!_pointerdownTarget) return;
+      const link = ev.target?.closest?.("a[href]");
+      if (link !== _pointerdownTarget) {
+        const href = _pointerdownTarget.getAttribute("href") || "";
+        const parsed = parseHrefToRoute(href);
+        if (parsed?.page) _cancelPrefetch(parsed.page);
+      }
+      _pointerdownTarget = null;
+    } catch (_) {
+      // Reset the tracking reference even if the cancellation path threw, so
+      // a stale target cannot suppress the next prefetch.
+      _pointerdownTarget = null;
+    }
+  }, { passive: true });
 
   /**
    * Compute the sessionStorage key used to persist scroll position

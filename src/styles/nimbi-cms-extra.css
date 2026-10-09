@@ -210,6 +210,17 @@
     pointer-events: none;
 }
 
+/* Native View Transitions cross-fade for route changes. Only applies when
+   `document.startViewTransition` is available; the `is-inactive` class above
+   remains the fallback for browsers without it. */
+@media (prefers-reduced-motion: no-preference) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation-duration: 220ms;
+        animation-timing-function: ease;
+    }
+}
+
 
 .nimbi-site-navbar+.nimbi-cms .nimbi-content {
     padding-top: calc(var(--nimbi-site-navbar-height) + 2rem);
@@ -927,7 +938,7 @@ a.nimbi-version-label,
     
     overflow-x: auto;
     content-visibility: auto;
-    contain-intrinsic-sizing: auto;
+    contain-intrinsic-size: auto 1000px;
 }
 
 .nimbi-article table,

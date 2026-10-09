@@ -35,6 +35,7 @@ import {
   decodeHtmlEntities,
   applyCspNonce,
 } from "./utils/helpers.js";
+import { stripContentBasePrefix } from "./utils/stripContentBasePrefix.js";
 import { buildCosmeticUrl, parseHrefToRoute } from "./utils/urlHelper.js";
 import { markNotFound } from "./seoManager.js";
 import { debugWarn, debugInfo, isDebugLevel } from "./utils/debug.js";
@@ -199,6 +200,7 @@ function getResolvedIndexPathToSlug() {
             const url = new URL(item.loc, location.href);
             path = String(url.pathname).replace(/^\//, "");
           } catch (_e) {
+            // Unresolvable loc: use the raw value as the path.
             path = item.loc;
           }
         }
@@ -210,6 +212,7 @@ function getResolvedIndexPathToSlug() {
         const suffix = getLastPathSegments(path, 2);
         if (suffix && !map.has(suffix)) map.set(suffix, slug);
       } catch (_) {
+        // Malformed index entry: skip it rather than aborting the whole map.
         continue;
       }
     }
@@ -252,44 +255,6 @@ function getSlugForRelativePath(rel) {
 }
 
 /**
- * Remove any leading repetition of the content base pathname from a
- * resolved path. This guards against authored links that accidentally
- * include the site subpath (e.g. "nimbiCMS_pre/...") which would
- * otherwise produce duplicated segments when combined with `contentBase`.
- *
- * @param {string} rel - path portion possibly prefixed with the base
- * @param {string} contentBasePath - ensureTrailingSlash(pathname) form
- * @returns {string}
- */
-function stripContentBasePrefix(rel, contentBasePath) {
-  try {
-    if (!rel) return rel;
-    if (!contentBasePath) return String(rel ?? "");
-    const baseTrim = String(contentBasePath ?? "").replace(/^\/+|\/+$/g, "");
-    if (!baseTrim) return String(rel ?? "");
-    let out = String(rel ?? "");
-    // Remove leading slash(es)
-    out = out.replace(/^\/+/, "");
-    // Collapse any repeated leading base segments: 'base/base/...' -> '...'
-    const prefix = baseTrim + "/";
-    while (out.startsWith(prefix)) out = out.slice(prefix.length);
-    if (out === baseTrim) return "";
-    return out;
-  } catch (e) {
-    return String(rel ?? "");
-  }
-}
-
-/**
- * @typedef {{path:string,name:string,children?:NavItem[]}} NavItem
- * @typedef {{html:string,meta:Record<string, unknown>,toc:Array<{level:number,text:string,id?:string}>}} ParsedPage
- */
-
-/**
- * @typedef {{article:HTMLElement,parsed:ParsedPage,toc:HTMLElement,topH1:HTMLElement|null,h1Text:string|null,slugKey:string|null}} ArticleResult
- */
-
-/**
  * Build a navigation tree DOM element from a simple tree description.
  * @param {Function} t - localization function that returns translated strings
  * @param {Array<{path:string,name:string,children?:Array}>} tree - nav items
@@ -319,6 +284,7 @@ export function createNavTree(t, tree) {
         try {
           a.setAttribute("href", buildPageUrl(p));
         } catch (e) {
+          // buildPageUrl failed: fall back to a cosmetic URL.
           if (p?.indexOf("/") === -1)
             a.setAttribute("href", "#" + encodeURIComponent(p));
           else a.setAttribute("href", fullCosmetic(p));
@@ -338,6 +304,7 @@ export function createNavTree(t, tree) {
             try {
               ca.setAttribute("href", buildPageUrl(cp));
             } catch (e) {
+              // buildPageUrl failed: fall back to a cosmetic URL.
               if (cp?.indexOf("/") === -1)
                 ca.setAttribute("href", "#" + encodeURIComponent(cp));
               else ca.setAttribute("href", fullCosmetic(cp));
@@ -365,11 +332,13 @@ export function createNavTree(t, tree) {
           try {
             a.setAttribute("href", buildPageUrl(p));
           } catch (e) {
+            // buildPageUrl failed: fall back to a cosmetic URL.
             if (p?.indexOf("/") === -1)
               a.setAttribute("href", "#" + encodeURIComponent(p));
             else a.setAttribute("href", fullCosmetic(p));
           }
         } catch (e) {
+          // Anchor construction failed entirely: link to the raw path.
           a.setAttribute("href", "#" + item.path);
         }
         a.textContent = item.name;
@@ -384,11 +353,13 @@ export function createNavTree(t, tree) {
               try {
                 ca.setAttribute("href", buildPageUrl(cp));
               } catch (e) {
+                // buildPageUrl failed: fall back to a cosmetic URL.
                 if (cp?.indexOf("/") === -1)
                   ca.setAttribute("href", "#" + encodeURIComponent(cp));
                 else ca.setAttribute("href", fullCosmetic(cp));
               }
             } catch (e) {
+              // Anchor construction failed entirely: link to the raw path.
               ca.setAttribute("href", "#" + c.path);
             }
             ca.textContent = c.name;
@@ -576,6 +547,7 @@ function rewriteRelativeAssets(el, pagePath, contentBase) {
       try {
         baseForPage = new URL(pageDir || ".", location.href).toString();
       } catch (e) {
+        // Both contentBase and location are unusable: use the raw pageDir.
         baseForPage = pageDir || "./";
       }
     }
@@ -710,6 +682,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
           contentBaseUrl = new URL(contentBase, location.href);
           contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname);
         } catch (e) {
+          // Unresolvable contentBase: treat content as site-rooted.
           contentBaseUrl = null;
           contentBasePath = "/";
         }
@@ -842,6 +815,7 @@ async function rewriteAnchors(article, contentBase, pagePath, opts = {}) {
                   if (!/\.[^\/]+$/.test(String(rel ?? "")))
                     htmlRel = String(rel ?? "") + ".html";
                 } catch (err) {
+                  // Extension test failed: keep the relative path as-is.
                   htmlRel = rel;
                 }
                 htmlPending.add(htmlRel);
@@ -1168,6 +1142,7 @@ function computeSlug(parsed, article, pagePath, anchor) {
             curHash = "";
           }
         } catch (err) {
+          // Route parse failed: no current hash to preserve.
           curHash = "";
         }
       }
@@ -1725,6 +1700,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
         parsed = parseHtml(data.raw || "");
       }
     } catch (err) {
+      // Markdown parse failed: retry as HTML.
       parsed = parseHtml(data.raw || "");
     }
   } else {
@@ -1852,6 +1828,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
             article.innerHTML = parsed.html;
           }
         } catch (e) {
+          // Atomic replaceChildren failed: fall back to innerHTML.
           article.innerHTML = parsed.html;
         }
       }
@@ -1942,6 +1919,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           try {
             tb.setAttribute?.("class", classes.join(" "));
           } catch (e) {
+            // setAttribute unavailable: assign className directly.
             tb.className = classes.join(" ");
           }
         }
@@ -1976,6 +1954,7 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
           if (dateRaw && !isNaN(d.getTime())) dateText = d.toLocaleDateString();
           else dateText = dateRaw;
         } catch (e) {
+          // Date formatting failed: show the raw value.
           dateText = dateRaw;
         }
         const pieces = [];
@@ -2140,6 +2119,7 @@ export function executeEmbeddedScripts(
              fn();
              executed = true;
            } catch (e) {
+             // Inline script threw: mark as not executed.
              executed = false;
            }
            if (executed) {
@@ -2292,6 +2272,7 @@ export function renderNotFound(contentWrap, t, e) {
         try {
           a.href = buildPageUrl(homePage);
         } catch (err) {
+          // homePage unusable: retry with an empty fallback slug.
           a.href = buildPageUrl(homePage || "");
         }
         a.textContent = t ? t("home") || "Home" : "Home";
@@ -2329,6 +2310,7 @@ export function renderNotFound(contentWrap, t, e) {
             try {
               location.replace(target);
             } catch (e) {
+              // replace() unavailable: assign href instead.
               location.href = target;
             }
           }
@@ -2606,6 +2588,7 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
             article.innerHTML = rewrittenHtml;
           }
         } catch (e) {
+          // Atomic replaceChildren failed: fall back to innerHTML.
           article.innerHTML = rewrittenHtml;
         }
       }
@@ -2627,16 +2610,6 @@ export async function rewriteAnchorsWorker(article, contentBase, pagePath) {
   }
 }
 
-/**
- * Exported helper aliases (intended for tests and advanced usage).
- *
- * `_parseHtml(raw)` -> Parse raw HTML into a `ParsedPage`.
- * `_parseMarkdown(raw)` -> Parse markdown source into a `ParsedPage` (async).
- * `_ensureLanguages(raw)` -> Register highlight.js languages referenced in markdown (async).
- * `_computeSlug(parsed, article, pagePath, anchor)` -> Compute article slug and update slug mappings.
- *
- * Note: these are thin aliases to the internal implementations above.
- */
 /**
  * Parse raw HTML and return the normalized parsed page object.
  * @param {string} raw
@@ -2819,16 +2792,6 @@ export function attachTocClickHandler(toc) {
   }
 }
 
-/**
- * Scroll the primary CMS container to either the top or to a specific
- * element with the given `id`.  When an anchor is supplied the helper
- * attempts to position the element at the top of the scroll viewport;
- * otherwise it simply resets the scroll offset to zero.  A small delay is
- * used to ensure the DOM has been updated before performing the scroll.
- *
- * @param {string|null} anchor - element id (without '#') or `null` to scroll
- *                               to the top.
- */
 /**
  * Scroll to a specific anchor ID inside the CMS container or to top.
  * @param {string|null} anchor - Element id (without '#') or null to scroll to top.
@@ -3019,7 +2982,21 @@ export function ensureScrollTopButton(
           debugWarn("[htmlBuilder] onScroll handler failed", err);
         }
       };
-      safe(() => root.addEventListener("scroll", rafThrottle(onScroll)));
+      // Remove any listener left by a previous render before adding a new one.
+      // Without this, every render of a page with no H1 attaches another
+      // scroll listener, so they accumulate for the page lifetime and each
+      // closes over a stale button/TOC pair.
+      if (btn._nimbiScroll) {
+        safe(() =>
+          root.removeEventListener("scroll", btn._nimbiScroll),
+        );
+        btn._nimbiScroll = null;
+      }
+      const throttled = rafThrottle(onScroll);
+      btn._nimbiScroll = throttled;
+      safe(() =>
+        root.addEventListener("scroll", throttled, { passive: true }),
+      );
       onScroll();
     } else {
       if (!btn._nimbiObserver) {

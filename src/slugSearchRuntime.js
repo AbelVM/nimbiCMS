@@ -1,6 +1,8 @@
 import * as slugManagerRuntime from "./slugManager.js";
 import { parseFrontmatter } from "./utils/frontmatter.js";
 import { slugify as _slugify } from "./utils/slugify.js";
+import { runWithConcurrency } from "./utils/concurrency.js";
+import { createWorkQueue } from "./utils/workQueue.js";
 
 let _indexPromise = null;
 let _indexPromiseKey = null;
@@ -67,27 +69,6 @@ async function _fetchText(path, contentBase) {
   return await res.text();
 }
 
-async function _runWithConcurrency(
-  items,
-  worker,
-  concurrency = DEFAULT_CONCURRENCY,
-) {
-  const queue = Array.isArray(items) ? items.slice() : [];
-  const limit = Math.max(1, Number(concurrency) || 1);
-  const runners = [];
-  for (let i = 0; i < Math.min(limit, queue.length); i++) {
-    runners.push(
-      (async () => {
-        while (queue.length) {
-          const item = queue.shift();
-          if (item == null) continue;
-          await worker(item);
-        }
-      })(),
-    );
-  }
-  await Promise.all(runners);
-}
 
 async function _crawlAllMarkdown(
   contentBase,
@@ -96,7 +77,7 @@ async function _crawlAllMarkdown(
 ) {
   const seenDirs = new Set();
   const found = new Set();
-  const queue = [""];
+  const queue = createWorkQueue([""]);
   if (Array.isArray(seedPaths)) {
     for (const path of seedPaths) {
       try {
@@ -118,6 +99,7 @@ async function _crawlAllMarkdown(
       if (!res || !res.ok) continue;
       html = await res.text();
     } catch (_) {
+      // Fetch failed: skip this URL and try the next.
       continue;
     }
     if (!html) continue;
@@ -298,7 +280,7 @@ export async function buildSearchIndex(
       );
 
     const entries = [];
-    await _runWithConcurrency(allPaths, async (path) => {
+    await runWithConcurrency(allPaths, async (path) => {
       const raw = await _fetchText(path, contentBase);
       if (!raw) return;
       const isHtml = /\.html?$/i.test(path);
@@ -344,7 +326,7 @@ export async function buildSearchIndex(
           });
         }
       }
-    });
+    }, DEFAULT_CONCURRENCY);
 
     _cachedIndex = entries;
     const manifest = globalThis?.window?.__nimbiRuntimeManifest;

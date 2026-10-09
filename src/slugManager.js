@@ -29,6 +29,11 @@ import SlugWorker from "./worker/slugWorker.js?worker&inline";
 
 import { PowerCache, PowerMemoizer } from "performance-helpers/powerCache";
 import { slugify } from "./utils/slugify.js";
+import {
+  activeGeneration,
+  setIfCurrent,
+  setIfLive,
+} from "./utils/runtimeGlobals.js";
 import { PowerDeadline } from "performance-helpers/powerDeadline";
 import { PowerRetry } from "performance-helpers/powerRetry";
 import { PowerPool } from "performance-helpers/powerPool";
@@ -38,21 +43,14 @@ import {
   unregisterWorkerPool,
 } from "./utils/workerPoolDiagnostics.js";
 import { runWithConcurrency } from "./utils/concurrency.js";
+import { createWorkQueue } from "./utils/workQueue.js";
 import { debugLog, debugWarn, debugError, isDebug } from "./utils/debug.js";
-import { yieldIfNeeded } from "./utils/idle.js";
+import { yieldIfNeeded, createYieldGate } from "./utils/idle.js";
 
 // Hoisted from `crawlAllMarkdown` so `ensureSlug` can yield during the
 // cooperative-crawl loop. The counter is pure state with no reason to be
 // per-call; keeping it at module scope fixes the `ReferenceError` that
 // made `yieldIfNeeded` a dead no-op.
-let crawlBatchYieldCount = 0;
-
-/**
- * Localized slug mapping entry. When multilingual sites are configured the
- * value stored for a slug may be an object with a `default` path and a
- * `langs` map with per-language paths.
- * @typedef {{default?:string, langs?: Record<string,string>}} SlugEntry
- */
 
 /**
  * Mapping from a slug (generated from title/H1) to either a markdown path
@@ -109,6 +107,7 @@ export function watchForColdHashRoute(parsed) {
           if (typeof location !== "undefined" && location?.hash)
             full += String(location.hash);
         } catch (_) {
+          // Unreadable location: fall back to the site root.
           full = "/";
         }
       }
@@ -184,11 +183,6 @@ try {
     this._nimbiVersion += 1;
   };
 } catch (_) {}
-
-/**
- * Result returned from `fetchMarkdown`.
- * @typedef {{raw:string,isHtml?:boolean,status?:number}} FetchResult
- */
 
 /**
  * Configured available language codes for the site (e.g. ['en','fr']).
@@ -417,6 +411,7 @@ export function _storeSlugMapping(slug, rel) {
         ? normalizePath(rel)
         : normalizePath(String(rel ?? ""));
   } catch (_) {
+    // normalizePath is best-effort; keep the raw value.
     relNorm = String(rel ?? "");
   }
   if (!relNorm) return;
@@ -464,6 +459,7 @@ export function _storeSlugMapping(slug, rel) {
               ? normalizePath(existing.default)
               : null;
         } catch (_) {
+          // Unreadable mapping: treat as no existing path.
           existingPath = null;
         }
         if (existingPath === relNorm) {
@@ -484,6 +480,7 @@ export function _storeSlugMapping(slug, rel) {
                   ? normalizePath(candExisting.default)
                   : null;
             } catch (_) {
+              // Unreadable candidate mapping: treat as no match.
               candPath = null;
             }
             if (candPath === relNorm) {
@@ -667,11 +664,11 @@ export function _setSearchIndex(arr) {
       for (const it of arr) searchIndex.push(it);
       try {
         if (typeof window !== "undefined") {
-          try {
-            window.__nimbiLiveSearchIndex = searchIndex;
-          } catch (_) {
-            /* swallow */
-          }
+          // Permissive variant (`setIfLive`): `setSearchIndex` is part of
+          // the public API and hosts call it directly, with no initCMS
+          // runtime and therefore no generation. Only a superseded
+          // generation is blocked.
+          setIfLive(activeGeneration(), "__nimbiLiveSearchIndex", searchIndex);
         }
       } catch (_) {}
     } catch (e) {
@@ -691,6 +688,87 @@ export const listSlugCache = new Map();
 export const listPathsFetched = new Set();
 /** @type {Map<string,string|null>} */
 export const crawlCache = new Map();
+
+/**
+ * Maximum entries retained in `crawlCache`.
+ *
+ * The cache previously grew without bound — one entry per decoded slug
+ * probed, including misses — so a long session or a crawler hitting many
+ * unknown slugs retained every key indefinitely. `Map` preserves insertion
+ * order, so evicting the oldest entry is a cheap approximation of LRU that
+ * needs no extra bookkeeping.
+ * @type {number}
+ */
+const CRAWL_CACHE_MAX_ENTRIES = 500;
+
+/**
+ * How long a *miss* (`null`) stays cached.
+ *
+ * A miss means "this slug could not be resolved by crawling". Unlike a hit,
+ * that answer can become wrong as soon as content is added, so misses expire
+ * quickly. Hits are bounded by entry count instead of time.
+ * @type {number}
+ */
+const CRAWL_CACHE_MISS_TTL_MS = 60 * 1000;
+
+/** @type {Map<string, number>} slug -> timestamp of the recorded miss */
+const crawlMissRecordedAt = new Map();
+
+/**
+ * Record a crawl result, evicting the oldest entry when the cache is full.
+ *
+ * Kept as a helper rather than inlining at the call site so the bound is
+ * applied consistently and the eviction policy lives in one place.
+ * @param {string} key
+ * @param {string|null} value
+ * @returns {void}
+ */
+function _crawlCacheSet(key, value) {
+  try {
+    // Re-setting an existing key must not count as a new insertion, otherwise
+    // a hot slug would be evicted immediately.
+    if (!crawlCache.has(key) && crawlCache.size >= CRAWL_CACHE_MAX_ENTRIES) {
+      const oldest = crawlCache.keys().next();
+      if (!oldest.done) {
+        crawlCache.delete(oldest.value);
+        crawlMissRecordedAt.delete(oldest.value);
+      }
+    }
+    crawlCache.set(key, value);
+    if (value === null) crawlMissRecordedAt.set(key, Date.now());
+    else crawlMissRecordedAt.delete(key);
+  } catch (_) {
+    // Cache bounding is best-effort; never fail a resolution because of it.
+  }
+}
+
+/**
+ * Look up a crawl result, treating an expired miss as absent.
+ * @param {string} key
+ * @returns {string|null|undefined} The cached value, or `undefined` when
+ *   there is no usable entry.
+ */
+function _crawlCacheGet(key) {
+  try {
+    if (!crawlCache.has(key)) return undefined;
+    const value = crawlCache.get(key);
+    if (value !== null) return value;
+    const recordedAt = crawlMissRecordedAt.get(key);
+    if (
+      typeof recordedAt === "number" &&
+      Date.now() - recordedAt > CRAWL_CACHE_MISS_TTL_MS
+    ) {
+      // The miss is stale: drop it so the slug is re-crawled, in case the
+      // content now exists.
+      crawlCache.delete(key);
+      crawlMissRecordedAt.delete(key);
+      return undefined;
+    }
+    return value;
+  } catch (_) {
+    return undefined;
+  }
+}
 
 /**
  * Clear caches used for directory list -> slug mappings and path fetch
@@ -729,6 +807,46 @@ function _deriveCommonPrefix(paths) {
  * @returns {string}
  */
 export { slugify };
+
+/**
+ * Lazily-built index of slugified filenames to their paths.
+ *
+ * `crawlForSlug` and `ensureSlug` both need to answer "which known file has
+ * this slug as its name". Scanning `allMarkdownPaths` and re-slugifying every
+ * entry on each call made cold-route resolution O(paths) per navigation; this
+ * index makes it O(1). Invalidated whenever the path set changes size.
+ * @returns {Map<string, string>|null}
+ */
+let _filenameIndexCache = null;
+let _filenameIndexSize = -1;
+
+function getFilenameSlugIndex() {
+  try {
+    const size = allMarkdownPathsSet ? allMarkdownPathsSet.size : 0;
+    if (_filenameIndexCache && _filenameIndexSize === size)
+      return _filenameIndexCache;
+
+    const map = new Map();
+    if (Array.isArray(allMarkdownPaths)) {
+      for (const p of allMarkdownPaths) {
+        try {
+          const name = String(p ?? "")
+            .replace(/^.*\//, "")
+            .replace(/\.(md|html?)$/i, "");
+          if (!name) continue;
+          const slug = slugify(name);
+          if (slug && !map.has(slug)) map.set(slug, p);
+        } catch (_) {}
+      }
+    }
+    _filenameIndexCache = map;
+    _filenameIndexSize = size;
+    return map;
+  } catch (_) {
+    return null;
+  }
+}
+
 /**
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
  * maps and `allMarkdownPaths` relative to that base.
@@ -868,13 +986,6 @@ export function uniqueSlug(base, existing) {
 
 /**
  * Return true for links that point outside the site content (absolute
- * schemes, protocol-relative `//`, etc.). Centralizing this check avoids
- * inconsistencies across crawlers and indexers.
- * @param {string} href - The href to test for being external.
- * @returns {boolean} - True when the href points outside the site content.
- */
-/**
- * Return true for links that point outside the site content (absolute
  * schemes, protocol-relative `//`, etc.). Centralized helper.
  * @param {string} href - href parameter
  * @returns {boolean} - True when the href points outside the site content.
@@ -883,15 +994,6 @@ export function isExternalLink(href) {
   return isExternalLinkWithBase(href, undefined);
 }
 
-/**
- * Determine whether an href points outside of the provided contentBase.
- * If `contentBase` is omitted, this falls back to a conservative check
- * (protocol or protocol-relative URLs are considered external).
- *
- * @param {string} href - href parameter
- * @param {string} [contentBase] - optional absolute or relative content base
- * @returns {boolean} - True when the href points outside the provided content base.
- */
 /**
  * Determine whether an href points outside of the provided contentBase.
  * @param {string} href - The href to test for being external.
@@ -928,13 +1030,6 @@ export function isExternalLinkWithBase(href, contentBase) {
 }
 
 /**
- * Unescape Markdown-escaped characters so search titles/excerpts show
- * natural text (e.g. "\\_clearHooks" -> "_clearHooks"). Only a small
- * set of escapable characters per CommonMark is handled here.
- * @param {string} s - Input string potentially containing Markdown escapes.
- * @returns {string} - The unescaped string.
- */
-/**
  * Unescape a small set of Markdown-escaped characters.
  * @param {string} s - s parameter
  * @returns {string} - The unescaped string.
@@ -944,14 +1039,6 @@ export function unescapeMarkdown(s) {
   return String(s).replace(/\\([\\`*_{}\[\]()#+\-.!])/g, (_m, ch) => ch);
 }
 
-/**
- * Given a slug, return the most appropriate markdown path taking the
- * current UI language and available language list into account. If no
- * mapping exists the return value is `null`.
- *
- * @param {string} slug - slug parameter
- * @returns {string|null} - The resolved markdown path for the slug, or `null` if not found.
- */
 /**
  * Given a slug, return the most appropriate markdown path taking the
  * current UI language into account.
@@ -979,9 +1066,15 @@ export function resolveSlugPath(slug) {
 /**
  * Cache of ongoing or completed `fetchMarkdown` promises keyed by resolved URL.
  * Maps absolute URL string -> Promise<FetchResult>.
+ * Bounded to 500 entries (was 2000): each entry retains a full page body
+ * once its fetch resolves, and PowerCache expiry (default 60s TTL) is
+ * enforced lazily on read, so `maxEntries` is the hard retention bound.
+ * 500 still covers concurrent-fetch dedupe and the 60s revisit window with
+ * wide margin; crawl passes keep bodies in their own maps, so eviction
+ * never forces a re-fetch during indexing.
  * @type {Map<string, Promise<FetchResult>>}
  */
-export const fetchCache = new PowerCache({ maxEntries: 2000 });
+export const fetchCache = new PowerCache({ maxEntries: 500 });
 /**
  * Clear internal fetch cache used by `fetchMarkdown`.
  * @returns {void} - No return value.
@@ -1006,10 +1099,12 @@ export function getFetchCacheDiagnostics() {
 /**
  * Short-term negative cache for failed fetches. Maps absolute URL -> expiresAt (ms).
  * When a URL is present and not expired, `fetchMarkdown` will reject immediately
- * without issuing a network request.
+ * without issuing a network request. Bounded to 500 entries (was 2000) to cap
+ * retained URL keys; entries also expire via NEGATIVE_CACHE_TTL_MS, so earlier
+ * eviction only means a failed URL may be retried sooner, never served stale.
  * @type {Map<string, number>}
  */
-export const negativeFetchCache = new PowerCache({ maxEntries: 2000 });
+export const negativeFetchCache = new PowerCache({ maxEntries: 500 });
 
 function getFetchCacheKey(url) {
   try {
@@ -1083,6 +1178,7 @@ export function setFetchConcurrency(n) {
   try {
     FETCH_CONCURRENCY = Math.max(1, Number(n) || 1);
   } catch (e) {
+    // Invalid concurrency value: fall back to serial fetching.
     FETCH_CONCURRENCY = 1;
   }
 }
@@ -1105,6 +1201,7 @@ export function getFetchConcurrency() {
  */
 export let fetchMarkdown = async function (path, base, opts) {
   if (!path) throw new Error("path required");
+
   try {
     if (
       typeof path === "string" &&
@@ -1144,6 +1241,7 @@ export let fetchMarkdown = async function (path, base, opts) {
             path = left;
           }
         } catch (_) {
+          // Path comparison failed; keep the left-hand candidate.
           path = left;
         }
       }
@@ -1576,6 +1674,7 @@ export function setFetchMarkdown(fn) {
  */
 export function clearCrawlCache() {
   crawlCache.clear();
+  crawlMissRecordedAt.clear();
 }
 
 /**
@@ -1601,7 +1700,7 @@ export let searchIndex = [];
 /**
  * Return the live `searchIndex` array (not a copy).
  * Consumers should avoid mutating the returned array directly.
- * @returns {Array}
+ * @returns {Array<{slug:string,title:string,excerpt:string,path:string}>}
  */
 export function getSearchIndex() {
   return searchIndex;
@@ -1662,6 +1761,9 @@ export async function buildSearchIndex(
   noIndexing = undefined,
   seedPaths = undefined,
 ) {
+  // Captured once so every global publish below is dropped if this runtime is
+  // torn down while the (long-running) index build is still in flight.
+  const generation = activeGeneration();
   const earlyExcludes = Array.isArray(noIndexing)
     ? Array.from(
         new Set((noIndexing || []).map((p) => normalizePath(String(p ?? "")))),
@@ -1739,6 +1841,7 @@ export async function buildSearchIndex(
         try {
           paths = Array.from(mdToSlug.keys());
         } catch (_) {
+          // mdToSlug unreadable: no paths to crawl.
           paths = [];
         }
       } else {
@@ -1770,16 +1873,21 @@ export async function buildSearchIndex(
       );
     }
 
+    // Bodies fetched during discovery, reused by the indexing pass. Without
+    // this every page is fetched twice: once to discover links, once to read
+    // its title and excerpt.
+    const discoveryMd = new Map();
+
     try {
       const visited = new Set(paths);
-      const queue = [...paths];
+      const queue = createWorkQueue(paths);
 
       const fetchConcurrency = Math.max(
         1,
         Math.min(getFetchConcurrency(), queue.length || getFetchConcurrency()),
       );
 
-      let workerYieldCount = 0;
+      const yieldGate = createYieldGate();
       const worker = async () => {
         while (true) {
           if (visited.size > defaultCrawlMaxQueue) break;
@@ -1787,6 +1895,9 @@ export async function buildSearchIndex(
           if (!p) break;
           try {
             const md = await fetchMarkdown(p, contentBase);
+            // Remember the body so the indexing pass below does not have to
+            // fetch the same page a second time.
+            if (md) discoveryMd.set(p, md);
             if (md && md.raw) {
               if (md.status === 404) continue;
               let raw = md.raw;
@@ -1866,8 +1977,7 @@ export async function buildSearchIndex(
             debugLog("[slugManager] discovery fetch failed for", p, e);
           }
           try {
-            workerYieldCount++;
-            await yieldIfNeeded(workerYieldCount, 32);
+            await yieldGate();
           } catch (_) {}
         }
       };
@@ -1896,7 +2006,7 @@ export async function buildSearchIndex(
       1,
       Math.min(getFetchConcurrency(), pathsToFetch.length || 1),
     );
-    const fetchQueue = pathsToFetch.slice();
+    const fetchQueue = createWorkQueue(pathsToFetch);
     const fetchWorkers = [];
     for (let i = 0; i < fetchConcurrency; i++) {
       fetchWorkers.push(
@@ -1905,7 +2015,13 @@ export async function buildSearchIndex(
             const p = fetchQueue.shift();
             if (!p) break;
             try {
-              const md = await fetchMarkdown(p, contentBase);
+              // Reuse the body captured during discovery when available;
+              // only pages discovered by link extraction but never fetched
+              // need a network round trip here.
+              const cached = discoveryMd.get(p);
+              const md = cached !== undefined
+                ? cached
+                : await fetchMarkdown(p, contentBase);
               pathMdMap.set(p, md);
             } catch (err) {
               debugLog(
@@ -1921,11 +2037,18 @@ export async function buildSearchIndex(
     }
     await Promise.all(fetchWorkers);
 
-    let processYieldCount = 0;
+    // Built once and maintained incrementally. Rebuilding this per page made
+    // index construction O(n²) in the number of mappings, which dominates
+    // runtime on large sites.
+    const takenSlugs = new Set();
+    try {
+      for (const k of slugToMd.keys()) takenSlugs.add(k);
+    } catch (_) {}
+
+    const yieldGate = createYieldGate();
     for (const path of paths) {
       try {
-        processYieldCount++;
-        await yieldIfNeeded(processYieldCount, 16);
+        await yieldGate();
       } catch (_) {}
       if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue;
       try {
@@ -1964,16 +2087,7 @@ export async function buildSearchIndex(
                     pageSlug = existing;
                   } else {
                     let cand = slugify(title || path);
-                    const taken = new Set();
-                    try {
-                      for (const k of slugToMd.keys()) taken.add(k);
-                    } catch (_) {}
-                    try {
-                      for (const it of idx) {
-                        if (it && it.slug)
-                          taken.add(String(it.slug).split("::")[0]);
-                      }
-                    } catch (_) {}
+                    const taken = takenSlugs;
                     let belongs = false;
                     try {
                       if (slugToMd.has(cand)) {
@@ -1995,6 +2109,10 @@ export async function buildSearchIndex(
                       cand = uniqueSlug(cand, taken);
                     }
                     pageSlug = cand;
+                    // Keep the shared dedupe set in sync: the previous code
+                    // rebuilt it from `idx` on every iteration, so newly
+                    // assigned slugs were visible to later pages.
+                    takenSlugs.add(cand);
                     try {
                       if (!mdToSlug?.has?.(path))
                         _storeSlugMapping(pageSlug, path);
@@ -2114,16 +2232,7 @@ export async function buildSearchIndex(
                   pageSlug = existing;
                 } else {
                   let cand = slugify(title || path);
-                  const taken = new Set();
-                  try {
-                    for (const k of slugToMd.keys()) taken.add(k);
-                  } catch (_) {}
-                  try {
-                    for (const it of idx) {
-                      if (it && it.slug)
-                        taken.add(String(it.slug).split("::")[0]);
-                    }
-                  } catch (_) {}
+                  const taken = takenSlugs;
                   let belongs = false;
                   try {
                     if (slugToMd.has(cand)) {
@@ -2154,6 +2263,10 @@ export async function buildSearchIndex(
                 debugLog("[slugManager] derive pageSlug failed", err);
               }
               const h2re = /^##\s+(.+)$/gm;
+              // Sticky (`y`) so it matches in place at `lastIndex` instead of
+              // requiring a copy of the remaining document.
+              const h2ParaRe =
+                /(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/y;
               let m2;
               while ((m2 = h2re.exec(raw))) {
                 try {
@@ -2164,10 +2277,12 @@ export async function buildSearchIndex(
                   const h2Slug = pageSlug
                     ? `${pageSlug}::${anchor}`
                     : `${slugify(path)}::${anchor}`;
-                  const after = raw.slice(h2re.lastIndex);
-                  const paraMatch = after.match(
-                    /^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/,
-                  );
+                  // Sticky regex anchored at the heading's end, rather than
+                  // slicing the whole remainder of the document first. Slicing
+                  // copied the rest of the body once per heading, making
+                  // excerpt extraction O(n^2) in document length.
+                  h2ParaRe.lastIndex = h2re.lastIndex;
+                  const paraMatch = h2ParaRe.exec(raw);
                   const h2Excerpt =
                     paraMatch && paraMatch[1]
                       ? String(paraMatch[1])
@@ -2193,6 +2308,9 @@ export async function buildSearchIndex(
             if (indexDepth === 3) {
               try {
                 const h3re = /^###\s+(.+)$/gm;
+                // Sticky, as above: no remainder copy per heading.
+                const h3ParaRe =
+                  /(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/y;
                 let m3;
                 while ((m3 = h3re.exec(raw))) {
                   try {
@@ -2203,10 +2321,9 @@ export async function buildSearchIndex(
                     const h3Slug = pageSlug
                       ? `${pageSlug}::${anchor3}`
                       : `${slugify(path)}::${anchor3}`;
-                    const after3 = raw.slice(h3re.lastIndex);
-                    const paraMatch3 = after3.match(
-                      /^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/,
-                    );
+                    // Sticky regex, as above: no remainder copy per heading.
+                    h3ParaRe.lastIndex = h3re.lastIndex;
+                    const paraMatch3 = h3ParaRe.exec(raw);
                     const h3Excerpt =
                       paraMatch3 && paraMatch3[1]
                         ? String(paraMatch3[1])
@@ -2249,16 +2366,7 @@ export async function buildSearchIndex(
                 pageSlug = existing;
               } else {
                 let cand = slugify(title || path);
-                const taken = new Set();
-                try {
-                  for (const k of slugToMd.keys()) taken.add(k);
-                } catch (_) {}
-                try {
-                  for (const it of idx) {
-                    if (it && it.slug)
-                      taken.add(String(it.slug).split("::")[0]);
-                  }
-                } catch (_) {}
+                const taken = takenSlugs;
                 let belongs = false;
                 try {
                   if (slugToMd.has(cand)) {
@@ -2315,14 +2423,16 @@ export async function buildSearchIndex(
         try {
           searchIndex = Array.from(finalIdx);
         } catch (_) {
+          // Array.from unavailable: assign the source array directly.
           searchIndex = finalIdx;
         }
       }
       try {
         if (typeof window !== "undefined") {
-          try {
-            window.__nimbiResolvedIndex = searchIndex;
-          } catch (e) {}
+          // Strict variant: `buildSearchIndex` is driven by initCMS, so a
+          // generation is always live here and a stale write must be
+          // dropped outright.
+          setIfCurrent(generation, "__nimbiResolvedIndex", searchIndex);
           try {
             const dedup = [];
             const seenBase = new Set();
@@ -2339,15 +2449,11 @@ export async function buildSearchIndex(
                 dedup.push(entry);
               } catch (_) {}
             }
-            try {
-              window.__nimbiSitemapJson = {
-                generatedAt: new Date().toISOString(),
-                entries: dedup,
-              };
-            } catch (_) {}
-            try {
-              window.__nimbiSitemapFinal = dedup;
-            } catch (_) {}
+            setIfLive(generation, "__nimbiSitemapJson", {
+              generatedAt: new Date().toISOString(),
+              entries: dedup,
+            });
+            setIfLive(generation, "__nimbiSitemapFinal", dedup);
           } catch (_) {}
         }
       } catch (e) {}
@@ -2362,6 +2468,7 @@ export async function buildSearchIndex(
         try {
           searchIndex = Array.from(idx);
         } catch (_) {
+          // Array.from unavailable: assign the source array directly.
           searchIndex = idx;
         }
       }
@@ -2391,7 +2498,7 @@ export async function buildSearchIndex(
  * `searchIndex` array (possibly empty on timeout).
  *
  * @param {{timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}} opts
- * @returns {Promise<Array>} resolves to the live `searchIndex` array
+ * @returns {Promise<any[]>} resolves to the live `searchIndex` array
  */
 export async function whenSearchIndexReady(opts = {}) {
   try {
@@ -2472,7 +2579,7 @@ export async function whenSearchIndexReady(opts = {}) {
  * not use timeouts should use this API instead of `whenSearchIndexReady`.
  *
  * @param {{contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}} opts
- * @returns {Promise<Array>} resolves to the live `searchIndex` array
+ * @returns {Promise<any[]>} resolves to the live `searchIndex` array
  */
 export async function awaitSearchIndex(opts = {}) {
   try {
@@ -2532,10 +2639,11 @@ export let crawlForSlug = async function (
   contentBase,
   maxQueue = defaultCrawlMaxQueue,
 ) {
-  if (crawlCache.has(decoded)) return crawlCache.get(decoded);
+  const cached = _crawlCacheGet(decoded);
+  if (cached !== undefined) return cached;
   let found = null;
   const seenDirs = new Set();
-  const queue = [""];
+  const queue = createWorkQueue([""]);
 
   const origin =
     typeof location !== "undefined" && location.origin
@@ -2554,13 +2662,14 @@ export let crawlForSlug = async function (
       }
     }
   } catch (err) {
+    // Malformed contentBase: resolve against the origin root.
     baseForResolve = origin + "/";
   }
 
   const concurrency = Math.max(1, Math.min(poolSize, 6));
   while (queue.length && !found) {
     if (queue.length > maxQueue) break;
-    const batch = queue.splice(0, concurrency);
+    const batch = queue.take(concurrency);
     await runWithConcurrency(
       batch,
       async (relDir) => {
@@ -2612,6 +2721,7 @@ export let crawlForSlug = async function (
                 ? doc.getElementsByTagName("a")
                 : [];
             } catch (_) {
+              // Legacy DOM API unavailable: no links to crawl.
               links = [];
             }
           }
@@ -2637,6 +2747,8 @@ export let crawlForSlug = async function (
                   const subNorm = ensureTrailingSlash(normalizePath(sub));
                   if (!seenDirs.has(subNorm)) queue.push(subNorm);
                 } catch (err) {
+                  // Absolute URL resolution failed; join relative to the
+                  // current directory instead.
                   const sub = normalizePath(relDir + href);
                   if (!seenDirs.has(sub)) queue.push(sub);
                 }
@@ -2696,7 +2808,7 @@ export let crawlForSlug = async function (
       concurrency,
     );
   }
-  crawlCache.set(decoded, found);
+  _crawlCacheSet(decoded, found);
   return found;
 };
 
@@ -2713,7 +2825,7 @@ export async function crawlAllMarkdown(
   const result = new Set();
 
   const seenDirs = new Set();
-  const queue = [""];
+  const queue = createWorkQueue([""]);
 
   const origin =
     typeof location !== "undefined" && location.origin
@@ -2732,13 +2844,14 @@ export async function crawlAllMarkdown(
       }
     }
   } catch (err) {
+    // Malformed contentBase: resolve against the origin root.
     baseForResolve = origin + "/";
   }
 
   const concurrency = Math.max(1, Math.min(poolSize, 6));
   while (queue.length) {
     if (queue.length > maxQueue) break;
-    const batch = queue.splice(0, concurrency);
+    const batch = queue.take(concurrency);
     await runWithConcurrency(
       batch,
       async (relDir) => {
@@ -2790,6 +2903,7 @@ export async function crawlAllMarkdown(
                 ? doc.getElementsByTagName("a")
                 : [];
             } catch (_) {
+              // Legacy DOM API unavailable: no links to crawl.
               links = [];
             }
           }
@@ -2814,7 +2928,9 @@ export async function crawlAllMarkdown(
                   const subNorm = ensureTrailingSlash(normalizePath(sub));
                   if (!seenDirs.has(subNorm)) queue.push(subNorm);
                 } catch (err) {
-                  const sub = relDir + href;
+                  // Absolute URL resolution failed; join relative to the
+                  // current directory instead.
+                  const sub = normalizePath(relDir + href);
                   if (!seenDirs.has(sub)) queue.push(sub);
                 }
                 continue;
@@ -2873,6 +2989,7 @@ export async function crawlAllMarkdown(
  * @returns {Promise<string|null>} - Promise resolving to the markdown path or `null` if not found.
  */
 export async function ensureSlug(decoded, contentBase, maxQueue) {
+  const yieldGate = createYieldGate();
   if (decoded && typeof decoded === "string") {
     decoded = normalizePath(decoded);
     decoded = trimTrailingSlash(decoded);
@@ -2907,18 +3024,11 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
     // Fast path: resolve slug from known file names before doing expensive
     // markdown fetches, index builds, or crawls.
-    for (const p of allMarkdownPaths) {
-      try {
-        const name = String(p ?? "")
-          .replace(/^.*\//, "")
-          .replace(/\.(md|html?)$/i, "");
-        if (name && slugify(name) === decoded) {
-          _storeSlugMapping(decoded, p);
-          return p;
-        }
-      } catch (err) {
-        debugLog("[slugManager] filename fast-path match failed", err);
-      }
+    const filenameIndex = getFilenameSlugIndex();
+    if (filenameIndex?.has(decoded)) {
+      const p = filenameIndex.get(decoded);
+      _storeSlugMapping(decoded, p);
+      return p;
     }
 
     if (listSlugCache.has(decoded)) {
@@ -2947,8 +3057,7 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
       }
     }
     try {
-      crawlBatchYieldCount++;
-      await yieldIfNeeded(crawlBatchYieldCount, 8);
+      await yieldGate();
     } catch (_) {}
   }
 
@@ -2991,16 +3100,11 @@ export async function ensureSlug(decoded, contentBase, maxQueue) {
   }
 
   if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
-    for (const p of allMarkdownPaths) {
-      try {
-        const name = p.replace(/^.*\//, "").replace(/\.(md|html?)$/i, "");
-        if (slugify(name) === decoded) {
-          _storeSlugMapping(decoded, p);
-          return p;
-        }
-      } catch (err) {
-        debugLog("[slugManager] build-time filename match failed", err);
-      }
+    const filenameIndex = getFilenameSlugIndex();
+    if (filenameIndex?.has(decoded)) {
+      const p = filenameIndex.get(decoded);
+      _storeSlugMapping(decoded, p);
+      return p;
     }
   }
 
