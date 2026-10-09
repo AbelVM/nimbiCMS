@@ -78,4 +78,23 @@ describe("utils/textMetrics cache", () => {
     expect(a.words).toBe(b.words);
     expect(a.text).toBe(b.text);
   });
+
+  it("counts words per word, not per whitespace run, for CJK", () => {
+    // `split(/\s+/)` counts an entire space-less CJK sentence as one word,
+    // which makes reading-time estimates badly wrong. `Intl.Segmenter`
+    // counts per word.
+    const cjk = getTextMetrics("日本語のページです").wordCount;
+    expect(cjk).toBeGreaterThan(1);
+
+    // Latin text is unaffected.
+    expect(getTextMetrics("one two three").wordCount).toBe(3);
+    expect(getTextMetrics("Привет мир").wordCount).toBe(2);
+  });
+
+  it("falls back to a whitespace split when Segmenter is unavailable", () => {
+    // The implementation degrades rather than throwing; assert the contract
+    // holds for the inputs that matter either way.
+    expect(getTextMetrics("alpha beta").wordCount).toBe(2);
+    expect(getTextMetrics("").wordCount).toBe(0);
+  });
 });

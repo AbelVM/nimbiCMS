@@ -74,15 +74,51 @@ function derefCacheEntry(ref) {
 }
 
 /**
- * Compute a simple whitespace-based word count for fallback cases.
- * This is intentionally conservative and fast.
+ * Word segmenter, created once and reused.
+ *
+ * `Intl.Segmenter` with `granularity: 'word'` understands scripts that do not
+ * separate words with spaces. Splitting on `/\s+/` counts an entire CJK
+ * sentence as a single "word", which makes reading-time estimates badly wrong
+ * for those languages — the same class of bug as the slugification collapse
+ * fixed in G-002.
+ * @type {Intl.Segmenter|null}
+ */
+let _wordSegmenter = null;
+try {
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+    _wordSegmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+  }
+} catch (_) {
+  // Segmenter unavailable or unsupported for the default locale.
+  _wordSegmenter = null;
+}
+
+/**
+ * Compute a word count.
+ *
+ * Uses `Intl.Segmenter` when available so that scripts without word spacing
+ * (CJK, Thai, Lao, Khmer) are counted per word rather than per run of
+ * non-space characters. Falls back to a whitespace split otherwise.
  * @param {string} text
  * @returns {number}
  * @private
  */
 function computeWordCount(text) {
   if (!text) return 0;
-  return String(text).trim().split(/\s+/).filter(Boolean).length;
+  const str = String(text);
+  if (_wordSegmenter) {
+    try {
+      let count = 0;
+      for (const segment of _wordSegmenter.segment(str)) {
+        // `isWordLike` excludes whitespace and punctuation segments.
+        if (segment.isWordLike) count += 1;
+      }
+      return count;
+    } catch (_) {
+      // Fall through to the whitespace split.
+    }
+  }
+  return str.trim().split(/\s+/).filter(Boolean).length;
 }
 
 /**
