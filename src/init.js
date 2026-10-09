@@ -75,6 +75,67 @@ import { startPerformanceDiagnostics } from "./utils/performanceDiagnostics.js";
 import { createRuntimeManifest } from "./utils/runtimeManifest.js";
 
 /**
+ * Options accepted by `initCMS`.
+ *
+ * Declared here rather than only at the call site so the generated
+ * `index.d.ts` and the TypeDoc pages both carry the full shape.
+ * @typedef {Object} InitOptions
+ * @property {string|Element} el
+ * @property {string} [contentPath]
+ * @property {number} [crawlMaxQueue]
+ * @property {boolean} [searchIndex]
+ * @property {'eager'|'lazy'} [searchIndexMode]
+ * @property {'light'|'dark'|'system'} [defaultStyle]
+ * @property {string} [bulmaCustomize]
+ * @property {string} [lang]
+ * @property {string|null} [l10nFile]
+ * @property {number} [cacheTtlMinutes]
+ * @property {number} [cacheMaxEntries]
+ * @property {Array<Record<string,unknown>>} [markdownExtensions]
+ * @property {string[]} [availableLanguages]
+ * @property {string} [homePage]
+ * @property {string|null} [notFoundPage]
+ * @property {boolean} [skipRootReadme]
+ * @property {boolean} [allowUrlPathOverrides]
+ * @property {boolean} [allowEmbeddedScripts]
+ * @property {string[]} [embeddedScriptOrigins]
+ * @property {Object} [seoMap]
+ * @property {Object} [manifest]
+ * @property {boolean} [exposeSitemap]
+ * @property {boolean} [performanceDiagnostics]
+ * @property {(record:Object) => void} [onRuntimeError]
+ */
+
+/**
+ * Parsed query-string options, a subset of {@link InitOptions}.
+ * @typedef {Object} ParsedInitOptions
+ * @property {string|Element} [el]
+ * @property {string} [contentPath]
+ * @property {number} [crawlMaxQueue]
+ * @property {boolean} [searchIndex]
+ * @property {'eager'|'lazy'} [searchIndexMode]
+ * @property {'light'|'dark'|'system'} [defaultStyle]
+ * @property {string} [bulmaCustomize]
+ * @property {string} [lang]
+ * @property {string|null} [l10nFile]
+ * @property {number} [cacheTtlMinutes]
+ * @property {number} [cacheMaxEntries]
+ * @property {Array<Record<string,unknown>>} [markdownExtensions]
+ * @property {string[]} [availableLanguages]
+ * @property {string} [homePage]
+ * @property {string|null} [notFoundPage]
+ * @property {boolean} [skipRootReadme]
+ * @property {boolean} [allowUrlPathOverrides]
+ * @property {boolean} [allowEmbeddedScripts]
+ * @property {string[]} [embeddedScriptOrigins]
+ * @property {Object} [seoMap]
+ * @property {Object} [manifest]
+ * @property {boolean} [exposeSitemap]
+ * @property {boolean} [performanceDiagnostics]
+ * @property {(record:Object) => void} [onRuntimeError]
+ */
+
+/**
  * Parse URL query string into a normalized `initCMS` options object.
  * Conservative, descriptive helper used by `initCMS` and tests.
  * @param {string} [queryString]
