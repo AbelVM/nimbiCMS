@@ -6,12 +6,8 @@
 
 # Function: teardownRendererWorkerPool()
 
-> **teardownRendererWorkerPool**(): `Promise`\<`void`\>
-
-Explicitly terminate and clear the renderer worker pool.
-Uses the pool's own drain/terminate logic so in-flight tasks get a
-chance to complete before workers are torn down.
+> **teardownRendererWorkerPool**(): `Promise`\<`any`\>
 
 ## Returns
 
-`Promise`\<`void`\>
+`Promise`\<`any`\>

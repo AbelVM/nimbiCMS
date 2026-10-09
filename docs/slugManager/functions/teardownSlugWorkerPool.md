@@ -6,12 +6,8 @@
 
 # Function: teardownSlugWorkerPool()
 
-> **teardownSlugWorkerPool**(): `Promise`\<`void`\>
-
-Explicitly terminate and clear the slug worker pool.
-Uses the pool's own drain/terminate logic so in-flight tasks get a
-chance to complete before workers are torn down.
+> **teardownSlugWorkerPool**(): `Promise`\<`any`\>
 
 ## Returns
 
-`Promise`\<`void`\>
+`Promise`\<`any`\>
