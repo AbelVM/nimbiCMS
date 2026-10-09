@@ -412,7 +412,7 @@ verdict for each so neither audit is orphaned.
 | G-011 Shared search results renderer | ⬜ | Not started. P2. |
 | G-012 Bound `crawlCache`/`fetchCache` | ✅ | `fetchCache` bounded in M4 (2000 to 500). **`crawlCache` now bounded too** (G-012b): capped at 500 entries with oldest-first eviction (`Map` preserves insertion order, so this is a cheap LRU approximation with no extra bookkeeping), and *misses* expire after 60s so newly-added content is picked up. Re-setting an existing key does not count as a new insertion, so a hot slug is not evicted immediately. The public `Map` API and its `.d.ts` type are unchanged. 5 new tests. |
 | G-012b Bound `crawlCache` | ✅ | Done as part of G-012. |
-| G-013 Pool teardown drain/dispose | ⬜ | Not started. P1. |
+| G-013 Pool teardown drain/dispose | ✅ | **Mostly already done; added the missing piece.** All three teardowns already preferred `Symbol.asyncDispose` and fell back to `drain()` then `terminate()`. The gap was that `drain()` was called with **no options**, so a worker stuck mid-task would keep the teardown promise pending forever and `destroy()` would never resolve. `PowerPool.drain()` accepts `{ timeout }`; now passed as `POOL_DRAIN_TIMEOUT_MS = 2000` in `slugManager.js`, `markdown.js`, and `htmlBuilder.js`. On timeout we fall through to `terminate()`, which is correct for a pool being discarded. 4 new tests pin the observable contract. |
 | G-014 AbortSignal on semaphore acquire | ✅ | `runWithConcurrency` already forwards the signal. |
 | G-015 Decouple anchor worker | ⬜ | Not started. P1. |
 | G-016 hljs build-time generation | ⏰ | Deferred. The project deliberately keeps the runtime fetch for "no rebuild needed"; the offline/CSP tradeoff is real but is a product decision, not a defect. |

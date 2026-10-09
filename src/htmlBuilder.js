@@ -2486,6 +2486,14 @@ export function initAnchorWorker() {
  * Tear down the anchor worker pool.
  * @returns {Promise<void>}
  */
+/**
+ * How long to wait for in-flight worker tasks during teardown before
+ * terminating the pool. Teardown must not hang, and a pool being discarded
+ * does not need a graceful finish.
+ * @type {number}
+ */
+const POOL_DRAIN_TIMEOUT_MS = 2000;
+
 export function teardownAnchorWorkerPool() {
   const pool = _anchorPool;
   _anchorPool = null;
@@ -2495,8 +2503,14 @@ export function teardownAnchorWorkerPool() {
     const asyncDispose = pool[Symbol.asyncDispose];
     if (typeof asyncDispose === "function")
       return Promise.resolve(asyncDispose.call(pool)).catch(() => {});
+    // Pass a drain timeout: without one, a worker stuck mid-task would keep
+    // the teardown promise pending indefinitely and `destroy()` would never
+    // resolve. On timeout we fall through to `terminate()`, which is the
+    // correct outcome for a pool we are discarding anyway.
     const drained =
-      typeof pool.drain === "function" ? Promise.resolve(pool.drain()) : Promise.resolve();
+      typeof pool.drain === "function"
+        ? Promise.resolve(pool.drain({ timeout: POOL_DRAIN_TIMEOUT_MS }))
+        : Promise.resolve();
     return drained
       .catch(() => {})
       .then(() => {
