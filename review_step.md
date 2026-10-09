@@ -66,6 +66,31 @@ original copies. See §4 and task B7.
 
 ---
 
+## 1b. Architectural constraints (read before acting on any recommendation)
+
+nimbiCMS is a **100% runtime CMS**. From the README:
+
+> "No database, no build step, no backend — just Markdown files and a browser."
+> "nimbiCMS loads content at runtime, so changes appear immediately."
+
+Two distinct "build steps" must not be confused:
+
+| | Exists? | Notes |
+|---|---|---|
+| nimbiCMS's own bundling (Vite → `dist/`) | Yes | Normal library build. Recommendations about it are fine. |
+| A build step over the **user's** content | **Must never exist** | This is the product's core value proposition. |
+
+Any recommendation requiring users to pre-process their own Markdown — a
+prebuilt search index, a generated sitemap, precomputed slugs — is
+**architecturally incompatible** and is rejected on that basis regardless of
+its technical merit. Three such recommendations appear in the glyph audit and
+are recorded as rejected: **G-023**, **S1**, and **F2**.
+
+The runtime index build is not overhead to be optimised away. It *is* the
+product.
+
+---
+
 ## 2. Verification baseline
 
 | Gate | Before | After |
@@ -415,14 +440,14 @@ verdict for each so neither audit is orphaned.
 | G-013 Pool teardown drain/dispose | ✅ | **Mostly already done; added the missing piece.** All three teardowns already preferred `Symbol.asyncDispose` and fell back to `drain()` then `terminate()`. The gap was that `drain()` was called with **no options**, so a worker stuck mid-task would keep the teardown promise pending forever and `destroy()` would never resolve. `PowerPool.drain()` accepts `{ timeout }`; now passed as `POOL_DRAIN_TIMEOUT_MS = 2000` in `slugManager.js`, `markdown.js`, and `htmlBuilder.js`. On timeout we fall through to `terminate()`, which is correct for a pool being discarded. 4 new tests pin the observable contract. |
 | G-014 AbortSignal on semaphore acquire | ✅ | `runWithConcurrency` already forwards the signal. |
 | G-015 Decouple anchor worker | ✅ | **Already done — the audit's premise no longer holds.** It cited `src/worker/anchorRewriter.js:1-15` importing `slugManager`, but that module was deleted (confirmed by RC7/G-031). Verified the current worker graph: `anchorWorker.js` imports only `anchorRuntime.js` and `powerMessageCodec`; `anchorRuntime.js` imports only `sharedDomParser`, `slugify`, `helpers`, `stripContentBasePrefix`, and `concurrency`. No `slugManager`, no worker factories, no caches. |
-| G-016 hljs build-time generation | ⏰ | Deferred. The project deliberately keeps the runtime fetch for "no rebuild needed"; the offline/CSP tradeoff is real but is a product decision, not a defect. |
+| G-016 hljs build-time generation | ⏰ | Deferred. **Not architecturally incompatible** — unlike G-023 this concerns nimbiCMS's *own* Vite build (generating `supportedLanguages.json` from the highlight.js package), not the user's content, so it adds no step for users. Deferred because the project deliberately keeps the runtime fetch for "no rebuild needed"; the offline/CSP tradeoff is real but is a product decision, not a defect. |
 | G-017 `import.meta.glob` for hljs languages | ⬜ | Not started. P1. |
 | G-018 `bulmaManager` observer disconnect | ✅ | **Done.** Observers are now tracked in a module-level `_bulmaHeadObservers` set and disconnected by a new `disconnectBulmaObservers()`, wired into `destroy()`. Also fixed the broken reuse logic: it stored the literal string `"1"` in `data-bulmaswatch-observer` and then queried for an element carrying that value, which resolved to the link itself rather than an observer — so every call created a fresh observer. The callback now also disconnects when its stylesheet leaves the document, instead of running for the rest of the page lifetime. `injectLink` exported as a test seam. 6 new tests. |
 | G-019 `textMetrics` cache to PowerCache | ❌ | **Not actionable — the audit's three claims are all false, and the proposed change would regress.** Verified empirically: (1) the cache is keyed by `length:hash`, not the full text; (2) values are held via `WeakRef`, so the GC can reclaim them under pressure before the FIFO limit — `PowerCache` holds *strong* references and would make retention worse; (3) the empty-string eviction edge case does not exist — `makeKey` always returns `"N:H"`, which is never falsy, and eviction was exercised 250 times with correct results. The cache is already bounded at 200 entries with FIFO eviction. Added 7 tests pinning the behaviour so a future change is deliberate. |
 | G-020 SEO favicon memoize / selector cache | ⬜ | Not started. P3. |
 | G-021 Image zoom CSS write batching | ⬜ | Not started. P3. |
 | G-022 Yield coverage in crawl loops | ✅ | Done as X7 (time-budgeted `createYieldGate`). |
-| G-023 Build-time search index | ⬜ | Not started. P1. Largest remaining UX win; see X1 for why the runtime half was only partially done. |
+| G-023 Build-time search index | ❌ | **Architecturally incompatible — rejected.** nimbiCMS is a 100% runtime CMS: README states "No database, no build step, no backend — just Markdown files and a browser", and "nimbiCMS loads content at runtime, so changes appear immediately". A prebuilt `search-index.json` would require every user to run a build step over their own content, which is the exact thing the project exists to avoid. The runtime index build is not an implementation detail to be optimised away — it is the product. |
 | G-024 `Intl.Segmenter` for word counts | ⬜ | Not started. P2. |
 | G-025 Dev perf overlay | ⬜ | Not started. P2. |
 | G-026 `prefers-reduced-data`/`reduced-motion` | 🟡 | `prefers-reduced-motion` honoured for View Transitions (X3). `prefers-reduced-data` not addressed. |
@@ -432,6 +457,8 @@ verdict for each so neither audit is orphaned.
 | G-030 GCRA / retry budgets / hedging | ⏰ | Deferred. |
 | G-031 Confirm dead modules removed | ✅ | Verified absent. |
 | G-032 Hedging HTTP fetches | ❌ | Rejected. Traffic amplification risk. |
+| S1 Build-time full-text search (MiniSearch/FlexSearch) | ❌ | **Architecturally incompatible — same reason as G-023.** Requires users to pre-build an index from their content. The runtime crawl is the product, not overhead. |
+| F2 Build-time search index | ❌ | **Architecturally incompatible — same reason as G-023.** |
 
 ## 10c. Regression guards added
 
