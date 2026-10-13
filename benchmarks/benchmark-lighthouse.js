@@ -7,6 +7,8 @@ import net from 'net'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
+import { PowerApdex } from 'performance-helpers/powerApdex'
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const REPORT_DIR = join(process.cwd(), 'benchmarks', 'reports')
@@ -17,6 +19,13 @@ const DEPLOYED_URL = 'https://abelvm.github.io/nimbiCMS/'
 const MAX_ATTEMPTS = 4
 const BASE_TIMEOUT_MS = 180000 // 3 minutes
 const BACKOFF_MS = 30000 // 30s
+
+// APDEX target for `interactive` (ms). APDEX is a single 0–1 score per
+// device/cache combination, which is easier to trend than seven raw metrics.
+// 2500 ms is the interactive target used by the project's own performance
+// guidance; `tolerance` defaults to 4x the target (10 s), which is the
+// standard APDEX "tolerating" band for web interactivity.
+const APDEX_TARGET_MS = 2500
 
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
@@ -170,23 +179,56 @@ function extractMetricsFromJson(jsonPath) {
     const categories = lc.categories || {}
     const audits = lc.audits || {}
     const perf = categories.performance && categories.performance.score != null ? Math.round(categories.performance.score * 100) : null
+    const interactive = audits['interactive']?.numericValue ?? null
+    // APDEX (performance-helpers PowerApdex): a single 0–1 score per
+    // device/cache combination, computed exactly from the `interactive`
+    // timing rather than derived from a histogram. `target` is the satisfied
+    // threshold; `tolerance` defaults to 4x (the standard APDEX band).
+    const apdex = computeApdex(interactive)
     return {
       performance: perf,
       fcp: audits['first-contentful-paint']?.numericValue ?? null,
       lcp: audits['largest-contentful-paint']?.numericValue ?? null,
       cls: audits['cumulative-layout-shift']?.numericValue ?? null,
-      interactive: audits['interactive']?.numericValue ?? null,
+      interactive,
       tbt: audits['total-blocking-time']?.numericValue ?? null,
-      speedIndex: audits['speed-index']?.numericValue ?? null
+      speedIndex: audits['speed-index']?.numericValue ?? null,
+      apdex,
     }
   } catch (e) {
     return null
   }
 }
 
+/**
+ * Score one `interactive` latency against the APDEX target.
+ *
+ * Returns `null` when there is no latency to score (a failed run), so callers
+ * can distinguish "no measurement" from "a measurement that scored 0".
+ *
+ * @param {number|null|undefined} interactiveMs
+ * @returns {{score:number,satisfied:number,tolerating:number,frustrated:number,total:number}|null}
+ */
+function computeApdex(interactiveMs) {
+  if (interactiveMs == null || !Number.isFinite(Number(interactiveMs))) return null
+  const apdex = new PowerApdex({ target: APDEX_TARGET_MS })
+  apdex.record(Number(interactiveMs))
+  return {
+    score: apdex.score(),
+    satisfied: apdex.satisfied,
+    tolerating: apdex.tolerating,
+    frustrated: apdex.frustrated,
+    total: apdex.total,
+  }
+}
+
 function fmt(val, metric) {
   if (val == null) return '—'
   if (metric === 'performance') return String(val)
+  if (metric === 'apdex') {
+    // APDEX is a 0–1 score; show three decimals and mark the better one.
+    return String(Number(val).toFixed(3))
+  }
   if (metric === 'cls') return String(Number(val).toFixed(3))
   return String(Math.round(val)) + ' ms'
 }
@@ -203,16 +245,19 @@ async function generateResultsMd(results, outPath) {
       lines.push('|---|---:|---:|')
       const dev = results.dev?.[device]?.[cache]
       const dep = results.deployed?.[device]?.[cache]
-      const metrics = ['performance', 'fcp', 'lcp', 'interactive', 'tbt', 'speedIndex', 'cls']
+      // APDEX is a single 0–1 score per device/cache combination (exact, not
+      // derived from a histogram). It sits after the raw timings so the report
+      // reads "timings, then the aggregate".
+      const metrics = ['performance', 'fcp', 'lcp', 'interactive', 'tbt', 'speedIndex', 'cls', 'apdex']
       for (const m of metrics) {
         const dv = dev ? dev[m] : null
         const pv = dep ? dep[m] : null
         let dvFmt = fmt(dv, m)
         let pvFmt = fmt(pv, m)
-        // determine better: higher for performance, lower for timings
+        // determine better: higher for performance/apdex, lower for timings
         let devBetter = null
         if (dv != null && pv != null) {
-          if (m === 'performance') devBetter = dv > pv
+          if (m === 'performance' || m === 'apdex') devBetter = dv > pv
           else devBetter = dv < pv
         }
         if (devBetter === true) dvFmt = `\`${dvFmt}\``

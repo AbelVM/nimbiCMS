@@ -99,6 +99,18 @@ export function teardownRendererWorkerPool() {
   _rendererPool = null;
   if (!pool) return Promise.resolve();
   unregisterWorkerPool("renderer", pool);
+  // performance-helpers 2.1.0 ships a single `close()` entry point that
+  // drains in-flight work (bounded by `timeout`) and then terminates. It
+  // replaces the hand-rolled `Symbol.asyncDispose` -> `drain()` -> `terminate()`
+  // cascade below, and returns the final `getStats()` snapshot for free.
+  if (typeof pool.close === "function") {
+    return Promise.resolve(
+      pool.close({ timeout: POOL_DRAIN_TIMEOUT_MS }),
+    ).catch((e) => {
+      debugWarn("[markdown] teardownRendererWorkerPool close failed", e);
+    });
+  }
+  // Legacy fallback: pools that predate `close()` still drain then terminate.
   try {
     const asyncDispose = pool[Symbol.asyncDispose];
     if (typeof asyncDispose === "function")

@@ -2,8 +2,13 @@
 
 All notable changes to **nimbiCMS** will be documented in this file.
 
-## Unreleased
-
+## V2.0.0 Major revamp
+ 
+- **[CHORE]** Bump `performance-helpers` to **2.1.0** and adopt a selection of its v2.1.0 features (`PowerPool.close`, `pool:worker:exit` events, `PowerApdex`). The migration from the vendored implementation to the published package is complete; this round wires the new APIs into the existing integration points.
+- **[CHORE]** Unify the slug, renderer, and anchor worker-pool teardown paths onto `PowerPool.close({ timeout })`, which drains in-flight work (bounded by `timeout`) and then terminates, returning the final `getStats()` snapshot for free. The three `teardown*WorkerPool` functions previously each re-implemented the same `Symbol.asyncDispose` → `drain()` → `terminate()` cascade; pools that predate `close()` still fall through to that legacy cascade, so behavior is unchanged for them.
+- **[PERF]** Subscribe each registered worker pool to its `pool:worker:exit` event so a worker dying mid-flight (e.g. the renderer worker during a large anchor-rewrite pass) is recorded as a fallback in worker-pool diagnostics instead of staying silent. The diagnostics previously only counted pool-construction failures; dead-worker detection is now observable.
+- **[TEST]** Give the `registerLanguage` UMD runtime test an explicit 120 s timeout. The test runs `npm run build` plus bundle execution in a `vm` context, which together edge past the default 20 s budget under parallel worker load; it passes in isolation.
+- **[CHORE]** Add an APDEX score (target 2500 ms on `interactive`) to the Lighthouse benchmark report via `performance-helpers/powerApdex`, giving a single 0–1 number per device/cache combination to trend alongside the seven raw timings. Additive — no runtime change.
 - **[PERF]** Extract Markdown heading excerpts with a sticky regex anchored at the heading instead of copying the remainder of the document once per heading, making index construction linear rather than quadratic in document length. Measured up to 3.4x faster on a 1,000-heading document with identical output.
 - **[PERF]** Drain crawl and fetch queues through a head-index work queue instead of `Array.shift()`, which re-indexes every remaining element. Measured 4.5x faster at 5,000 entries and neutral at the default 1,000-entry queue size; adds `benchmarks/benchmark-work-queue.mjs`.
 - **[FIX]** Disconnect the MutationObservers that keep Bulmaswatch theme stylesheets last in `<head>` on teardown, instead of leaving them watching `document.head` for the lifetime of the page. They also stop once their stylesheet is removed, and the broken observer-reuse lookup that created a fresh observer on every call is gone.

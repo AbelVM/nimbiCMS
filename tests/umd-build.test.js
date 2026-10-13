@@ -49,7 +49,6 @@ it('build:umd produces a usable UMD bundle', () => {
 }, 120000)
 
 it('umd runtime: registerLanguage and theming APIs exist and are callable', async () => {
-  // Ensure build (no-op if already built by previous test)
   execSync('npm run build', { stdio: 'inherit' })
 
   const bundlePath = 'dist/nimbi-cms.js'

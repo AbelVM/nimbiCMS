@@ -294,14 +294,22 @@ export function teardownSlugWorkerPool() {
   _slugPool = null;
   if (!pool) return Promise.resolve();
   unregisterWorkerPool("slug", pool);
+  // performance-helpers 2.1.0 ships a single `close()` entry point that
+  // drains in-flight work (bounded by `timeout`) and then terminates. It
+  // replaces the hand-rolled `Symbol.asyncDispose` -> `drain()` -> `terminate()`
+  // cascade below, and returns the final `getStats()` snapshot for free.
+  if (typeof pool.close === "function") {
+    return Promise.resolve(
+      pool.close({ timeout: POOL_DRAIN_TIMEOUT_MS }),
+    ).catch((e) => {
+      debugWarn("[slugManager] teardownSlugWorkerPool close failed", e);
+    });
+  }
+  // Legacy fallback: pools that predate `close()` still drain then terminate.
   try {
     const asyncDispose = pool[Symbol.asyncDispose];
     if (typeof asyncDispose === "function")
       return Promise.resolve(asyncDispose.call(pool)).catch(() => {});
-    // Pass a drain timeout: without one, a worker stuck mid-task would keep
-    // the teardown promise pending indefinitely and `destroy()` would never
-    // resolve. On timeout we fall through to `terminate()`, which is the
-    // correct outcome for a pool we are discarding anyway.
     const drained =
       typeof pool.drain === "function"
         ? Promise.resolve(pool.drain({ timeout: POOL_DRAIN_TIMEOUT_MS }))

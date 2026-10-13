@@ -423,10 +423,10 @@ export function handleSlugWorkerMessage(msg: object): Promise<object>
 
 
 // --- from src/utils/workerPoolDiagnostics.js
-
-
-
-
+export function recordWorkerFallback(reason: any, durationMs: any): any
+export function registerWorkerPool(name: string, pool: any): any
+export function unregisterWorkerPool(name: string, pool: any): void
+export function getWorkerPoolDiagnostics(): object
 
 // --- from src/utils/workQueue.js
 export function createWorkQueue(items: Iterable<any>): {push: Function, shift: Function, take: Function,

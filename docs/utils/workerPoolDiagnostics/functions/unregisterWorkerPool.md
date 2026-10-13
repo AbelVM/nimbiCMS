@@ -8,15 +8,21 @@
 
 > **unregisterWorkerPool**(`name`, `pool`): `void`
 
+Unregister a pool and remove its worker-exit listener.
+
 ## Parameters
 
 ### name
 
-`any`
+`string`
+
+Pool name previously passed to `registerWorkerPool`.
 
 ### pool
 
 `any`
+
+Pool instance that was registered.
 
 ## Returns
 

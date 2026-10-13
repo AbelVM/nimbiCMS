@@ -6,16 +6,13 @@
 
 # Function: getWorkerPoolDiagnostics()
 
-> **getWorkerPoolDiagnostics**(): `object`
+> **getWorkerPoolDiagnostics**(): `Object`
+
+Return a snapshot of per-pool stats and accumulated fallback counters.
 
 ## Returns
 
-`object`
+`Object`
 
-### \_fallbackDurationMs
-
-> **\_fallbackDurationMs**: `any`
-
-### \_fallbacks
-
-> **\_fallbacks**: `any`
+Diagnostics object keyed by pool name, plus `_fallbacks`
+  and `_fallbackDurationMs` maps when any fallback has been recorded.
