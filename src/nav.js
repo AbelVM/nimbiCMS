@@ -365,6 +365,14 @@ export async function buildNav(
         if (transition && typeof transition.ready?.catch === "function") {
           transition.ready.catch(() => {});
         }
+        // `updateCallbackDone` rejects when the DOM-update callback passed to
+        // `startViewTransition` throws or returns a rejecting promise. That is
+        // not an error worth surfacing either — the transition is already
+        // committed — so consume it like the sibling promises above. Without
+        // this the rejection escapes as an unhandled promise rejection.
+        if (transition && typeof transition.updateCallbackDone?.catch === "function") {
+          transition.updateCallbackDone.catch(() => {});
+        }
         return;
       } catch (e) {
         // Fall through to the class-based transition below.

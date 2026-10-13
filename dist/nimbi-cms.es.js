@@ -36776,6 +36776,7 @@ async function Dg(e, t, n, r, i, s, a, o, l = "eager", c = 1, h = void 0, u = "f
       });
       N && typeof N.finished?.catch == "function" && N.finished.catch(() => {
       }), N && typeof N.ready?.catch == "function" && N.ready.catch(() => {
+      }), N && typeof N.updateCallbackDone?.catch == "function" && N.updateCallbackDone.catch(() => {
       });
       return;
     } catch {
