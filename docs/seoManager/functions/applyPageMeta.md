@@ -50,27 +50,27 @@ The path of the page being rendered.
 
 ### anchor
 
-Optional anchor fragment to consider.
+`string` \| `null`
 
-`string` | `null`
+Optional anchor fragment to consider.
 
 ### topH1
 
-Top H1 element for the page (if any).
+`HTMLElement` \| `null`
 
-`HTMLElement` | `null`
+Top H1 element for the page (if any).
 
 ### h1Text
 
-Text of the top H1.
+`string` \| `null`
 
-`string` | `null`
+Text of the top H1.
 
 ### slugKey
 
-Computed slug key for the page.
+`string` \| `null`
 
-`string` | `null`
+Computed slug key for the page.
 
 ### data
 

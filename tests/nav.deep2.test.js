@@ -46,7 +46,7 @@ describe('nav search and burger deeper branches', () => {
     // wait for debounce + async handlers
     await new Promise(r => setTimeout(r, 400))
     const results = navbarWrap.querySelector('#nimbi-search-results')
-    expect(results && results.style.display === 'block').toBe(true)
+    expect(results && !results.classList.contains('is-hidden')).toBe(true)
   })
 
   it('burger toggles is-active and menu closes on menu click', async () => {

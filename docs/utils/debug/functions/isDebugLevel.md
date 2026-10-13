@@ -8,8 +8,6 @@
 
 > **isDebugLevel**(`level?`): `boolean`
 
-Returns true when the configured debug level is >= `level`.
-
 ## Parameters
 
 ### level?

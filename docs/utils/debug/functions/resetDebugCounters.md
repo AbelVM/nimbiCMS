@@ -8,7 +8,7 @@
 
 > **resetDebugCounters**(): `void`
 
-Reset counters (test helper).
+Reset all counters.
 
 ## Returns
 

@@ -6,7 +6,8 @@
 
 # Variable: resolutionCache
 
-> `const` **resolutionCache**: `Map`\<`string`, [`ResolutionRecord`](../type-aliases/ResolutionRecord.md)\>
+> `const` **resolutionCache**: `PowerCache`
 
 Runtime cache for recent page-resolution results.
-Maps cacheKey -> [ResolutionRecord](../type-aliases/ResolutionRecord.md)
+Stores the resolved value directly and relies on PowerCache for TTL/LRU.
+Also accepts legacy `{ value, ts }` records written by older tests/helpers.

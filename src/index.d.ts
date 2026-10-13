@@ -182,9 +182,7 @@ export function fetchMarkdown(path: string, base?: string): Promise<FetchResult>
 
 
 // --- from src/worker-manager.js
-export function makeWorkerPool(createWorker: any, name: any, size: any): any
-export function makeWorkerManagerFromRaw(code: string, handleFn: {function(object):Promise<object>}, name: string): ReturnType<typeof makeWorkerManager>
-export function makeWorkerPoolFromRaw(code: string, handleFn: {function(object):Promise<object>}, name: string, size: number): ReturnType<typeof makeWorkerPool>
+export function disposeWorkerBlobUrlCache(): void
 
 
 
@@ -194,15 +192,29 @@ export function getVersion(): Promise<string>
 // --- from src/ui.js
 
 
+// --- from src/slugState.js
+export function setAllMarkdownPaths(arr: any): any
+export const allMarkdownPaths: string[]
+export const allMarkdownPathsSet: Set<string>
+
+
+
+// --- from src/slugSearchRuntime.js
+export function clearSearchIndexCache(): any
+
+
+
+
+
 // --- from src/slugManager.js
 export function watchForColdHashRoute(parsed: {type:string,page:string,anchor?:string,params?:string}): any
 export function setSkipRootReadme(v: any): any
 export const skipRootReadme: boolean
 export function getLanguages(): string[]
+export function teardownSlugWorkerPool(): Promise<void>
 export function _storeSlugMapping(slug: string, rel: string): void
-export const slugResolvers: Set<Function>
-export const allMarkdownPaths: string[]
-export const allMarkdownPathsSet: Set<string>
+export function storeSlugMapping(slug: string, rel: string): void
+export const slugResolvers: any
 export const homePage: string
 export const HOME_SLUG: string
 export function setHomePage(p: string): void
@@ -211,17 +223,19 @@ export function uniqueSlug(base: string, existing: Set<string>): string
 export function isExternalLink(href: string): boolean
 export function isExternalLinkWithBase(href: string, contentBase: string): boolean
 export function unescapeMarkdown(s: string): string
-export const negativeFetchCache: any
-export function setFetchNegativeCacheTTL(ms: any): any
+export function getFetchCacheDiagnostics(): {fetchEntries:number, negativeEntries:number, maxEntries:number}
+export const negativeFetchCache: Map<string, number>
+export function setFetchNegativeCacheTTL(ms: number): void
 export function setFetchCacheMaxSize(n: number): any
 export function setFetchCacheTTL(ms: number): any
 export function setNegativeFetchCacheMaxSize(n: number): any
 export function setFetchConcurrency(n: number): void
 export function getFetchConcurrency(): number
 export function setFetchMarkdown(fn: (path:string, base?:string)=>Promise<FetchResult>): void
+export function clearCrawlCache(): void
 export function getSearchIndex(): any
-export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}): Promise<Array>
-export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}): Promise<Array>
+export function whenSearchIndexReady(opts: {timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}): Promise<any[]>
+export function awaitSearchIndex(opts: {contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}): Promise<any[]>
 export const CRAWL_MAX_QUEUE: number
 export const defaultCrawlMaxQueue: number
 
@@ -248,12 +262,9 @@ export const defaultCrawlMaxQueue: number
 
 
 
-
-
-
-
-
 // --- from src/seoManager.js
+export function ensureDocumentMeta(): void
+export function setHreflangTags(pageSlug: string): void
 export function getSiteNameFromMeta(): string
 export function setSeoMap(map: object): any
 export function injectSeoForPage(page: string, initialDocumentTitle: string): any
@@ -264,15 +275,20 @@ export function markNotFound(opts: any): any
 
 
 // --- from src/runtimeSitemap.js
-export function generateSitemapJson(opts: object): Promise<SitemapJson>
+export function generateSitemapJson(opts: object): Promise<{generatedAt:string, entries:Array<any>}>
 export function generateSitemapXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateRssXml(json: {generatedAt:string,entries:any[]}|any[]): string
 export function generateAtomXml(json: {generatedAt:string,entries:any[]}|any[]): string
-export function handleSitemapRequest(opts: any): any
+export function generateRobotsTxt(opts: object): string
+export function generateLlmsTxt(opts: object): string
+export function clearSitemapWriteTimer(): any
+export function attachSitemapDownloadUI(opts: {filename?: string}): HTMLElement|null
 export function exposeSitemapGlobals(opts: any): any
 
+
 // --- from src/router.js
-export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
+export function augmentIndexWithAllMarkdownPaths(arrOrMap: Array<any>|string[]|{values:()=>Iterable<any>}): void
+export function disposeResolutionCachePurge(): void
 
 
 
@@ -292,6 +308,7 @@ export function augmentIndexWithAllMarkdownPaths(arrOrMap: any): any
 
 
 // --- from src/markdown.js
+export function teardownRendererWorkerPool(): Promise<void>
 export const _sendToRenderer: any
 export function streamParseMarkdown(opts: {chunkSize?:number}): Promise<void>
 export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<string,string>): Promise<Set<string>>
@@ -304,6 +321,9 @@ export function detectFenceLanguagesAsync(mdText: string, supportedMap: Map<stri
 
 // --- from src/l10nManager.js
 export function loadL10nFile(path: string, pageDir: string): Promise<void>
+export function tPlural(opts: any): string
+export function formatDate(opts: any): string
+export function formatNumber(opts: any): string
 export function setLang(lang: string): void
 
 
@@ -315,20 +335,25 @@ export function setLang(lang: string): void
 export function parseInitOptionsFromQuery(queryString: string): any
 export const currentHighlightTheme: string
 export const initialDocumentTitle: string
+export function destroy(): Promise<void>
 
 
 // --- from src/indexManager.js
 export const indexSet: any
+export function isIndexPathsRefreshed(): any
+export function setIndexPathsRefreshed(value: boolean): void
 
 
 // --- from src/imagePreview.js
-export function attachImagePreview(opts: any): void
+export function disposeImagePreview(): void
+
 
 // --- from src/htmlBuilder.js
-export function preScanHtmlSlugs(linkEls: NodeListOf<HTMLAnchorElement>, base: string): Promise<void>
-export function preMapMdSlugs(linkEls: NodeListOf<HTMLAnchorElement>|HTMLAnchorElement[], contentBase: string): Promise<void>
-export function executeEmbeddedScripts(article: any): void
+export function preScanHtmlSlugs(opts: any): Promise<void>
+export function preMapMdSlugs(opts: any): Promise<void>
+export function executeEmbeddedScripts(opts: any): void
 export function renderNotFound(contentWrap: HTMLElement|null, t: Function|null, e: Error|null): void
+export function teardownAnchorWorkerPool(): Promise<void>
 
 
 
@@ -362,11 +387,14 @@ export function clearLanguageImportCache(): void
 export function setLanguageImportNegativeCacheTTL(ms: number): void
 export function loadSupportedLanguages(url: string): Promise<void>
 export function registerLanguage(name: string, modulePath: string): Promise<boolean>
-export function observeCodeBlocks(root: any): any
+export function disposeCodeblocksObserver(): void
 export function setHighlightTheme(opts: {useCdn?:boolean}): void
 
 
+
 // --- from src/bulmaManager.js
+export function disconnectBulmaObservers(): void
+export function injectLink(opts: any): any
 export function ensureBulma(bulmaCustomize: string, pageDir: string): Promise<void>
 export function setStyle(style: 'light'|'dark'|'system'): void
 export function setThemeVars(vars: Record<string,string>): void
@@ -375,14 +403,34 @@ export function registerThemedElement(el: any): () => void
 // --- from src/worker/slugWorker.js
 export function handleSlugWorkerMessage(msg: object): Promise<object>
 
+// --- from src/worker/rendererRuntime.js
+
+
+
+
+
+
+
+
+
 // --- from src/worker/renderer.js
-export function clearRendererImportCache(): any
-export function setRendererImportNegativeCacheTTL(ms: any): any
-export function handleWorkerMessage(msg: object): Promise<object>
-export function handleWorkerMessageStream(msg: object, onChunk: {function(object):void}): any
+
+// --- from src/worker/renderer.entry.js
 
 // --- from src/worker/anchorWorker.js
-export function handleAnchorWorkerMessage(msg: object): Promise<object>
+
+// --- from src/worker/anchorRuntime.js
+
+
+// --- from src/utils/workerPoolDiagnostics.js
+export function recordWorkerFallback(reason: any, durationMs: any): any
+export function registerWorkerPool(name: string, pool: any): any
+export function unregisterWorkerPool(name: string, pool: any): void
+export function getWorkerPoolDiagnostics(): object
+
+// --- from src/utils/workQueue.js
+export function createWorkQueue(items: Iterable<any>): {push: Function, shift: Function, take: Function,
+  clear: Function, length: number, size: number, isEmpty: boolean}
 
 // --- from src/utils/urlHelper.js
 export function buildCosmeticUrl(page: string, anchor: any, baseSearch: any): string
@@ -394,16 +442,41 @@ export function getReadingTime(text: string): any
 export function getTextMetrics(text: string): any
 export function clearTextMetricsCache(): void
 
+// --- from src/utils/stripContentBasePrefix.js
+export function stripContentBasePrefix(rel: string, contentBasePath: string): string
+
+// --- from src/utils/splitIntoSections.js
+export function splitIntoSections(content: string, chunkSize: number): string[]
+
+// --- from src/utils/slugify.js
+export const MAX_SLUG_LENGTH: number
+export function slugifyHeading(s: string): string
+export function slugifyTitle(s: string): string
+export function clearSlugifyCache(): void
+
+
 // --- from src/utils/sharedDomParser.js
 export function getSharedParser(): DOMParser|null
 export function setSharedParser(parser: DOMParser|null): void
 export function resetSharedParser(): void
 
-// --- from src/utils/renderer-manager.js
+// --- from src/utils/runtimeManifest.js
 
 
+// --- from src/utils/runtimeGlobals.js
+export function claimGeneration(): any
+export function releaseGeneration(): void
+export function activeGeneration(): number|null
+export function isCurrentGeneration(generation: number|null): boolean
+export function isGenerationLive(generation: number|null): boolean
+export function setIfLive(generation: number|null, key: string, value: any): boolean
+export function setIfCurrent(generation: number|null, key: string, value: any): boolean
+export function getGlobal(key: string, fallback: any): any
+export function clearGlobal(key: string): void
+export const MANAGED_GLOBALS: any
+export function clearAllGlobals(): void
 
-// --- from src/utils/memoize.js
+// --- from src/utils/performanceDiagnostics.js
 
 
 // --- from src/utils/l10n-defaults.js
@@ -418,16 +491,24 @@ export function importUrlWithCache(url: string): Promise<any|null>
 // --- from src/utils/idle.js
 export function yieldToEventLoop(): Promise<void>
 export function yieldIfNeeded(iteration: number, threshold: number): Promise<void>
+export function createYieldGate(budgetMs: number): () => Promise<void>
 
 // --- from src/utils/helpers.js
-export const normalizePath: any
+export function normalizePath(p: string): string
 export const trimTrailingSlash: any
 export const ensureTrailingSlash: any
+export function addResourceHints(): any
+export function addPreloadHints(highlightJsVersion: string, theme: string): void
+export function setCspNonce(nonce: any): any
+export function getCspNonce(): string|null
+export function applyCspNonce(el: any): void
 export function setEagerForAboveFoldImages(container: any, marginPx: number, debug: boolean): void
 export function buildPageUrl(page: string, hash: string|null, baseSearch: string): string
+export function safe(fn: any): string
 export const encodeURL: any
-export function safe(fn: () => any|Promise<any>): any|Promise<any>|undefined
-export const decodeHtmlEntities: any
+export const getWorkerPoolSize: any
+
+
 
 
 
@@ -440,29 +521,29 @@ export function parseFrontmatter(md: string): {content:string, data: Record<stri
 
 
 
-
 // --- from src/utils/emojiMap.js
+
+// --- from src/utils/domPurify.js
+export function getDOMPurify(): any
+
+// --- from src/utils/decodeHtmlEntities.js
+export function decodeHtmlEntities(s: string): string
 
 // --- from src/utils/debug.js
 export function setDebugLevel(level: any): any
+export const _logger: any
 export function getDebugLevel(): number
 export function isDebugLevel(level: number): boolean
 export function isDebug(): boolean
-export function debugError(...args: any): void
-export function debugWarn(...args: any): void
-export function debugInfo(...args: any): void
-export function debugLog(...args: any): void
-export function incrementCounter(name: string): void
-export function syncLegacyCounter(name: string): void
-export function hasLegacyDebug(): boolean
+export function debugError(...args: any): any
+export function debugWarn(...args: any): any
+export function debugInfo(...args: any): any
+export function debugLog(...args: any): any
+export function incrementCounter(name: string): any
 export function getDebugCounters(): Record<string,number>
-export function resetDebugCounters(): void
+export function resetDebugCounters(): any
 
 // --- from src/utils/concurrency.js
-export function runWithConcurrency(items: T[], worker: (item:T, index:number)=>Promise<U>, concurrency: number): Promise<Array<U>>
-
-// --- from src/utils/cache.js
-export function createLRUCache(opts: any): any
-
+export function runWithConcurrency(items: Iterable<any>, worker: (item: any, index: number) => Promise<any>|any, concurrency: number, signal: any): Promise<Array<any>>
 
 // --- from src/lib/index.js

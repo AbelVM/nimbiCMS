@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SUPPORTED_HLJS_MAP, HLJS_ALIAS_MAP, registerLanguage } from '../src/codeblocksManager.js'
 
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). The factory is static, so it is safe to keep active for the whole
+// file.
+vi.mock('highlight.js/lib/languages/javascript.js', () => ({ default: () => ({}) }), { virtual: true })
+
 describe('codeblocksManager deep branches', () => {
   beforeEach(() => {
     SUPPORTED_HLJS_MAP.clear()
@@ -12,8 +17,6 @@ describe('codeblocksManager deep branches', () => {
   })
 
   it('registerLanguage succeeds via alias mapping when supported map contains canonical', async () => {
-    // mock local language module
-    vi.mock('highlight.js/lib/languages/javascript.js', () => ({ default: () => ({}) }), { virtual: true })
     SUPPORTED_HLJS_MAP.set('javascript', 'javascript')
     const ok = await registerLanguage('js')
     expect(ok).toBe(true)

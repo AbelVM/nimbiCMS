@@ -42,9 +42,51 @@ Re-exports [ensureBulma](../bulmaManager/functions/ensureBulma.md)
 
 ***
 
+### exposeSitemapGlobals
+
+Re-exports [exposeSitemapGlobals](../runtimeSitemap/functions/exposeSitemapGlobals.md)
+
+***
+
+### generateAtomXml
+
+Re-exports [generateAtomXml](../runtimeSitemap/functions/generateAtomXml.md)
+
+***
+
+### generateLlmsTxt
+
+Re-exports [generateLlmsTxt](../runtimeSitemap/functions/generateLlmsTxt.md)
+
+***
+
+### generateRssXml
+
+Re-exports [generateRssXml](../runtimeSitemap/functions/generateRssXml.md)
+
+***
+
+### generateSitemapJson
+
+Re-exports [generateSitemapJson](../runtimeSitemap/functions/generateSitemapJson.md)
+
+***
+
+### generateSitemapXml
+
+Re-exports [generateSitemapXml](../runtimeSitemap/functions/generateSitemapXml.md)
+
+***
+
 ### getVersion
 
 Re-exports [getVersion](../version/functions/getVersion.md)
+
+***
+
+### handleSitemapRequest
+
+Re-exports [handleSitemapRequest](../runtimeSitemap/functions/handleSitemapRequest.md)
 
 ***
 

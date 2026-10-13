@@ -28,7 +28,7 @@ describe('docs indexing', () => {
     _setAllMd(manifest)
     // Provide fetchMarkdown that reads from the local docs tree during indexing
     setFetchMarkdown(async (path, base) => {
-      const rel = String(path || '').replace(/^\//, '')
+      const rel = String(path ?? '').replace(/^\//, '')
       const full = join(baseDir, rel)
       const raw = await readFile(full, 'utf8')
       return { raw }

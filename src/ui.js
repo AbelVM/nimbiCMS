@@ -5,18 +5,37 @@
  *
  * @module ui
  */
-export { addHook, onPageLoad, onNavBuild, transformHtml, runHooks, _clearHooks } from './nimbi-cms.js'
+export {
+  addHook,
+  onPageLoad,
+  onNavBuild,
+  transformHtml,
+  runHooks,
+  _clearHooks,
+} from "./hookManager.js";
 
-import { fetchPageData } from './router.js'
-import { parseHrefToRoute } from './utils/urlHelper.js'
-import { prepareArticle, executeEmbeddedScripts, renderNotFound, attachTocClickHandler, scrollToAnchorOrTop, ensureScrollTopButton, createNavTree } from './htmlBuilder.js'
-import { setEagerForAboveFoldImages } from './utils/helpers.js'
-import { applyPageMeta } from './seoManager.js'
-import { attachImagePreview } from './imagePreview.js'
-import { debugWarn, debugError, incrementCounter, syncLegacyCounter } from './utils/debug.js'
-import { notFoundPage } from './slugManager.js'
-
-
+import { fetchPageData } from "./router.js";
+import { parseHrefToRoute } from "./utils/urlHelper.js";
+import {
+  prepareArticle,
+  executeEmbeddedScripts,
+  renderNotFound,
+  attachTocClickHandler,
+  scrollToAnchorOrTop,
+  ensureScrollTopButton,
+  createNavTree,
+} from "./htmlBuilder.js";
+import { setEagerForAboveFoldImages } from "./utils/helpers.js";
+import { applyPageMeta } from "./seoManager.js";
+import { attachImagePreview } from "./imagePreview.js";
+import { observeCodeBlocks } from "./codeblocksManager.js";
+import { debugWarn, debugError, incrementCounter } from "./utils/debug.js";
+import {
+  activeGeneration,
+  isGenerationLive,
+} from "./utils/runtimeGlobals.js";
+import { notFoundPage } from "./slugManager.js";
+import { fetchMarkdown, isExternalLink } from "./slugManager.js";
 
 /**
  * Initialize UI rendering helpers for a mounted CMS instance.
@@ -30,6 +49,8 @@ import { notFoundPage } from './slugManager.js'
  * @property {string} homePage - Default home page path or slug
  * @property {string} initialDocumentTitle - Document title at initialization
  * @property {Function} runHooks - Hook runner function provided by `hookManager`
+ * @property {boolean} [allowEmbeddedScripts=false] - Opt-in to execute embedded scripts in rendered content. Enable only for trusted markdown sources.
+ * @property {string[]} [embeddedScriptOrigins=[]] - Additional origins allowed for external embedded scripts.
  *
  * @typedef {Object} UIReturn
  * @property {() => Promise<void>} renderByQuery - Render current page based on URL query.
@@ -45,7 +66,7 @@ import { notFoundPage } from './slugManager.js'
  * @param {UIOptions} opts
  * @returns {UIReturn}
  */
-export function createUI(opts) {
+ export function createUI(opts) {
   const {
     contentWrap,
     navWrap,
@@ -55,30 +76,77 @@ export function createUI(opts) {
     contentBase,
     homePage,
     initialDocumentTitle,
-    runHooks
-  } = opts || {}
+    runHooks,
+    allowEmbeddedScripts = false,
+    embeddedScriptOrigins = [],
+    signal,
+  } = opts || {};
   if (!contentWrap || !(contentWrap instanceof HTMLElement)) {
-    throw new TypeError('contentWrap must be an HTMLElement')
+    throw new TypeError("contentWrap must be an HTMLElement");
   }
 
-  let currentPagePath = null
-  const siteNav = createNavTree(t, [{ path: homePage, name: t('home'), isIndex: true, children: [] }])
+  let currentPagePath = null;
+  // In-memory fallback for scroll positions when sessionStorage is full
+  const _scrollMemory = {};
+  const siteNav = createNavTree(t, [
+    { path: homePage, name: t("home"), isIndex: true, children: [] },
+  ]);
+  const _preparedPageCache = new Map();
+  // Halved from 12 to 6: each entry holds a full cloneNode(true) of the
+  // rendered article (plus TOC) DOM subtree, making this the largest DOM
+  // retention in the UI. 6 still covers rapid re-renders and back/forward
+  // revisits of recently viewed pages; a miss falls back to a full re-parse.
+  const _preparedPageCacheMax = 6;
   // Serialize renders to avoid concurrent duplicate rendering when multiple
   // navigation events fire in quick succession (e.g. popstate + script-driven calls).
   // `_isRendering` guards active render; `_queuedRender` signals a subsequent
   // render should run once the active render completes.
-  let _isRendering = false
-  let _queuedRender = false
+  let _isRendering = false;
+  let _queuedRender = false;
+  let _queuedRenderWaiters = [];
 
   // Helper to clear an element's children with modern API when available.
   function _clearElement(el) {
     try {
-      if (!el) return
-      if (typeof el.replaceChildren === 'function') return el.replaceChildren()
-      while (el.firstChild) el.removeChild(el.firstChild)
+      if (!el) return;
+      if (typeof el.replaceChildren === "function") return el.replaceChildren();
+      while (el.firstChild) el.removeChild(el.firstChild);
     } catch (e) {
-      try { if (el) el.innerHTML = '' } catch (_) {}
+      try {
+        if (el) el.innerHTML = "";
+      } catch (_) {}
     }
+  }
+
+  function _pageContentSignature(data) {
+    try {
+      const raw = String(data?.raw || "");
+      const len = raw.length;
+      const head = raw.slice(0, 120);
+      const tail = raw.slice(Math.max(0, len - 120));
+      return `${len}:${head}:${tail}`;
+    } catch (_) {
+      return "0::";
+    }
+  }
+
+  function _cacheGetPrepared(key) {
+    const v = _preparedPageCache.get(key);
+    if (!v) return null;
+    _preparedPageCache.delete(key);
+    _preparedPageCache.set(key, v);
+    return v;
+  }
+
+  function _cacheSetPrepared(key, value) {
+    try {
+      if (_preparedPageCache.has(key)) _preparedPageCache.delete(key);
+      _preparedPageCache.set(key, value);
+      while (_preparedPageCache.size > _preparedPageCacheMax) {
+        const oldest = _preparedPageCache.keys().next().value;
+        _preparedPageCache.delete(oldest);
+      }
+    } catch (_) {}
   }
 
   /**
@@ -87,69 +155,234 @@ export function createUI(opts) {
    * @param {string|null|undefined} hashAnchor - Optional anchor to scroll to after render.
    * @returns {Promise<void>}
    */
-  async function renderPage(raw, hashAnchor) {
-    let data, pagePath, anchor
+  async function renderPage(raw, hashAnchor, expectedHref) {
+    const expectedRoute = expectedHref
+      ? parseHrefToRoute(expectedHref)
+      : null;
+    const routeIsCurrent = () =>
+      !expectedRoute ||
+      (() => {
+        try {
+          const currentRoute = parseHrefToRoute(location.href);
+          return (
+            currentRoute?.page === expectedRoute?.page &&
+            currentRoute?.anchor === expectedRoute?.anchor
+          );
+        } catch (_) {
+          return location.href === expectedHref;
+        }
+      })();
+    let data, pagePath, anchor;
     try {
-      ({ data, pagePath, anchor } = await fetchPageData(raw, contentBase))
+      ({ data, pagePath, anchor } = await fetchPageData(raw, contentBase));
     } catch (e) {
       // Treat expected 'no page data' failures as warnings when the
       // consumer has elected to use the inline not-found fallback
       // (i.e. `notFoundPage` is unset). Preserve error-level logs for
       // unexpected failures.
-      const msg = e && e.message ? String(e.message) : ''
-      const expectedMissing = (!notFoundPage || typeof notFoundPage !== 'string' || !notFoundPage) && /no page data/i.test(msg)
+      const msg = e?.message ? String(e.message) : "";
+      const expectedMissing =
+        (!notFoundPage || typeof notFoundPage !== "string" || !notFoundPage) &&
+        /no page data/i.test(msg);
       try {
         if (expectedMissing) {
-          try { debugWarn('[nimbi-cms] fetchPageData (expected missing)', e) } catch (err) {}
+          try {
+            debugWarn("[nimbi-cms] fetchPageData (expected missing)", e);
+          } catch (err) {}
         } else {
-          try { debugError('[nimbi-cms] fetchPageData failed', e) } catch (err) {}
+          try {
+            debugError("[nimbi-cms] fetchPageData failed", e);
+          } catch (err) {}
         }
       } catch (_e) {}
       // When hosts choose to disable a configured `notFoundPage` (set to
       // `null`) we render a small inline 404 helper. In that case the
       // sidebar/nav TOC should be hidden so the page doesn't show stale
       // navigation for a missing route.
-      try { if (!notFoundPage && navWrap) _clearElement(navWrap) } catch (err) {}
-      renderNotFound(contentWrap, t, e)
-      return
+      try {
+        if (!notFoundPage && navWrap) _clearElement(navWrap);
+      } catch (err) {}
+      if (!routeIsCurrent()) return;
+      renderNotFound(contentWrap, t, e);
+      return;
     }
-    if (!anchor && hashAnchor) anchor = hashAnchor
-
-    try { scrollToAnchorOrTop(null) } catch (_) { debugWarn('[nimbi-cms] scrollToAnchorOrTop failed', _) }
-    try { _clearElement(contentWrap) } catch (e) { try { contentWrap.innerHTML = '' } catch (_) {} }
-
-    const { article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(t, data, pagePath, anchor, contentBase)
-
-    applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data)
-
-    try { _clearElement(navWrap) } catch (e) { try { navWrap.innerHTML = '' } catch (_) {} }
-    if (toc) {
-      navWrap.appendChild(toc)
-      attachTocClickHandler(toc)
-    }
-
-    try { await runHooks('transformHtml', { article, parsed, toc, pagePath, anchor, topH1, h1Text, slugKey, data }) } catch (e) { debugWarn('[nimbi-cms] transformHtml hooks failed', e) }
-
-    contentWrap.appendChild(article)
-
-    try { executeEmbeddedScripts(article) } catch (e) { debugWarn('[nimbi-cms] executeEmbeddedScripts failed', e) }
-
-    try { attachImagePreview(article, { t }) } catch (e) { debugWarn('[nimbi-cms] attachImagePreview failed', e) }
+    if (!routeIsCurrent()) return;
+    if (!anchor && hashAnchor) anchor = hashAnchor;
 
     try {
-      setEagerForAboveFoldImages(container, 100, false)
-      requestAnimationFrame(() => setEagerForAboveFoldImages(container, 100, false))
-      setTimeout(() => setEagerForAboveFoldImages(container, 100, false), 250)
-    } catch (e) {
-      debugWarn('[nimbi-cms] setEagerForAboveFoldImages failed', e)
+      scrollToAnchorOrTop(null);
+    } catch (_) {
+      debugWarn("[nimbi-cms] scrollToAnchorOrTop failed", _);
+    }
+    const preparedKey = `${String(pagePath ?? "")}|||${_pageContentSignature(data)}`;
+    const preparedCached = _cacheGetPrepared(preparedKey);
+
+    let article, parsed, toc, topH1, h1Text, slugKey;
+    if (preparedCached?.articleTemplate) {
+      article = preparedCached.articleTemplate.cloneNode(true);
+      toc = preparedCached.tocTemplate
+        ? preparedCached.tocTemplate.cloneNode(true)
+        : null;
+      topH1 = article.querySelector("h1");
+      h1Text = topH1
+        ? (topH1.textContent || "").trim()
+        : preparedCached.h1Text || "";
+      slugKey = preparedCached.slugKey || (topH1 ? topH1.id || "" : "");
+      parsed = { meta: Object.assign({}, preparedCached.meta || {}) };
+    } else {
+      ({ article, parsed, toc, topH1, h1Text, slugKey } = await prepareArticle(
+        t,
+        data,
+        pagePath,
+        anchor,
+        contentBase,
+      ));
+      if (!routeIsCurrent()) return;
+      _cacheSetPrepared(preparedKey, {
+        articleTemplate: article.cloneNode(true),
+        tocTemplate: toc ? toc.cloneNode(true) : null,
+        meta: Object.assign({}, parsed?.meta || {}),
+        h1Text: h1Text || "",
+        slugKey: slugKey || "",
+      });
     }
 
-    scrollToAnchorOrTop(anchor)
-    ensureScrollTopButton(article, topH1, { mountOverlay, container, navWrap, t })
+    if (!routeIsCurrent()) return;
 
-    try { await runHooks('onPageLoad', { data, pagePath, anchor, article, toc, topH1, h1Text, slugKey, contentWrap, navWrap }) } catch (e) { debugWarn('[nimbi-cms] onPageLoad hooks failed', e) }
+    try {
+      await runHooks("transformHtml", {
+        article,
+        parsed,
+        toc,
+        pagePath,
+        anchor,
+        topH1,
+        h1Text,
+        slugKey,
+        data,
+      });
+    } catch (e) {
+      debugWarn("[nimbi-cms] transformHtml hooks failed", e);
+    }
+    if (!routeIsCurrent()) return;
 
-    currentPagePath = pagePath
+    const activeElement = document.activeElement;
+    const shouldFocusMain =
+      activeElement === document.body ||
+      contentWrap.contains(activeElement) ||
+      navWrap.contains(activeElement);
+
+    const nextMain = document.createElement("main");
+    nextMain.className = "nimbi-main";
+    nextMain.appendChild(article);
+    if (toc) attachTocClickHandler(toc);
+    try {
+      contentWrap.replaceChildren(nextMain);
+      navWrap.replaceChildren(...(toc ? [toc] : []));
+    } catch (e) {
+      // Atomic replaceChildren failed: clear and append individually.
+      _clearElement(contentWrap);
+      _clearElement(navWrap);
+      contentWrap.appendChild(nextMain);
+      if (toc) navWrap.appendChild(toc);
+    }
+
+    // Ensure skip-to-content link exists for keyboard accessibility
+    try {
+      if (!document.querySelector(".nimbi-skip-link")) {
+        const skipLink = document.createElement("a");
+        skipLink.className = "nimbi-skip-link";
+        skipLink.href = "#main";
+        skipLink.textContent = "Skip to content";
+        skipLink.setAttribute("aria-label", "Skip to content");
+        // Insert as the first child of the mount element
+        const mountEl =
+          document.querySelector(".nimbi-mount") ||
+          document.querySelector(".nimbi-cms") ||
+          document.body;
+        if (mountEl && mountEl.firstChild) {
+          mountEl.insertBefore(skipLink, mountEl.firstChild);
+        } else if (mountEl) {
+          mountEl.appendChild(skipLink);
+        }
+      }
+    } catch (_) {}
+
+    // Focus the newly committed semantic landmark after replacement.
+    try {
+      if (shouldFocusMain && routeIsCurrent()) {
+        nextMain.tabIndex = -1;
+        nextMain.focus({ preventScroll: true });
+      }
+    } catch (_) {}
+
+    applyPageMeta(
+      t,
+      initialDocumentTitle,
+      parsed,
+      toc,
+      article,
+      pagePath,
+      anchor,
+      topH1,
+      h1Text,
+      slugKey,
+      data,
+    );
+
+    try {
+      observeCodeBlocks(article);
+    } catch (e) {
+      debugWarn("[nimbi-cms] observeCodeBlocks failed", e);
+    }
+
+    try {
+      executeEmbeddedScripts(article, allowEmbeddedScripts, embeddedScriptOrigins);
+    } catch (e) {
+      debugWarn("[nimbi-cms] executeEmbeddedScripts failed", e);
+    }
+
+    try {
+      attachImagePreview(article, { t });
+    } catch (e) {
+      debugWarn("[nimbi-cms] attachImagePreview failed", e);
+    }
+
+    try {
+      setEagerForAboveFoldImages(container, 100, false);
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => setEagerForAboveFoldImages(container, 100, false));
+      }
+    } catch (e) {
+      debugWarn("[nimbi-cms] setEagerForAboveFoldImages failed", e);
+    }
+
+    scrollToAnchorOrTop(anchor);
+    ensureScrollTopButton(article, topH1, {
+      mountOverlay,
+      container,
+      navWrap,
+      t,
+    });
+
+    try {
+      await runHooks("onPageLoad", {
+        data,
+        pagePath,
+        anchor,
+        article,
+        toc,
+        topH1,
+        h1Text,
+        slugKey,
+        contentWrap,
+        navWrap,
+      });
+    } catch (e) {
+      debugWarn("[nimbi-cms] onPageLoad hooks failed", e);
+    }
+
+    currentPagePath = pagePath;
   }
 
   /**
@@ -158,31 +391,45 @@ export function createUI(opts) {
    * @returns {Promise<void>}
    */
   async function renderByQuery() {
+    // Performance timing: measure render duration
+    const renderStart =
+      typeof performance !== "undefined" &&
+      typeof performance.now === "function"
+        ? performance.now()
+        : null;
     // Prevent concurrent renders: if a render is already in progress, mark
-    // that another render is desired and return. When the active render
-    // completes it will re-run `renderByQuery` to pick up the latest URL.
+    // that another render is desired and wait for it to finish.
     if (_isRendering) {
-      _queuedRender = true
-      return
+      _queuedRender = true;
+      return new Promise((resolve) => {
+        _queuedRenderWaiters.push(resolve);
+      });
     }
-    _isRendering = true
+    _isRendering = true;
     try {
-      try { incrementCounter('renderByQuery') } catch (_) {}
-      try { syncLegacyCounter('renderByQuery') } catch (_) {}
-      let parsed = parseHrefToRoute(location.href)
+      try {
+        incrementCounter("renderByQuery");
+      } catch (_) {}
+      let parsed = parseHrefToRoute(location.href);
       // If the path-style URL equals the site's content base (repo subpath)
       // treat it as the site root so the configured `homePage` is used
       // instead of attempting to resolve a page with the same name as
       // the repo folder (which produces duplicated subpath probes).
       try {
-        if (parsed && parsed.type === 'path' && parsed.page && contentBase) {
+        if (parsed?.type === "path" && parsed?.page && contentBase) {
           try {
-            const cb = (typeof contentBase === 'string') ? new URL(contentBase, location.href).pathname : ''
-            const cbNorm = String(cb || '').replace(/^\/+|\/+$/g, '')
-            const parsedNorm = String(parsed.page || '').replace(/^\/+|\/+$/g, '')
+            const cb =
+              typeof contentBase === "string"
+                ? new URL(contentBase, location.href).pathname
+                : "";
+            const cbNorm = String(cb ?? "").replace(/^\/+|\/+$/g, "");
+            const parsedNorm = String(parsed.page ?? "").replace(
+              /^\/+|\/+$/g,
+              "",
+            );
             if (cbNorm && parsedNorm === cbNorm) {
               // Null out the parsed page so later logic falls back to `homePage`
-              parsed.page = null
+              parsed.page = null;
             }
           } catch (_e) {}
         }
@@ -190,39 +437,237 @@ export function createUI(opts) {
       // If a path-style URL was used (e.g. /slug) convert it to the
       // canonical `?page=slug[...]` form so the rest of the pipeline only
       // sees the approved patterns. Use replaceState so we don't reload.
-      if (parsed && parsed.type === 'path' && parsed.page) {
+      if (parsed?.type === "path" && parsed?.page) {
         try {
-          let out = '?page=' + encodeURIComponent(parsed.page || '')
-          if (parsed.params) out += (out.includes('?') ? '&' : '?') + parsed.params
-          if (parsed.anchor) out += '#' + encodeURIComponent(parsed.anchor)
-          try { history.replaceState(history.state, '', out) } catch (e) { try { history.replaceState({}, '', out) } catch (_e) {} }
-          parsed = parseHrefToRoute(location.href)
-        } catch (e) { /* ignore replace failures */ }
+          let out = "?page=" + encodeURIComponent(parsed.page || "");
+          if (parsed.params)
+            out += (out.includes("?") ? "&" : "?") + parsed.params;
+          if (parsed.anchor) out += "#" + encodeURIComponent(parsed.anchor);
+          try {
+            history.replaceState(history.state, "", out);
+          } catch (e) {
+            try {
+              history.replaceState({}, "", out);
+            } catch (_e) {}
+          }
+          parsed = parseHrefToRoute(location.href);
+        } catch (e) {
+          /* ignore replace failures */
+        }
       }
-      const raw = (parsed && parsed.page) ? parsed.page : homePage
-      const hashAnchor = parsed && parsed.anchor ? parsed.anchor : null
-      await renderPage(raw, hashAnchor)
+      const raw = parsed?.page ? parsed.page : homePage;
+      const hashAnchor = parsed?.anchor ? parsed.anchor : null;
+      if (typeof document.startViewTransition === "function") {
+        try {
+          await document.startViewTransition(async () => {
+            await renderPage(raw, hashAnchor, location.href);
+          }).finished;
+        } catch {
+          // View transition was skipped or failed; DOM state is still valid.
+        }
+      } else {
+        await renderPage(raw, hashAnchor, location.href);
+      }
     } catch (e) {
-      debugWarn('[nimbi-cms] renderByQuery failed', e)
-      try { if (!notFoundPage && navWrap) _clearElement(navWrap) } catch (err) {}
-      renderNotFound(contentWrap, t, e)
+      debugWarn("[nimbi-cms] renderByQuery failed", e);
+      try {
+        if (!notFoundPage && navWrap) _clearElement(navWrap);
+      } catch (err) {}
+      renderNotFound(contentWrap, t, e);
     } finally {
-      _isRendering = false
-      if (_queuedRender) {
-        _queuedRender = false
-        try { await renderByQuery() } catch (e) { /* ignore re-run errors */ }
+      // Performance timing: log render duration
+      if (renderStart !== null) {
+        try {
+          const renderEnd = performance.now();
+          const duration = renderEnd - renderStart;
+          // Permissive variant (`isGenerationLive`): `renderByQuery` is
+          // public API and can be driven by host navigation with no initCMS
+          // runtime, so a null generation must still record timings. Only a
+          // superseded generation is skipped, which is what stops a render
+          // that finishes after teardown from growing a dead runtime's
+          // diagnostics array.
+          if (
+            typeof window !== "undefined" &&
+            window.__nimbiRenderTimings &&
+            isGenerationLive(activeGeneration())
+          ) {
+            window.__nimbiRenderTimings.push(duration);
+            if (window.__nimbiRenderTimings.length > 50)
+              window.__nimbiRenderTimings.splice(
+                0,
+                window.__nimbiRenderTimings.length - 50,
+              );
+          }
+        } catch (_) {}
       }
+      _isRendering = false;
+      if (_queuedRender) {
+        _queuedRender = false;
+        try {
+          await renderByQuery();
+        } catch (e) {
+          /* ignore re-run errors */
+        }
+      }
+      const waiters = _queuedRenderWaiters;
+      _queuedRenderWaiters = [];
+      for (const resolve of waiters) resolve();
     }
   }
 
-  window.addEventListener('popstate', renderByQuery)
+  const addEventListener = (target, type, listener, options) => {
+    if (signal) {
+      target.addEventListener(type, listener, { ...options, signal });
+    } else {
+      target.addEventListener(type, listener, options);
+    }
+  };
+
+  addEventListener(window, "popstate", renderByQuery);
+  addEventListener(window, "hashchange", renderByQuery);
+
+  const updateConnectionState = (online) => {
+    try {
+      document.documentElement.dataset.nimbiConnection = online
+        ? "online"
+        : "offline";
+      document.dispatchEvent(
+        new CustomEvent("nimbi.connectionchange", {
+          detail: { online },
+        }),
+      );
+    } catch (e) {
+      debugWarn("[nimbi-cms] connection state update failed", e);
+    }
+  };
+  updateConnectionState(typeof navigator === "undefined" || navigator.onLine !== false);
+  addEventListener(window, "online", () => updateConnectionState(true));
+  addEventListener(window, "offline", () => updateConnectionState(false));
+
+  const updateVisibilityState = () => {
+    try {
+      const state = document.visibilityState === "hidden" ? "hidden" : "visible";
+      document.documentElement.dataset.nimbiVisibility = state;
+      document.dispatchEvent(
+        new CustomEvent("nimbi.visibilitychange", {
+          detail: { state, hidden: state === "hidden" },
+        }),
+      );
+    } catch (e) {
+      debugWarn("[nimbi-cms] visibility state update failed", e);
+    }
+  };
+  updateVisibilityState();
+  addEventListener(document, "visibilitychange", updateVisibilityState);
+
+  /**
+   * Prefetch markdown for internal navigation links on pointerdown.
+   * This improves INP by starting the fetch ~100-200ms before click.
+   * Cancels on pointercancel/mouseleave to avoid wasted fetches.
+   */
+  const _prefetchControllers = new Map();
+  function _prefetchForLink(link) {
+    try {
+      const href = link.getAttribute?.("href") || "";
+      if (!href) return;
+      if (isExternalLink(href)) return;
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      // Skip if already prefetching this page
+      if (_prefetchControllers.has(parsed.page)) return;
+      const controller = new AbortController();
+      _prefetchControllers.set(parsed.page, controller);
+      // Fire-and-forget prefetch; cache will make subsequent navigation instant
+      fetchMarkdown(parsed.page, contentBase, { signal: controller.signal }).catch(() => {
+        // Ignore prefetch errors (abort, network, etc.)
+      });
+    } catch (_) {
+      // Ignore any prefetch setup errors
+    }
+  }
+  function _cancelPrefetch(page) {
+    const controller = _prefetchControllers.get(page);
+    if (controller) {
+      try {
+        controller.abort();
+      } catch (_) {}
+      _prefetchControllers.delete(page);
+    }
+  }
+  function _cancelAllPrefetches() {
+    for (const controller of _prefetchControllers.values()) {
+      try {
+        controller.abort();
+      } catch (_) {}
+    }
+    _prefetchControllers.clear();
+  }
+  // Delegated pointerdown on document to catch all internal nav links
+  let _pointerdownTarget = null;
+  addEventListener(document, "pointerdown", (ev) => {
+    try {
+      const link = ev.target?.closest?.("a[href]");
+      if (!link) return;
+      const href = link.getAttribute("href") || "";
+      if (!href || isExternalLink(href)) return;
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      _pointerdownTarget = link;
+      _prefetchForLink(link);
+    } catch (_) {}
+  }, { passive: true });
+  // Cancel on pointercancel (gesture taken over by the browser).
+  addEventListener(document, "pointercancel", (ev) => {
+    try {
+      const link = ev.target?.closest?.("a[href]");
+      if (!link) return;
+      const href = link.getAttribute("href") || "";
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      _cancelPrefetch(parsed.page);
+    } catch (_) {}
+  }, { passive: true });
+  // Cancel when the pointer leaves the link. `pointerout` is used rather than
+  // `pointerleave` because `pointerleave` does not bubble, so a delegated
+  // listener on `document` would never receive it. `relatedTarget` is checked
+  // so moving between children inside the same link does not cancel.
+  addEventListener(document, "pointerout", (ev) => {
+    try {
+      const link = ev.target?.closest?.("a[href]");
+      if (!link) return;
+      // Pointer moved to a descendant of the same link: not a real leave.
+      if (ev.relatedTarget && link.contains(ev.relatedTarget)) return;
+      const href = link.getAttribute("href") || "";
+      const parsed = parseHrefToRoute(href);
+      if (!parsed?.page) return;
+      _cancelPrefetch(parsed.page);
+    } catch (_) {}
+  }, { passive: true });
+  // Also cancel if pointerup happens on a different element (drag off link)
+  addEventListener(document, "pointerup", (ev) => {
+    try {
+      if (!_pointerdownTarget) return;
+      const link = ev.target?.closest?.("a[href]");
+      if (link !== _pointerdownTarget) {
+        const href = _pointerdownTarget.getAttribute("href") || "";
+        const parsed = parseHrefToRoute(href);
+        if (parsed?.page) _cancelPrefetch(parsed.page);
+      }
+      _pointerdownTarget = null;
+    } catch (_) {
+      // Reset the tracking reference even if the cancellation path threw, so
+      // a stale target cannot suppress the next prefetch.
+      _pointerdownTarget = null;
+    }
+  }, { passive: true });
 
   /**
    * Compute the sessionStorage key used to persist scroll position
    * for the current URL.
    * @returns {string}
    */
-  const scrollStoreKey = () => `nimbi-cms-scroll:${location.pathname}${location.search}`
+  const scrollStoreKey = () =>
+    `nimbi-cms-scroll:${location.pathname}${location.search}`;
 
   /**
    * Persist current scroll position for the page into sessionStorage.
@@ -230,17 +675,27 @@ export function createUI(opts) {
    */
   const saveScrollPosition = () => {
     try {
-      const containerEl = container || document.querySelector('.nimbi-cms')
-      if (!containerEl) return
+      const containerEl = container || document.querySelector(".nimbi-cms");
+      if (!containerEl) return;
       const data = {
         top: containerEl.scrollTop || 0,
-        left: containerEl.scrollLeft || 0
-      }
-      sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data))
+        left: containerEl.scrollLeft || 0,
+      };
+      sessionStorage.setItem(scrollStoreKey(), JSON.stringify(data));
     } catch (e) {
-      debugWarn('[nimbi-cms] save scroll position failed', e)
+      // QuotaExceededError: sessionStorage is full; fall back to in-memory storage
+      if (e && e.name === "QuotaExceededError") {
+        try {
+          _scrollMemory[scrollStoreKey()] = {
+            top: (container || document.querySelector(".nimbi-cms"))?.scrollTop || 0,
+            left: (container || document.querySelector(".nimbi-cms"))?.scrollLeft || 0,
+          };
+        } catch (_e2) {}
+        return;
+      }
+      debugWarn("[nimbi-cms] save scroll position failed", e);
     }
-  }
+  };
 
   /**
    * Restore persisted scroll position from sessionStorage, if present.
@@ -248,37 +703,49 @@ export function createUI(opts) {
    */
   const restoreScrollPosition = () => {
     try {
-      const containerEl = container || document.querySelector('.nimbi-cms')
-      if (!containerEl) return
-      const stored = sessionStorage.getItem(scrollStoreKey())
-      if (!stored) return
-      const data = JSON.parse(stored)
-      if (data && typeof data.top === 'number') {
-        containerEl.scrollTo({ top: data.top, left: (data.left || 0), behavior: 'auto' })
+      const containerEl = container || document.querySelector(".nimbi-cms");
+      if (!containerEl) return;
+      let data = null;
+      try {
+        const stored = sessionStorage.getItem(scrollStoreKey());
+        if (stored) data = JSON.parse(stored);
+      } catch (_e) {
+        /* ignore sessionStorage read errors */
+      }
+      // Fall back to in-memory storage if sessionStorage was unavailable
+      if (!data && _scrollMemory[scrollStoreKey()]) {
+        data = _scrollMemory[scrollStoreKey()];
+      }
+      if (data && typeof data?.top === "number") {
+        containerEl.scrollTo({
+          top: data.top,
+          left: data.left || 0,
+          behavior: "auto",
+        });
       }
     } catch (_e) {
       /* ignore restore errors */
     }
-  }
+  };
 
-  window.addEventListener('pageshow', (event) => {
+  addEventListener(window, "pageshow", (event) => {
     if (event.persisted) {
       try {
-        restoreScrollPosition()
-        setEagerForAboveFoldImages(container, 100, false)
+        restoreScrollPosition();
+        setEagerForAboveFoldImages(container, 100, false);
       } catch (e) {
-        debugWarn('[nimbi-cms] bfcache restore failed', e)
+        debugWarn("[nimbi-cms] bfcache restore failed", e);
       }
     }
-  })
+  });
 
-  window.addEventListener('pagehide', () => {
+  addEventListener(window, "pagehide", () => {
     try {
-      saveScrollPosition()
+      saveScrollPosition();
     } catch (e) {
-      debugWarn('[nimbi-cms] save scroll position failed', e)
+      debugWarn("[nimbi-cms] save scroll position failed", e);
     }
-  })
+  });
 
-  return { renderByQuery, siteNav, getCurrentPagePath: () => currentPagePath }
+  return { renderByQuery, siteNav, getCurrentPagePath: () => currentPagePath };
 }

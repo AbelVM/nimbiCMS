@@ -4,9 +4,9 @@
 
 [nimbi-cms](../../../README.md) / [utils/events](../README.md) / scheduleDOMWrite
 
-# Variable: scheduleDOMWrite()
+# Variable: scheduleDOMWrite
 
-> `const` **scheduleDOMWrite**: (`fn`) => `void`
+> `const` **scheduleDOMWrite**: (`fn`) => \{ `cancel`: () => `void`; \} \| `undefined`
 
 ## Parameters
 
@@ -16,4 +16,4 @@
 
 ## Returns
 
-`void`
+\{ `cancel`: () => `void`; \} \| `undefined`

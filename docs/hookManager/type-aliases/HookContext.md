@@ -6,6 +6,6 @@
 
 # Type Alias: HookContext
 
-> **HookContext**\<\> = `Record`\<`string`, `unknown`\>
+> **HookContext** = `Record`\<`string`, `unknown`\>
 
 ## Type Parameters

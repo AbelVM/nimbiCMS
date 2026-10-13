@@ -6,6 +6,6 @@
 
 # Type Alias: ThemeVars
 
-> **ThemeVars**\<\> = `Record`\<`string`, `string`\>
+> **ThemeVars** = `Record`\<`string`, `string`\>
 
 ## Type Parameters

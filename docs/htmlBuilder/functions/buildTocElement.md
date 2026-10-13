@@ -26,7 +26,7 @@ TOC entries
 
 ### pagePath?
 
-`string` = `''`
+`string` = `""`
 
 optional page path used for relative href normalization
 

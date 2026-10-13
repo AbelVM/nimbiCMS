@@ -6,13 +6,19 @@
 
 # Function: generateSitemapJson()
 
-> **generateSitemapJson**(`opts?`): `Promise`\<[`SitemapJson`](../type-aliases/SitemapJson.md)\>
+> **generateSitemapJson**(`opts?`): `Promise`\<\{ `entries`: `any`[]; `generatedAt`: `string`; \}\>
 
 Generate sitemap JSON from the runtime search index (or a provided snapshot).
 
 ## Parameters
 
 ### opts?
+
+#### baseUrl?
+
+`string` \| `URL`
+
+base URL used for generated locations
 
 #### homePage?
 
@@ -38,6 +44,6 @@ optional snapshot array of index entries
 
 ## Returns
 
-`Promise`\<[`SitemapJson`](../type-aliases/SitemapJson.md)\>
+`Promise`\<\{ `entries`: `any`[]; `generatedAt`: `string`; \}\>
 
 sitemap JSON object

@@ -9,11 +9,12 @@ describe('router resolution cache behavior', () => {
   })
 
   it('evicts expired entries based on TTL', () => {
-    setResolutionCacheTtl(1)
+    setResolutionCacheTtl(60 * 1000)
     resolutionCacheSet('k1', { resolved: 'a', anchor: null })
     const rec = resolutionCache.get('k1')
-    // set timestamp to long past
-    resolutionCache.set('k1', { value: rec.value, ts: Date.now() - 100000 })
+    expect(rec).toEqual({ resolved: 'a', anchor: null })
+    // Simulate a legacy { value, ts } record written by older helpers
+    resolutionCache.set('k1', { value: rec, ts: Date.now() - 100000 })
     expect(resolutionCacheGet('k1')).toBeUndefined()
   })
 

@@ -1,45 +1,73 @@
 /**
  * @module worker/slugWorker
  */
-import { buildSearchIndex, crawlForSlug } from '../slugManager.js'
+import { decodeInbound, announceCapabilities } from "performance-helpers/powerMessageCodec";
+import { buildSearchIndex, crawlForSlug } from "../slugSearchRuntime.js";
 
-/**
- * Worker entrypoint for slug-related background tasks.
- */
+// Announce native structured-clone support so PowerPool can use native
+// envelopes when available. Guarded for test environments where `postMessage`
+// may not be the worker-style single-argument form yet.
+try {
+  if (typeof postMessage === "function") {
+    postMessage(announceCapabilities({ native: true }));
+  }
+} catch (_) {}
 
 /**
  * Worker `onmessage` handler for slug-related background tasks.
- * @param {MessageEvent} ev - Message event; `ev.data` should be the request
- * (e.g. `{ type: 'buildSearchIndex', id, contentBase }` or `{ type: 'crawlForSlug', id, slug, base?, maxQueue? }`).
- * @returns {Promise<void>} Posts `{id, result}` or `{id, error}` back to the caller.
+ * Uses `decodeInbound` to handle native envelopes, framed v2 messages,
+ * and legacy bare JSON transparently.
+ * @param {MessageEvent} ev - Message event; `ev.data` should be the request.
+ * @returns {Promise<void>} Posts `{correlationId, response}` (PowerPool) or `{id, result}` (legacy).
  */
 onmessage = async (ev) => {
-  const msg = ev.data || {}
-  try {
-    if (msg.type === 'buildSearchIndex') {
-      const { id, contentBase, indexDepth, noIndexing } = msg
-      try {
-        const res = await buildSearchIndex(contentBase, indexDepth, noIndexing)
-        postMessage({ id, result: res })
-      } catch (e) {
-        postMessage({ id, error: String(e) })
-      }
-      return
+  const decoded = decodeInbound(ev.data);
+  const msg = decoded.value;
+  const correlationId = decoded.correlationId ?? msg.correlationId;
+  const _reply = (result) => {
+    if (correlationId != null) {
+      postMessage({ correlationId, response: result });
+    } else {
+      postMessage({ id: msg.id, result });
     }
-    if (msg.type === 'crawlForSlug') {
-      const { id, slug, base, maxQueue } = msg
+  };
+  const _replyErr = (error) => {
+    if (correlationId != null) {
+      postMessage({ correlationId, response: { error: String(error) } });
+    } else {
+      postMessage({ id: msg.id, error: String(error) });
+    }
+  };
+  try {
+    if (msg.type === "buildSearchIndex") {
+      const { contentBase, indexDepth, noIndexing, seedPaths } = msg;
       try {
-        const res = await crawlForSlug(slug, base, maxQueue)
-        postMessage({ id, result: res === undefined ? null : res })
+        const res = await buildSearchIndex(
+          contentBase,
+          indexDepth,
+          noIndexing,
+          seedPaths,
+        );
+        _reply(res);
       } catch (e) {
-        postMessage({ id, error: String(e) })
+        _replyErr(e);
       }
-      return
+      return;
+    }
+    if (msg.type === "crawlForSlug") {
+      const { slug, base, maxQueue } = msg;
+      try {
+        const res = await crawlForSlug(slug, base, maxQueue);
+        _reply(res === undefined ? null : res);
+      } catch (e) {
+        _replyErr(e);
+      }
+      return;
     }
   } catch (e) {
-    postMessage({ id: msg.id, error: String(e) })
+    _replyErr(e);
   }
-}
+};
 
 /**
  * Helper to process slug-worker messages outside of a Worker.
@@ -48,22 +76,31 @@ onmessage = async (ev) => {
  */
 export async function handleSlugWorkerMessage(msg) {
   try {
-    if (msg.type === 'buildSearchIndex') {
-      const { id, contentBase, indexDepth, noIndexing } = msg
+    if (msg.type === "buildSearchIndex") {
+      const { id, contentBase, indexDepth, noIndexing, seedPaths } = msg;
       try {
-        const res = await buildSearchIndex(contentBase, indexDepth, noIndexing)
-        return { id, result: res }
-      } catch (e) { return { id, error: String(e) } }
+        const res = await buildSearchIndex(
+          contentBase,
+          indexDepth,
+          noIndexing,
+          seedPaths,
+        );
+        return { id, result: res };
+      } catch (e) {
+        return { id, error: String(e) };
+      }
     }
-    if (msg.type === 'crawlForSlug') {
-      const { id, slug, base, maxQueue } = msg
+    if (msg.type === "crawlForSlug") {
+      const { id, slug, base, maxQueue } = msg;
       try {
-        const res = await crawlForSlug(slug, base, maxQueue)
-        return { id, result: res === undefined ? null : res }
-      } catch (e) { return { id, error: String(e) } }
+        const res = await crawlForSlug(slug, base, maxQueue);
+        return { id, result: res === undefined ? null : res };
+      } catch (e) {
+        return { id, error: String(e) };
+      }
     }
-    return { id: msg && msg.id, error: 'unsupported message' }
+    return { id: msg?.id, error: "unsupported message" };
   } catch (e) {
-    return { id: msg && msg.id, error: String(e) }
+    return { id: msg?.id, error: String(e) };
   }
 }

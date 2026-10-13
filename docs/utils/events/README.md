@@ -12,6 +12,5 @@
 
 ## Functions
 
-- [createRafBatcher](functions/createRafBatcher.md)
 - [debounce](functions/debounce.md)
 - [rafThrottle](functions/rafThrottle.md)

@@ -6,6 +6,6 @@
 
 # Type Alias: HookName
 
-> **HookName**\<\> = `"onPageLoad"` \| `"onNavBuild"` \| `"transformHtml"`
+> **HookName** = `"onPageLoad"` \| `"onNavBuild"` \| `"transformHtml"`
 
 ## Type Parameters

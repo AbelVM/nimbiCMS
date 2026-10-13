@@ -26,10 +26,10 @@ test('initCMS runtime nav slug mapping harness', async () => {
       // (e.g. http://localhost:3000/) are handled correctly.
       let key = null
       try {
-        const u = new URL(String(path || ''), String(base || 'http://localhost/'))
-        key = u.pathname || ('/' + String(path || '').replace(/^\//, ''))
+        const u = new URL(String(path ?? ''), String(base || 'http://localhost/'))
+        key = u.pathname || ('/' + String(path ?? '').replace(/^\//, ''))
       } catch (_) {
-        key = '/' + String(path || '').replace(/^\//, '')
+        key = '/' + String(path ?? '').replace(/^\//, '')
       }
       const raw = manifest[key]
       if (!raw) throw new Error('manifest missing: ' + key)

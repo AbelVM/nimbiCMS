@@ -1,4 +1,3 @@
-
 /**
  * Index management helpers for content paths.
  *
@@ -7,7 +6,12 @@
  *
  * @module indexManager
  */
-import { slugToMd, mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from './slugManager.js';
+import {
+  slugToMd,
+  mdToSlug,
+  allMarkdownPaths,
+  allMarkdownPathsSet,
+} from "./slugState.js";
 
 /**
  * A Map-like interface used by index augmentation helpers.
@@ -26,6 +30,24 @@ import { slugToMd, mdToSlug, allMarkdownPaths, allMarkdownPathsSet } from './slu
  * @type {Set<string>}
  */
 export const indexSet = new Set();
+let _refreshed = false;
+
+/**
+ * Return whether index paths have been refreshed at least once.
+ * @returns {boolean}
+ */
+export function isIndexPathsRefreshed() {
+  return _refreshed;
+}
+
+/**
+ * Set the internal refresh flag for index paths.
+ * @param {boolean} value
+ * @returns {void}
+ */
+export function setIndexPathsRefreshed(value) {
+  _refreshed = !!value;
+}
 /**
  * Refresh the internal `indexSet` from available markdown paths and slug maps.
  * Useful when the content base or path list changes at runtime (tests/plugins).
@@ -49,8 +71,20 @@ export function refreshIndexPaths(contentBase) {
   }
   _augmentIndexWithMap(slugToMd);
   _augmentIndexWithMap(mdToSlug);
-  refreshIndexPaths._refreshed = true;
+  _refreshed = true;
 }
+
+try {
+  Object.defineProperty(refreshIndexPaths, "_refreshed", {
+    get() {
+      return _refreshed;
+    },
+    set(v) {
+      _refreshed = !!v;
+    },
+    configurable: true,
+  });
+} catch (_) {}
 
 /**
  * Add all values from a Map-like object into the runtime `indexSet`.
@@ -59,7 +93,7 @@ export function refreshIndexPaths(contentBase) {
  * @returns {void}
  */
 function _augmentIndexWithMap(map) {
-  if (!map || typeof map.values !== 'function') return;
+  if (!map || typeof map.values !== "function") return;
   for (const v of map.values()) {
     if (v) indexSet.add(v);
   }
@@ -67,16 +101,29 @@ function _augmentIndexWithMap(map) {
 
 /**
  * Instrument a map so that any value inserted also populates the index set.
- * @param {MapLike|Map<any, any>} map - A Map-like object whose `set` method will be wrapped.
+ *
+ * `clear` is wrapped as well as `set`: `slugManager` bumps its own
+ * `_nimbiVersion` on `clear`, but without a matching wrapper here the
+ * `indexSet` would keep every path from before the clear and serve stale
+ * entries until the next explicit `refreshIndex()`.
+ * @param {MapLike|Map<any, any>} map - A Map-like object whose `set`/`clear` methods will be wrapped.
  * @returns {void}
  */
 function _trackMap(map) {
-  if (!map || typeof map.set !== 'function') return;
-  const orig = map.set;
-  map.set = function(k, v) {
-    if (v) indexSet.add(v);
-    return orig.call(this, k, v);
+  if (!map || typeof map.set !== "function") return;
+  const origSet = map.set;
+  map.set = function (k, v) {
+    if (v && typeof v === "string") indexSet.add(v);
+    else if (v?.default) indexSet.add(v.default);
+    return origSet.call(this, k, v);
   };
+  if (typeof map.clear === "function") {
+    const origClear = map.clear;
+    map.clear = function () {
+      indexSet.clear();
+      return origClear.call(this);
+    };
+  }
 }
 
 /** Lazily install tracking wrappers on the slug maps; idempotent. @returns {void} */

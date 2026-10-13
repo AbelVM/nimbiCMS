@@ -18,7 +18,7 @@ test('fetchPageData behaves the same for canonical and cosmetic location hrefs',
     try { slugMgr.slugToMd.clear && slugMgr.slugToMd.clear() } catch (_) {}
     slugMgr.slugToMd.set('foo', 'foo.md')
     slugMgr.setFetchMarkdown(async (path, base) => {
-      if (String(path || '').endsWith('foo.md')) return { raw: '# Foo Title' }
+      if (String(path ?? '').endsWith('foo.md')) return { raw: '# Foo Title' }
       return null
     })
 

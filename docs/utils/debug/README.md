@@ -6,11 +6,8 @@
 
 # utils/debug
 
-Centralized debug helper for nimbi-cms.
-
-Provides a runtime gate for console messages and an internal
-counter store useful for lightweight instrumentation in tests.
-Call `setDebugLevel(level)` during initialization to control verbosity.
+Centralized debug helper for nimbi-cms. Backed by PowerLogger from
+performance-helpers for level management and counter instrumentation.
 
 Debug levels:
  - 0: disabled
@@ -18,19 +15,13 @@ Debug levels:
  - 2: errors and warnings
  - 3: all messages (info/log)
 
-Usage example:
-```js
-import { setDebugLevel, debugWarn } from './utils/debug.js'
-setDebugLevel(2)
-debugWarn('something notable')
-```
-
 ## See
 
 ./init.js
 
 ## Variables
 
+- [\_logger](variables/logger.md)
 - [default](variables/default.md)
 
 ## Functions
@@ -41,10 +32,8 @@ debugWarn('something notable')
 - [debugWarn](functions/debugWarn.md)
 - [getDebugCounters](functions/getDebugCounters.md)
 - [getDebugLevel](functions/getDebugLevel.md)
-- [hasLegacyDebug](functions/hasLegacyDebug.md)
 - [incrementCounter](functions/incrementCounter.md)
 - [isDebug](functions/isDebug.md)
 - [isDebugLevel](functions/isDebugLevel.md)
 - [resetDebugCounters](functions/resetDebugCounters.md)
 - [setDebugLevel](functions/setDebugLevel.md)
-- [syncLegacyCounter](functions/syncLegacyCounter.md)

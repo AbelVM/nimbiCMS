@@ -19,10 +19,10 @@ test('candidate HTML rejection: probes alt .md then rejects (initcms token)', as
     const calls = []
     slugMgr.setFetchMarkdown(async (path, base) => {
       calls.push(path)
-      if (String(path || '').toLowerCase().endsWith('.html')) {
+      if (String(path ?? '').toLowerCase().endsWith('.html')) {
         return { raw: '<!doctype html><html><body>initcms( boot )</body></html>', isHtml: true }
       }
-      if (String(path || '').toLowerCase().endsWith('.md')) {
+      if (String(path ?? '').toLowerCase().endsWith('.md')) {
         return null
       }
       return null

@@ -1,0 +1,331 @@
+import { getSharedParser } from "../utils/sharedDomParser.js";
+import { slugifyTitle } from "../utils/slugify.js";
+import {
+  buildPageUrl,
+  ensureTrailingSlash,
+  getBaseName,
+  getLastPathSegments,
+  isExternalLink,
+  normalizePath,
+  trimTrailingSlash,
+} from "../utils/helpers.js";
+import { stripContentBasePrefix } from "../utils/stripContentBasePrefix.js";
+import { runWithConcurrency } from "../utils/concurrency.js";
+
+function createParser() {
+  if (typeof DOMParser === "undefined") return null;
+  const parser = getSharedParser();
+  try {
+    if (parser?.constructor === DOMParser) return parser;
+  } catch (_) {}
+  return new DOMParser();
+}
+
+function getSnapshotReverseMap(pathToSlug) {
+  const reverse = new Map();
+  try {
+    if (!pathToSlug || typeof pathToSlug !== "object") return reverse;
+    for (const [path, slug] of Object.entries(pathToSlug || {})) {
+      try {
+        if (!path || !slug) continue;
+        reverse.set(String(slug), String(path));
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return reverse;
+}
+
+function resolveActualPagePath(pagePath, snapshot) {
+  try {
+    const path = String(pagePath ?? "");
+    if (!path) return pagePath;
+    if (path.includes("/") || /\.(?:md|html?)$/i.test(path)) return path;
+    const reverse = getSnapshotReverseMap(snapshot?.pathToSlug);
+    return reverse.get(path) || pagePath;
+  } catch (_) {
+    return pagePath;
+  }
+}
+
+function getSlugForRelativePath(rel, pathToSlug) {
+  if (!rel || !pathToSlug) return null;
+  try {
+    if (pathToSlug.has(rel)) return pathToSlug.get(rel);
+  } catch (_) {}
+  const baseName = getBaseName(rel);
+  try {
+    if (baseName && pathToSlug.has(baseName)) return pathToSlug.get(baseName);
+    const suffix = getLastPathSegments(rel, 2);
+    if (suffix && pathToSlug.has(suffix)) return pathToSlug.get(suffix);
+  } catch (_) {}
+  return null;
+}
+
+function getSnapshotMap(snapshot) {
+  const map = new Map();
+  for (const [path, slug] of Object.entries(snapshot?.pathToSlug || {})) {
+    if (!path || !slug) continue;
+    if (!map.has(path)) map.set(path, slug);
+    const baseName = getBaseName(path);
+    if (baseName && !map.has(baseName)) map.set(baseName, slug);
+    const suffix = getLastPathSegments(path, 2);
+    if (suffix && !map.has(suffix)) map.set(suffix, slug);
+  }
+  return map;
+}
+
+function rememberMapping(pathToSlug, learnedMappings, path, slug) {
+  const key = String(path ?? "");
+  const value = String(slug ?? "");
+  if (!key || !value || pathToSlug.has(key)) return;
+  pathToSlug.set(key, value);
+  learnedMappings.push({ path: key, slug: value });
+}
+
+async function fetchText(path, contentBase) {
+  const url = new URL(
+    String(path ?? ""),
+    String(
+      contentBase ||
+        (typeof location !== "undefined" ? location.href : "http://localhost/"),
+    ),
+  );
+  const res = await fetch(url.toString());
+  if (!res || !res.ok) return null;
+  return await res.text();
+}
+
+function extractSlugFromText(raw, isHtml) {
+  if (!raw) return null;
+  if (!isHtml) {
+    const headingMatch = String(raw).match(/^#\s+(.+)$/m);
+    return headingMatch?.[1] ? slugifyTitle(headingMatch[1].trim()) : null;
+  }
+  try {
+    const parser = createParser();
+    if (!parser) return null;
+    const doc = parser.parseFromString(String(raw), "text/html");
+    const title = doc.querySelector("title")?.textContent?.trim();
+    const h1 = doc.querySelector("h1")?.textContent?.trim();
+    return slugifyTitle(title || h1 || "") || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+
+export async function rewriteAnchorsHtml(
+  html,
+  contentBase,
+  pagePath,
+  snapshot = {},
+) {
+  const parser = createParser();
+  if (!parser) return { html: String(html ?? ""), mappings: [] };
+
+  const doc = parser.parseFromString(String(html ?? ""), "text/html");
+  const article = doc.body;
+  const anchors = article.querySelectorAll("a");
+  if (!anchors || !anchors.length)
+    return { html: doc.body.innerHTML, mappings: [] };
+
+  let contentBasePath = "/";
+  try {
+    const contentBaseUrl = new URL(
+      String(contentBase ?? ""),
+      typeof location !== "undefined" ? location.href : "http://localhost/",
+    );
+    contentBasePath = ensureTrailingSlash(contentBaseUrl.pathname);
+  } catch (_) {}
+
+  pagePath = resolveActualPagePath(pagePath, snapshot);
+  const pathToSlug = getSnapshotMap(snapshot);
+  const learnedMappings = [];
+  const pendingMd = new Set();
+  const pendingHtml = new Set();
+  const anchorInfo = [];
+  const htmlAnchorInfo = [];
+  const homeSlug = String(snapshot?.homeSlug || "_home");
+
+  for (const anchor of Array.from(anchors)) {
+    try {
+      try {
+        if (anchor?.closest?.("h1,h2,h3,h4,h5,h6")) continue;
+      } catch (_) {}
+      const href = anchor.getAttribute("href") || "";
+      if (!href || isExternalLink(href)) continue;
+
+      try {
+        if ((href.startsWith("?") || href.includes("?")) && pagePath) {
+          const tmpUrl = new URL(
+            href,
+            String(
+              contentBase ||
+                (typeof location !== "undefined"
+                  ? location.href
+                  : "http://localhost/"),
+            ),
+          );
+          const pageParam = tmpUrl.searchParams.get("page");
+          if (pageParam && !pageParam.includes("/")) {
+            const dir = pagePath.includes("/")
+              ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1)
+              : "";
+            if (dir) {
+              const nextPage = normalizePath(dir + pageParam);
+              anchor.setAttribute(
+                "href",
+                buildPageUrl(
+                  nextPage,
+                  tmpUrl.hash ? tmpUrl.hash.replace(/^#/, "") : null,
+                ),
+              );
+              continue;
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (href.startsWith("/") && !href.endsWith(".md")) continue;
+
+      const mdMatch = href.match(/^([^#?]+\.md)(?:#(.+))?$/);
+      if (mdMatch) {
+        let mdPathRaw = mdMatch[1];
+        const frag = mdMatch[2];
+        if (!mdPathRaw.startsWith("/") && pagePath) {
+          const dir = pagePath.includes("/")
+            ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1)
+            : "";
+          mdPathRaw = dir + mdPathRaw;
+        }
+        const resolved = new URL(
+          mdPathRaw,
+          String(
+            contentBase ||
+              (typeof location !== "undefined"
+                ? location.href
+                : "http://localhost/"),
+          ),
+        ).pathname;
+        let rel = resolved.startsWith(contentBasePath)
+          ? resolved.slice(contentBasePath.length)
+          : resolved;
+        rel = normalizePath(stripContentBasePrefix(rel, contentBasePath));
+        anchorInfo.push({ node: anchor, rel, frag });
+        if (!pathToSlug.has(rel)) pendingMd.add(rel);
+        continue;
+      }
+
+      let toResolve = href;
+      if (!href.startsWith("/") && pagePath) {
+        if (href.startsWith("#")) toResolve = pagePath + href;
+        else {
+          const dir = pagePath.includes("/")
+            ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1)
+            : "";
+          toResolve = dir + href;
+        }
+      }
+
+      const full = new URL(
+        toResolve,
+        String(
+          contentBase ||
+            (typeof location !== "undefined"
+              ? location.href
+              : "http://localhost/"),
+        ),
+      );
+      const pathname = full.pathname || "";
+      if (!pathname || !pathname.includes(contentBasePath)) continue;
+
+      let rel = pathname.startsWith(contentBasePath)
+        ? pathname.slice(contentBasePath.length)
+        : pathname;
+      rel = normalizePath(stripContentBasePrefix(rel, contentBasePath));
+      rel = trimTrailingSlash(rel);
+      if (!rel) rel = homeSlug;
+
+      if (!rel.endsWith(".md")) {
+        const slug = getSlugForRelativePath(rel, pathToSlug);
+        if (slug) {
+          anchor.setAttribute("href", buildPageUrl(slug));
+        } else {
+          const htmlRel = /\.[^/]+$/.test(rel) ? rel : `${rel}.html`;
+          pendingHtml.add(htmlRel);
+          htmlAnchorInfo.push({ node: anchor, rel: htmlRel, fallbackRel: rel });
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (snapshot?.allowProbe) {
+    await runWithConcurrency(
+      pendingMd,
+      async (rel) => {
+        try {
+          const slug = extractSlugFromText(
+            await fetchText(rel, contentBase),
+            false,
+          );
+          if (!slug) return;
+          rememberMapping(pathToSlug, learnedMappings, rel, slug);
+          rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
+        } catch (_) {}
+      },
+      6,
+    );
+
+    await runWithConcurrency(
+      pendingHtml,
+      async (rel) => {
+        try {
+          const slug = extractSlugFromText(
+            await fetchText(rel, contentBase),
+            true,
+          );
+          if (!slug) return;
+          rememberMapping(pathToSlug, learnedMappings, rel, slug);
+          rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
+        } catch (_) {}
+      },
+      5,
+    );
+  } else {
+    for (const rel of pendingMd) {
+      const baseName = getBaseName(rel).replace(/\.md$/i, "");
+      const slug = slugifyTitle(baseName);
+      if (!slug) continue;
+      rememberMapping(pathToSlug, learnedMappings, rel, slug);
+      rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
+    }
+    for (const rel of pendingHtml) {
+      const baseName = getBaseName(rel).replace(/\.html$/i, "");
+      const slug = slugifyTitle(baseName);
+      if (!slug) continue;
+      rememberMapping(pathToSlug, learnedMappings, rel, slug);
+      rememberMapping(pathToSlug, learnedMappings, getBaseName(rel), slug);
+    }
+  }
+
+  for (const info of anchorInfo) {
+    const slug = pathToSlug.get(info.rel);
+    info.node.setAttribute(
+      "href",
+      buildPageUrl(slug || info.rel, info.frag || null),
+    );
+  }
+
+  for (const info of htmlAnchorInfo) {
+    const slug =
+      pathToSlug.get(info.rel) ||
+      pathToSlug.get(getBaseName(info.rel)) ||
+      pathToSlug.get(info.fallbackRel);
+    info.node.setAttribute("href", buildPageUrl(slug || info.rel));
+  }
+
+  return { html: doc.body.innerHTML, mappings: learnedMappings };
+}
+
+// Re-exported so the shared slug contract can be asserted directly in tests.
+export { slugifyTitle };

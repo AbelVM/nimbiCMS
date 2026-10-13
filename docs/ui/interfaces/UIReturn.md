@@ -8,7 +8,7 @@
 
 ## Properties
 
-### getCurrentPagePath()
+### getCurrentPagePath
 
 > **getCurrentPagePath**: () => `string` \| `null`
 
@@ -20,7 +20,7 @@ Returns the currently rendered page path or null.
 
 ***
 
-### renderByQuery()
+### renderByQuery
 
 > **renderByQuery**: () => `Promise`\<`void`\>
 

@@ -37,4 +37,36 @@ describe('slug worker API (direct invocation)', () => {
     expect(res.id).toBe('2')
     expect(res.result).toBeNull()
   })
+
+  it('passes seedPaths through buildSearchIndex worker messages', async () => {
+    vi.resetModules()
+    const buildSearchIndex = vi.fn(async () => ['ok'])
+    vi.doMock('../src/slugSearchRuntime.js', () => ({
+      buildSearchIndex,
+      crawlForSlug: vi.fn(async () => null),
+    }))
+    await import('../src/worker/slugWorker.js')
+    const localHandler = global.onmessage
+    const promise = new Promise((resolve) => {
+      global.postMessage = (msg) => resolve(msg)
+    })
+    localHandler({
+      data: {
+        type: 'buildSearchIndex',
+        id: '3',
+        contentBase: '/base/',
+        indexDepth: 2,
+        noIndexing: ['skip'],
+        seedPaths: ['assets/brochure.md', 'assets/navigation.md'],
+      },
+    })
+    const res = await promise
+    expect(res.id).toBe('3')
+    expect(buildSearchIndex).toHaveBeenCalledWith(
+      '/base/',
+      2,
+      ['skip'],
+      ['assets/brochure.md', 'assets/navigation.md'],
+    )
+  })
 })

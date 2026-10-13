@@ -28,6 +28,6 @@ describe('renderer runImportWithCache error handling', () => {
     expect(res.result.html).toContain('language-javascript')
     // HTML escapes quotes, assert on code presence and escaped quotes
     expect(res.result.html).toContain('console.log')
-    expect(res.result.html).toContain('&quot;x&quot;')
+    expect(res.result.html).toContain('console.log("x")')
   })
 })

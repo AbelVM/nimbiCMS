@@ -15,13 +15,13 @@ overrides or named themes fetched from unpkg.
 
 ### bulmaCustomize?
 
-`string` = `'none'`
+`string` = `"none"`
 
 'none' | 'local' | theme name to load from unpkg.
 
 ### pageDir?
 
-`string` = `'/'`
+`string` = `"/"`
 
 Directory to probe for a local `bulma.css` when using 'local'.
 

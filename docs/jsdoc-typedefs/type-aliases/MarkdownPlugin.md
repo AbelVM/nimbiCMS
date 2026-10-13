@@ -6,7 +6,7 @@
 
 # Type Alias: MarkdownPlugin
 
-> **MarkdownPlugin**\<\> = `object`
+> **MarkdownPlugin** = `object`
 
 ## Type Parameters
 
@@ -14,16 +14,16 @@
 
 ### renderer?
 
-> `optional` **renderer**: `Object`
+> `optional` **renderer?**: `Object`
 
 ### tokenizer?
 
-> `optional` **tokenizer**: `Function`
+> `optional` **tokenizer?**: `Function`
 
 ### transform?
 
-> `optional` **transform**: `Function`
+> `optional` **transform?**: `Function`
 
 ### walkTokens?
 
-> `optional` **walkTokens**: `Function`
+> `optional` **walkTokens?**: `Function`

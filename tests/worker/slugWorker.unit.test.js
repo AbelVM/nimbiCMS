@@ -5,8 +5,13 @@ vi.mock('../../src/slugManager.js', () => ({
   crawlForSlug: vi.fn()
 }))
 
+vi.mock('../../src/slugSearchRuntime.js', () => ({
+  buildSearchIndex: vi.fn(),
+  crawlForSlug: vi.fn()
+}))
+
 import { handleSlugWorkerMessage } from '../../src/worker/slugWorker.js'
-import { buildSearchIndex, crawlForSlug } from '../../src/slugManager.js'
+import { buildSearchIndex, crawlForSlug } from '../../src/slugSearchRuntime.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -17,7 +22,7 @@ describe('handleSlugWorkerMessage', () => {
     buildSearchIndex.mockResolvedValue({ indexed: true })
     const res = await handleSlugWorkerMessage({ id: 1, type: 'buildSearchIndex', contentBase: '/c' })
     expect(res).toEqual({ id: 1, result: { indexed: true } })
-    expect(buildSearchIndex).toHaveBeenCalledWith('/c', undefined, undefined)
+    expect(buildSearchIndex).toHaveBeenCalledWith('/c', undefined, undefined, undefined)
   })
 
   it('returns error when buildSearchIndex rejects', async () => {

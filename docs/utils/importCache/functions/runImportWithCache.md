@@ -16,16 +16,10 @@ Run a loader function with single-flight dedupe and negative-caching.
 
 `string`
 
-Cache key identifying the resource.
-
 ### loader
 
 () => `Promise`\<`any`\>
 
-Async loader returning the module or null.
-
 ## Returns
 
 `Promise`\<`any`\>
-
-The loaded module or null on failure.

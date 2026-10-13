@@ -29,7 +29,7 @@ describe('parseMarkdownToHtml images and heading classes (HLJS branch)', () => {
     ].join('\n')
 
     const res = await parseMarkdownToHtml(md)
-    const html = String(res && res.html || '')
+    const html = String((res && res.html) ?? '')
 
     expect(html).toContain('src="/a.png"')
     expect(html).toContain('loading="lazy"')

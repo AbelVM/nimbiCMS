@@ -8,12 +8,15 @@ describe('runtimeSitemap RSS/Atom', () => {
   let origDocOpen
   let origDocWrite
   let origDocClose
+  let origFetch
 
   beforeEach(() => {
     origSlugEntries = Array.from(slugManager.slugToMd.entries())
     origLocation = globalThis.location
+    origFetch = globalThis.fetch
     slugManager.slugToMd.clear()
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', search: '?rss' }, configurable: true })
+    globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => '' })
 
     // clear any pending sitemap globals/timers from other tests
     try {
@@ -31,6 +34,7 @@ describe('runtimeSitemap RSS/Atom', () => {
     slugManager.slugToMd.clear()
     for (const [k, v] of origSlugEntries) slugManager.slugToMd.set(k, v)
     try { Object.defineProperty(globalThis, 'location', { value: origLocation, configurable: true }) } catch (e) {}
+    try { globalThis.fetch = origFetch } catch (e) {}
     if (origDocOpen !== undefined) document.open = origDocOpen
     if (origDocWrite !== undefined) document.write = origDocWrite
     if (origDocClose !== undefined) document.close = origDocClose
@@ -58,10 +62,10 @@ describe('runtimeSitemap RSS/Atom', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)
@@ -84,10 +88,10 @@ describe('runtimeSitemap RSS/Atom', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).toBe(true)

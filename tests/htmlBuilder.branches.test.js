@@ -42,6 +42,28 @@ describe('htmlBuilder branch coverage extras', () => {
     }
   })
 
+  it('preMapMdSlugs skips title probing when a markdown manifest exists', async () => {
+    const a = document.createElement('a')
+    a.setAttribute('href', 'foo.md')
+    const anchors = [a]
+    const orig = slugMgr.fetchMarkdown
+    try {
+      slugMgr.allMarkdownPathsSet.add('foo.md')
+      let called = false
+      slugMgr.setFetchMarkdown(async () => {
+        called = true
+        throw new Error('should not be called')
+      })
+      await preMapMdSlugs(anchors, '/content/', { allowProbe: false })
+      expect(called).toBe(false)
+      expect(slugMgr.mdToSlug.has('foo.md')).toBe(true)
+      expect(slugMgr.slugToMd.get('foo')).toBe('foo.md')
+    } finally {
+      slugMgr.setFetchMarkdown(orig)
+      slugMgr.allMarkdownPathsSet.clear()
+    }
+  })
+
   it('rewriteAnchors handles html pending and sets href from fetched title', async () => {
     const article = document.createElement('article')
     const a = document.createElement('a')
@@ -60,6 +82,21 @@ describe('htmlBuilder branch coverage extras', () => {
     } finally {
       slugMgr.setFetchMarkdown(orig)
     }
+  })
+
+  it('rewriteAnchors resolves slug pagePath to actual markdown directory before relative link mapping', async () => {
+    const article = document.createElement('article')
+    const a = document.createElement('a')
+    a.setAttribute('href', 'other.md')
+    article.appendChild(a)
+    slugMgr.slugToMd.set('nimbi-cms', 'nimbi-cms/README.md')
+    slugMgr.mdToSlug.set('nimbi-cms/README.md', 'nimbi-cms')
+    slugMgr.slugToMd.set('other', 'nimbi-cms/other.md')
+    slugMgr.mdToSlug.set('nimbi-cms/other.md', 'other')
+    await rewriteAnchors(article, 'http://example.com/content/', 'nimbi-cms')
+    const out = a.getAttribute('href') || ''
+    expect(out.includes('?page=') || out.includes('#/')).toBe(true)
+    expect(out).toContain('other')
   })
 
   it('ensureScrollTopButton observes topH1 when IntersectionObserver present', () => {

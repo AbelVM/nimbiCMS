@@ -1,6 +1,6 @@
 {
   "name": "nimbi-cms",
-  "version": "1.0.8",
+  "version": "2.0.2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AbelVM/nimbiCMS.git"
@@ -26,58 +26,85 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --config vite.config.js",
-    "build:analyze": "ANALYZE=1 vite build --config vite.config.js",
+    "build": "npm run build:lib && npm run build:umd",
+    "build:lib": "vite build --config vite.config.js",
+    "build:umd": "BUILD_TARGET=umd vite build --config vite.config.js",
+    "build:analyze": "ANALYZE=1 npm run build:lib && npm run build:umd",
     "preview": "vite preview",
     "test": "npx vitest run",
+    "test:coverage": "npx vitest run --coverage",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"src/**/*.js\"",
     "a11y:scan": "node scripts/a11y-runner.js",
+    "seo:inspect": "node scripts/inspect-seo.mjs",
     "gen-dts": "node scripts/gen-dts.js",
     "prepare": "npm run build && npm run gen-dts && npm run docs",
-    "check-dts": "npx tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck",
+    "check-dts": "node node_modules/typescript7/bin/tsc --noEmit src/index.d.ts --lib es2015,dom --skipLibCheck --ignoreConfig",
     "type-test": "npx tsd",
-    "docs": "typedoc --options typedoc.json"
+    "docs": "typedoc --options typedoc.json",
+    "benchmark": "npm run benchmark:lighthouse",
+    "benchmark:lighthouse": "node benchmarks/benchmark-lighthouse.js",
+    "benchmark:content": "node benchmarks/benchmark-content.js",
+    "check:bundle": "node scripts/check-bundle.cjs"
   },
   "dependencies": {
     "bulma": "^1.0.4",
-    "highlight.js": "^11.11.1",
-    "marked": "^17.0.4"
+    "dompurify": "^3.4.17",
+    "highlight.js": "^11.12.0",
+    "marked": "^18.1.1",
+    "performance-helpers": "^2.1.0"
   },
   "devDependencies": {
     "@fullhuman/postcss-purgecss": "^8.0.0",
-    "@vitest/coverage-v8": "^4.0.18",
-    "axe-core": "^4.11.1",
-    "comment-parser": "^0.7.6",
-    "cssnano": "^7.1.3",
-    "eslint": "^10.0.3",
+    "@vitest/coverage-v8": "^5.0.4",
+    "axe-core": "^4.14.0",
+    "comment-parser": "^1.4.9",
+    "cssnano": "^9.8.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
+    "eslint-plugin-nimbi-debug": "file:eslint-plugin-nimbi-debug",
     "eslint-plugin-unused-imports": "^4.4.1",
-    "glob": "^10.4.1",
-    "jsdom": "^28.1.0",
-    "postcss": "^8.5.8",
-    "postcss-discard-duplicates": "^7.0.2",
-    "postcss-merge-rules": "^7.0.8",
-    "postcss-preset-env": "^11.2.0",
-    "puppeteer": "^24.39.1",
+    "glob": "^13.0.6",
+    "jsdom": "^30.1.2",
+    "lighthouse": "^13.5.0",
+    "postcss": "^8.5.30",
+    "postcss-discard-duplicates": "^9.0.7",
+    "postcss-merge-rules": "^9.1.5",
+    "postcss-preset-env": "^11.6.1",
+    "prettier": "^3.9.10",
+    "puppeteer": "^25.13.0",
     "reading-time": "^1.5.0",
-    "rollup-plugin-visualizer": "^5.8.0",
+    "rollup-plugin-visualizer": "^7.1.1",
     "serve": "^14.2.6",
-    "terser": "^5.17.0",
     "tsd": "^0.33.0",
-    "typedoc": "^0.28.17",
-    "typedoc-plugin-markdown": "^4.10.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.1",
-    "vite-plugin-restart": "^2.0.0",
-    "vitest": "^4.0.18"
+    "typedoc": "^0.28.20",
+    "typedoc-plugin-markdown": "^4.13.1",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript7": "npm:typescript@^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
   },
   "main": "dist/nimbi-cms.cjs.js",
   "module": "dist/nimbi-cms.es.js",
   "types": "src/index.d.ts",
   "unpkg": "dist/nimbi-cms.js",
+  "sideEffects": [
+    "**/*.css",
+    "src/utils/domPurify.js",
+    "dist/nimbi-cms.es.js",
+    "dist/nimbi-cms.cjs.js",
+    "dist/nimbi-cms.js"
+  ],
   "files": [
     "dist",
     "src/index.d.ts"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "puppeteer@25.13.0": true
   }
 }

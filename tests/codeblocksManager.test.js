@@ -66,6 +66,24 @@ describe('codeblocksManager', () => {
     expect(ok2).toBe(true)
   })
 
+  it('registerLanguage returns false on failed module load and warns once', async () => {
+    cb.clearLanguageImportCache()
+    cb.SUPPORTED_HLJS_MAP.clear()
+    cb.SUPPORTED_HLJS_MAP.set('nonexistentlang', 'nonexistentlang')
+    cb.setLanguageImporter(async () => null)
+
+    const warnSpy = vi.spyOn(debug, 'debugWarn').mockImplementation(() => {})
+    const first = await cb.registerLanguage('nonexistentlang')
+    const second = await cb.registerLanguage('nonexistentlang')
+
+    expect(first).toBe(false)
+    expect(second).toBe(false)
+    expect(warnSpy.mock.calls.filter(([msg]) => String(msg).includes('language import failed')).length).toBe(1)
+
+    warnSpy.mockRestore()
+    cb.setLanguageImporter(null)
+  })
+
   it('setHighlightTheme replaces existing link and respects useCdn flag', () => {
     // existing link removal
     const link = document.createElement('link')

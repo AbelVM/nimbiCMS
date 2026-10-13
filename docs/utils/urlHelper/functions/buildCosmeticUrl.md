@@ -22,15 +22,15 @@ slug or relative path to include in the cosmetic hash
 
 ### anchor?
 
-optional anchor (without `#`)
+`string` \| `null`
 
-`string` | `null`
+optional anchor (without `#`)
 
 ### baseSearch?
 
-optional query string (including leading `?`)
+`string` \| `null`
 
-`string` | `null`
+optional query string (including leading `?`)
 
 ## Returns
 

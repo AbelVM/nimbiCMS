@@ -17,7 +17,7 @@ test('absolute HTML probe returns sibling .md and is preferred', async () => {
     const mdContent = '# Title\n\nThis is markdown content.'
     slugMgr.setFetchMarkdown(async (path, base) => {
       // return markdown only for the sibling .md probe
-      if (String(path || '').toLowerCase().endsWith('.md')) return { raw: mdContent }
+      if (String(path ?? '').toLowerCase().endsWith('.md')) return { raw: mdContent }
       return null
     })
 
@@ -34,7 +34,7 @@ test('absolute HTML probe returns sibling .md and is preferred', async () => {
     // wrap the fetchMarkdown to record which paths are probed
     slugMgr.setFetchMarkdown(async (path, base) => {
       calls.push(path)
-      if (String(path || '').toLowerCase().endsWith('.md')) return { raw: mdContent }
+      if (String(path ?? '').toLowerCase().endsWith('.md')) return { raw: mdContent }
       return null
     })
 

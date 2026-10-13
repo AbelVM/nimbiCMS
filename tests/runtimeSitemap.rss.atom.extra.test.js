@@ -7,16 +7,20 @@ describe('runtimeSitemap RSS/Atom endpoints (extra branches)', () => {
   let origDocOpen
   let origDocWrite
   let origDocClose
+  let origFetch
 
   beforeEach(() => {
     // clear slug maps
     slugManager.slugToMd.clear()
     slugManager.mdToSlug.clear()
     origLocation = globalThis.location
+    origFetch = globalThis.fetch
+    globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => '' })
   })
 
   afterEach(() => {
     try { Object.defineProperty(globalThis, 'location', { value: origLocation, configurable: true }) } catch (e) {}
+    try { globalThis.fetch = origFetch } catch (e) {}
     if (origDocOpen !== undefined) document.open = origDocOpen
     if (origDocWrite !== undefined) document.write = origDocWrite
     if (origDocClose !== undefined) document.close = origDocClose
@@ -38,10 +42,10 @@ describe('runtimeSitemap RSS/Atom endpoints (extra branches)', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).to.equal(true)
@@ -62,10 +66,10 @@ describe('runtimeSitemap RSS/Atom endpoints (extra branches)', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: slugManager.searchIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for the scheduled write to flush
     await new Promise((r) => setTimeout(r, 60))
     expect(handled).to.equal(true)

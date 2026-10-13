@@ -22,6 +22,9 @@ translating keys with optional replacements.
 
 ## Functions
 
+- [formatDate](functions/formatDate.md)
+- [formatNumber](functions/formatNumber.md)
 - [loadL10nFile](functions/loadL10nFile.md)
 - [setLang](functions/setLang.md)
 - [t](functions/t.md)
+- [tPlural](functions/tPlural.md)

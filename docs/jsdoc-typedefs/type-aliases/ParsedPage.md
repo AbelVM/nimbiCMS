@@ -6,7 +6,7 @@
 
 # Type Alias: ParsedPage
 
-> **ParsedPage**\<\> = `object`
+> **ParsedPage** = `object`
 
 ## Type Parameters
 

@@ -6,7 +6,7 @@
 
 # Function: preScanHtmlSlugs()
 
-> **preScanHtmlSlugs**(`linkEls`, `base`): `Promise`\<`void`\>
+> **preScanHtmlSlugs**(`linkEls`, `base`, `opts?`): `Promise`\<`void`\>
 
 Given a collection of anchor elements pointing at HTML files, fetch each
 document and extract a title or first H1.  This allows us to create
@@ -26,6 +26,8 @@ Anchors to inspect for HTML titles.
 `string`
 
 Base URL used for `fetchMarkdown` when resolving links.
+
+### opts?
 
 ## Returns
 

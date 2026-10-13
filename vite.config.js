@@ -1,118 +1,163 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
-import ViteRestart from 'vite-plugin-restart'
-import path from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
-import fs from 'fs'
-import { fileURLToPath } from 'url'
-import { dirname, resolve } from 'path'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const libraryEntry = path.resolve(__dirname, 'src/nimbi-cms.js')
 
-export default ({ command }) => {
-  if (command === 'build') {
-    const shouldAnalyze = !!process.env.ANALYZE
-
-    // Load package.json at build-time; Vite may not support JSON module imports
-    // in all environments, so read & parse manually.
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = dirname(__filename)
-    let highlightJsVersion = '11.11.1'
-    let pkg = null
-    try {
-      const pkgPath = resolve(__dirname, 'package.json')
-      const pkgText = fs.readFileSync(pkgPath, 'utf8')
-      pkg = JSON.parse(pkgText)
-      const dep = pkg && pkg.dependencies && pkg.dependencies['highlight.js']
-      if (dep) {
-        const m = String(dep).match(/(\d+\.\d+\.\d+)/)
-        if (m && m[1]) highlightJsVersion = m[1]
-      }
-    } catch (_e) {
-      // fallback to default version if package.json is inaccessible
-      pkg = null
+function readPackageMetadata() {
+  let pkg = null
+  let highlightJsVersion = null
+  try {
+    const pkgPath = path.resolve(__dirname, 'package.json')
+    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+    const dep = pkg?.dependencies?.['highlight.js']
+    if (dep) {
+      const match = String(dep).match(/(\d+\.\d+\.\d+)/)
+      if (match?.[1]) highlightJsVersion = match[1]
     }
+  } catch (_) {
+    pkg = null
+  }
+  return { pkg, highlightJsVersion }
+}
 
-    return defineConfig({
-      define: {
-        __HIGHLIGHT_JS_VERSION__: JSON.stringify(highlightJsVersion),
-        __NIMBI_CMS_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
-        __NIMBI_CMS_HOMEPAGE__: JSON.stringify(
-          (pkg && pkg.homepage) ||
-          (pkg && pkg.repository && (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url)) ||
-          ''
-        )
-      },
-      worker: { format: 'es', inline: true },
-      plugins: [
-        ViteRestart({
-          restart: ['dist/nimbi-cms.js']
+function isCssSideEffect(id) {
+  return /\.css($|\?)/.test(String(id ?? ''))
+}
+
+function createAnalyzePlugins(shouldAnalyze) {
+  return shouldAnalyze
+    ? [
+        visualizer({
+          filename: 'dist/bundle-analysis.html',
+          template: 'sunburst',
+          gzipSize: true,
+          brotliSize: true,
+          open: false,
+          title: 'nimbi-cms bundle analysis'
         })
-      ],
-      build: {
-        // prevent small files (like the renderer worker) from being inlined
-        // as data URIs; we rely on an actual URL so imports resolve correctly.
-        assetsInlineLimit: 0,
-        // Emit a single CSS file across multi-format library builds so we
-        // don't produce duplicate identical CSS files for each format.
-        cssCodeSplit: false,
-        lib: {
-          // Use the full library entry so helper exports (registerLanguage,
-          // setStyle, etc.) are included in all bundle formats.
-          entry: path.resolve(__dirname, 'src/nimbi-cms.js'),
-          name: 'nimbiCMS',
-          // Always emit ES, CJS and UMD builds. UMD will be the plain
-          // `nimbi-cms.js` artifact (no .umd suffix); ES gets an explicit
-          // suffix so consumers can reference it via `module` field.
-          formats: ['es', 'cjs', 'umd'],
-          fileName: (format) => {
-            if (format === 'umd') return 'nimbi-cms.js'
-            return `nimbi-cms.${format}.js`
-          }
-        },
+      ]
+    : []
+}
 
-        rollupOptions: {
-          output: { exports: 'named', inlineDynamicImports: true },
-          plugins: [
-            // optionally generate a static HTML bundle analysis when
-            // `ANALYZE=1` is set in the environment
-            ...(shouldAnalyze ? [
-              visualizer({
-                filename: 'dist/bundle-analysis.html',
-                // sunburst provides a compact overview useful for spotting large
-                // modules; treemap is another option. We also include gzip and
-                // brotli sizes to get accurate compressed metrics.
-                template: 'sunburst',
-                gzipSize: true,
-                brotliSize: true,
-                open: false,
-                title: 'nimbi-cms bundle analysis'
-              })
-            ] : [])
-          ]
+function createImportMapPlugin(enabled) {
+  if (!enabled) return null
+  return {
+    name: 'vite:import-map',
+    apply: 'build',
+    closeBundle() {
+      const { pkg } = readPackageMetadata()
+      const pkgName = pkg?.name || 'nimbi-cms'
+
+      const importMap = {
+        imports: {
+          [pkgName]: './dist/nimbi-cms.es.js',
+          [`${pkgName}/lib`]: './dist/nimbi-cms.es.js',
         }
       }
-    })
+
+      const importMapPath = path.resolve(__dirname, 'dist/import-map.json')
+      fs.mkdirSync(path.dirname(importMapPath), { recursive: true })
+      fs.writeFileSync(importMapPath, JSON.stringify(importMap, null, 2), 'utf8')
+    }
   }
+}
+
+function createBuildConfig({ mode, shouldAnalyze }) {
+  const { pkg, highlightJsVersion } = readPackageMetadata()
+  const isUmd = mode === 'umd'
+  const defineValues = {
+    __HIGHLIGHT_JS_VERSION__: JSON.stringify(highlightJsVersion),
+    __NIMBI_CMS_VERSION__: JSON.stringify(pkg?.version || '0.0.0'),
+    __NIMBI_CMS_HOMEPAGE__: JSON.stringify(
+      pkg?.homepage ||
+      (typeof pkg?.repository === 'string' ? pkg.repository : pkg?.repository?.url) ||
+      ''
+    )
+  }
+
   return defineConfig({
-    server: { port: 5173 },
-    worker: { format: 'es', inline: true },
-    plugins: [
-      ViteRestart({ restart: ['dist/nimbi-cms.js'] })
-    ],
-    build: {
-      // also disable inlining during dev build so ?url returns a real path
-      assetsInlineLimit: 0,
-      // Keep CSS output consistent in dev build as well
-      cssCodeSplit: false,
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          drop_console: true,
-          drop_debugger: true
-        },
-        format: {
-          comments: false
+    define: defineValues,
+    worker: {
+      format: 'es',
+      rollupOptions: {
+        output: {
+          codeSplitting: true
         }
+      }
+    },
+    build: {
+      sourcemap: 'hidden',
+      assetsInlineLimit: 4096,
+      cssCodeSplit: true,
+      // CSS minification is handled in postcss.config.cjs via cssnano.
+      cssMinify: false,
+      minify: 'esbuild',
+      emptyOutDir: !isUmd,
+      lib: isUmd
+        ? {
+            entry: libraryEntry,
+            name: 'nimbiCMS',
+            formats: ['umd']
+          }
+        : {
+            entry: libraryEntry,
+            name: 'nimbiCMS'
+          },
+      rollupOptions: {
+        treeshake: {
+          moduleSideEffects: (id) => isCssSideEffect(id)
+        },
+        output: isUmd
+          ? {
+              format: 'umd',
+              name: 'nimbiCMS',
+              entryFileNames: 'nimbi-cms.js',
+              exports: 'named',
+              codeSplitting: true
+            }
+          : [
+              {
+                format: 'es',
+                entryFileNames: 'nimbi-cms.es.js',
+                exports: 'named',
+                codeSplitting: true
+              },
+              {
+                format: 'cjs',
+                entryFileNames: 'nimbi-cms.cjs.js',
+                exports: 'named',
+                codeSplitting: true
+              }
+            ],
+        plugins: [
+          ...createAnalyzePlugins(shouldAnalyze && !isUmd),
+          createImportMapPlugin(!isUmd)
+        ].filter(Boolean)
       }
     }
   })
 }
+
+export default defineConfig(({ command }) => {
+  if (command !== 'build') {
+    return {
+      server: {
+        port: 5173,
+        hmr: {
+          overlay: false
+        }
+      },
+      worker: { format: 'es' }
+    }
+  }
+
+  const shouldAnalyze = !!process.env.ANALYZE
+  const mode = process.env.BUILD_TARGET === 'umd' ? 'umd' : 'lib'
+
+  return createBuildConfig({ mode, shouldAnalyze })
+})

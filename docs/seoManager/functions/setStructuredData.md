@@ -44,7 +44,7 @@ Optional override for the description.
 
 ### initialDocumentTitle?
 
-`string` = `''`
+`string` = `""`
 
 Fallback document title.
 

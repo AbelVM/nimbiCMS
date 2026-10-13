@@ -15,21 +15,21 @@ Placed immediately above export for TypeDoc.
 
 ### contentWrap
 
-Container where the message will be rendered; may be null.
+`HTMLElement` \| `null`
 
-`HTMLElement` | `null`
+Container where the message will be rendered; may be null.
 
 ### t
 
-Translation function that accepts a key and returns a localized string.
+`Function` \| `null`
 
-`Function` | `null`
+Translation function that accepts a key and returns a localized string.
 
 ### e
 
-Optional error whose message may be displayed to the user.
+`Error` \| `null`
 
-`Error` | `null`
+Optional error whose message may be displayed to the user.
 
 ## Returns
 

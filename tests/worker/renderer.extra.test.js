@@ -3,13 +3,21 @@ import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
 
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). The factory is static, so it is safe to keep active for the whole
+// file.
+vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
+
+function decodePosted(m) {
+  return m
+}
+
 describe('renderer worker extra', () => {
   let posted = []
   beforeEach(() => {
     posted = []
-    globalThis.postMessage = (m) => posted.push(m)
+    globalThis.postMessage = (m) => posted.push(decodePosted(m))
     vi.resetModules()
-    vi.mock('../../src/utils/frontmatter.js', () => ({ parseFrontmatter: (md) => ({ content: md || '', data: {} }) }))
     // prepare a fake language module
     const langMod = `export default function(hljs) { return { name: 'fake' } }`;
     const langPath = path.resolve('tests/worker/_fake_lang.mjs')
@@ -17,13 +25,12 @@ describe('renderer worker extra', () => {
     globalThis._fakeLangPath = pathToFileURL(langPath).href
     // create a modified copy of renderer.js with pre-seeded hljs and globalThis.onmessage
     const src = fs.readFileSync(path.resolve('src/worker/renderer.js'), 'utf8')
-    let rewritten = src.replace('let hljs = null', "let hljs = { registerLanguage: function(name, lang) { this[name]=lang }, getLanguage: function(n){ return !!this[n] }, highlight: function(c, o){ return c } }")
+    let rewritten = src.replace('from "./rendererRuntime.js"', 'from "../../src/worker/rendererRuntime.js"')
+    rewritten = rewritten.replace(/"\.\.\/utils\//g, '"../../src/utils/')
     rewritten = rewritten.replace(/(^|\n)onmessage\s*=/g, '$1globalThis.onmessage =')
-    rewritten = rewritten.replace("../utils/frontmatter.js", "../../src/utils/frontmatter.js")
-    rewritten = rewritten.replace("../utils/cache.js", "../../src/utils/cache.js")
-    rewritten = rewritten.replace("../utils/importCache.js", "../../src/utils/importCache.js")
+    let tryMock = rewritten.replace('let hljs = null', "let hljs = { registerLanguage: function(name, lang) { this[name]=lang }, getLanguage: function(n){ return !!this[n] }, highlight: function(c, o){ return c } }")
     const tmpPath = path.resolve('tests/worker/_renderer_test_module_extra.mjs')
-    fs.writeFileSync(tmpPath, rewritten, 'utf8')
+    fs.writeFileSync(tmpPath, tryMock, 'utf8')
     globalThis._rendererTestModuleExtra = tmpPath
   })
 
@@ -32,7 +39,10 @@ describe('renderer worker extra', () => {
     try { delete globalThis.postMessage } catch (_) {}
     try { fs.unlinkSync(path.resolve('tests/worker/_fake_lang.mjs')) } catch (_) {}
     try { fs.unlinkSync(globalThis._rendererTestModuleExtra) } catch (_) {}
-    vi.unmock('../../src/utils/frontmatter.js')
+    // vi.unmock is intentionally omitted: the mock is hoisted to the top
+    // level and is file-scoped, so it is reset automatically when the module
+    // registry is torn down. (In Vitest 5 vi.unmock is also hoistable, so a
+    // nested call here would throw.)
   })
 
   it('register success posts registered when hljs available', async () => {

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+function decodePosted(m) {
+  return m
+}
+
 let handler
 
 beforeEach(() => {
@@ -15,7 +19,7 @@ beforeEach(() => {
 describe('renderer worker API (direct invocation)', () => {
   it('renders markdown to html and returns meta/toc', async () => {
     expect(typeof handler).toBe('function')
-    const promise = new Promise(r => { global.postMessage = (msg) => r(msg) })
+    const promise = new Promise(r => { global.postMessage = (msg) => r(decodePosted(msg)) })
     const md = '# Hi'
     handler({ data: { type: 'render', id: 'r1', md } })
     const res = await promise
@@ -25,7 +29,7 @@ describe('renderer worker API (direct invocation)', () => {
   })
 
   it('registers a language module and responds with registered message', async () => {
-    const promise = new Promise(r => { global.postMessage = (msg) => r(msg) })
+    const promise = new Promise(r => { global.postMessage = (msg) => r(decodePosted(msg)) })
     handler({ data: { type: 'register', name: 'test', url: 'https://example.com/lang.js' } })
     const res = await promise
     expect(res.type).toMatch(/registered|register-error/)

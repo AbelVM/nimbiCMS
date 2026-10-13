@@ -22,7 +22,7 @@ optional meta object containing title/description/image
 
 ### pagePath?
 
-`string` = `''`
+`string` = `""`
 
 optional page path used for canonical URL generation
 

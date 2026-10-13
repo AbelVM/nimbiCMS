@@ -6,11 +6,11 @@
 
 # Function: getSearchIndex()
 
-> **getSearchIndex**(): `any`[]
+> **getSearchIndex**(): `object`[]
 
 Return the live `searchIndex` array (not a copy).
 Consumers should avoid mutating the returned array directly.
 
 ## Returns
 
-`any`[]
+`object`[]

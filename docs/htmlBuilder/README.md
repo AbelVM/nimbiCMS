@@ -11,18 +11,14 @@ HTML builder and article rendering helpers.
 Functions to parse markdown into article DOM, build TOC elements, and
 prepare content for rendering inside the UI.
 
-## Type Aliases
-
-- [ArticleResult](type-aliases/ArticleResult.md)
-- [NavItem](type-aliases/NavItem.md)
-- [ParsedPage](type-aliases/ParsedPage.md)
-
 ## Functions
 
+- [\_buildAnchorWorkerSnapshot](functions/buildAnchorWorkerSnapshot.md)
 - [\_computeSlug](functions/computeSlug.md)
 - [\_ensureLanguages](functions/ensureLanguages.md)
 - [\_parseHtml](functions/parseHtml.md)
 - [\_parseMarkdown](functions/parseMarkdown.md)
+- [\_resolveSlugForWorkerPath](functions/resolveSlugForWorkerPath.md)
 - [attachTocClickHandler](functions/attachTocClickHandler.md)
 - [buildTocElement](functions/buildTocElement.md)
 - [createNavTree](functions/createNavTree.md)
@@ -36,6 +32,7 @@ prepare content for rendering inside the UI.
 - [rewriteAnchors](functions/rewriteAnchors.md)
 - [rewriteAnchorsWorker](functions/rewriteAnchorsWorker.md)
 - [scrollToAnchorOrTop](functions/scrollToAnchorOrTop.md)
+- [teardownAnchorWorkerPool](functions/teardownAnchorWorkerPool.md)
 
 ## References
 

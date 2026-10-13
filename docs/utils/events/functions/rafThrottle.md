@@ -6,7 +6,7 @@
 
 # Function: rafThrottle()
 
-> **rafThrottle**(`fn`): (...`args`) => `void`
+> **rafThrottle**(`fn`): \{(...`args`): `void`; `cancel`: `void`; \}
 
 ## Parameters
 
@@ -16,14 +16,12 @@
 
 ## Returns
 
-> (...`args`): `void`
+\{(...`args`): `void`; `cancel`: `void`; \}
 
-### Parameters
+### cancel()
 
-#### args
+> **cancel**(): `void`
 
-...`any`[]
-
-### Returns
+#### Returns
 
 `void`

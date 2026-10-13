@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "nimbi-cms": "./dist/nimbi-cms.es.js",
+    "nimbi-cms/lib": "./dist/nimbi-cms.es.js"
+  }
+}

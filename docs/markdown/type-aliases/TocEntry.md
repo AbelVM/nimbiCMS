@@ -6,7 +6,7 @@
 
 # Type Alias: TocEntry
 
-> **TocEntry**\<\> = `object`
+> **TocEntry** = `object`
 
 ## Type Parameters
 
@@ -14,7 +14,7 @@
 
 ### id?
 
-> `optional` **id**: `string`
+> `optional` **id?**: `string`
 
 ### level
 
@@ -22,11 +22,11 @@
 
 ### parentTitle?
 
-> `optional` **parentTitle**: `string`
+> `optional` **parentTitle?**: `string`
 
 ### slug?
 
-> `optional` **slug**: `string`
+> `optional` **slug?**: `string`
 
 ### text
 

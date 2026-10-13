@@ -28,6 +28,7 @@ supporting SPA-style navigation within the runtime.
 - [\_purgeExpiredEntries](functions/purgeExpiredEntries.md)
 - [augmentIndexWithAllMarkdownPaths](functions/augmentIndexWithAllMarkdownPaths.md)
 - [buildPageCandidates](functions/buildPageCandidates.md)
+- [disposeResolutionCachePurge](functions/disposeResolutionCachePurge.md)
 - [fetchPageData](functions/fetchPageData.md)
 - [resolutionCacheGet](functions/resolutionCacheGet.md)
 - [resolutionCacheSet](functions/resolutionCacheSet.md)
@@ -38,10 +39,10 @@ supporting SPA-style navigation within the runtime.
 
 ### allMarkdownPaths
 
-Re-exports [allMarkdownPaths](../slugManager/variables/allMarkdownPaths.md)
+Re-exports [allMarkdownPaths](../slugState/variables/allMarkdownPaths.md)
 
 ***
 
 ### allMarkdownPathsSet
 
-Re-exports [allMarkdownPathsSet](../slugManager/variables/allMarkdownPathsSet.md)
+Re-exports [allMarkdownPathsSet](../slugState/variables/allMarkdownPathsSet.md)

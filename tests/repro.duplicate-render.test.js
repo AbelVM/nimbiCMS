@@ -11,8 +11,6 @@ describe('repro: duplicate render', () => {
     const wrap = document.createElement('div')
     const container = document.createElement('main')
     const renderByQuery = vi.fn(() => Promise.resolve())
-    // enable debug counters
-    try { globalThis.__nimbiCMSDebug = {} } catch (e) {}
 
     const nav = await import('../src/nav.js')
     await nav.buildNav(wrap, container, navHtml, 'http://base/', 'home', (k) => k, renderByQuery, false)
@@ -29,7 +27,5 @@ describe('repro: duplicate render', () => {
     // allow microtask/macrotask queue to settle
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(renderByQuery).toHaveBeenCalledTimes(1)
-    // instrumentation: ensure runRenderWithTransition invoked once
-    try { expect(globalThis.__nimbiCMSDebug && globalThis.__nimbiCMSDebug.runRenderWithTransition).toBe(1) } catch (e) {}
   })
 })

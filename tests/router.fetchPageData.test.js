@@ -8,7 +8,7 @@ test('fetchPageData detects site-shell HTML and prefers markdown sibling', async
   try {
     // stub fetch to return an HTML site shell for the absolute URL
     globalThis.fetch = vi.fn(async (url) => {
-      const s = String(url || '')
+      const s = String(url ?? '')
       if (s.endsWith('/foo.html') || s.endsWith('/foo.html')) {
         return {
           ok: true,
@@ -22,7 +22,7 @@ test('fetchPageData detects site-shell HTML and prefers markdown sibling', async
 
     // stub fetchMarkdown to return a markdown page for the sibling .md
     slug.setFetchMarkdown(async (path, base) => {
-      if (String(path || '').endsWith('foo.md')) return { raw: '# Found Title' }
+      if (String(path ?? '').endsWith('foo.md')) return { raw: '# Found Title' }
       return null
     })
 

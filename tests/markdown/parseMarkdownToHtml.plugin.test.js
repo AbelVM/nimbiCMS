@@ -13,6 +13,6 @@ describe('parseMarkdownToHtml plugin path', () => {
     expect(Array.isArray(res.toc)).toBe(true)
     expect(res.toc.length).toBeGreaterThan(0)
     // plugin should have affected paragraph rendering
-    expect(String(res.html || '').includes('class=pl') || String(res.html || '').length > 0).toBe(true)
+    expect(String(res.html ?? '').includes('class=pl') || String(res.html ?? '').length > 0).toBe(true)
   })
 })

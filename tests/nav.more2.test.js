@@ -69,8 +69,10 @@ describe('nav deeper edge branches', () => {
   })
 
   it('html fetchMarkdown error falls back to original href', async () => {
-    // mock slugManager.fetchMarkdown to throw
-    vi.mock('../src/slugManager.js', async (importOriginal) => {
+    // mock slugManager.fetchMarkdown to throw. vi.doMock is used (not
+    // vi.mock) because the factory differs per test and must be applied at
+    // runtime rather than hoisted at file load.
+    vi.doMock('../src/slugManager.js', async (importOriginal) => {
       const actual = await importOriginal()
       return {
         ...actual,

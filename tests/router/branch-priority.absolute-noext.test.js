@@ -29,14 +29,14 @@ test('absolute URL without .html probes alt .md and prefers it', async () => {
     const calls = []
     slugMgr.setFetchMarkdown(async (path, base) => {
       calls.push(path)
-      if (String(path || '').toLowerCase().endsWith('.md')) return { raw: mdContent }
+      if (String(path ?? '').toLowerCase().endsWith('.md')) return { raw: mdContent }
       return null
     })
 
     const res = await router.fetchPageData('http://example.com/shell', 'http://example.com/content/')
     expect(res).toBeTruthy()
     // ensure the alt md probe happened and was accepted
-    expect(calls.some(p => String(p || '').toLowerCase().endsWith('.md'))).toBe(true)
+    expect(calls.some(p => String(p ?? '').toLowerCase().endsWith('.md'))).toBe(true)
     expect(res.data && res.data.raw).toContain('# Shell MD')
   } finally {
     try { if (origFetch) vi.stubGlobal('fetch', origFetch) } catch (_) {}

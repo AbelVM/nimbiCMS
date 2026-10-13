@@ -93,4 +93,34 @@ describe('bulmaManager theming helpers', () => {
     await ensureBulma('local', '/base/')
     expect(document.querySelector('style[data-bulma-override]')).toBeNull()
   })
+
+  it('disconnects MutationObserver after excessive moves', async () => {
+    const { ensureBulma } = await import('../src/bulmaManager.js')
+    const disconnectSpy = vi.spyOn(MutationObserver.prototype, 'disconnect')
+
+    await ensureBulma('solarized')
+    const themeLink = document.querySelector('link[data-bulmaswatch-theme="solarized"]')
+    expect(themeLink).toBeTruthy()
+
+    // Set move count to 1000 to trigger cleanup
+    themeLink.setAttribute('data-bulmaswatch-move-count', '1000')
+
+    // Ensure the link is not the last child so the observer callback
+    // does not early-return before checking moveCount.
+    const extra = document.createElement('link')
+    extra.rel = 'stylesheet'
+    extra.href = 'bogus.css'
+    document.head.appendChild(extra)
+
+    // Trigger MutationObserver by appending another element
+    const trigger = document.createElement('div')
+    document.head.appendChild(trigger)
+
+    // Allow the observer callback to flush
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(disconnectSpy).toHaveBeenCalled()
+
+    disconnectSpy.mockRestore()
+  })
 })

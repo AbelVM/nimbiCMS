@@ -17,9 +17,9 @@ discovered in slug maps.
 
 ### contentBase
 
-Base path or URL for content used by the indexer.
+`string` \| `URL`
 
-`string` | `URL`
+Base path or URL for content used by the indexer.
 
 ## Returns
 

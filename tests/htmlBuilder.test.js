@@ -14,7 +14,8 @@ import {
   _computeSlug,
   rewriteAnchors,
   rewriteAnchors as _rewriteAnchors,
-  rewriteAnchorsWorker
+  rewriteAnchorsWorker,
+  _buildAnchorWorkerSnapshot
 } from '../src/htmlBuilder.js'
 import { slugify, slugToMd, mdToSlug, searchIndex } from '../src/slugManager.js'
 import * as slugMgr from '../src/slugManager.js'
@@ -42,6 +43,10 @@ describe('htmlBuilder utilities', () => {
     mdToSlug.clear()
     // clear any search index state from prior tests
     searchIndex.splice(0)
+    // clear any resolved index state from prior tests
+    delete globalThis.__nimbiResolvedIndex
+    delete globalThis.__nimbiSitemapFinal
+    delete globalThis.__nimbiSitemapJson
     // remove any leftover container or scroll button elements from prior runs
     document.querySelectorAll('.nimbi-cms, .nimbi-scroll-top').forEach(el => el.remove())
   })
@@ -89,7 +94,7 @@ describe('htmlBuilder utilities', () => {
       'sub/bar.md': '# Another'
     }
     global.fetch = vi.fn(async (url) => {
-      const str = String(url || '')
+      const str = String(url ?? '')
       for (const k in responses) {
         if (str.includes(k)) return { ok: true, text: () => Promise.resolve(responses[k]) }
       }
@@ -99,6 +104,16 @@ describe('htmlBuilder utilities', () => {
     await preMapMdSlugs(anchors, 'http://example.com/base/')
     expect(slugToMd.get('foo-title')).toBe('foo.md')
     expect(slugToMd.get('another')).toBe('sub/bar.md')
+  })
+
+  it('builds worker anchor snapshot pathToSlug from resolved index entries', () => {
+    globalThis.__nimbiResolvedIndex = [
+      { path: 'docs/bulmaManager/README.md', slug: 'bulmamanager' },
+    ]
+    const article = document.createElement('article')
+    article.innerHTML = '<a href="bulmaManager/README.md">bulmaManager</a>'
+    const snapshot = _buildAnchorWorkerSnapshot(article, 'http://example.com/', 'docs/README.md')
+    expect(snapshot.pathToSlug['docs/bulmaManager/README.md']).toBe('bulmamanager')
   })
 
   it('parseHtml returns html and toc entries', () => {
@@ -165,7 +180,7 @@ describe('htmlBuilder utilities', () => {
     const fakeNavMd = { raw: '- [Home](_home.md)\n- [Foo](foo.md)' }
     // stub global.fetch so both navigation and individual pages resolve
     global.fetch = vi.fn(async (url) => {
-      const u = String(url || '')
+      const u = String(url ?? '')
       if (u.includes('_home.md')) return { ok: true, text: () => Promise.resolve('# Home') }
       if (u.includes('_navigation.md')) return { ok: true, text: () => Promise.resolve(fakeNavMd.raw) }
       if (u.includes('foo.md')) return { ok: true, text: () => Promise.resolve('# Foo\n\nbar') }
@@ -440,18 +455,7 @@ describe('htmlBuilder utilities', () => {
   })
 
   // additional tests for worker support and coverage
-  it('rewriteAnchorsWorker falls back when worker unavailable', async () => {
-    const htmlBuilder = await import('../src/htmlBuilder.js')
-    const spy = vi.spyOn(htmlBuilder, 'initAnchorWorker').mockReturnValue(null)
-    const article = document.createElement('article')
-    article.innerHTML = '<a href="foo.md">x</a>'
-    const { slugToMd, mdToSlug } = await import('../src/slugManager.js')
-    slugToMd.set('foo', 'foo.md')
-    mdToSlug.set('foo.md', 'foo')
-    await htmlBuilder.rewriteAnchorsWorker(article, 'http://base/', '')
-    expect(article.querySelector('a').href).toContain('?page=foo')
-    spy.mockRestore()
-  })
+
 
   it('rewriteAnchorsWorker uses actual worker when available', async () => {
     // allow real worker creation and stub fetch
@@ -493,6 +497,17 @@ describe('htmlBuilder utilities', () => {
     ensureScrollTopButton(article, topH1, {})
     global.setTimeout = origTimeout
     expect(document.querySelector('.nimbi-scroll-top')).toBeTruthy()
+  })
+
+  it('ensureScrollTopButton uses a default aria-label when no translator is provided', () => {
+    const article = document.createElement('article')
+    const navWrap = document.createElement('div')
+    navWrap.className = 'nimbi-nav-wrap'
+    document.body.appendChild(navWrap)
+    ensureScrollTopButton(article, null, { navWrap, t: null })
+    const btn = document.querySelector('.nimbi-scroll-top')
+    expect(btn).toBeTruthy()
+    expect(btn.getAttribute('aria-label')).toBe('Scroll to top')
   })
 
 })

@@ -24,7 +24,7 @@ test('title enrichment fetches markdown H1 and marks _titleSource as fetched', a
     expect(json).toBeTruthy()
     const found = json.entries.find(e => e.slug === 'fslug')
     expect(found).toBeTruthy()
-    expect(String(found.title || '')).toMatch(/Fetched Title/)
+    expect(String(found.title ?? '')).toMatch(/Fetched Title/)
     expect(found._titleSource === 'fetched' || found._titleSource === 'index' || typeof found._titleSource === 'string').toBe(true)
   } finally {
     slugManager.setFetchMarkdown(origFetch)

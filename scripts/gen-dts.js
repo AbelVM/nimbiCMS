@@ -304,9 +304,10 @@ globSync('src/**/*.js').forEach(file => {
   // pre-split source lines once for comment indexing
   const srcLines = src.split('\n')
   comments.forEach(c => {
-    if (!c.line) return
+    const commentLine = c.line || (Array.isArray(c.source) && c.source[0] && c.source[0].number)
+    if (!commentLine) return
     // compute position of the start of the comment based on line number
-    const idx = srcLines.slice(0, c.line - 1).join('\n').length
+    const idx = srcLines.slice(0, commentLine - 1).join('\n').length
     let endIdx = src.indexOf('*/', idx)
     if (endIdx === -1) {
       endIdx = idx
@@ -337,7 +338,7 @@ globSync('src/**/*.js').forEach(file => {
         const retTag = c.tags.find(t=>t.tag==='returns' || t.tag==='return')
         let retType = 'any'
         if (retTag) {
-          const raw = String(retTag.type || '')
+          const raw = String(retTag.type ?? '')
           // determine if there is a *top-level* union (pipe not nested inside
           // braces, parentheses, or generic angle brackets).
           function hasTopUnion(str) {
@@ -374,7 +375,7 @@ globSync('src/**/*.js').forEach(file => {
         }
         // helper to clean individual parameter type string
         function sanitizeParamType(typeStr) {
-          let ty = String(typeStr || '').trim()
+          let ty = String(typeStr ?? '').trim()
           // don't modify function types or types containing arrows
           if (ty.includes('=>')) return ty
           // wrap object-like annotations if not already braced

@@ -9,7 +9,7 @@ vi.mock('../src/slugManager.js', async (importOriginal) => {
     ...actual,
     slugToMd,
     resolveSlugPath: (s) => undefined,
-    slugify: (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
+    slugify: (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9\-\s]+/g, '').replace(/\s+/g, '-')
   }
 })
 

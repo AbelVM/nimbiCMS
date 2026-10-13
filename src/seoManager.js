@@ -6,9 +6,10 @@
  *
  * @module seoManager
  */
-import { normalizePath } from './utils/helpers.js'
-import { getTextMetrics } from './utils/textMetrics.js'
-import { debugWarn } from './utils/debug.js'
+import { normalizePath, applyCspNonce } from "./utils/helpers.js";
+import { getTextMetrics } from "./utils/textMetrics.js";
+import { debugWarn } from "./utils/debug.js";
+import { availableLanguages, getLanguages } from "./slugManager.js";
 
 /**
  * Page data shape passed around the renderer.
@@ -24,51 +25,272 @@ import { debugWarn } from './utils/debug.js'
  * @returns {void}
  */
 export function setTag(name, content) {
-  let tag = document.querySelector(`meta[name="${name}"]`)
+  const escapedName =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(name))
+      : String(name);
+  let tag = document.querySelector(`meta[name="${escapedName}"]`);
   if (!tag) {
-    tag = document.createElement('meta')
-    tag.setAttribute('name', name)
-    document.head.appendChild(tag)
+    tag = document.createElement("meta");
+    tag.setAttribute("name", name);
+    document.head.appendChild(tag);
   }
-  tag.setAttribute('content', content)
+  tag.setAttribute("content", content);
+}
+
+/**
+ * Ensure essential document-level meta tags exist (charset, viewport).
+ * Safe to call multiple times; only adds missing tags.
+ * @returns {void}
+ */
+export function ensureDocumentMeta() {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    try {
+      if (!document.querySelector('meta[charset]')) {
+        const charset = document.createElement("meta");
+        charset.setAttribute("charset", "utf-8");
+        document.head.prepend(charset);
+      }
+    } catch (e) {}
+    try {
+      if (!document.querySelector('meta[name="viewport"]')) {
+        const viewport = document.createElement("meta");
+        viewport.setAttribute("name", "viewport");
+        viewport.setAttribute("content", "width=device-width, initial-scale=1");
+        document.head.appendChild(viewport);
+      }
+    } catch (e) {}
+  } catch (e) {}
 }
 
 function upsertMeta(attrName, attrValue, content) {
-  let sel = `meta[${attrName}="${attrValue}"]`
-  let tag = document.querySelector(sel)
+  const escapedAttrValue =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(attrValue))
+      : String(attrValue);
+  let sel = `meta[${attrName}="${escapedAttrValue}"]`;
+  let tag = document.querySelector(sel);
   if (!tag) {
-    tag = document.createElement('meta')
-    tag.setAttribute(attrName, attrValue)
-    document.head.appendChild(tag)
+    tag = document.createElement("meta");
+    tag.setAttribute(attrName, attrValue);
+    document.head.appendChild(tag);
   }
-  tag.setAttribute('content', content)
+  tag.setAttribute("content", content);
+}
+
+function replaceMetaValues(attrName, attrValue, values) {
+  const escapedAttrValue =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(attrValue))
+      : String(attrValue);
+  document
+    .querySelectorAll(`meta[${attrName}="${escapedAttrValue}"]`)
+    .forEach((tag) => tag.remove());
+  for (const value of values) {
+    const tag = document.createElement("meta");
+    tag.setAttribute(attrName, attrValue);
+    tag.setAttribute("content", String(value));
+    document.head.appendChild(tag);
+  }
 }
 
 function upsertLinkRel(rel, href) {
   try {
-    if (!rel) return
-    let link = document.querySelector(`link[rel="${rel}"]`)
+    if (!rel) return;
+    const escapedRel =
+      typeof CSS !== "undefined" && CSS.escape
+        ? CSS.escape(String(rel))
+        : String(rel);
+    let link = document.querySelector(`link[rel="${escapedRel}"]`);
     if (!link) {
-      link = document.createElement('link')
-      link.setAttribute('rel', rel)
-      document.head.appendChild(link)
+      link = document.createElement("link");
+      link.setAttribute("rel", rel);
+      document.head.appendChild(link);
     }
-    link.setAttribute('href', href)
-  } catch (e) { debugWarn('[seoManager] upsertLinkRel failed', e) }
+    link.setAttribute("href", href);
+  } catch (e) {
+    debugWarn("[seoManager] upsertLinkRel failed", e);
+  }
 }
 
-function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
-  const title = (titleOverride && String(titleOverride).trim()) ? titleOverride : (meta.title || document.title)
-  upsertMeta('property', 'og:title', title)
-  const desc = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description || '')
-  if (desc && String(desc).trim()) upsertMeta('property', 'og:description', desc)
-  if (desc && String(desc).trim()) upsertMeta('name', 'twitter:description', desc)
-  upsertMeta('name', 'twitter:card', meta.twitter_card || 'summary_large_image')
-  const img = imageOverride || meta.image
-  if (img) {
-    upsertMeta('property', 'og:image', img)
-    upsertMeta('name', 'twitter:image', img)
+/**
+ * Detect whether a language code is RTL using Intl.Locale.
+ * @param {string} lang - Language code (e.g. 'ar', 'he', 'fa').
+ * @returns {boolean} - True when the language is right-to-left.
+ */
+function _isRtlLang(lang) {
+  try {
+    if (!lang) return false;
+    const loc = new Intl.Locale(lang);
+    if (loc.textInfo && typeof loc.textInfo.direction === "string") {
+      return loc.textInfo.direction === "rtl";
+    }
+    // Fallback: check known RTL language prefixes
+    const short = String(lang).split("-")[0].toLowerCase();
+    return ["ar", "he", "fa", "ur", "ps", "sd", "ug", "ku", "dv", "yi"].includes(
+      short,
+    );
+  } catch (_) {
+    return false;
   }
+}
+
+function _validLanguageTags(langs) {
+  if (!Array.isArray(langs)) return [];
+  const valid = new Set();
+  for (const lang of langs) {
+    try {
+      const tag = new Intl.Locale(String(lang)).toString();
+      if (tag.toLowerCase() !== "x-default") valid.add(tag);
+    } catch (_) {}
+  }
+  return [...valid];
+}
+
+/**
+ * Emit hreflang `<link rel="alternate">` tags for every configured
+ * available language plus an `x-default` fallback. Each tag points to
+ * the current page URL with the appropriate `?lang=` query parameter.
+ * Safe to call multiple times; existing tags are updated in place.
+ * @param {string} [pageSlug] - Optional page slug for the canonical URL.
+ * @returns {void}
+ */
+export function setHreflangTags(pageSlug) {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    document
+      .querySelectorAll('link[rel="alternate"][hreflang]')
+      .forEach((el) => el.remove());
+    const langs = _validLanguageTags(getLanguages());
+    if (!Array.isArray(langs) || langs.length === 0) return;
+
+    try {
+      const base =
+        typeof location !== "undefined" && location?.origin
+          ? location.origin + location.pathname.split("?")[0]
+          : "";
+      if (!base) return;
+
+      const slug = pageSlug || "";
+      const baseUrl = slug
+        ? `${base}?page=${encodeURIComponent(slug)}`
+        : base;
+
+      for (const lang of langs) {
+        try {
+          const separator = baseUrl.includes("?") ? "&" : "?";
+          const href = `${baseUrl}${separator}lang=${encodeURIComponent(String(lang))}`;
+          const link = document.createElement("link");
+          link.setAttribute("rel", "alternate");
+          link.setAttribute("hreflang", String(lang));
+          link.setAttribute("href", href);
+          document.head.appendChild(link);
+        } catch (_) {}
+      }
+
+      // x-default fallback
+      try {
+        const xDefault = document.createElement("link");
+        xDefault.setAttribute("rel", "alternate");
+        xDefault.setAttribute("hreflang", "x-default");
+        xDefault.setAttribute("href", baseUrl);
+        document.head.appendChild(xDefault);
+      } catch (_) {}
+    } catch (e) {
+      debugWarn("[seoManager] setHreflangTags failed", e);
+    }
+  } catch (e) {
+    debugWarn("[seoManager] setHreflangTags failed", e);
+  }
+}
+
+/**
+ * Set or update Open Graph and Twitter Card meta tags.
+ * @param {Object} meta - Page metadata object.
+ * @param {string} [titleOverride] - Optional title override.
+ * @param {string} [imageOverride] - Optional image URL override.
+ * @param {string} [descOverride] - Optional description override.
+ * @param {string} [pageType] - Optional page type for og:type (e.g. 'article', 'website').
+ * @returns {void}
+ */
+function setOgTwitter(
+  meta,
+  titleOverride,
+  imageOverride,
+  descOverride,
+  pageType,
+) {
+  const title =
+    titleOverride && String(titleOverride).trim()
+      ? titleOverride
+      : meta.title || document.title;
+  upsertMeta("property", "og:title", title);
+  const desc =
+    descOverride && String(descOverride).trim()
+      ? descOverride
+      : meta.description || "";
+  if (desc && String(desc).trim())
+    upsertMeta("property", "og:description", desc);
+  if (desc && String(desc).trim())
+    upsertMeta("name", "twitter:description", desc);
+  upsertMeta(
+    "name",
+    "twitter:card",
+    meta.twitter_card || "summary_large_image",
+  );
+  const img = imageOverride || meta.image;
+  if (img) {
+    upsertMeta("property", "og:image", img);
+    upsertMeta("name", "twitter:image", img);
+    if (meta.image_width)
+      upsertMeta("property", "og:image:width", String(meta.image_width));
+    if (meta.image_height)
+      upsertMeta("property", "og:image:height", String(meta.image_height));
+  }
+  // og:type — default to 'website', use 'article' for content pages
+  const ogType = pageType || meta.og_type || (meta.type === "Article" ? "article" : "website");
+  upsertMeta("property", "og:type", ogType);
+  // og:locale — derive from current language
+  try {
+    const lang =
+      typeof navigator !== "undefined"
+        ? navigator.language || navigator.languages?.[0] || "en"
+        : "en";
+    const locale = String(lang).replace("-", "_").toLowerCase();
+    upsertMeta("property", "og:locale", locale);
+    // og:locale:alternate — one per available language
+    const langs = _validLanguageTags(getLanguages());
+    if (Array.isArray(langs) && langs.length > 0) {
+      replaceMetaValues(
+        "property",
+        "og:locale:alternate",
+        langs.map((l) => String(l).replace("-", "_").toLowerCase()),
+      );
+    } else {
+      replaceMetaValues("property", "og:locale:alternate", []);
+    }
+  } catch (_) {}
+  // article:published_time / article:modified_time
+  if (meta.date) {
+    try {
+      const d = new Date(meta.date);
+      if (!isNaN(d.getTime()))
+        upsertMeta("property", "article:published_time", d.toISOString());
+    } catch (_) {}
+  }
+  if (meta.dateModified) {
+    try {
+      const d = new Date(meta.dateModified);
+      if (!isNaN(d.getTime()))
+        upsertMeta("property", "article:modified_time", d.toISOString());
+    } catch (_) {}
+  }
+  // twitter:site / twitter:creator
+  if (meta.twitter_site)
+    upsertMeta("name", "twitter:site", String(meta.twitter_site));
+  if (meta.twitter_creator)
+    upsertMeta("name", "twitter:creator", String(meta.twitter_creator));
 }
 
 /**
@@ -80,13 +302,31 @@ function setOgTwitter(meta, titleOverride, imageOverride, descOverride) {
  * @param {string} [_initialDocumentTitle] - Fallback site/document title.
  * @returns {void}
  */
-export function setMetaTags(data, titleOverride, imageOverride, descOverride, _initialDocumentTitle = '') {
-  const meta = data.meta || {}
-  const existingHtmlDesc = (document && document.querySelector) ? (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '' : ''
-  const finalDesc = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description && String(meta.description).trim()) ? meta.description : (existingHtmlDesc && String(existingHtmlDesc).trim()) ? existingHtmlDesc : ''
-  if (finalDesc && String(finalDesc).trim()) setTag('description', finalDesc)
-  setTag('robots', meta.robots || 'index,follow')
-  setOgTwitter(meta, titleOverride, imageOverride, finalDesc)
+export function setMetaTags(
+  data,
+  titleOverride,
+  imageOverride,
+  descOverride,
+  _initialDocumentTitle = "",
+) {
+  const meta = data.meta || {};
+  const existingHtmlDesc = document?.querySelector
+    ? document
+        .querySelector('meta[name="description"]')
+        ?.getAttribute("content") || ""
+    : "";
+  const finalDesc =
+    descOverride && String(descOverride).trim()
+      ? descOverride
+      : meta.description && String(meta.description).trim()
+        ? meta.description
+        : existingHtmlDesc && String(existingHtmlDesc).trim()
+          ? existingHtmlDesc
+          : "";
+  if (finalDesc && String(finalDesc).trim()) setTag("description", finalDesc);
+  setTag("robots", meta.robots || "index,follow");
+  setOgTwitter(meta, titleOverride, imageOverride, finalDesc, meta.type);
+  setHreflangTags(data.slug || data.meta?.slug || "");
 }
 
 /**
@@ -100,19 +340,19 @@ export function getSiteNameFromMeta() {
       'meta[name="site-name"]',
       'meta[name="siteName"]',
       'meta[property="og:site_name"]',
-      'meta[name="twitter:site"]'
-    ]
+      'meta[name="twitter:site"]',
+    ];
     for (const sel of candidates) {
-      const m = document.querySelector(sel)
+      const m = document.querySelector(sel);
       if (m) {
-        const c = m.getAttribute('content') || ''
-        if (c && c.trim()) return c.trim()
+        const c = m.getAttribute("content") || "";
+        if (c?.trim()) return c.trim();
       }
     }
   } catch (e) {
-    debugWarn('[seoManager] getSiteNameFromMeta failed', e)
+    debugWarn("[seoManager] getSiteNameFromMeta failed", e);
   }
-  return ''
+  return "";
 }
 
 /**
@@ -125,55 +365,203 @@ export function getSiteNameFromMeta() {
  * @param {string} [initialDocumentTitle] - Fallback document title.
  * @returns {void}
  */
-export function setStructuredData(data, pagePath, titleOverride, imageOverride, descOverride, initialDocumentTitle = '') {
+export function setStructuredData(
+  data,
+  pagePath,
+  titleOverride,
+  imageOverride,
+  descOverride,
+  initialDocumentTitle = "",
+) {
   try {
-    const meta = data.meta || {}
-    const title = (titleOverride && String(titleOverride).trim()) ? titleOverride : (meta.title || initialDocumentTitle || document.title)
-    const description = (descOverride && String(descOverride).trim()) ? descOverride : (meta.description || (document.querySelector('meta[name="description"]') && document.querySelector('meta[name="description"]').getAttribute('content')) || '')
-    const image = imageOverride || meta.image || null
-    let canonical = ''
+    const meta = data.meta || {};
+    const title =
+      titleOverride && String(titleOverride).trim()
+        ? titleOverride
+        : meta.title || initialDocumentTitle || document.title;
+    const description =
+      descOverride && String(descOverride).trim()
+        ? descOverride
+        : meta.description ||
+          document
+            .querySelector('meta[name="description"]')
+            ?.getAttribute("content") ||
+          "";
+    const image = imageOverride || meta.image || null;
+function _computeCanonical(page) {
+  try {
+    const p = normalizePath(page);
     try {
-      if (pagePath) {
-        const p = normalizePath(pagePath)
-        try {
-          const base = location.origin + location.pathname
-          canonical = base.split('?')[0] + '?page=' + encodeURIComponent(p)
-        } catch (e) {
-          canonical = location.href.split('#')[0]
-        }
-      } else {
-        canonical = location.href.split('#')[0]
+      const base = location.origin + location.pathname;
+      return base.split("?")[0] + "?page=" + encodeURIComponent(p);
+    } catch (e) {
+      return location.href.split("#")[0];
+    }
+  } catch (e) {
+    return location.href.split("#")[0];
+  }
+}
+
+    const canonical = _computeCanonical(pagePath);
+
+    if (canonical) upsertLinkRel("canonical", canonical);
+    try {
+      upsertMeta("property", "og:url", canonical);
+    } catch (e) {
+      debugWarn("[seoManager] upsertMeta og:url failed", e);
+    }
+
+    function _inferPageType(page, meta) {
+      try {
+        const raw = String(meta?.type || "").trim();
+        if (raw) return raw;
+        const p = String(page || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+        if (!p || p === "index" || p === "home") return "WebPage";
+        const segments = p.split("/");
+        const first = segments[0] || "";
+        const last = segments[segments.length - 1] || "";
+        const map = {
+          about: "AboutPage",
+          contact: "ContactPage",
+          blog: "Blog",
+          posts: "Blog",
+          article: "Article",
+          articles: "Article",
+          news: "NewsArticle",
+          product: "Product",
+          products: "Product",
+          event: "Event",
+          events: "Event",
+          person: "ProfilePage",
+          people: "ProfilePage",
+          author: "ProfilePage",
+          authors: "ProfilePage",
+          search: "SearchResultsPage",
+          faq: "FAQPage",
+          faqs: "FAQPage",
+          help: "WebPage",
+          support: "WebPage",
+          docs: "TechArticle",
+          documentation: "TechArticle",
+          tutorial: "TechArticle",
+          howto: "HowTo",
+          "how-to": "HowTo",
+          recipe: "Recipe",
+          recipes: "Recipe",
+          review: "Review",
+          reviews: "Review",
+          video: "VideoObject",
+          videos: "VideoObject",
+          audio: "AudioObject",
+          podcast: "PodcastEpisode",
+        };
+        // For single-segment paths (e.g., /blog, /about), use the first segment mapping
+        if (segments.length === 1 && map[first]) return map[first];
+        // For multi-segment paths, check the last segment first (e.g., /blog/about -> AboutPage)
+        if (map[last]) return map[last];
+        // Default to Article for content paths
+        return "Article";
+      } catch (_) {
+        return "Article";
       }
-    } catch (e) { canonical = location.href.split('#')[0]; debugWarn('[seoManager] compute canonical failed', e) }
+    }
 
-    if (canonical) upsertLinkRel('canonical', canonical)
-    try { upsertMeta('property', 'og:url', canonical) } catch (e) { debugWarn('[seoManager] upsertMeta og:url failed', e) }
-
+    const pageType = _inferPageType(pagePath, meta);
+    const pageId = canonical ? `${canonical}#webpage` : `${location.href}#webpage`;
+    const siteName = getSiteNameFromMeta() || initialDocumentTitle || "";
     const json = {
-      '@context': 'https://schema.org',
-      '@type': 'Article',
-      'headline': title || '',
-      'description': description || '',
-      'url': canonical || location.href.split('#')[0]
+      "@context": "https://schema.org",
+      "@type": pageType,
+      "@id": pageId,
+      headline: title || "",
+      description: description || "",
+      url: canonical || location.href.split("#")[0],
+    };
+    try {
+      const language = meta.inLanguage || document.documentElement.lang;
+      if (language) json.inLanguage = String(language);
+      if (siteName) {
+        json.isPartOf = {
+          "@type": "WebSite",
+          "@id": `${location.origin}#website`,
+          name: siteName,
+          url: location.origin,
+        };
+      }
+    } catch (_) {}
+    if (image) json.image = String(image);
+    if (meta.date) json.datePublished = meta.date;
+    if (meta.dateModified) json.dateModified = meta.dateModified;
+    if (meta.author) {
+      json.author = {
+        "@type": "Person",
+        name: String(meta.author),
+      };
     }
-    if (image) json.image = String(image)
-    if (meta.date) json.datePublished = meta.date
-    if (meta.dateModified) json.dateModified = meta.dateModified
+    try {
+      // Publisher: prefer frontmatter `meta.publisher` (string or
+      // { name } object), falling back to the site name from meta tags.
+      let publisherName = "";
+      if (meta.publisher) {
+        publisherName =
+          typeof meta.publisher === "string"
+            ? String(meta.publisher).trim()
+            : meta.publisher?.name
+              ? String(meta.publisher.name).trim()
+              : "";
+      }
+      if (!publisherName) {
+        publisherName = getSiteNameFromMeta();
+      }
+      if (publisherName) {
+        json.publisher = {
+          "@type": "Organization",
+          "@id": `${location.origin}#organization`,
+          name: publisherName,
+        };
+      }
+    } catch (_) {}
+    if (canonical) {
+      json.mainEntityOfPage = {
+        "@type": "WebPage",
+        "@id": pageId,
+      };
+    }
+    if (Array.isArray(meta.breadcrumbs) && meta.breadcrumbs.length) {
+      const items = meta.breadcrumbs
+        .filter((item) => item && item.name)
+        .map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: String(item.name),
+          ...(item.url ? { item: String(item.url) } : {}),
+        }));
+      if (items.length) {
+        json.breadcrumb = {
+          "@type": "BreadcrumbList",
+          itemListElement: items,
+        };
+      }
+    }
 
-    const id = 'nimbi-jsonld'
-    let el = document.getElementById(id)
+    const id = "nimbi-jsonld";
+    let el = document.getElementById(id);
     if (!el) {
-      el = document.createElement('script')
-      el.type = 'application/ld+json'
-      el.id = id
-      document.head.appendChild(el)
+      el = document.createElement("script");
+      el.type = "application/ld+json";
+      el.id = id;
+      applyCspNonce(el);
+      document.head.appendChild(el);
     }
-    el.textContent = JSON.stringify(json, null, 2)
-  } catch (e) { debugWarn('[seoManager] setStructuredData failed', e) }
+    el.textContent = JSON.stringify(json, null, 2).replace(/<\/script>/gi, "<\\/script>");
+  } catch (e) {
+    debugWarn("[seoManager] setStructuredData failed", e);
+  }
 }
 
 // Lightweight in-memory SEO map; can be configured at runtime via `setSeoMap`.
-let seoMap = (typeof window !== 'undefined' && window.__SEO_MAP) ? window.__SEO_MAP : {}
+let seoMap =
+  typeof window !== "undefined" && window.__SEO_MAP ? window.__SEO_MAP : {};
 
 /**
  * Replace the internal SEO map used by `injectSeoForPage`.
@@ -181,9 +569,14 @@ let seoMap = (typeof window !== 'undefined' && window.__SEO_MAP) ? window.__SEO_
  */
 export function setSeoMap(map) {
   try {
-    if (!map || typeof map !== 'object') { seoMap = {}; return }
-    seoMap = Object.assign({}, map)
-  } catch (e) { debugWarn('[seoManager] setSeoMap failed', e) }
+    if (!map || typeof map !== "object") {
+      seoMap = {};
+      return;
+    }
+    seoMap = Object.assign({}, map);
+  } catch (e) {
+    debugWarn("[seoManager] setSeoMap failed", e);
+  }
 }
 
 /**
@@ -193,26 +586,74 @@ export function setSeoMap(map) {
  * @param {string} page - page token (slug or path)
  * @param {string} [initialDocumentTitle] - optional fallback title
  */
-export function injectSeoForPage(page, initialDocumentTitle = '') {
+export function injectSeoForPage(page, initialDocumentTitle = "") {
   try {
-    if (!page) return
-    const meta = (seoMap && seoMap[page]) ? seoMap[page] : (typeof window !== 'undefined' && window.__SEO_MAP && window.__SEO_MAP[page] ? window.__SEO_MAP[page] : null)
+    if (!page) return;
+    const runtimeManifest =
+      typeof window !== "undefined" ? window.__nimbiRuntimeManifest : null;
+    if (runtimeManifest && Number.isInteger(runtimeManifest.generation)) {
+      document.documentElement?.setAttribute(
+        "data-nimbi-generation",
+        String(runtimeManifest.generation),
+      );
+    }
+    const meta = seoMap?.[page]
+      ? seoMap[page]
+      : typeof window !== "undefined" && window.__SEO_MAP?.[page]
+        ? window.__SEO_MAP[page]
+        : null;
     // Ensure canonical for the page
     try {
-      const canonical = location.origin + location.pathname + '?page=' + encodeURIComponent(String(page || ''))
-      upsertLinkRel('canonical', canonical)
-      try { upsertMeta('property', 'og:url', canonical) } catch (e) {}
+      const canonical =
+        location.origin +
+        location.pathname +
+        "?page=" +
+        encodeURIComponent(String(page ?? ""));
+      upsertLinkRel("canonical", canonical);
+      try {
+        upsertMeta("property", "og:url", canonical);
+      } catch (e) {}
     } catch (e) {}
     // If we don't have a map entry, still leave canonical/og:url in place
-    if (!meta) return
-    try { if (meta.title) document.title = String(meta.title) } catch (e) {}
-    try { if (meta.description) setTag('description', String(meta.description)) } catch (e) {}
+    if (!meta) return;
+    try {
+      if (meta.title) document.title = String(meta.title);
+    } catch (e) {}
+    try {
+      if (meta.description) setTag("description", String(meta.description));
+    } catch (e) {}
     try {
       // Populate standard meta tags (robots, og, twitter) using setMetaTags
-      try { setMetaTags({ meta: meta }, meta.title || undefined, meta.image || undefined, meta.description || undefined, initialDocumentTitle) } catch (e) { /* continue */ }
+      try {
+        setMetaTags(
+          { meta: meta, slug: page },
+          meta.title || undefined,
+          meta.image || undefined,
+          meta.description || undefined,
+          initialDocumentTitle,
+        );
+      } catch (e) {
+        /* continue */
+      }
     } catch (e) {}
-    try { setStructuredData({ meta: meta }, page, meta.title || undefined, meta.image || undefined, meta.description || undefined, initialDocumentTitle) } catch (e) { debugWarn('[seoManager] inject structured data failed', e) }
-  } catch (e) { debugWarn('[seoManager] injectSeoForPage failed', e) }
+    try {
+      setHreflangTags(page);
+    } catch (e) {}
+    try {
+      setStructuredData(
+        { meta: meta },
+        page,
+        meta.title || undefined,
+        meta.image || undefined,
+        meta.description || undefined,
+        initialDocumentTitle,
+      );
+    } catch (e) {
+      debugWarn("[seoManager] inject structured data failed", e);
+    }
+  } catch (e) {
+    debugWarn("[seoManager] injectSeoForPage failed", e);
+  }
 }
 
 /**
@@ -224,16 +665,48 @@ export function injectSeoForPage(page, initialDocumentTitle = '') {
  * @param {string} [titleOverride] - optional title override
  * @param {string} [descOverride] - optional description override
  */
-export function markNotFound(meta = {}, pagePath = '', titleOverride = undefined, descOverride = undefined) {
+export function markNotFound(
+  meta = {},
+  pagePath = "",
+  titleOverride = undefined,
+  descOverride = undefined,
+) {
   try {
-    const m = meta || {}
-    const title = (typeof titleOverride === 'string' && titleOverride.trim()) ? titleOverride : (m.title || 'Not Found')
-    const desc = (typeof descOverride === 'string' && descOverride.trim()) ? descOverride : (m.description || '')
-    try { setTag('robots', 'noindex,follow') } catch (e) {}
-    try { if (desc && String(desc).trim()) setTag('description', String(desc)) } catch (e) {}
-    try { setMetaTags({ meta: Object.assign({}, m, { robots: 'noindex,follow' }) }, title, m.image || undefined, desc) } catch (e) {}
-    try { setStructuredData({ meta: Object.assign({}, m, { title: title, description: desc }) }, pagePath || '', title, m.image || undefined, desc) } catch (e) {}
-  } catch (e) { debugWarn('[seoManager] markNotFound failed', e) }
+    const m = meta || {};
+    const title =
+      typeof titleOverride === "string" && titleOverride.trim()
+        ? titleOverride
+        : m.title || "Not Found";
+    const desc =
+      typeof descOverride === "string" && descOverride.trim()
+        ? descOverride
+        : m.description || "";
+    try {
+      setTag("robots", "noindex,follow");
+    } catch (e) {}
+    try {
+      if (desc && String(desc).trim()) setTag("description", String(desc));
+    } catch (e) {}
+    try {
+      setMetaTags(
+        { meta: Object.assign({}, m, { robots: "noindex,follow" }) },
+        title,
+        m.image || undefined,
+        desc,
+      );
+    } catch (e) {}
+    try {
+      setStructuredData(
+        { meta: Object.assign({}, m, { title: title, description: desc }) },
+        pagePath || "",
+        title,
+        m.image || undefined,
+        desc,
+      );
+    } catch (e) {}
+  } catch (e) {
+    debugWarn("[seoManager] markNotFound failed", e);
+  }
 }
 
 /**
@@ -251,103 +724,186 @@ export function markNotFound(meta = {}, pagePath = '', titleOverride = undefined
  * @param {PageData} data - Full page data, including raw markdown for reading time.
  * @returns {void}
  */
-export function applyPageMeta(t, initialDocumentTitle, parsed, toc, article, pagePath, anchor, topH1, h1Text, slugKey, data) {
+export function applyPageMeta(
+  t,
+  initialDocumentTitle,
+  parsed,
+  toc,
+  article,
+  pagePath,
+  anchor,
+  topH1,
+  h1Text,
+  slugKey,
+  data,
+) {
   try {
-    if (toc && toc.querySelector) {
-      const labelEl = toc.querySelector('.menu-label')
+    if (toc?.querySelector) {
+      const labelEl = toc.querySelector(".menu-label");
       if (labelEl) {
-        labelEl.textContent = topH1 ? (topH1.textContent || t('onThisPage')) : t('onThisPage')
+        labelEl.textContent = topH1?.textContent || t("onThisPage");
       }
     }
-  } catch (e) { debugWarn('[seoManager] update toc label failed', e) }
+  } catch (e) {
+    debugWarn("[seoManager] update toc label failed", e);
+  }
 
   try {
-    const metaTitle = parsed.meta && parsed.meta.title ? String(parsed.meta.title).trim() : ''
-    const firstImgEl = article.querySelector('img')
-    const firstImageUrl = firstImgEl ? (firstImgEl.getAttribute('src') || firstImgEl.src || null) : null
-    let descOverride = ''
+    const metaTitle = parsed.meta?.title
+      ? String(parsed.meta.title).trim()
+      : "";
+    const firstImgEl = article?.querySelector?.("img") || null;
+    const firstImageUrl = firstImgEl
+      ? firstImgEl.getAttribute("src") || firstImgEl.src || null
+      : null;
+    let descOverride = "";
     try {
-      let found = ''
+      let found = "";
       try {
-        const h1El = topH1 || (article && article.querySelector ? article.querySelector('h1') : null)
+        const h1El = topH1 || article?.querySelector?.("h1") || null;
         if (h1El) {
-          let sib = h1El.nextElementSibling
-          const parts = []
-          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === 'h2')) {
+          let sib = h1El.nextElementSibling;
+          const parts = [];
+          while (sib && !(sib.tagName && sib.tagName.toLowerCase() === "h2")) {
             try {
-              if (sib.classList && sib.classList.contains('nimbi-article-subtitle')) { sib = sib.nextElementSibling; continue }
+              if (sib.classList?.contains("nimbi-article-subtitle")) {
+                sib = sib.nextElementSibling;
+                continue;
+              }
             } catch (_e) {}
-            const txt = (sib.textContent || '').trim()
-            if (txt) parts.push(txt)
-            sib = sib.nextElementSibling
+            const txt = (sib.textContent || "").trim();
+            if (txt) parts.push(txt);
+            sib = sib.nextElementSibling;
           }
           if (parts.length) {
-            found = parts.join(' ').replace(/\s+/g, ' ').trim()
+            found = parts.join(" ").replace(/\s+/g, " ").trim();
           }
-          if (!found && h1Text) found = String(h1Text).trim()
+          if (!found && h1Text) found = String(h1Text).trim();
         }
-          } catch (e) { debugWarn('[seoManager] compute descOverride failed', e) }
-      if (found && String(found).length > 160) found = String(found).slice(0, 157).trim() + '...'
-      descOverride = found
-    } catch (e) { debugWarn('[seoManager] compute descOverride failed', e) }
+      } catch (e) {
+        debugWarn("[seoManager] compute descOverride failed", e);
+      }
+      if (found && String(found).length > 160)
+        found = String(found).slice(0, 157).trim() + "...";
+      descOverride = found;
+    } catch (e) {
+      debugWarn("[seoManager] compute descOverride failed", e);
+    }
 
-    let displayTitle = ''
+    let displayTitle = "";
     try {
-      if (metaTitle) displayTitle = metaTitle
-    } catch (_e) { /* ignore */ }
-    if (!displayTitle) {
-      try { if (topH1 && topH1.textContent) displayTitle = String(topH1.textContent).trim() } catch (_e) { /* ignore */ }
+      if (metaTitle) displayTitle = metaTitle;
+    } catch (_e) {
+      /* ignore */
     }
     if (!displayTitle) {
       try {
-        const h2 = article.querySelector('h2')
-        if (h2 && h2.textContent) displayTitle = String(h2.textContent).trim()
-      } catch (_e) { /* ignore */ }
-    }
-    if (!displayTitle) displayTitle = pagePath || ''
-
-    try { setMetaTags(parsed, displayTitle || undefined, firstImageUrl, descOverride) } catch (e) { debugWarn('[seoManager] setMetaTags failed', e) }
-    try { setStructuredData(parsed, slugKey, displayTitle || undefined, firstImageUrl, descOverride, initialDocumentTitle) } catch (e) { debugWarn('[seoManager] setStructuredData failed', e) }
-    const siteName = getSiteNameFromMeta()
-    if (displayTitle) {
-      if (siteName) document.title = `${siteName} - ${displayTitle}`
-      else document.title = `${initialDocumentTitle || 'Site'} - ${displayTitle}`
-    } else if (metaTitle) {
-      document.title = metaTitle
-    } else {
-      document.title = initialDocumentTitle || document.title
-    }
-  } catch (e) { debugWarn('[seoManager] applyPageMeta failed', e) }
-
-  try {
-    try { const prevs = article.querySelectorAll('.nimbi-reading-time'); prevs && prevs.forEach(p => p.remove()) } catch (_e) {}
-    if (h1Text) {
-      const metrics = getTextMetrics(data.raw || '')
-      const rt = metrics && metrics.readingTime ? metrics.readingTime : null
-      const minutes = rt && typeof rt.minutes === 'number' ? Math.ceil(rt.minutes) : 0
-      const rtText = minutes ? t('readingTime', { minutes }) : ''
-      if (!rtText) return
-      const topH1Elem = article.querySelector('h1')
-      if (topH1Elem) {
-        const subtitleEl = article.querySelector('.nimbi-article-subtitle')
-        try {
-          if (subtitleEl) {
-            const span = document.createElement('span')
-            span.className = 'nimbi-reading-time'
-            // text only; visual separator handled via CSS ::before so it can be toggled per-breakpoint
-            span.textContent = rtText
-            subtitleEl.appendChild(span)
-          } else {
-            const sub = document.createElement('p')
-            sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'
-            const span = document.createElement('span')
-            span.className = 'nimbi-reading-time'
-            span.textContent = rtText
-            sub.appendChild(span)
-            try { topH1Elem.parentElement.insertBefore(sub, topH1Elem.nextSibling) } catch (e) { try { topH1Elem.insertAdjacentElement('afterend', sub) } catch (e2) { /* ignore */ } }
-          }
-        } catch (err) { try { const sub = document.createElement('p'); sub.className = 'nimbi-article-subtitle is-6 has-text-grey-light'; const span = document.createElement('span'); span.className = 'nimbi-reading-time'; span.textContent = rtText; sub.appendChild(span); topH1Elem.insertAdjacentElement('afterend', sub) } catch (err2) { /* ignore */ } }
+        if (topH1?.textContent) displayTitle = String(topH1.textContent).trim();
+      } catch (_e) {
+        /* ignore */
       }
     }
-  } catch (ee) { debugWarn('[seoManager] reading time update failed', ee) }
+    if (!displayTitle) {
+      try {
+        const h2 = article.querySelector("h2");
+        if (h2?.textContent) displayTitle = String(h2.textContent).trim();
+      } catch (_e) {
+        /* ignore */
+      }
+    }
+    if (!displayTitle) displayTitle = pagePath || "";
+
+    try {
+      setMetaTags(
+        parsed,
+        displayTitle || undefined,
+        firstImageUrl,
+        descOverride,
+      );
+    } catch (e) {
+      debugWarn("[seoManager] setMetaTags failed", e);
+    }
+    try {
+      setStructuredData(
+        parsed,
+        slugKey,
+        displayTitle || undefined,
+        firstImageUrl,
+        descOverride,
+        initialDocumentTitle,
+      );
+    } catch (e) {
+      debugWarn("[seoManager] setStructuredData failed", e);
+    }
+    const siteName = getSiteNameFromMeta();
+    if (displayTitle) {
+      if (siteName) document.title = `${siteName} - ${displayTitle}`;
+      else
+        document.title = `${initialDocumentTitle || "Site"} - ${displayTitle}`;
+    } else if (metaTitle) {
+      document.title = metaTitle;
+    } else {
+      document.title = initialDocumentTitle || document.title;
+    }
+  } catch (e) {
+    debugWarn("[seoManager] applyPageMeta failed", e);
+  }
+
+  try {
+    try {
+      const prevs = article.querySelectorAll(".nimbi-reading-time");
+      prevs?.forEach((p) => p.remove());
+    } catch (_e) {}
+    if (h1Text) {
+      const metrics = getTextMetrics(data?.raw || "");
+      const rt = metrics?.readingTime ? metrics.readingTime : null;
+      const minutes =
+        typeof rt?.minutes === "number" ? Math.ceil(rt.minutes) : 0;
+      const rtText = minutes ? t("readingTime", { minutes }) : "";
+      if (!rtText) return;
+      const topH1Elem = article.querySelector("h1");
+      if (topH1Elem) {
+        const subtitleEl = article.querySelector(".nimbi-article-subtitle");
+        try {
+          if (subtitleEl) {
+            const span = document.createElement("span");
+            span.className = "nimbi-reading-time";
+            // text only; visual separator handled via CSS ::before so it can be toggled per-breakpoint
+            span.textContent = rtText;
+            subtitleEl.appendChild(span);
+          } else {
+            const sub = document.createElement("p");
+            sub.className = "nimbi-article-subtitle is-6 has-text-grey-light";
+            const span = document.createElement("span");
+            span.className = "nimbi-reading-time";
+            span.textContent = rtText;
+            sub.appendChild(span);
+            try {
+              topH1Elem.parentElement.insertBefore(sub, topH1Elem.nextSibling);
+            } catch (e) {
+              try {
+                topH1Elem.insertAdjacentElement("afterend", sub);
+              } catch (e2) {
+                /* ignore */
+              }
+            }
+          }
+        } catch (err) {
+          try {
+            const sub = document.createElement("p");
+            sub.className = "nimbi-article-subtitle is-6 has-text-grey-light";
+            const span = document.createElement("span");
+            span.className = "nimbi-reading-time";
+            span.textContent = rtText;
+            sub.appendChild(span);
+            topH1Elem.insertAdjacentElement("afterend", sub);
+          } catch (err2) {
+            /* ignore */
+          }
+        }
+      }
+    }
+  } catch (ee) {
+    debugWarn("[seoManager] reading time update failed", ee);
+  }
 }

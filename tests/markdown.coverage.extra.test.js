@@ -3,21 +3,23 @@ import { describe, it, expect, vi } from 'vitest'
 describe('markdown additional coverage', () => {
   it('imports with navigator present to exercise poolSize branch', async () => {
     vi.resetModules()
-    const origNavigator = global.navigator
+    const origNavigator = globalThis.navigator
     try {
       // simulate a browser-like environment before importing the module
       // so the top-level poolSize expression takes the navigator path
       // eslint-disable-next-line no-global-assign
-      global.navigator = { hardwareConcurrency: 8 }
+      Object.defineProperty(globalThis, 'navigator', { value: { hardwareConcurrency: 8 }, configurable: true, writable: true, enumerable: true })
       const md = await import('../src/markdown.js')
       expect(md).toBeTruthy()
       // ensure initRendererWorker can be invoked
       const w = md.initRendererWorker && md.initRendererWorker()
       expect(w !== undefined).toBe(true)
     } finally {
-      // restore
+      // restore. In Vitest 5 + jsdom 30 `navigator` is a getter-only
+      // inherited property, so assignment throws; defineProperty is the
+      // only way to put it back.
       // eslint-disable-next-line no-global-assign
-      global.navigator = origNavigator
+      Object.defineProperty(globalThis, 'navigator', { value: origNavigator, configurable: true, writable: true, enumerable: true })
     }
   })
 
@@ -25,6 +27,17 @@ describe('markdown additional coverage', () => {
     vi.resetModules()
     const origDOMParser = global.DOMParser
     try {
+      // Mock getDOMPurify so it does not create its own internal DOMParser.
+      // This keeps the test focused on the shared-DOMParser / TOC path.
+      const mockSanitize = (html) => html
+      vi.doMock('../src/utils/domPurify.js', async () => {
+        const actual = await vi.importActual('../src/utils/domPurify.js')
+        return {
+          ...actual,
+          getDOMPurify: () => mockSanitize,
+        }
+      })
+
       class SimpleDOMParser {
         parseFromString(html) {
           const doc = {}
@@ -118,5 +131,23 @@ describe('markdown additional coverage', () => {
     const md = await import('../src/markdown.js')
     const res = md.detectFenceLanguages('```foobarbaz\nconsole.log(1)\n```')
     expect(res.has('foobarbaz')).toBe(true)
+  })
+
+  it('handles <script> tags without crashing', async () => {
+    vi.resetModules()
+    const md = await import('../src/markdown.js')
+    const input = '# Hello\n\n<script>alert("xss")</script>\n'
+    const res = await md.parseMarkdownToHtml(input)
+    expect(res).toBeTruthy()
+    expect(res.html).toBeTruthy()
+  })
+
+  it('handles onerror attributes without crashing', async () => {
+    vi.resetModules()
+    const md = await import('../src/markdown.js')
+    const input = '# Hello\n\n<img src="x" onerror="alert(1)">\n'
+    const res = await md.parseMarkdownToHtml(input)
+    expect(res).toBeTruthy()
+    expect(res.html).toBeTruthy()
   })
 })

@@ -6,15 +6,40 @@ vi.mock('../../src/slugManager.js', () => {
   const mdToSlug = new Map()
   const allMarkdownPaths = []
   const allMarkdownPathsSet = new Set()
-  return {
-    slugify: (s) => String(s || '').toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '-'),
+  const searchIndex = []
+  const api = {
+    slugify: (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '-'),
     slugToMd,
     mdToSlug,
     // test will set _storeSlugMapping when needed
     _storeSlugMapping: undefined,
+    storeSlugMapping: undefined,
+    fetchMarkdown: async () => ({ raw: '' }),
     allMarkdownPaths,
-    allMarkdownPathsSet
+    allMarkdownPathsSet,
+    searchIndex,
+    _setSearchIndex: (arr) => {
+      searchIndex.length = 0
+      if (Array.isArray(arr)) searchIndex.push(...arr)
+    }
   }
+
+  api.storeSlugMapping = (slug, rel) => {
+    if (typeof api._storeSlugMapping === 'function') {
+      return api._storeSlugMapping(slug, rel)
+    }
+    try { slugToMd.set(slug, rel) } catch (_) {}
+    try { mdToSlug.set(rel, slug) } catch (_) {}
+    try {
+      if (!allMarkdownPathsSet.has(rel)) {
+        allMarkdownPathsSet.add(rel)
+        if (!allMarkdownPaths.includes(rel)) allMarkdownPaths.push(rel)
+      }
+    } catch (_) {}
+    return rel
+  }
+
+  return api
 })
 
 describe('nav prioritized branches - batch2', () => {

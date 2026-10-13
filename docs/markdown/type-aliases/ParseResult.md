@@ -6,7 +6,7 @@
 
 # Type Alias: ParseResult
 
-> **ParseResult**\<\> = `object`
+> **ParseResult** = `object`
 
 ## Type Parameters
 

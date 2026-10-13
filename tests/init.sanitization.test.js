@@ -22,6 +22,14 @@ describe('initCMS sanitization helpers', () => {
     await expect(initCMS({ el: '#app', searchIndex: false, allowUrlPathOverrides: true })).rejects.toThrow(TypeError)
   })
 
+  it('rejects ambiguous embedded script origins', async () => {
+    await expect(initCMS({
+      el: '#app',
+      searchIndex: false,
+      embeddedScriptOrigins: ['https://cdn.example.test/assets'],
+    })).rejects.toThrow(/absolute http\(s\) origins/)
+  })
+
   it('accepts safe homePage basename provided via URL when allowUrlPathOverrides is true', async () => {
     global.location = new URL('http://localhost/?homePage=index.html')
     const calls = []

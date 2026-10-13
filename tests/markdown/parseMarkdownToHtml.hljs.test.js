@@ -18,6 +18,6 @@ describe('parseMarkdownToHtml hljs branch', () => {
     const md = '```js\nconsole.log("hi")\n```'
     const res = await parseMarkdownToHtml(md)
     expect(res).toBeTruthy()
-    expect(String(res.html || '').toLowerCase()).toContain('<pre')
+    expect(String(res.html ?? '').toLowerCase()).toContain('<pre')
   })
 })

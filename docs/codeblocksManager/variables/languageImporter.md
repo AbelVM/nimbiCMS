@@ -6,7 +6,7 @@
 
 # Variable: languageImporter
 
-> **languageImporter**: (`candidate`) => `Promise`\<`unknown`\> \| `null` = `null`
+> **languageImporter**: ((`candidate`) => `Promise`\<`unknown`\>) \| `null` = `null`
 
 Optional custom importer used for tests or bespoke loading strategies.
 When set to a function `(candidate: string) => Promise<Module|null>` it

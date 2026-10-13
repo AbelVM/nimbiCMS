@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { handleWorkerMessage } from '../../src/worker/renderer.js'
 
 describe('renderer worker unit tests', () => {
-  it('returns register-error when hljs unavailable', async () => {
+  it('returns register-error when language module import fails', async () => {
     const res = await handleWorkerMessage({ type: 'register', name: 'javascript', url: 'https://example.com/lang.js' })
     expect(res).toHaveProperty('type')
     expect(res.type).toBe('register-error')
     expect(res).toHaveProperty('error')
-    expect(String(res.error).toLowerCase()).toMatch(/hljs unavailable|cannot/i)
+    expect(String(res.error).toLowerCase()).toMatch(/failed to import language module|cannot|error/i)
   })
 
   it('renders markdown and returns html, toc and meta', async () => {

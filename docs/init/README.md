@@ -22,5 +22,6 @@ Exports `initCMS` and helpers to initialize the CMS runtime.
 
 ## Functions
 
+- [destroy](functions/destroy.md)
 - [initCMS](functions/initCMS.md)
 - [parseInitOptionsFromQuery](functions/parseInitOptionsFromQuery.md)

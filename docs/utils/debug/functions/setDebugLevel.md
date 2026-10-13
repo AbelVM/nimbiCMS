@@ -8,15 +8,11 @@
 
 > **setDebugLevel**(`level`): `void`
 
-Set the global debug level.
-
 ## Parameters
 
 ### level
 
 `number`
-
-0..3
 
 ## Returns
 

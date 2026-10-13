@@ -24,9 +24,9 @@ The target page slug or path.
 
 ### hash?
 
-Optional hash fragment (without the leading '#').
+`string` \| `null`
 
-`string` | `null`
+Optional hash fragment (without the leading '#').
 
 ### baseSearch?
 

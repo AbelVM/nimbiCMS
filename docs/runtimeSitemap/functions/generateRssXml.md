@@ -14,9 +14,9 @@ Render sitemap JSON to an RSS 2.0 feed.
 
 ### json
 
-sitemap JSON or entries array
+`any`[] \| \{ `entries`: `any`[]; `generatedAt`: `string`; \}
 
-`any`[] | \{ `entries`: `any`[]; `generatedAt`: `string`; \}
+sitemap JSON or entries array
 
 ## Returns
 

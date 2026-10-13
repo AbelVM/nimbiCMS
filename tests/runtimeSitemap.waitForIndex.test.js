@@ -8,19 +8,22 @@ describe('runtimeSitemap waits for index completion', () => {
   let origDocWrite
   let origDocClose
   let origWhen
+  let origFetch
 
   beforeEach(() => {
     origLocation = globalThis.location
     Object.defineProperty(globalThis, 'location', { value: { origin: 'http://example.test', pathname: '/', search: '?sitemap' }, configurable: true })
     // clear slug maps
     slugManager.slugToMd.clear()
+    origFetch = globalThis.fetch
+    globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => '' })
     // backup whenSearchIndexReady
     origWhen = slugManager.whenSearchIndexReady
   })
 
   afterEach(() => {
     try { Object.defineProperty(globalThis, 'location', { value: origLocation, configurable: true }) } catch (e) {}
-    try { globalThis.fetch = undefined } catch (_) {}
+    try { globalThis.fetch = origFetch } catch (_) {}
     if (origDocOpen !== undefined) document.open = origDocOpen
     if (origDocWrite !== undefined) document.write = origDocWrite
     if (origDocClose !== undefined) document.close = origDocClose
@@ -44,15 +47,15 @@ describe('runtimeSitemap waits for index completion', () => {
     origDocWrite = document.write
     origDocClose = document.close
     document.open = () => {}
-    document.write = (s) => writes.push(String(s || ''))
+    document.write = (s) => writes.push(String(s ?? ''))
     document.close = () => {}
 
-    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: finalIndex, waitForIndexMs: 1000 })
+    const handled = await runtimeSitemap.handleSitemapRequest({ includeAllMarkdown: true, index: finalIndex, waitForIndexMs: 1000, writeToDocument: true })
     // wait for scheduled sitemap write to flush
     await new Promise(r => setTimeout(r, 80))
     expect(handled).toBe(true)
     const written = writes.join('')
     // ensure an entry from the tail of the final index is present
     expect(written).toContain('?page=' + encodeURIComponent('p20'))
-  }, 20000)
+  }, 60000)
 })

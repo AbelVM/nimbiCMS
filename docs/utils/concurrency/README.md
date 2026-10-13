@@ -6,7 +6,13 @@
 
 # utils/concurrency
 
-Simple concurrency runner for async tasks.
+Bounded-concurrency map helper.
+
+Several modules need to run an async worker over a list of items while
+capping how many are in flight at once (crawling, anchor rewriting, slug
+probing). This is the single implementation; it is backed by
+`PowerSemaphore` so the concurrency limit and abort handling behave
+identically everywhere.
 
 ## Functions
 

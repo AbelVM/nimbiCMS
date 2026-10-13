@@ -7,7 +7,7 @@ it('explicit HTML homepage that returns directory listing should be treated as n
   const origFetch = global.fetch
   // Stub fetch to return 404 for candidate contentBase URL and directory listing for absolute fallback
   vi.stubGlobal('fetch', async (url, opts) => {
-    const s = String(url || '')
+    const s = String(url ?? '')
     if (s.includes('localhost:3000')) {
       return { ok: false, status: 404, statusText: 'Not Found', text: async () => '' }
     }

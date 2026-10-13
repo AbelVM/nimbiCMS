@@ -450,35 +450,32 @@ describe('slugManager module', () => {
   })
 
   // worker wrapper tests --------------------------------------------------
-  it('buildSearchIndexWorker delegates to local function when worker unavailable', async () => {
-    // enforce worker required: mock initSlugWorker to return null and expect rejection
-    const spy = vi.spyOn(slugMgr, 'initSlugWorker').mockReturnValue(null)
+  it('buildSearchIndexWorker works with lazy worker initialization', async () => {
     slugMgr.searchIndex.splice(0)
-    await expect(slugMgr.buildSearchIndexWorker('http://base/')).rejects.toThrow()
-    spy.mockRestore()
+    const res = await slugMgr.buildSearchIndexWorker('http://base/')
+    expect(Array.isArray(res)).toBe(true)
   })
 
-  it('crawlForSlugWorker falls back if worker creation fails', async () => {
-    const spy = vi.spyOn(slugMgr, 'initSlugWorker').mockReturnValue(null)
+  it('crawlForSlugWorker works with lazy worker initialization', async () => {
     slugMgr.crawlCache.clear && slugMgr.crawlCache.clear()
     // seed crawlCache with known value
     slugMgr.crawlCache.set('slug', 'foo.md')
-    await expect(slugMgr.crawlForSlugWorker('slug', 'http://base/')).rejects.toThrow()
-    spy.mockRestore()
+    const out = await slugMgr.crawlForSlugWorker('slug', 'http://base/')
+    expect(out).toBe('foo.md')
   })
 
-  it('worker wrappers communicate with real worker when available', async () => {
+  it('buildSearchIndex and crawlForSlug work correctly', async () => {
     // ensure Worker exists and stub network for slugManager
     slugMgr.clearFetchCache()
     global.fetch = vi.fn(async (u) => {
       if (String(u).endsWith('nav.md')) return { ok: true, text: () => Promise.resolve('# Nav') }
       return { ok: false, status: 404, text: () => Promise.resolve('') }
     })
-    // call buildSearchIndexWorker - should not throw
-    const idx = await slugMgr.buildSearchIndexWorker('/base/')
+    // call buildSearchIndex directly (pool-agnostic)
+    const idx = await slugMgr.buildSearchIndex('/base/')
     expect(Array.isArray(idx)).toBe(true)
-    // call crawlForSlugWorker on nonexistent slug
-    const crawl = await slugMgr.crawlForSlugWorker('nothing', '/base/')
+    // call crawlForSlug on nonexistent slug
+    const crawl = await slugMgr.crawlForSlug('nothing', '/base/')
     expect(crawl).toBeNull()
   })
 

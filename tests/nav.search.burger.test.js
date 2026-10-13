@@ -9,6 +9,12 @@ vi.mock('../src/slugManager.js', async (importOriginal) => {
   }
 })
 
+vi.mock('../src/slugSearchRuntime.js', () => ({
+  buildSearchIndex: async () => [{ slug: 'about', title: 'About page', excerpt: 'about excerpt', path: 'about.md' }],
+  buildSearchIndexWorker: async () => [{ slug: 'about', title: 'About page', excerpt: 'about excerpt', path: 'about.md' }],
+  awaitSearchIndex: async () => [{ slug: 'about', title: 'About page', excerpt: 'about excerpt', path: 'about.md' }]
+}))
+
 import { buildNav } from '../src/nav.js'
 
 describe('nav search & burger', () => {
@@ -59,7 +65,7 @@ describe('nav search & burger', () => {
     // wait for debounce + promise resolution
     await new Promise((r) => setTimeout(r, 150))
 
-    expect(results.style.display).toBe('block')
+    expect(results.classList.contains('is-hidden')).toBe(false)
     const link = results.querySelector('a')
     expect(link).toBeTruthy()
     const linkHref = link.getAttribute('href') || ''

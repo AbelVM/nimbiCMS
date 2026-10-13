@@ -15,7 +15,7 @@ test('crawl: md/html link fetch fallback derives slug from H1', async () => {
     const idx = [ { slug: 'source', path: 's.md', title: 'Source' } ]
 
     slugManager.setFetchMarkdown(async (p) => {
-      const s = String(p || '')
+      const s = String(p ?? '')
       if (s.endsWith('s.md')) return { raw: '[link](target.md)' }
       if (s.endsWith('target.md')) return { raw: '# Target Title' }
       return { raw: '' }

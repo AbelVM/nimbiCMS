@@ -6,40 +6,41 @@
 
 # Function: runWithConcurrency()
 
-> **runWithConcurrency**\<`T`, `U`\>(`items`, `worker`, `concurrency?`): `Promise`\<`U`[]\>
+> **runWithConcurrency**(`items`, `worker`, `concurrency?`, `signal?`): `Promise`\<`any`[]\>
 
-Run items through an async worker function with limited concurrency.
+Run `worker` over every item with at most `concurrency` in flight.
 
-## Type Parameters
-
-### T
-
-`T`
-
-### U
-
-`U`
+Results are returned in input order. An aborted `signal` rejects the
+pending work rather than leaving promises dangling.
 
 ## Parameters
 
 ### items
 
-`T`[]
+`Iterable`\<`any`, `any`, `any`\>
 
-Array of items to process
+Items to process (Array, Set, or any iterable).
 
 ### worker
 
-(`item`, `index`) => `Promise`\<`U`\>
+(`item`, `index`) => `any`
 
-Async worker function
+Async worker.
 
 ### concurrency?
 
 `number` = `4`
 
-Max concurrent workers
+Maximum simultaneous workers.
+
+### signal?
+
+`AbortSignal`
+
+Optional abort signal.
 
 ## Returns
 
-`Promise`\<`U`[]\>
+`Promise`\<`any`[]\>
+
+Results in input order.

@@ -27,7 +27,7 @@ test('handleSitemapRequest serves sitemap.html and writes HTML output', async ()
 
   slugManager._setSearchIndex([{ slug: 's', title: 'S', path: 's.md' }])
 
-  const handled = await runtimeSitemap.handleSitemapRequest({})
+  const handled = await runtimeSitemap.handleSitemapRequest({ writeToDocument: true })
   expect(handled).toBe(true)
   try { expect(window.__nimbiSitemapRenderedAt).toBeGreaterThan(0) } catch (e) {}
 

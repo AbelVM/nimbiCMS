@@ -50,9 +50,78 @@ async function runWithPuppeteer() {
     // If injection fails, let the outer try/catch handle fallback to JSDOM
     throw e
   }
-  const results = await page.evaluate(async () => {
-    return await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } })
-  })
+  const fixtures = [
+    { width: 320, height: 800 },
+    { width: 375, height: 812, textZoom: true },
+    { width: 768, height: 1024 },
+    { width: 1280, height: 900, reducedMotion: true },
+  ]
+  const reports = []
+  for (const fixture of fixtures) {
+    await page.setViewport({ width: fixture.width, height: fixture.height })
+    await page.emulateMediaFeatures([
+      { name: 'prefers-reduced-motion', value: fixture.reducedMotion ? 'reduce' : 'no-preference' },
+    ])
+    await page.evaluate((textZoom) => {
+      document.documentElement.style.fontSize = textZoom ? '200%' : ''
+    }, fixture.textZoom === true)
+    reports.push({
+      fixture,
+      result: await page.evaluate(async () => {
+        let cumulativeLayoutShift = 0
+        if (typeof PerformanceObserver !== 'undefined') {
+          const observer = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              if (!entry.hadRecentInput) cumulativeLayoutShift += entry.value
+            }
+          })
+          try {
+            observer.observe({ type: 'layout-shift', buffered: true })
+          } catch (e) {}
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+          observer.disconnect()
+        }
+        let markdownLink = document.querySelector('article a[href], main a[href], .content a[href]')
+        let injectedMarkdownFixture = false
+        if (!markdownLink) {
+          const fixtureArticle = document.createElement('article')
+          fixtureArticle.innerHTML = '<a href="fixture.md">Markdown fixture</a>'
+          document.body.append(fixtureArticle)
+          markdownLink = fixtureArticle.querySelector('a')
+          injectedMarkdownFixture = true
+        }
+        let markdownInteraction = false
+        if (markdownLink) {
+          markdownLink.addEventListener('click', (event) => event.preventDefault(), { once: true })
+          markdownLink.focus()
+          markdownLink.click()
+          markdownInteraction = document.activeElement === markdownLink
+        }
+        const axeResult = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } })
+        axeResult.horizontalOverflow = document.documentElement.scrollWidth > document.documentElement.clientWidth
+        axeResult.cumulativeLayoutShift = cumulativeLayoutShift
+        axeResult.markdownInteraction = markdownInteraction
+        axeResult.injectedMarkdownFixture = injectedMarkdownFixture
+        return axeResult
+      }),
+    })
+  }
+  const results = {
+    testEnvironments: reports.map(({ fixture }) => fixture),
+    layoutChecks: reports.map(({ fixture, result }) => ({
+      fixture,
+      horizontalOverflow: result.horizontalOverflow === true,
+      cumulativeLayoutShift: result.cumulativeLayoutShift || 0,
+    })),
+    interactionChecks: reports.map(({ fixture, result }) => ({
+      fixture,
+      markdownInteraction: result.markdownInteraction === true,
+      injectedMarkdownFixture: result.injectedMarkdownFixture === true,
+    })),
+    violations: reports.flatMap(({ result }) => result.violations),
+    incomplete: reports.flatMap(({ result }) => result.incomplete),
+    passes: reports.flatMap(({ result }) => result.passes),
+  }
   await browser.close()
   return results
 }
@@ -212,6 +281,11 @@ function awaitImport(mod) {
       results.violations.forEach(v => {
         console.log('-', v.id, v.impact, v.help)
       })
+      process.exit(2)
+    }
+
+    if (results.layoutChecks?.some(({ cumulativeLayoutShift }) => cumulativeLayoutShift > 0.1)) {
+      console.log('Cumulative layout shift exceeded the 0.1 budget')
       process.exit(2)
     }
 

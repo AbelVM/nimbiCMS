@@ -10,8 +10,8 @@
 
 Toggle theme styling by setting `data-theme` on each `.nimbi-mount`
 container. There are three recognized theme values:
-- `light`: explicitly apply light theme (sets `data-theme="light"`).
-- `dark`: explicitly apply dark theme (sets `data-theme="dark"`).
+- `light`: explicitly apply light theme (sets `data-theme="light").
+- `dark`: explicitly apply dark theme (sets `data-theme="dark").
 - `system`: follow the system/OS preference; implementation removes any
   explicit `data-theme` attribute so user agent or CSS using
   `prefers-color-scheme` can take effect.
@@ -23,9 +23,9 @@ applied to `document.documentElement` to support global/UMD usage.
 
 ### style
 
-chosen theme mode.
+`"light"` \| `"dark"` \| `"system"`
 
-`"light"` | `"dark"` | `"system"`
+chosen theme mode.
 
 ## Returns
 

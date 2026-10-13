@@ -6,7 +6,7 @@
 
 # Type Alias: SearchIndexEntry
 
-> **SearchIndexEntry**\<\> = `object`
+> **SearchIndexEntry** = `object`
 
 ## Type Parameters
 
@@ -14,7 +14,7 @@
 
 ### excerpt?
 
-> `optional` **excerpt**: `string`
+> `optional` **excerpt?**: `string`
 
 ### slug
 

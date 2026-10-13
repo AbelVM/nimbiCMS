@@ -1,14 +1,18 @@
 import { test, expect, vi } from 'vitest'
 
+// vi.mock must be hoisted to the top level (Vitest 5 makes nested calls
+// throw). In Vitest 4 this mock was already hoisted automatically, so
+// hoisting it explicitly preserves the exact same behavior.
+vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => ({
+  default: {
+    registerLanguage: vi.fn(),
+    getLanguage: (name) => (name === 'javascript' || name === 'plaintext'),
+    highlight: () => { throw new Error('boom') }
+  }
+}), { virtual: true })
+
 test('marked fallback when hljs.highlight throws', async () => {
   vi.resetModules()
-  vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => ({
-    default: {
-      registerLanguage: vi.fn(),
-      getLanguage: (name) => (name === 'javascript' || name === 'plaintext'),
-      highlight: () => { throw new Error('boom') }
-    }
-  }), { virtual: true })
   const { handleWorkerMessage } = await import('../../src/worker/renderer.js')
   const md = '```javascript\nconsole.log(1)\n```'
   const out = await handleWorkerMessage({ id: 'hb', md })

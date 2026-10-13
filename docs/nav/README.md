@@ -18,10 +18,20 @@ navigation callbacks into the site header.
 - [ParsedPage](type-aliases/ParsedPage.md)
 - [SearchIndexEntry](type-aliases/SearchIndexEntry.md)
 
+## Variables
+
+- [normalizeSearchIndexEntries](variables/normalizeSearchIndexEntries.md)
+
 ## Functions
 
 - [buildNav](functions/buildNav.md)
 - [createSiteNav](functions/createSiteNav.md)
-- [normalizeSearchIndexEntries](functions/normalizeSearchIndexEntries.md)
+- [normalizeSearchIndexEntriesMut](functions/normalizeSearchIndexEntriesMut.md)
 - [safeGet](functions/safeGet.md)
-- [storeSlugMapping](functions/storeSlugMapping.md)
+- [searchEntryMatches](functions/searchEntryMatches.md)
+
+## References
+
+### storeSlugMapping
+
+Re-exports [storeSlugMapping](../slugManager/functions/storeSlugMapping-1.md)

@@ -6,7 +6,7 @@
 
 # Function: preMapMdSlugs()
 
-> **preMapMdSlugs**(`linkEls`, `contentBase`): `Promise`\<`void`\>
+> **preMapMdSlugs**(`linkEls`, `contentBase`, `opts?`): `Promise`\<`void`\>
 
 Map referenced markdown links to slugs by fetching titles where needed.
 
@@ -14,15 +14,17 @@ Map referenced markdown links to slugs by fetching titles where needed.
 
 ### linkEls
 
-Anchors to inspect for markdown links.
+`NodeListOf`\<`HTMLAnchorElement`\> \| `HTMLAnchorElement`[]
 
-`NodeListOf`\<`HTMLAnchorElement`\> | `HTMLAnchorElement`[]
+Anchors to inspect for markdown links.
 
 ### contentBase
 
 `string`
 
 Base URL used when resolving relative markdown paths.
+
+### opts?
 
 ## Returns
 

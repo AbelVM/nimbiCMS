@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock the CDN core import so `ensureHljs` can succeed during tests
-vi.mock('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js', () => {
+// Mock the local hljs core import so `ensureHljs` can succeed during tests
+vi.mock('highlight.js/lib/core', () => {
   const hljs = {
     registerLanguage: vi.fn(),
     getLanguage: vi.fn(() => false),
@@ -31,7 +31,7 @@ describe('worker/renderer extra branches', () => {
     importCache.importUrlWithCache.mockResolvedValueOnce({ default: (v) => v })
     const res = await handleWorkerMessage({ type: 'register', name: 'mylang', url: 'https://example.com/lang.js' })
     expect(res).toEqual({ type: 'registered', name: 'mylang' })
-    const core = await import('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js')
+    const core = await import('highlight.js/lib/core')
     expect(core.default.registerLanguage).toHaveBeenCalledWith('mylang', expect.any(Function))
   })
 
@@ -61,7 +61,7 @@ describe('worker/renderer extra branches', () => {
 
   it('marked.highlighted: uses hljs.highlight when language supported', async () => {
     importCache.importUrlWithCache.mockResolvedValueOnce(null)
-    const core = await import('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js')
+    const core = await import('highlight.js/lib/core')
     core.default.getLanguage.mockImplementationOnce((name) => name === 'javascript')
     core.default.highlight.mockImplementationOnce((code) => ({ value: `<span class="hl">${code}</span>` }))
     const res = await handleWorkerMessage({ id: 'h1', md: '```javascript\n1+1\n```' })
@@ -73,7 +73,7 @@ describe('worker/renderer extra branches', () => {
 
   it('marked.highlighted: falls back to plaintext when requested lang unavailable', async () => {
     importCache.importUrlWithCache.mockResolvedValueOnce(null)
-    const core = await import('https://cdn.jsdelivr.net/npm/highlight.js/lib/core.js')
+    const core = await import('highlight.js/lib/core')
     core.default.getLanguage.mockImplementationOnce(() => false)
     core.default.getLanguage.mockImplementationOnce((name) => name === 'plaintext')
     core.default.highlight.mockImplementationOnce((code) => ({ value: `<span class="pl">${code}</span>` }))

@@ -6,12 +6,51 @@
  * @module slugManager
  */
 
-/**
- * Localized slug mapping entry. When multilingual sites are configured the
- * value stored for a slug may be an object with a `default` path and a
- * `langs` map with per-language paths.
- * @typedef {{default?:string, langs?: Record<string,string>}} SlugEntry
- */
+import * as l10n from "./l10nManager.js";
+import { refreshIndexPaths, isIndexPathsRefreshed } from "./indexManager.js";
+import {
+  setAllMarkdownPaths,
+  slugToMd,
+  mdToSlug,
+  allMarkdownPaths,
+  allMarkdownPathsSet,
+} from "./slugState.js";
+import { parseHrefToRoute } from "./utils/urlHelper.js";
+import { getSharedParser } from "./utils/sharedDomParser.js";
+import { parseFrontmatter } from "./utils/frontmatter.js";
+import {
+  normalizePath,
+  trimTrailingSlash,
+  ensureTrailingSlash,
+  getWorkerPoolSize,
+} from "./utils/helpers.js";
+
+import SlugWorker from "./worker/slugWorker.js?worker&inline";
+
+import { PowerCache, PowerMemoizer } from "performance-helpers/powerCache";
+import { slugify } from "./utils/slugify.js";
+import {
+  activeGeneration,
+  setIfCurrent,
+  setIfLive,
+} from "./utils/runtimeGlobals.js";
+import { PowerDeadline } from "performance-helpers/powerDeadline";
+import { PowerRetry } from "performance-helpers/powerRetry";
+import { PowerPool } from "performance-helpers/powerPool";
+import {
+  recordWorkerFallback,
+  registerWorkerPool,
+  unregisterWorkerPool,
+} from "./utils/workerPoolDiagnostics.js";
+import { runWithConcurrency } from "./utils/concurrency.js";
+import { createWorkQueue } from "./utils/workQueue.js";
+import { debugLog, debugWarn, debugError, isDebug } from "./utils/debug.js";
+import { yieldIfNeeded, createYieldGate } from "./utils/idle.js";
+
+// Hoisted from `crawlAllMarkdown` so `ensureSlug` can yield during the
+// cooperative-crawl loop. The counter is pure state with no reason to be
+// per-call; keeping it at module scope fixes the `ReferenceError` that
+// made `yieldIfNeeded` a dead no-op.
 
 /**
  * Mapping from a slug (generated from title/H1) to either a markdown path
@@ -21,11 +60,11 @@
  * crawling.
  * @type {Map<string, string|SlugEntry>}
  */
-export const slugToMd = new Map()
+export { slugToMd } from "./slugState.js";
 
 // Watchers for cold cosmetic hash route requests.
 // Map: slug -> Array<string> of original cosmetic tokens (e.g. "#/slug#anchor?params")
-const _coldRouteWatchers = new Map()
+const _coldRouteWatchers = new Map();
 
 /**
  * Register interest in a cold cosmetic hash route request so the runtime
@@ -35,67 +74,87 @@ const _coldRouteWatchers = new Map()
  */
 export function watchForColdHashRoute(parsed) {
   try {
-    if (!parsed) return
-    let key = HOME_SLUG
-    let full = ''
-    if (parsed.type === 'cosmetic') {
-      const hasPage = (parsed.page != null && String(parsed.page).trim() !== '')
-      key = hasPage ? String(parsed.page) : HOME_SLUG
-      full = '#/' + (hasPage ? String(parsed.page) : '')
-      if (parsed.anchor) full += '#' + String(parsed.anchor)
-      if (parsed.params) full += '?' + String(parsed.params)
-    } else if (parsed.type === 'path') {
-      const hasPage = (parsed.page != null && String(parsed.page).trim() !== '')
-      key = hasPage ? String(parsed.page) : HOME_SLUG
-      full = '/' + (hasPage ? String(parsed.page) : '')
-      if (parsed.anchor) full += '#' + String(parsed.anchor)
-      if (parsed.params) full += '?' + String(parsed.params)
-    } else if (parsed.type === 'canonical') {
+    if (!parsed) return;
+    let key = HOME_SLUG;
+    let full = "";
+    if (parsed.type === "cosmetic") {
+      const hasPage = parsed.page != null && String(parsed.page).trim() !== "";
+      key = hasPage ? String(parsed.page) : HOME_SLUG;
+      full = "#/" + (hasPage ? String(parsed.page) : "");
+      if (parsed.anchor) full += "#" + String(parsed.anchor);
+      if (parsed.params) full += "?" + String(parsed.params);
+    } else if (parsed.type === "path") {
+      const hasPage = parsed.page != null && String(parsed.page).trim() !== "";
+      key = hasPage ? String(parsed.page) : HOME_SLUG;
+      full = "/" + (hasPage ? String(parsed.page) : "");
+      if (parsed.anchor) full += "#" + String(parsed.anchor);
+      if (parsed.params) full += "?" + String(parsed.params);
+    } else if (parsed.type === "canonical") {
       if (parsed.page) {
-        key = parsed.page
-        full = '?page=' + encodeURIComponent(parsed.page)
-        if (parsed.anchor) full += '#' + String(parsed.anchor)
-        if (parsed.params) full += '?' + String(parsed.params)
+        key = parsed.page;
+        full = "?page=" + encodeURIComponent(parsed.page);
+        if (parsed.anchor) full += "#" + String(parsed.anchor);
+        if (parsed.params) full += "?" + String(parsed.params);
       } else {
-        key = HOME_SLUG
+        key = HOME_SLUG;
         try {
-          full = (typeof location !== 'undefined' && location && location.pathname) ? String(location.pathname) : '/'
-          if (typeof location !== 'undefined' && location.search) full += String(location.search)
-          if (typeof location !== 'undefined' && location.hash) full += String(location.hash)
-        } catch (_) { full = '/' }
+          full =
+            typeof location !== "undefined" && location?.pathname
+              ? String(location.pathname)
+              : "/";
+          if (typeof location !== "undefined" && location?.search)
+            full += String(location.search);
+          if (typeof location !== "undefined" && location?.hash)
+            full += String(location.hash);
+        } catch (_) {
+          // Unreadable location: fall back to the site root.
+          full = "/";
+        }
       }
     } else {
-      return
+      return;
     }
-    const existing = _coldRouteWatchers.get(key) || []
-    existing.push(full)
-    _coldRouteWatchers.set(key, existing)
+    const existing = _coldRouteWatchers.get(key) || [];
+    existing.push(full);
+    _coldRouteWatchers.set(key, existing);
   } catch (_) {}
 }
 
 function _notifyColdRouteWatchers(slug, rel) {
   try {
-    const key = String(slug || '')
-    const arr = _coldRouteWatchers.get(key)
-    if (!arr || !arr.length) return
+    const key = String(slug ?? "");
+    const arr = _coldRouteWatchers.get(key);
+    if (!arr || !arr.length) return;
     try {
-      const gh = (typeof globalThis !== 'undefined') ? globalThis : null
+      const gh = typeof globalThis !== "undefined" ? globalThis : null;
       if (gh) {
         try {
-          if (!gh.__nimbiColdRouteResolved) gh.__nimbiColdRouteResolved = []
+          if (!gh.__nimbiColdRouteResolved) gh.__nimbiColdRouteResolved = [];
         } catch (_) {}
         for (const tok of arr) {
           try {
-            // console.info(`[slugManager] resolved cold route "${tok}" to "${rel}" (slug: "${key}")`)
-            const rec = { slug: key, token: tok, rel: String(rel || '') }
-            try { gh.__nimbiColdRouteResolved.push(rec) } catch (_) {}
-            try { if (gh && typeof gh.dispatchEvent === 'function') gh.dispatchEvent(new CustomEvent('nimbi.coldRouteResolved', { detail: rec })) } catch (_) {}
-            try { if (gh && gh.__nimbiUI && typeof gh.__nimbiUI.renderByQuery === 'function') gh.__nimbiUI.renderByQuery().catch(() => {}) } catch (_) {}
+            const rec = { slug: key, token: tok, rel: String(rel ?? "") };
+            try {
+              gh.__nimbiColdRouteResolved.push(rec);
+              if (gh.__nimbiColdRouteResolved.length > 50)
+                gh.__nimbiColdRouteResolved.splice(
+                  0,
+                  gh.__nimbiColdRouteResolved.length - 50,
+                );
+            } catch (_) {}
+            try {
+              gh?.dispatchEvent?.(
+                new CustomEvent("nimbi.coldRouteResolved", { detail: rec }),
+              );
+            } catch (_) {}
+            try {
+              gh?.__nimbiUI?.renderByQuery?.().catch(() => {});
+            } catch (_) {}
           } catch (_) {}
         }
       }
     } catch (_) {}
-    _coldRouteWatchers.delete(key)
+    _coldRouteWatchers.delete(key);
   } catch (_) {}
 }
 
@@ -103,28 +162,34 @@ function _notifyColdRouteWatchers(slug, rel) {
 // when a new slug key is added. Use the Map prototype methods to avoid
 // recursive calls and preserve `instanceof Map` behavior for consumers.
 try {
-  const _origSet = slugToMd.set
-  slugToMd.set = function(k, v) {
-    const existed = Map.prototype.has.call(this, k)
-    const res = Map.prototype.set.call(this, k, v)
+  slugToMd._nimbiVersion = 0;
+  slugToMd.set = function (k, v) {
+    const existed = Map.prototype.has.call(this, k);
+    const res = Map.prototype.set.call(this, k, v);
+    this._nimbiVersion += 1;
     try {
-      if (!existed) _notifyColdRouteWatchers(k, v)
+      if (!existed) {
+        const relStr =
+          typeof v === "string"
+            ? v
+            : (v?.default ?? Object.values(v?.langs ?? {})[0] ?? "");
+        _notifyColdRouteWatchers(k, relStr);
+      }
     } catch (_) {}
-    return res
-  }
+    return res;
+  };
+  slugToMd.clear = function () {
+    Map.prototype.clear.call(this);
+    this._nimbiVersion += 1;
+  };
 } catch (_) {}
-
-/**
- * Result returned from `fetchMarkdown`.
- * @typedef {{raw:string,isHtml?:boolean,status?:number}} FetchResult
- */
 
 /**
  * Configured available language codes for the site (e.g. ['en','fr']).
  * When non-empty, slug mappings may store language-specific paths.
  * @type {string[]}
  */
-export let availableLanguages = []
+export let availableLanguages = [];
 
 /**
  * When true, skip crawling links inside repository-root README files
@@ -133,7 +198,7 @@ export let availableLanguages = []
  * building. Default: false (treat README like other pages by default).
  * @type {boolean}
  */
-export let skipRootReadme = false
+export let skipRootReadme = false;
 
 /**
  * Configure whether README files at the repository root should be
@@ -141,7 +206,9 @@ export let skipRootReadme = false
  * @param {boolean} v - Truthy to skip root README files, falsy to include.
  * @returns {void} - No return value.
  */
-export function setSkipRootReadme(v) { skipRootReadme = !!v }
+export function setSkipRootReadme(v) {
+  skipRootReadme = !!v;
+}
 
 /**
  * Set available language codes for multilingual sites.
@@ -149,43 +216,170 @@ export function setSkipRootReadme(v) { skipRootReadme = !!v }
  * @returns {void} - No return value.
  */
 export function setLanguages(list) {
-  availableLanguages = Array.isArray(list) ? list.slice() : []
+  availableLanguages = Array.isArray(list) ? list.slice() : [];
 }
 /**
  * Return the current list of configured available language codes.
  * @returns {string[]} - Array of available language codes.
  */
-export function getLanguages() { return availableLanguages }
-
-import * as l10n from './l10nManager.js'
-import { parseHrefToRoute } from './utils/urlHelper.js'
-import { getSharedParser } from './utils/sharedDomParser.js'
-import { runWithConcurrency } from './utils/concurrency.js'
-
-import slugWorkerCode from './worker/slugWorker.js?raw'
-
-import { LRUCache } from './utils/cache.js'
-import { makeWorkerPool, createWorkerFromRaw } from './worker-manager.js'
-import { debugLog, debugWarn, debugError, isDebug } from './utils/debug.js'
-import { yieldIfNeeded } from './utils/idle.js'
-
-const poolSize = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2)) : 2
-const _slugWorkerManager = makeWorkerPool(() => createWorkerFromRaw(slugWorkerCode), 'slugManager', poolSize)
-
-function _slugShouldLog() {
-  try { if (isDebug()) return true } catch (_e) {}
-  try { return (typeof notFoundPage === 'string' && notFoundPage) ? true : false } catch (_e) { return false }
+export function getLanguages() {
+  return availableLanguages;
 }
 
-function _debugLog(...args) { try { debugLog(...args) } catch (_) {} }
+const poolSize = getWorkerPoolSize();
+const slugAutoScaleOptions = {
+  intervalMs: 750,
+  targetMs: 120,
+  hysteresis: 0.3,
+  cooldownMs: 1000,
+  stepUp: 1,
+  stepDown: 1,
+};
+let _slugPool = null;
+
+function _createSlugPool() {
+  // PowerPool options audit (performance-helpers v2.0.0 validation):
+  // v2.0.0 validates constructor options and throws TypeError on
+  // non-numeric `minSize`/`maxSize`/`idleTimeout`. Every size option
+  // here is numeric: `size` is `poolSize` (always a number, from
+  // getWorkerPoolSize()) and `minSize` is the literal 2, so this pool
+  // complies with the v2 validation rules.
+  const poolOpts = {
+    size: poolSize,
+    minSize: 2,
+    autoScale: slugAutoScaleOptions,
+    // Negotiate native structured-clone envelopes with the workers.
+    messageCodec: 'negotiated',
+    // Backpressure: cap the task queue to prevent unbounded growth under load.
+    maxQueueLength: 100,
+  };
+  try {
+    if (import.meta.env.DEV) {
+      poolOpts.debugLevel = 0;
+    }
+  } catch (_e) {}
+  try {
+    return registerWorkerPool("slug", new PowerPool(SlugWorker, poolOpts));
+  } catch (e) {
+    return {
+      workers: [],
+      postMessage: async () => {
+        throw new Error("slug worker unavailable");
+      },
+    };
+  }
+}
+
+function _getSlugPool() {
+  if (!_slugPool) _slugPool = _createSlugPool();
+  return _slugPool;
+}
+
+/**
+ * Explicitly terminate and clear the slug worker pool.
+ * Uses the pool's own drain/terminate logic so in-flight tasks get a
+ * chance to complete before workers are torn down.
+ * @returns {Promise<void>}
+ */
+/**
+ * How long to wait for in-flight worker tasks during teardown before
+ * terminating the pool. Teardown must not hang, and a pool being discarded
+ * does not need a graceful finish.
+ * @type {number}
+ */
+const POOL_DRAIN_TIMEOUT_MS = 2000;
+
+export function teardownSlugWorkerPool() {
+  const pool = _slugPool;
+  _slugPool = null;
+  if (!pool) return Promise.resolve();
+  unregisterWorkerPool("slug", pool);
+  // performance-helpers 2.1.0 ships a single `close()` entry point that
+  // drains in-flight work (bounded by `timeout`) and then terminates. It
+  // replaces the hand-rolled `Symbol.asyncDispose` -> `drain()` -> `terminate()`
+  // cascade below, and returns the final `getStats()` snapshot for free.
+  if (typeof pool.close === "function") {
+    return Promise.resolve(
+      pool.close({ timeout: POOL_DRAIN_TIMEOUT_MS }),
+    ).catch((e) => {
+      debugWarn("[slugManager] teardownSlugWorkerPool close failed", e);
+    });
+  }
+  // Legacy fallback: pools that predate `close()` still drain then terminate.
+  try {
+    const asyncDispose = pool[Symbol.asyncDispose];
+    if (typeof asyncDispose === "function")
+      return Promise.resolve(asyncDispose.call(pool)).catch(() => {});
+    const drained =
+      typeof pool.drain === "function"
+        ? Promise.resolve(pool.drain({ timeout: POOL_DRAIN_TIMEOUT_MS }))
+        : Promise.resolve();
+    return drained
+      .catch(() => {})
+      .then(() => {
+        if (typeof pool.terminate === "function") pool.terminate();
+      });
+  } catch (e) {
+    debugWarn("[slugManager] teardownSlugWorkerPool failed", e);
+    return Promise.resolve();
+  }
+}
+
+function _slugShouldLog() {
+  try {
+    return isDebug();
+  } catch (_e) {
+    return false;
+  }
+}
+
+function _fetchDiagnostic(url, response, error) {
+  if (error) {
+    return {
+      kind: error.name === "AbortError" ? "aborted" : "network-error",
+      url,
+      error: error.message || String(error),
+    };
+  }
+  const contentType =
+    typeof response?.headers?.get === "function"
+      ? response.headers.get("content-type") || ""
+      : "";
+  return {
+    kind: response?.ok ? "invalid-response" : "http-error",
+    url,
+    status: response?.status,
+    statusText: response?.statusText,
+    redirected: response?.redirected === true,
+    contentType,
+  };
+}
 
 /**
  * Lazily return a worker instance used for slug-related background tasks.
  * @returns {Worker|null}
  */
-export function initSlugWorker() { return _slugWorkerManager.get() }
+export function initSlugWorker() {
+  return _getSlugPool().workers?.[0]?.worker?._underlying ?? null;
+}
 
-function _sendToWorker(msg) { return _slugWorkerManager.send(msg, 5000) }
+function _sendToWorker(msg) {
+  const w = initSlugWorker?.();
+  if (!w)
+    return Promise.reject(new Error("slug worker required but unavailable"));
+  return _getSlugPool()
+    .postMessage(msg, undefined, { awaitResponse: true, timeout: 5000 })
+    .then((result) => {
+      if (result?.error) throw new Error(result.error);
+      return result;
+    })
+    .catch((e) => {
+      const m = e?.message || "";
+      if (m.includes("postMessage response timeout"))
+        throw new Error("worker timeout");
+      throw e;
+    });
+}
 
 /**
  * Build the search index using the slug worker when available.
@@ -193,14 +387,22 @@ function _sendToWorker(msg) { return _slugWorkerManager.send(msg, 5000) }
  * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>} - Resolved search index entries.
  */
 
-export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noIndexing = undefined) {
-  const ns = await import('./slugManager.js')
-  const w = ns.initSlugWorker && ns.initSlugWorker()
-  if (!w) throw new Error('slug worker required but unavailable')
-  return await _sendToWorker({ type: 'buildSearchIndex', contentBase, indexDepth, noIndexing })
+export async function buildSearchIndexWorker(
+  contentBase,
+  indexDepth = 1,
+  noIndexing = undefined,
+  seedPaths = undefined,
+) {
+  const w = initSlugWorker?.();
+  if (!w) throw new Error("slug worker required but unavailable");
+  return await _sendToWorker({
+    type: "buildSearchIndex",
+    contentBase,
+    indexDepth,
+    noIndexing,
+    seedPaths,
+  });
 }
-
-
 
 /**
  * Attempt to resolve a slug via the worker when available, otherwise fallback
@@ -211,10 +413,9 @@ export async function buildSearchIndexWorker(contentBase, indexDepth = 1, noInde
  * @returns {Promise<string|null>} - Resolved markdown path or `null` if not found.
  */
 export async function crawlForSlugWorker(slug, base, maxQueue) {
-  const ns = await import('./slugManager.js')
-  const w = ns.initSlugWorker && ns.initSlugWorker()
-  if (!w) throw new Error('slug worker required but unavailable')
-  return _sendToWorker({ type: 'crawlForSlug', slug, base, maxQueue })
+  const w = initSlugWorker?.();
+  if (!w) throw new Error("slug worker required but unavailable");
+  return _sendToWorker({ type: "crawlForSlug", slug, base, maxQueue });
 }
 
 /**
@@ -224,74 +425,112 @@ export async function crawlForSlugWorker(slug, base, maxQueue) {
  * @returns {void}
  */
 export function _storeSlugMapping(slug, rel) {
-  if (!slug) return
-  let relNorm = null
-  try { relNorm = typeof rel === 'string' ? normalizePath(rel) : normalizePath(String(rel || '')) } catch (_) { relNorm = String(rel || '') }
-  if (!relNorm) return
+  if (!slug) return;
+  let relNorm = null;
+  try {
+    relNorm =
+      typeof rel === "string"
+        ? normalizePath(rel)
+        : normalizePath(String(rel ?? ""));
+  } catch (_) {
+    // normalizePath is best-effort; keep the raw value.
+    relNorm = String(rel ?? "");
+  }
+  if (!relNorm) return;
 
   try {
-    if (availableLanguages && availableLanguages.length) {
-      const parts = String(relNorm).split('/')
-      const firstSeg = parts[0]
-      const isLang = availableLanguages.includes(firstSeg)
-      let entry = slugToMd.get(slug)
-      if (!entry || typeof entry === 'string') {
-        entry = { default: typeof entry === 'string' ? normalizePath(entry) : undefined, langs: {} }
+    if (availableLanguages?.length) {
+      const parts = String(relNorm).split("/");
+      const firstSeg = parts[0];
+      // Modernized: use Set for availableLanguages if array is large
+      const isLang = Array.isArray(availableLanguages)
+        ? availableLanguages.length > 8
+          ? (availableLanguages._set ||= new Set(availableLanguages)).has(
+              firstSeg,
+            )
+          : availableLanguages.includes(firstSeg)
+        : false;
+      let entry = slugToMd.get(slug);
+      if (!entry || typeof entry === "string") {
+        entry = {
+          default: typeof entry === "string" ? normalizePath(entry) : undefined,
+          langs: {},
+        };
       } else {
-        try { if (entry.default) entry.default = normalizePath(entry.default) } catch (_) {}
+        try {
+          if (entry.default) entry.default = normalizePath(entry.default);
+        } catch (_) {}
       }
       if (isLang) {
-        entry.langs[firstSeg] = relNorm
+        entry.langs[firstSeg] = relNorm;
       } else {
-        entry.default = relNorm
+        entry.default = relNorm;
       }
-      slugToMd.set(slug, entry)
+      slugToMd.set(slug, entry);
     } else {
-      const existing = slugToMd.has(slug) ? slugToMd.get(slug) : undefined
+      const existing = slugToMd.has(slug) ? slugToMd.get(slug) : undefined;
       if (!existing) {
-        slugToMd.set(slug, relNorm)
+        slugToMd.set(slug, relNorm);
       } else {
-        let existingPath = null
+        let existingPath = null;
         try {
-          if (typeof existing === 'string') existingPath = normalizePath(existing)
-          else if (existing && typeof existing === 'object') existingPath = existing.default ? normalizePath(existing.default) : null
-        } catch (_) { existingPath = null }
+          if (typeof existing === "string")
+            existingPath = normalizePath(existing);
+          else if (existing && typeof existing === "object")
+            existingPath = existing.default
+              ? normalizePath(existing.default)
+              : null;
+        } catch (_) {
+          // Unreadable mapping: treat as no existing path.
+          existingPath = null;
+        }
         if (existingPath === relNorm) {
-          slugToMd.set(slug, relNorm)
+          slugToMd.set(slug, relNorm);
         } else {
-          let candidate = null
-          let i = 2
+          let candidate = null;
+          let i = 2;
           while (true) {
-            candidate = `${slug}-${i}`
-            if (!slugToMd.has(candidate)) break
-            let candExisting = slugToMd.get(candidate)
-            let candPath = null
+            candidate = `${slug}-${i}`;
+            if (!slugToMd.has(candidate)) break;
+            let candExisting = slugToMd.get(candidate);
+            let candPath = null;
             try {
-              if (typeof candExisting === 'string') candPath = normalizePath(candExisting)
-              else if (candExisting && typeof candExisting === 'object') candPath = candExisting.default ? normalizePath(candExisting.default) : null
-            } catch (_) { candPath = null }
-            if (candPath === relNorm) {
-              slug = candidate
-              break
+              if (typeof candExisting === "string")
+                candPath = normalizePath(candExisting);
+              else if (candExisting && typeof candExisting === "object")
+                candPath = candExisting.default
+                  ? normalizePath(candExisting.default)
+                  : null;
+            } catch (_) {
+              // Unreadable candidate mapping: treat as no match.
+              candPath = null;
             }
-            i += 1
-            if (i > 10000) break
+            if (candPath === relNorm) {
+              slug = candidate;
+              break;
+            }
+            i += 1;
+            if (i > 10000) break;
           }
           try {
             if (!slugToMd.has(candidate)) {
-              slugToMd.set(candidate, relNorm)
-              slug = candidate
+              slugToMd.set(candidate, relNorm);
+              slug = candidate;
             } else {
-              if (slugToMd.get(candidate) === relNorm) slug = candidate
+              if (slugToMd.get(candidate) === relNorm) slug = candidate;
               else {
-                const taken = new Set()
-                for (const k of slugToMd.keys()) taken.add(k)
-                const newSlug = typeof uniqueSlug === 'function' ? uniqueSlug(slug, taken) : `${slug}-2`
-                slugToMd.set(newSlug, relNorm)
-                slug = newSlug
+                const taken = new Set();
+                for (const k of slugToMd.keys()) taken.add(k);
+                const newSlug =
+                  typeof uniqueSlug === "function"
+                    ? uniqueSlug(slug, taken)
+                    : `${slug}-2`;
+                slugToMd.set(newSlug, relNorm);
+                slug = newSlug;
               }
             }
-          } catch (_) {
+          } catch (e) {
+            debugWarn("[slugManager] slug collision resolution failed", e);
           }
         }
       }
@@ -300,19 +539,26 @@ export function _storeSlugMapping(slug, rel) {
 
   try {
     if (relNorm) {
-      try { mdToSlug.set(relNorm, slug) } catch (_) {}
       try {
-        if (allMarkdownPathsSet && typeof allMarkdownPathsSet.has === 'function') {
-          if (!allMarkdownPathsSet.has(relNorm)) {
-            try { allMarkdownPathsSet.add(relNorm) } catch (_) {}
-            try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(relNorm)) allMarkdownPaths.push(relNorm) } catch (_) {}
-          }
-        } else {
-          try { if (Array.isArray(allMarkdownPaths) && !allMarkdownPaths.includes(relNorm)) allMarkdownPaths.push(relNorm) } catch (_) {}
-        }
+        mdToSlug.set(relNorm, slug);
       } catch (_) {}
+      // Modernized: always trust Set for membership, keep array for order
+      if (allMarkdownPathsSet && !allMarkdownPathsSet.has(relNorm)) {
+        allMarkdownPathsSet.add(relNorm);
+        if (Array.isArray(allMarkdownPaths)) allMarkdownPaths.push(relNorm);
+      }
     }
   } catch (_) {}
+}
+
+/**
+ * Public alias for `_storeSlugMapping` used by UI/runtime modules.
+ * @param {string} slug - Slug key to associate with a markdown path.
+ * @param {string} rel - Markdown path (relative to content base) to associate with the slug.
+ * @returns {void}
+ */
+export function storeSlugMapping(slug, rel) {
+  return _storeSlugMapping(slug, rel);
 }
 
 /**
@@ -322,7 +568,7 @@ export function _storeSlugMapping(slug, rel) {
  * the slug cannot be resolved.
  * @type {Set<Function>}
  */
-export const slugResolvers = new Set()
+export const slugResolvers = new Set();
 /**
  * Register a custom resolver function. The function should accept a slug
  * string and return a markdown path (or promise thereof) or `null` if not
@@ -330,48 +576,42 @@ export const slugResolvers = new Set()
  * @param {(slug:string,contentBase?:string)=>Promise<string|null>|string|null} fn - Resolver function to add.
  * @returns {void} - No return value.
  */
-export function addSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.add(fn) }
+export function addSlugResolver(fn) {
+  if (typeof fn === "function") slugResolvers.add(fn);
+}
 /**
  * Unregister a previously added resolver.
  * @param {(slug:string)=>void|null} fn - Previously registered resolver to remove.
  * @returns {void} - No return value.
  */
-export function removeSlugResolver(fn) { if (typeof fn === 'function') slugResolvers.delete(fn) }
+export function removeSlugResolver(fn) {
+  if (typeof fn === "function") slugResolvers.delete(fn);
+}
 /**
  * Reverse mapping of `slugToMd` (markdown path -> slug).
  * @type {Map<string,string>}
  */
-export const mdToSlug = new Map()
+export {
+  mdToSlug,
+  allMarkdownPaths,
+  allMarkdownPathsSet,
+} from "./slugState.js";
 
-let _allMd = {}
-
-/**
- * Array of discovered markdown/html paths (relative to content base).
- * Populated by `_setAllMd` or via `setContentBase` when an index is applied.
- * @type {string[]}
- */
-export let allMarkdownPaths = []
-/**
- * Derived Set for fast membership checks against `allMarkdownPaths`.
- * Consumers should prefer `allMarkdownPathsSet.has(path)` when checking
- * whether a path is known to avoid O(n) array scans.
- * @type {Set<string>}
- */
-export const allMarkdownPathsSet = new Set()
+let _allMd = {};
 
 /**
  * Path to the not-found (404) page relative to the content base.
  * Used as a fallback when requested markdown pages are missing.
  * @type {string}
  */
-export let notFoundPage = '_404.md'
+export let notFoundPage = "_404.md";
 
 /**
  * Path to the home page relative to the content base.
  * Used as a fallback during slug resolution when appropriate.
  * @type {string}
  */
-export let homePage = null
+export let homePage = null;
 
 /**
  * Sentinel slug used internally to represent the site root when a slug
@@ -379,7 +619,7 @@ export let homePage = null
  * hard-coding the literal `'_home'`.
  * @type {string}
  */
-export const HOME_SLUG = '_home'
+export const HOME_SLUG = "_home";
 
 /**
  * Set the not-found page path used when `fetchMarkdown` encounters a
@@ -389,10 +629,10 @@ export const HOME_SLUG = '_home'
  */
 export function setNotFoundPage(p) {
   if (p == null) {
-    notFoundPage = null
-    return
+    notFoundPage = null;
+    return;
   }
-  notFoundPage = String(p || '')
+  notFoundPage = String(p ?? "");
 }
 
 /**
@@ -403,15 +643,17 @@ export function setNotFoundPage(p) {
  */
 export function setHomePage(p) {
   if (p == null) {
-    homePage = null
-    return
+    homePage = null;
+    return;
   }
-  homePage = String(p || '')
+  homePage = String(p ?? "");
   try {
     // Notify any cold-route watchers that were waiting for the site root
     // (cases where the cosmetic hash contained no slug and the host
     // intends the home page to be shown).
-    try { _notifyColdRouteWatchers(HOME_SLUG, homePage) } catch (_) {}
+    try {
+      _notifyColdRouteWatchers(HOME_SLUG, homePage);
+    } catch (_) {}
   } catch (_) {}
 }
 
@@ -423,7 +665,7 @@ export function setHomePage(p) {
  * @returns {void}
  */
 export function _setAllMd(mdMap) {
-  _allMd = mdMap || {}
+  _allMd = mdMap || {};
 }
 
 /**
@@ -435,74 +677,197 @@ export function _setAllMd(mdMap) {
 export function _setSearchIndex(arr) {
   try {
     if (!Array.isArray(searchIndex)) {
-      searchIndex = []
+      searchIndex = [];
     }
-    if (!Array.isArray(arr)) return
+    if (!Array.isArray(arr)) return;
+    if (searchIndex.length > arr.length) return;
+    try {
+      searchIndex.length = 0;
+      for (const it of arr) searchIndex.push(it);
       try {
-        if (!Array.isArray(searchIndex)) searchIndex = []
-        searchIndex.length = 0
-        for (const it of arr) searchIndex.push(it)
-        try {
-          if (typeof window !== 'undefined') {
-            try { window.__nimbiLiveSearchIndex = searchIndex } catch (_) { /* swallow */ }
-          }
-        } catch (_) {}
-      } catch (e) {
-        _debugLog('[slugManager] replacing searchIndex by assignment fallback', e)
-        try { searchIndex = Array.from(arr) } catch (_) { /* swallow */ }
+        if (typeof window !== "undefined") {
+          // Permissive variant (`setIfLive`): `setSearchIndex` is part of
+          // the public API and hosts call it directly, with no initCMS
+          // runtime and therefore no generation. Only a superseded
+          // generation is blocked.
+          setIfLive(activeGeneration(), "__nimbiLiveSearchIndex", searchIndex);
+        }
+      } catch (_) {}
+    } catch (e) {
+      debugLog("[slugManager] replacing searchIndex by assignment fallback", e);
+      try {
+        searchIndex = Array.from(arr);
+      } catch (_) {
+        /* swallow */
       }
+    }
   } catch (e) {}
 }
 
 /** @type {Map<string,string>} */
-export const listSlugCache = new Map()
+export const listSlugCache = new Map();
 /** @type {Set<string>} */
-export const listPathsFetched = new Set()
+export const listPathsFetched = new Set();
+/** @type {Map<string,string|null>} */
+export const crawlCache = new Map();
+
+/**
+ * Maximum entries retained in `crawlCache`.
+ *
+ * The cache previously grew without bound — one entry per decoded slug
+ * probed, including misses — so a long session or a crawler hitting many
+ * unknown slugs retained every key indefinitely. `Map` preserves insertion
+ * order, so evicting the oldest entry is a cheap approximation of LRU that
+ * needs no extra bookkeeping.
+ * @type {number}
+ */
+const CRAWL_CACHE_MAX_ENTRIES = 500;
+
+/**
+ * How long a *miss* (`null`) stays cached.
+ *
+ * A miss means "this slug could not be resolved by crawling". Unlike a hit,
+ * that answer can become wrong as soon as content is added, so misses expire
+ * quickly. Hits are bounded by entry count instead of time.
+ * @type {number}
+ */
+const CRAWL_CACHE_MISS_TTL_MS = 60 * 1000;
+
+/** @type {Map<string, number>} slug -> timestamp of the recorded miss */
+const crawlMissRecordedAt = new Map();
+
+/**
+ * Record a crawl result, evicting the oldest entry when the cache is full.
+ *
+ * Kept as a helper rather than inlining at the call site so the bound is
+ * applied consistently and the eviction policy lives in one place.
+ * @param {string} key
+ * @param {string|null} value
+ * @returns {void}
+ */
+function _crawlCacheSet(key, value) {
+  try {
+    // Re-setting an existing key must not count as a new insertion, otherwise
+    // a hot slug would be evicted immediately.
+    if (!crawlCache.has(key) && crawlCache.size >= CRAWL_CACHE_MAX_ENTRIES) {
+      const oldest = crawlCache.keys().next();
+      if (!oldest.done) {
+        crawlCache.delete(oldest.value);
+        crawlMissRecordedAt.delete(oldest.value);
+      }
+    }
+    crawlCache.set(key, value);
+    if (value === null) crawlMissRecordedAt.set(key, Date.now());
+    else crawlMissRecordedAt.delete(key);
+  } catch (_) {
+    // Cache bounding is best-effort; never fail a resolution because of it.
+  }
+}
+
+/**
+ * Look up a crawl result, treating an expired miss as absent.
+ * @param {string} key
+ * @returns {string|null|undefined} The cached value, or `undefined` when
+ *   there is no usable entry.
+ */
+function _crawlCacheGet(key) {
+  try {
+    if (!crawlCache.has(key)) return undefined;
+    const value = crawlCache.get(key);
+    if (value !== null) return value;
+    const recordedAt = crawlMissRecordedAt.get(key);
+    if (
+      typeof recordedAt === "number" &&
+      Date.now() - recordedAt > CRAWL_CACHE_MISS_TTL_MS
+    ) {
+      // The miss is stale: drop it so the slug is re-crawled, in case the
+      // content now exists.
+      crawlCache.delete(key);
+      crawlMissRecordedAt.delete(key);
+      return undefined;
+    }
+    return value;
+  } catch (_) {
+    return undefined;
+  }
+}
 
 /**
  * Clear caches used for directory list -> slug mappings and path fetch
  * tracking. Useful for tests and when rebuilding indexes.
  * @returns {void} - No return value.
  */
-export function clearListCaches() { listSlugCache.clear(); listPathsFetched.clear() }
-
-function _deriveCommonPrefix(paths) {
-  if (!paths || paths.length === 0) return ''
-  let prefix = paths[0]
-  for (let i = 1; i < paths.length; i++) {
-    const p = paths[i]
-    let j = 0
-    const max = Math.min(prefix.length, p.length)
-    while (j < max && prefix[j] === p[j]) j++
-    prefix = prefix.slice(0, j)
-  }
-  const lastSlash = prefix.lastIndexOf('/')
-  return lastSlash === -1 ? prefix : prefix.slice(0, lastSlash + 1)
+export function clearListCaches() {
+  listSlugCache.clear();
+  listPathsFetched.clear();
 }
 
-import { refreshIndexPaths } from './indexManager.js'
-import { normalizePath, trimTrailingSlash, ensureTrailingSlash } from './utils/helpers.js'
-import { memoize } from './utils/memoize.js'
+function _deriveCommonPrefix(paths) {
+  if (!paths || paths.length === 0) return "";
+  let prefix = paths[0];
+  for (let i = 1; i < paths.length; i++) {
+    const p = paths[i];
+    let j = 0;
+    const max = Math.min(prefix.length, p.length);
+    while (j < max && prefix[j] === p[j]) j++;
+    prefix = prefix.slice(0, j);
+  }
+  const lastSlash = prefix.lastIndexOf("/");
+  return lastSlash === -1 ? prefix : prefix.slice(0, lastSlash + 1);
+}
 
 /**
- * Generate a URL-friendly slug from a text string (memoized LRU).
+ * Generate a URL-friendly slug from a text string.
+ *
+ * Imported from `utils/slugify.js`, the single canonical implementation
+ * shared with the workers, and re-exported so existing consumers of
+ * `slugManager.slugify` keep working. Keeping one implementation
+ * guarantees that a slug produced by the anchor worker resolves against
+ * the maps built on the main thread.
+ *
  * @param {string} s - Text to generate a URL-friendly slug from.
  * @returns {string}
  */
-export const slugify = memoize(function(s) {
-  const MAX_SLUG_LENGTH = 80 // reasonable default to avoid extremely long URLs
-  let slug = String(s || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\- ]/g, '')
-    .replace(/ /g, '-')
-  slug = slug.replace(/(?:-?)(?:md|html)$/, '')
-  slug = slug.replace(/-+/g, '-')
-  slug = slug.replace(/^-|-$/g, '')
-  if (slug.length > MAX_SLUG_LENGTH) {
-    slug = slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/g, '')
+export { slugify };
+
+/**
+ * Lazily-built index of slugified filenames to their paths.
+ *
+ * `crawlForSlug` and `ensureSlug` both need to answer "which known file has
+ * this slug as its name". Scanning `allMarkdownPaths` and re-slugifying every
+ * entry on each call made cold-route resolution O(paths) per navigation; this
+ * index makes it O(1). Invalidated whenever the path set changes size.
+ * @returns {Map<string, string>|null}
+ */
+let _filenameIndexCache = null;
+let _filenameIndexSize = -1;
+
+function getFilenameSlugIndex() {
+  try {
+    const size = allMarkdownPathsSet ? allMarkdownPathsSet.size : 0;
+    if (_filenameIndexCache && _filenameIndexSize === size)
+      return _filenameIndexCache;
+
+    const map = new Map();
+    if (Array.isArray(allMarkdownPaths)) {
+      for (const p of allMarkdownPaths) {
+        try {
+          const name = String(p ?? "")
+            .replace(/^.*\//, "")
+            .replace(/\.(md|html?)$/i, "");
+          if (!name) continue;
+          const slug = slugify(name);
+          if (slug && !map.has(slug)) map.set(slug, p);
+        } catch (_) {}
+      }
+    }
+    _filenameIndexCache = map;
+    _filenameIndexSize = size;
+    return map;
+  } catch (_) {
+    return null;
   }
-  return slug
-}, 2000)
+}
 
 /**
  * Set the content base URL (the runtime `contentPath`) and rebuild slug
@@ -511,82 +876,116 @@ export const slugify = memoize(function(s) {
  * @returns {void} - No return value.
  */
 export function setContentBase(contentBase) {
-  slugToMd.clear(); mdToSlug.clear(); allMarkdownPaths = []
-  try { allMarkdownPathsSet.clear() } catch (e) {}
-  availableLanguages = availableLanguages || []
+  clearListCaches();
+  clearCrawlCache();
+  slugToMd.clear();
+  mdToSlug.clear();
+  setAllMarkdownPaths([]);
+  try {
+    allMarkdownPathsSet.clear();
+  } catch (e) {}
+  availableLanguages = availableLanguages || [];
+  const isLocalized = !!availableLanguages?.length;
+  const takenSlugs = new Set();
 
-  const keys = Object.keys(_allMd || {})
-  if (!keys.length) return
+  const keys = Object.keys(_allMd || {});
+  if (!keys.length) return;
 
-  let prefix = ''
+  let prefix = "";
   try {
     if (contentBase) {
       try {
         if (/^[a-z][a-z0-9+.-]*:/i.test(String(contentBase))) {
-          prefix = new URL(String(contentBase)).pathname
+          prefix = new URL(String(contentBase)).pathname;
         } else {
-          prefix = String(contentBase || '')
+          prefix = String(contentBase ?? "");
         }
       } catch (err) {
-        prefix = String(contentBase || '')
-        _debugLog('[slugManager] parse contentBase failed', err)
+        prefix = String(contentBase ?? "");
+        debugLog("[slugManager] parse contentBase failed", err);
       }
-      prefix = ensureTrailingSlash(prefix)
+      prefix = ensureTrailingSlash(prefix);
     }
-  } catch (err) { prefix = ''; _debugLog('[slugManager] setContentBase prefix derivation failed', err) }
+  } catch (err) {
+    prefix = "";
+    debugLog("[slugManager] setContentBase prefix derivation failed", err);
+  }
 
-  if (!prefix) prefix = _deriveCommonPrefix(keys)
+  if (!prefix) prefix = _deriveCommonPrefix(keys);
 
   for (const fullPath of keys) {
-    let rel = fullPath
+    let rel = fullPath;
     if (prefix && fullPath.startsWith(prefix)) {
-      rel = normalizePath(fullPath.slice(prefix.length))
+      rel = normalizePath(fullPath.slice(prefix.length));
     } else {
-      rel = normalizePath(fullPath)
+      rel = normalizePath(fullPath);
     }
-    allMarkdownPaths.push(rel)
-    try { allMarkdownPathsSet.add(rel) } catch (e) {}
-    try { refreshIndexPaths() } catch (err) { _debugLog('[slugManager] refreshIndexPaths failed', err) }
+    allMarkdownPaths.push(rel);
+    try {
+      allMarkdownPathsSet.add(rel);
+    } catch (e) {}
 
-    const val = _allMd[fullPath]
-    if (typeof val === 'string') {
-      const m = (val || '').match(/^#\s+(.+)$/m)
+    const val = _allMd[fullPath];
+    if (typeof val === "string") {
+      const m = (val || "").match(/^#\s+(.+)$/m);
       if (m && m[1]) {
-        const slug = slugify(m[1].trim())
+        const slug = slugify(m[1].trim());
         if (slug) {
           try {
-            let slugKey = slug
-            if (!availableLanguages || !availableLanguages.length) {
-              slugKey = uniqueSlug(slugKey, new Set(slugToMd.keys()))
+            let slugKey = slug;
+            if (!isLocalized) {
+              slugKey = uniqueSlug(slugKey, takenSlugs);
             }
 
-            if (availableLanguages && availableLanguages.length) {
-              const parts = rel.split('/')
-              const firstSeg = parts[0]
-              const isLang = availableLanguages.includes(firstSeg)
-              let entry = slugToMd.get(slugKey)
-              if (!entry || typeof entry === 'string') {
-                entry = { default: typeof entry === 'string' ? entry : undefined, langs: {} }
+            if (isLocalized) {
+              const parts = rel.split("/");
+              const firstSeg = parts[0];
+              // Modernized: use Set for availableLanguages if array is large
+              const isLang = Array.isArray(availableLanguages)
+                ? availableLanguages.length > 8
+                  ? (availableLanguages._set ||= new Set(
+                      availableLanguages,
+                    )).has(firstSeg)
+                  : availableLanguages.includes(firstSeg)
+                : false;
+              let entry = slugToMd.get(slugKey);
+              if (!entry || typeof entry === "string") {
+                entry = {
+                  default: typeof entry === "string" ? entry : undefined,
+                  langs: {},
+                };
               }
               if (isLang) {
-                entry.langs[firstSeg] = rel
+                entry.langs[firstSeg] = rel;
               } else {
-                entry.default = rel
+                entry.default = rel;
               }
-              slugToMd.set(slugKey, entry)
+              slugToMd.set(slugKey, entry);
             } else {
-              slugToMd.set(slugKey, rel)
+              slugToMd.set(slugKey, rel);
+              takenSlugs.add(slugKey);
             }
-            mdToSlug.set(rel, slugKey)
-          } catch (_e) { _debugLog('[slugManager] set slug mapping failed', _e) }
+            mdToSlug.set(rel, slugKey);
+          } catch (_e) {
+            debugLog("[slugManager] set slug mapping failed", _e);
+          }
         }
       }
     }
   }
+
+  try {
+    refreshIndexPaths();
+  } catch (err) {
+    debugLog("[slugManager] refreshIndexPaths failed", err);
+  }
 }
 
-try { setContentBase() } catch (err) { _debugLog('[slugManager] initial setContentBase failed', err) }
-
+try {
+  setContentBase();
+} catch (err) {
+  debugLog("[slugManager] initial setContentBase failed", err);
+}
 
 /**
  * Ensure a candidate slug is unique against an existing set.
@@ -597,23 +996,16 @@ try { setContentBase() } catch (err) { _debugLog('[slugManager] initial setConte
  * @returns {string} - A slug that does not appear in `existing`.
  */
 export function uniqueSlug(base, existing) {
-  if (!existing.has(base)) return base
-  let i = 2
-  let candidate = `${base}-${i}`
+  if (!existing.has(base)) return base;
+  let i = 2;
+  let candidate = `${base}-${i}`;
   while (existing.has(candidate)) {
-    i += 1
-    candidate = `${base}-${i}`
+    i += 1;
+    candidate = `${base}-${i}`;
   }
-  return candidate
+  return candidate;
 }
 
-/**
- * Return true for links that point outside the site content (absolute
- * schemes, protocol-relative `//`, etc.). Centralizing this check avoids
- * inconsistencies across crawlers and indexers.
- * @param {string} href - The href to test for being external.
- * @returns {boolean} - True when the href points outside the site content.
- */
 /**
  * Return true for links that point outside the site content (absolute
  * schemes, protocol-relative `//`, etc.). Centralized helper.
@@ -621,18 +1013,9 @@ export function uniqueSlug(base, existing) {
  * @returns {boolean} - True when the href points outside the site content.
  */
 export function isExternalLink(href) {
-  return isExternalLinkWithBase(href, undefined)
+  return isExternalLinkWithBase(href, undefined);
 }
 
-/**
- * Determine whether an href points outside of the provided contentBase.
- * If `contentBase` is omitted, this falls back to a conservative check
- * (protocol or protocol-relative URLs are considered external).
- *
- * @param {string} href - href parameter
- * @param {string} [contentBase] - optional absolute or relative content base
- * @returns {boolean} - True when the href points outside the provided content base.
- */
 /**
  * Determine whether an href points outside of the provided contentBase.
  * @param {string} href - The href to test for being external.
@@ -640,59 +1023,44 @@ export function isExternalLink(href) {
  * @returns {boolean} - True when the href points outside the provided content base.
  */
 export function isExternalLinkWithBase(href, contentBase) {
-  if (!href) return false
-  if (href.startsWith('//')) return true
+  if (!href) return false;
+  if (href.startsWith("//")) return true;
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
-    if (contentBase && typeof contentBase === 'string') {
+    if (contentBase && typeof contentBase === "string") {
       try {
-        const h = new URL(href)
-        const base = new URL(contentBase)
-        if (h.origin !== base.origin) return true
-        return !h.pathname.startsWith(base.pathname)
+        const h = new URL(href);
+        const base = new URL(contentBase);
+        if (h.origin !== base.origin) return true;
+        return !h.pathname.startsWith(base.pathname);
       } catch (err) {
-        return true
+        return true;
       }
     }
-    return true
+    return true;
   }
-  if (href.startsWith('/') && contentBase && typeof contentBase === 'string') {
+  if (href.startsWith("/") && contentBase && typeof contentBase === "string") {
     try {
-      const abs = new URL(href, contentBase)
-      const base = new URL(contentBase)
-      if (abs.origin !== base.origin) return true
-      return !abs.pathname.startsWith(base.pathname)
+      const abs = new URL(href, contentBase);
+      const base = new URL(contentBase);
+      if (abs.origin !== base.origin) return true;
+      return !abs.pathname.startsWith(base.pathname);
     } catch (err) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
 
-/**
- * Unescape Markdown-escaped characters so search titles/excerpts show
- * natural text (e.g. "\\_clearHooks" -> "_clearHooks"). Only a small
- * set of escapable characters per CommonMark is handled here.
- * @param {string} s - Input string potentially containing Markdown escapes.
- * @returns {string} - The unescaped string.
- */
 /**
  * Unescape a small set of Markdown-escaped characters.
  * @param {string} s - s parameter
  * @returns {string} - The unescaped string.
  */
 export function unescapeMarkdown(s) {
-  if (s == null) return s
-  return String(s).replace(/\\([\\`*_{}\[\]()#+\-.!])/g, (_m, ch) => ch)
+  if (s == null) return s;
+  return String(s).replace(/\\([\\`*_{}\[\]()#+\-.!])/g, (_m, ch) => ch);
 }
 
-/**
- * Given a slug, return the most appropriate markdown path taking the
- * current UI language and available language list into account. If no
- * mapping exists the return value is `null`.
- *
- * @param {string} slug - slug parameter
- * @returns {string|null} - The resolved markdown path for the slug, or `null` if not found.
- */
 /**
  * Given a slug, return the most appropriate markdown path taking the
  * current UI language into account.
@@ -700,44 +1068,77 @@ export function unescapeMarkdown(s) {
  * @returns {string|null} - The resolved markdown path for the slug, or `null` if not found.
  */
 export function resolveSlugPath(slug) {
-  if (!slug || !slugToMd.has(slug)) return null
-  const entry = slugToMd.get(slug)
-  if (!entry) return null
-  if (typeof entry === 'string') return entry
-  if (availableLanguages && availableLanguages.length && l10n.currentLang) {
+  if (!slug || !slugToMd.has(slug)) return null;
+  const entry = slugToMd.get(slug);
+  if (!entry) return null;
+  if (typeof entry === "string") return entry;
+  if (availableLanguages?.length && l10n.currentLang) {
     if (entry.langs && entry.langs[l10n.currentLang]) {
-      return entry.langs[l10n.currentLang]
+      return entry.langs[l10n.currentLang];
     }
   }
-  if (entry.default) return entry.default
+  if (entry.default) return entry.default;
   if (entry.langs) {
-    const keys = Object.keys(entry.langs)
-    if (keys.length) return entry.langs[keys[0]]
+    const keys = Object.keys(entry.langs);
+    if (keys.length) return entry.langs[keys[0]];
   }
-  return null
+  return null;
 }
 
 /**
  * Cache of ongoing or completed `fetchMarkdown` promises keyed by resolved URL.
  * Maps absolute URL string -> Promise<FetchResult>.
+ * Bounded to 500 entries (was 2000): each entry retains a full page body
+ * once its fetch resolves, and PowerCache expiry (default 60s TTL) is
+ * enforced lazily on read, so `maxEntries` is the hard retention bound.
+ * 500 still covers concurrent-fetch dedupe and the 60s revisit window with
+ * wide margin; crawl passes keep bodies in their own maps, so eviction
+ * never forces a re-fetch during indexing.
  * @type {Map<string, Promise<FetchResult>>}
  */
-export const fetchCache = new LRUCache({ maxSize: 2000 })
+export const fetchCache = new PowerCache({ maxEntries: 500 });
 /**
  * Clear internal fetch cache used by `fetchMarkdown`.
  * @returns {void} - No return value.
  */
-export function clearFetchCache() { fetchCache.clear(); negativeFetchCache.clear() }
+export function clearFetchCache() {
+  fetchCache.clear();
+  negativeFetchCache.clear();
+}
+
+/**
+ * Return bounded diagnostics for the runtime-owned Markdown caches.
+ * @returns {{fetchEntries:number, negativeEntries:number, maxEntries:number}}
+ */
+export function getFetchCacheDiagnostics() {
+  return {
+    fetchEntries: Number(fetchCache.size) || 0,
+    negativeEntries: Number(negativeFetchCache.size) || 0,
+    maxEntries: Number(fetchCache.maxEntries) || 0,
+  };
+}
 
 /**
  * Short-term negative cache for failed fetches. Maps absolute URL -> expiresAt (ms).
  * When a URL is present and not expired, `fetchMarkdown` will reject immediately
- * without issuing a network request.
+ * without issuing a network request. Bounded to 500 entries (was 2000) to cap
+ * retained URL keys; entries also expire via NEGATIVE_CACHE_TTL_MS, so earlier
+ * eviction only means a failed URL may be retried sooner, never served stale.
  * @type {Map<string, number>}
  */
-export const negativeFetchCache = new LRUCache({ maxSize: 2000 })
+export const negativeFetchCache = new PowerCache({ maxEntries: 500 });
 
-let NEGATIVE_CACHE_TTL_MS = 60 * 1000 // 1 minute default
+function getFetchCacheKey(url) {
+  try {
+    const manifest = globalThis?.window?.__nimbiRuntimeManifest;
+    if (manifest && Number.isInteger(manifest.generation)) {
+      return `${url}|||generation:${manifest.generation}|||language:${manifest.language || ""}`;
+    }
+  } catch (_) {}
+  return url;
+}
+
+let NEGATIVE_CACHE_TTL_MS = 60 * 1000; // 1 minute default
 
 /**
  * Adjust the negative-cache TTL (milliseconds). Useful for tests.
@@ -745,7 +1146,7 @@ let NEGATIVE_CACHE_TTL_MS = 60 * 1000 // 1 minute default
  * @returns {void}
  */
 export function setFetchNegativeCacheTTL(ms) {
-  NEGATIVE_CACHE_TTL_MS = Number(ms) || 0
+  NEGATIVE_CACHE_TTL_MS = Number(ms) || 0;
 }
 
 /**
@@ -755,8 +1156,9 @@ export function setFetchNegativeCacheTTL(ms) {
  */
 export function setFetchCacheMaxSize(n) {
   try {
-    const v = Math.max(0, Number(n) || 0)
-    if (fetchCache && typeof fetchCache._maxSize !== 'undefined') fetchCache._maxSize = v
+    const v = Math.max(0, Number(n) || 0);
+    if (fetchCache && typeof fetchCache.maxEntries !== "undefined")
+      fetchCache.maxEntries = v;
   } catch (_) {}
 }
 
@@ -766,8 +1168,9 @@ export function setFetchCacheMaxSize(n) {
  */
 export function setFetchCacheTTL(ms) {
   try {
-    const v = Math.max(0, Number(ms) || 0)
-    if (fetchCache && typeof fetchCache._ttlMs !== 'undefined') fetchCache._ttlMs = v
+    const v = Math.max(0, Number(ms) || 0);
+    if (fetchCache && typeof fetchCache.defaultTTL !== "undefined")
+      fetchCache.defaultTTL = v;
   } catch (_) {}
 }
 
@@ -777,12 +1180,16 @@ export function setFetchCacheTTL(ms) {
  */
 export function setNegativeFetchCacheMaxSize(n) {
   try {
-    const v = Math.max(0, Number(n) || 0)
-    if (negativeFetchCache && typeof negativeFetchCache._maxSize !== 'undefined') negativeFetchCache._maxSize = v
+    const v = Math.max(0, Number(n) || 0);
+    if (
+      negativeFetchCache &&
+      typeof negativeFetchCache.maxEntries !== "undefined"
+    )
+      negativeFetchCache.maxEntries = v;
   } catch (_) {}
 }
 
-let FETCH_CONCURRENCY = Math.max(1, Math.min(poolSize, 5))
+let FETCH_CONCURRENCY = Math.max(1, Math.min(poolSize, 5));
 
 /**
  * Set the maximum concurrent fetches used by the runtime indexer/crawler.
@@ -790,14 +1197,21 @@ let FETCH_CONCURRENCY = Math.max(1, Math.min(poolSize, 5))
  * @returns {void}
  */
 export function setFetchConcurrency(n) {
-  try { FETCH_CONCURRENCY = Math.max(1, Number(n) || 1) } catch (e) { FETCH_CONCURRENCY = 1 }
+  try {
+    FETCH_CONCURRENCY = Math.max(1, Number(n) || 1);
+  } catch (e) {
+    // Invalid concurrency value: fall back to serial fetching.
+    FETCH_CONCURRENCY = 1;
+  }
 }
 
 /**
  * Get the currently configured fetch concurrency.
  * @returns {number}
  */
-export function getFetchConcurrency() { return FETCH_CONCURRENCY }
+export function getFetchConcurrency() {
+  return FETCH_CONCURRENCY;
+}
 
 /**
  * Fetch markdown content by path.
@@ -807,45 +1221,56 @@ export function getFetchConcurrency() { return FETCH_CONCURRENCY }
  * @param {{force?:boolean}} [opts] - Options object ({force:true} bypasses guard).
  * @returns {Promise<FetchResult>} Resolves with the fetched content or rejects on failure.
  */
-export let fetchMarkdown = async function(path, base, opts) {
-  if (!path) throw new Error('path required')
+export let fetchMarkdown = async function (path, base, opts) {
+  if (!path) throw new Error("path required");
+
   try {
-    if (typeof path === 'string' && (path.indexOf('?page=') !== -1 || path.startsWith('?') || path.startsWith('#/') || path.indexOf('#/') !== -1)) {
+    if (
+      typeof path === "string" &&
+      (path.indexOf("?page=") !== -1 ||
+        path.startsWith("?") ||
+        path.startsWith("#/") ||
+        path.indexOf("#/") !== -1)
+    ) {
       try {
-        const parsed = parseHrefToRoute(path)
-        if (parsed && parsed.page) path = parsed.page
+        const parsed = parseHrefToRoute(path);
+        if (parsed?.page) path = parsed.page;
       } catch (e) {}
     }
   } catch (e) {}
   try {
-    const o = (String(path || '').match(/([^\/]+)\.md(?:$|[?#])/) || [])[1]
-    const isBare = typeof path === 'string' && String(path).indexOf('/') === -1
-    const wasPageToken = false
-    if (o && (isBare || wasPageToken) && slugToMd.has(o)) {
-      const mapped = resolveSlugPath(o) || slugToMd.get(o)
+    const o = (String(path ?? "").match(/([^\/]+)\.md(?:$|[?#])/) || [])[1];
+    const isBare = typeof path === "string" && String(path).indexOf("/") === -1;
+    if (o && isBare && slugToMd.has(o)) {
+      const mapped = resolveSlugPath(o) || slugToMd.get(o);
       if (mapped && mapped !== path) {
-        path = mapped
+        path = mapped;
       }
     }
-  } catch (err) { _debugLog('[slugManager] slug mapping normalization failed', err) }
+  } catch (err) {
+    debugLog("[slugManager] slug mapping normalization failed", err);
+  }
   try {
-    if (typeof path === 'string' && path.indexOf('::') !== -1) {
-      const left = String(path).split('::', 1)[0]
+    if (typeof path === "string" && path.indexOf("::") !== -1) {
+      const left = String(path).split("::", 1)[0];
       if (left) {
         try {
           if (slugToMd.has(left)) {
-            const mapped = resolveSlugPath(left) || slugToMd.get(left)
-            if (mapped) path = mapped
-            else path = left
+            const mapped = resolveSlugPath(left) || slugToMd.get(left);
+            if (mapped) path = mapped;
+            else path = left;
           } else {
-            path = left
+            path = left;
           }
         } catch (_) {
-          path = left
+          // Path comparison failed; keep the left-hand candidate.
+          path = left;
         }
       }
     }
-  } catch (err) { _debugLog('[slugManager] path sanitize failed', err) }
+  } catch (err) {
+    debugLog("[slugManager] path sanitize failed", err);
+  }
   // If a content `base` was provided and the `path` accidentally
   // includes the base's pathname (for example when links were authored
   // as "nimbiCMS_pre/assets/..." or "/nimbiCMS_pre/...' in a site
@@ -854,21 +1279,28 @@ export let fetchMarkdown = async function(path, base, opts) {
   try {
     if (base) {
       try {
-        const baseUrl = (/^[a-z][a-z0-9+.-]*:/i.test(String(base))) ? new URL(String(base)) : new URL(String(base), (typeof location !== 'undefined' ? location.origin : 'http://localhost'))
-        let bp = (baseUrl.pathname || '')
-        bp = bp.replace(/^\/+|\/+$/g, '') // trim slashes
+        const baseUrl = /^[a-z][a-z0-9+.-]*:/i.test(String(base))
+          ? new URL(String(base))
+          : new URL(
+              String(base),
+              typeof location !== "undefined"
+                ? location.origin
+                : "http://localhost",
+            );
+        let bp = baseUrl.pathname || "";
+        bp = bp.replace(/^\/+|\/+$/g, ""); // trim slashes
         if (bp) {
           try {
-            const pRaw = String(path || '')
+            const pRaw = String(path ?? "");
             // If path is an absolute URL, don't modify it
             if (!/^[a-z][a-z0-9+.-]*:/i.test(pRaw)) {
-              let p = pRaw.replace(/^\/+/, '')
+              let p = pRaw.replace(/^\/+/, "");
               if (p === bp) {
-                path = ''
-              } else if (p.startsWith(bp + '/')) {
-                path = p.slice(bp.length + 1)
+                path = "";
+              } else if (p.startsWith(bp + "/")) {
+                path = p.slice(bp.length + 1);
               } else {
-                path = p
+                path = p;
               }
             }
           } catch (_) {}
@@ -877,126 +1309,374 @@ export let fetchMarkdown = async function(path, base, opts) {
     }
   } catch (_) {}
 
-  const allowFetch = (opts && opts.force === true) || (typeof notFoundPage === 'string' && notFoundPage) || (slugToMd && slugToMd.size) || (allMarkdownPathsSet && allMarkdownPathsSet.size) || isDebug()
+  const allowFetch =
+    opts?.force === true ||
+    (typeof notFoundPage === "string" && notFoundPage) ||
+    slugToMd?.size ||
+    allMarkdownPathsSet?.size ||
+    isDebug();
   if (!allowFetch) {
-    throw new Error('failed to fetch md')
+    throw new Error("failed to fetch md");
   }
-  const baseClean = base == null ? '' : trimTrailingSlash(String(base))
-  let url = ''
+  const baseClean = base == null ? "" : trimTrailingSlash(String(base));
+  let url = "";
   try {
-    const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
+    const origin =
+      typeof location !== "undefined" && location?.origin
+        ? location.origin
+        : "http://localhost";
     // Build a consistent absolute base URL to resolve the `path` against.
     // Prefer `base` when it's an absolute URL; otherwise compose an
     // absolute base using the current origin so `new URL()` can correctly
     // handle absolute/relative `path` values without manual string ops.
-    let baseForResolve = origin.replace(/\/$/, '') + '/'
+    let baseForResolve = origin.replace(/\/$/, "") + "/";
     if (baseClean) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(baseClean)) {
-        baseForResolve = baseClean.replace(/\/$/, '') + '/'
-      } else if (baseClean.startsWith('/')) {
-        baseForResolve = origin.replace(/\/$/, '') + baseClean.replace(/\/$/, '') + '/'
+        baseForResolve = baseClean.replace(/\/$/, "") + "/";
+      } else if (baseClean.startsWith("/")) {
+        baseForResolve =
+          origin.replace(/\/$/, "") + baseClean.replace(/\/$/, "") + "/";
       } else {
-        baseForResolve = origin.replace(/\/$/, '') + '/' + baseClean.replace(/\/$/, '') + '/'
+        baseForResolve =
+          origin.replace(/\/$/, "") + "/" + baseClean.replace(/\/$/, "") + "/";
       }
     }
     try {
-      url = new URL(path.replace(/^\//, ''), baseForResolve).toString()
+      url = new URL(path.replace(/^\//, ""), baseForResolve).toString();
     } catch (err) {
       // Fallback to a conservative concatenation if URL resolution fails.
-      url = origin.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+      url = origin.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
     }
   } catch (err) {
-    url = (typeof location !== 'undefined' && location.origin ? location.origin : 'http://localhost') + '/' + path.replace(/^\//, '')
+    url =
+      (typeof location !== "undefined" && location.origin
+        ? location.origin
+        : "http://localhost") +
+      "/" +
+      path.replace(/^\//, "");
   }
-  const signal = opts && opts.signal
+  const signal = opts?.signal;
+  const fetchWithDeadline = async (targetUrl) => {
+    const timeoutMs =
+      opts && typeof opts.timeoutMs === "number"
+        ? Math.max(0, Number(opts.timeoutMs) || 0)
+        : 10_000;
 
-  try {
-    const neg = negativeFetchCache.get(url)
-    if (neg && neg > Date.now()) {
-      return Promise.reject(new Error('failed to fetch md'))
+    // Use an instance-based PowerDeadline per-request so we can merge the
+    // caller-provided signal with the deadline signal and ensure caller
+    // aborts cancel the underlying fetch. This keeps control local and
+    // avoids depending on a static `run` implementation.
+    if (typeof PowerDeadline === "function") {
+        const dl = new PowerDeadline({ totalTimeout: timeoutMs });
+        let mergedSignal = dl.signal;
+        try {
+          if (
+            signal &&
+            typeof AbortSignal !== "undefined" &&
+            typeof AbortSignal.any === "function" &&
+            dl.signal instanceof AbortSignal
+          ) {
+            mergedSignal = AbortSignal.any([signal, dl.signal]);
+          } else if (signal && typeof AbortSignal !== "undefined") {
+            const acProxy = new AbortController();
+            try {
+              signal.addEventListener("abort", () => acProxy.abort(), {
+                once: true,
+              });
+            } catch (_) {}
+            try {
+              dl.signal.addEventListener("abort", () => acProxy.abort(), {
+                once: true,
+              });
+            } catch (_) {}
+            try {
+              if (signal?.aborted || dl.signal?.aborted) acProxy.abort();
+            } catch (_) {}
+            mergedSignal = acProxy.signal;
+          }
+        } catch (_) {}
+
+        // Perform retries for transient network/server errors before
+        // failing and allowing the negative cache to record the URL.
+        // Prefer PowerRetry when available; otherwise fall back to a
+        // small manual retry loop with exponential backoff.
+        return await dl.run(async (deadlineSignal) => {
+            const requestSignal = deadlineSignal || signal || dl.signal;
+            const attempts = 3; // initial + 2 retries
+            // Helper that performs a single fetch attempt and treats
+            // 5xx responses as retryable failures.
+            const singleAttempt = async () => {
+              if (requestSignal?.aborted) {
+                const ae = new Error("aborted");
+                ae.name = "AbortError";
+                throw ae;
+              }
+              const fetchOpts = requestSignal
+                ? { signal: requestSignal, referrerPolicy: "no-referrer" }
+                : { referrerPolicy: "no-referrer" };
+              return await fetch(targetUrl, fetchOpts);
+            };
+
+            // Try using PowerRetry when it exists and has a run method.
+            if (typeof PowerRetry === "function") {
+              const retry = new PowerRetry({
+                maxAttempts: attempts,
+                backoff: "exponential",
+                baseDelay: 50,
+                jitter: false,
+              });
+              if (typeof retry.run === "function") {
+                return await retry.run(async () => {
+                  const r = await singleAttempt();
+                  if (r && typeof r.status === "number" && r.status >= 500) {
+                    const re = new Error("server error");
+                    re.status = r.status;
+                    throw re;
+                  }
+                  return r;
+                });
+              }
+            }
+
+            // Manual retry loop (safe fallback).
+            let lastErr;
+            for (let i = 0; i < attempts; i++) {
+              if (requestSignal?.aborted) {
+                const ae = new Error("aborted");
+                ae.name = "AbortError";
+                throw ae;
+              }
+              try {
+                const r = await singleAttempt();
+                if (r && typeof r.status === "number" && r.status >= 500) {
+                  lastErr = new Error("server error");
+                  lastErr.status = r.status;
+                  if (i < attempts - 1) {
+                    const delay = Math.pow(2, i) * 50;
+                    await new Promise((res) => setTimeout(res, delay));
+                    continue;
+                  }
+                  throw lastErr;
+                }
+                return r;
+              } catch (err) {
+                if (err && err.name === "AbortError") throw err;
+                lastErr = err;
+                if (i < attempts - 1) {
+                  const delay = Math.pow(2, i) * 50;
+                  await new Promise((res) => setTimeout(res, delay));
+                  continue;
+                }
+                throw lastErr;
+              }
+            }
+        }, signal ? { signal } : undefined);
     }
-    if (neg) negativeFetchCache.delete(url)
+
+    // Final fallback: use AbortSignal.timeout when available
+    let mergedSignal = signal || null;
+    try {
+      if (
+        !mergedSignal &&
+        typeof AbortSignal !== "undefined" &&
+        typeof AbortSignal.timeout === "function"
+      ) {
+        mergedSignal = AbortSignal.timeout(timeoutMs);
+      } else if (
+        mergedSignal &&
+        typeof AbortSignal !== "undefined" &&
+        typeof AbortSignal.timeout === "function" &&
+        typeof AbortSignal.any === "function"
+      ) {
+        mergedSignal = AbortSignal.any([
+          mergedSignal,
+          AbortSignal.timeout(timeoutMs),
+        ]);
+      }
+    } catch (_) {}
+    return await fetch(
+      targetUrl,
+      mergedSignal ? { signal: mergedSignal } : undefined,
+    );
+  };
+
+  const cacheKey = getFetchCacheKey(url);
+  try {
+    const neg = negativeFetchCache.get(cacheKey);
+    if (neg && neg > Date.now()) {
+      return Promise.reject(new Error("failed to fetch md"));
+    }
+    if (neg) negativeFetchCache.delete(cacheKey);
   } catch (_) {}
 
-  if (fetchCache.has(url)) {
-    return fetchCache.get(url)
+  if (fetchCache.has(cacheKey)) {
+    return fetchCache.get(cacheKey);
   }
 
   const promise = (async () => {
-    const res = await fetch(url, signal ? { signal } : undefined)
-    if (!res || typeof res.ok !== 'boolean' || !res.ok) {
+    let res;
+    try {
+      res = await fetchWithDeadline(url);
+    } catch (fetchErr) {
+      try {
+        debugError("fetchMarkdown failed:", () =>
+          _fetchDiagnostic(url, null, fetchErr),
+        );
+      } catch (e) {}
+      throw new Error("failed to fetch md");
+    }
+    if (!res || typeof res.ok !== "boolean" || !res.ok) {
       if (res && res.status === 404) {
-          if (typeof notFoundPage === 'string' && notFoundPage) {
-            try {
-              const p404 = `${baseClean}/${notFoundPage}`
-              const r404 = await globalThis.fetch(p404, signal ? { signal } : undefined)
-              if (r404 && typeof r404.ok === 'boolean' && r404.ok) {
-                const raw404 = await r404.text()
-                return { raw: raw404, status: 404 }
-              }
-            } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
+        if (typeof notFoundPage === "string" && notFoundPage) {
+          try {
+            const p404 = `${baseClean}/${notFoundPage}`;
+            const r404 = await fetchWithDeadline(p404);
+            if (r404 && typeof r404.ok === "boolean" && r404.ok) {
+              const raw404 = await r404.text();
+              return { raw: raw404, status: 404 };
+            }
+          } catch (_ee) {
+            debugLog("[slugManager] fetching fallback 404 failed", _ee);
           }
         }
-      let body = ''
+      }
+      let body = "";
       try {
-        if (res && typeof res.clone === 'function') {
-          body = await res.clone().text()
-        } else if (res && typeof res.text === 'function') {
-          body = await res.text()
+        if (res && typeof res.clone === "function") {
+          body = await res.clone().text();
+        } else if (res && typeof res.text === "function") {
+          body = await res.text();
         } else {
-          body = ''
+          body = "";
         }
       } catch (err) {
-        body = ''
-        _debugLog('[slugManager] reading error body failed', err)
+        body = "";
+        debugLog("[slugManager] reading error body failed", err);
       }
       try {
-        const status = res ? res.status : undefined
+        const status = res ? res.status : undefined;
         if (status === 404) {
-          try { debugWarn('fetchMarkdown failed (404):', () => ({ url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) })) } catch (e) {}
+          try {
+            debugWarn("fetchMarkdown failed (404):", () => ({
+              ..._fetchDiagnostic(url, res),
+              body: body.slice(0, 200),
+            }));
+          } catch (e) {}
         } else {
-          try { debugError('fetchMarkdown failed:', () => ({ url, status, statusText: res ? res.statusText : undefined, body: body.slice(0, 200) })) } catch (e) {}
+          try {
+            debugError("fetchMarkdown failed:", () => ({
+              ..._fetchDiagnostic(url, res),
+              body: body.slice(0, 200),
+            }));
+          } catch (e) {}
         }
       } catch (e) {}
-      throw new Error('failed to fetch md')
-      throw new Error('failed to fetch md')
+      throw new Error("failed to fetch md");
     }
-    const raw = await res.text()
-    const trimmed = raw.trim().slice(0, 128).toLowerCase()
-    const looksLikeHtml = /^(?:<!doctype|<html|<title|<h1)/.test(trimmed)
-    const isHtml = looksLikeHtml || String(path || '').toLowerCase().endsWith('.html')
+    const raw = await res.text();
+    const trimmed = raw.trim().slice(0, 128).toLowerCase();
+    const looksLikeHtml = /^(?:<!doctype|<html|<title|<h1)/.test(trimmed);
+    const isHtml =
+      looksLikeHtml ||
+      String(path ?? "")
+        .toLowerCase()
+        .endsWith(".html");
 
-    if (looksLikeHtml && String(path || '').toLowerCase().endsWith('.md')) {
+    if (
+      looksLikeHtml &&
+      String(path ?? "")
+        .toLowerCase()
+        .endsWith(".md")
+    ) {
       try {
-        if (typeof notFoundPage === 'string' && notFoundPage) {
-          const p404 = `${baseClean}/${notFoundPage}`
-          const r404 = await globalThis.fetch(p404, signal ? { signal } : undefined)
+        if (typeof notFoundPage === "string" && notFoundPage) {
+          const p404 = `${baseClean}/${notFoundPage}`;
+          const r404 = await fetchWithDeadline(p404);
           if (r404.ok) {
-            const raw404 = await r404.text()
-            return { raw: raw404, status: 404 }
+            const raw404 = await r404.text();
+            return { raw: raw404, status: 404 };
           }
         }
-      } catch (_ee) { _debugLog('[slugManager] fetching fallback 404 failed', _ee) }
-      if (_slugShouldLog()) debugError('fetchMarkdown: server returned HTML for .md request', url)
-      throw new Error('failed to fetch md')
+      } catch (_ee) {
+        debugLog("[slugManager] fetching fallback 404 failed", _ee);
+      }
+      if (_slugShouldLog())
+        debugError("fetchMarkdown: invalid content type for .md request", () => ({
+          ..._fetchDiagnostic(url, res),
+          expected: "text/markdown or text/plain",
+        }));
+      throw new Error("failed to fetch md");
     }
 
-    return isHtml ? { raw, isHtml: true } : { raw }
-  })()
+    return isHtml ? { raw, isHtml: true } : { raw };
+  })();
 
-  const tracked = promise.catch(err => {
-    if (err && err.name === 'AbortError') {
-      try { fetchCache.delete(url) } catch (_) {}
-      throw err
+  // Cache the promise so concurrent callers share the same underlying fetch.
+  fetchCache.set(cacheKey, promise);
+
+  // If the caller provided an AbortSignal, wire it to the returned promise
+  // so that aborting the signal rejects the caller-visible promise with
+  // AbortError, while keeping the shared fetch promise itself unraced.
+  let onAbort = null;
+  let returned = promise;
+  try {
+    if (signal && typeof signal === "object") {
+      const abortRace = new Promise((_, reject) => {
+        try {
+          if (signal.aborted) {
+            const ae = new Error("aborted");
+            ae.name = "AbortError";
+            return reject(ae);
+          }
+        } catch (_) {}
+        onAbort = () => {
+          const ae = new Error("aborted");
+          ae.name = "AbortError";
+          try {
+            signal.removeEventListener &&
+              signal.removeEventListener("abort", onAbort);
+          } catch (_) {}
+          reject(ae);
+        };
+        try {
+          signal.addEventListener && signal.addEventListener("abort", onAbort);
+        } catch (_) {}
+      });
+      returned = Promise.race([promise, abortRace]);
     }
-    try { negativeFetchCache.set(url, Date.now() + NEGATIVE_CACHE_TTL_MS) } catch (_) {}
-    try { fetchCache.delete(url) } catch (_) {}
-    throw err
-  })
+  } catch (_) {}
 
-  fetchCache.set(url, tracked)
-  return tracked
-}
+  const tracked = returned
+    .finally(() => {
+      try {
+        if (onAbort && signal && typeof signal.removeEventListener === "function") {
+          signal.removeEventListener("abort", onAbort);
+        }
+      } catch (_) {}
+    })
+    .catch((err) => {
+      if (
+        err &&
+        (err.name === "AbortError" ||
+          err.code === "EABORT" ||
+          err.code === "EDEADLINE")
+      ) {
+        try {
+          fetchCache.delete(cacheKey);
+        } catch (_) {}
+        throw err;
+      }
+      try {
+        negativeFetchCache.set(cacheKey, Date.now() + NEGATIVE_CACHE_TTL_MS);
+      } catch (_) {}
+      try {
+        fetchCache.delete(cacheKey);
+      } catch (_) {}
+      throw err;
+    });
+
+  return tracked;
+};
 
 /**
  * Override the internal fetchMarkdown implementation. Useful for tests
@@ -1005,17 +1685,19 @@ export let fetchMarkdown = async function(path, base, opts) {
  * @returns {void} - No return value.
  */
 export function setFetchMarkdown(fn) {
-  if (typeof fn === 'function') {
-    fetchMarkdown = fn
+  if (typeof fn === "function") {
+    fetchMarkdown = fn;
   }
 }
 
 /**
- * Cache used by `crawlForSlug` to memoize results keyed by decoded slug.
- * Values are the resolved path string or `null` when not found.
- * @type {Map<string,string|null>}
+ * Clear slug-crawl results when the content source or runtime changes.
+ * @returns {void} - No return value.
  */
-export const crawlCache = new Map()
+export function clearCrawlCache() {
+  crawlCache.clear();
+  crawlMissRecordedAt.clear();
+}
 
 /**
  * Remove code blocks, inline code, and HTML comments from markdown
@@ -1024,55 +1706,65 @@ export const crawlCache = new Map()
  * @returns {string} - The input with code blocks, inline code, and HTML comments removed.
  */
 function _stripCodeAndComments(raw) {
-  if (!raw || typeof raw !== 'string') return ''
-  let s = raw.replace(/```[\s\S]*?```/g, '')
-  s = s.replace(/<pre[\s\S]*?<\/pre>/gi, '')
-  s = s.replace(/<code[\s\S]*?<\/code>/gi, '')
-  s = s.replace(/<!--([\s\S]*?)-->/g, '')
-  s = s.replace(/^ {4,}.*$/gm, '')
-  s = s.replace(/`[^`]*`/g, '')
-  return s
+  if (!raw || typeof raw !== "string") return "";
+  let s = raw.replace(/```[\s\S]*?```/g, "");
+  s = s.replace(/<pre[\s\S]*?<\/pre>/gi, "");
+  s = s.replace(/<code[\s\S]*?<\/code>/gi, "");
+  s = s.replace(/<!--([\s\S]*?)-->/g, "");
+  s = s.replace(/^ {4,}.*$/gm, "");
+  s = s.replace(/`[^`]*`/g, "");
+  return s;
 }
 
 /** @type {Array<{slug:string,title:string,excerpt:string,path:string}>} */
-export let searchIndex = []
+export let searchIndex = [];
 
 /**
  * Return the live `searchIndex` array (not a copy).
  * Consumers should avoid mutating the returned array directly.
- * @returns {Array}
+ * @returns {Array<{slug:string,title:string,excerpt:string,path:string}>}
  */
-export function getSearchIndex() { return searchIndex }
+export function getSearchIndex() {
+  return searchIndex;
+}
 
 try {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     try {
-      Object.defineProperty(window, '__nimbiSearchIndex', {
-        get() { return searchIndex },
+      Object.defineProperty(window, "__nimbiSearchIndex", {
+        get() {
+          return searchIndex;
+        },
         enumerable: true,
-        configurable: true
-      })
+        configurable: true,
+      });
     } catch (e) {
-      try { window.__nimbiSearchIndex = searchIndex } catch (_) {}
+      try {
+        window.__nimbiSearchIndex = searchIndex;
+      } catch (_) {}
     }
   }
 } catch (_) {}
 
 try {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     try {
-      Object.defineProperty(window, '__nimbiIndexReady', {
-        get() { return awaitSearchIndex },
+      Object.defineProperty(window, "__nimbiIndexReady", {
+        get() {
+          return awaitSearchIndex;
+        },
         enumerable: true,
-        configurable: true
-      })
+        configurable: true,
+      });
     } catch (e) {
-      try { window.__nimbiIndexReady = awaitSearchIndex } catch (_) {}
+      try {
+        window.__nimbiIndexReady = awaitSearchIndex;
+      } catch (_) {}
     }
   }
 } catch (_) {}
 
-let _indexPromise = null
+let _indexPromise = null;
 
 /**
  * Build the runtime search index by scanning known markdown/html paths
@@ -1085,456 +1777,740 @@ let _indexPromise = null
  * @param {Array<string>|undefined} [seedPaths] - Optional seed paths to prioritize.
  * @returns {Promise<Array<{slug:string,title:string,excerpt:string,path:string}>>} - Resolves to the authoritative search index.
  */
-export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing = undefined, seedPaths = undefined) {
-  const earlyExcludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : []
+export async function buildSearchIndex(
+  contentBase,
+  indexDepth = 1,
+  noIndexing = undefined,
+  seedPaths = undefined,
+) {
+  // Captured once so every global publish below is dropped if this runtime is
+  // torn down while the (long-running) index build is still in flight.
+  const generation = activeGeneration();
+  const earlyExcludes = Array.isArray(noIndexing)
+    ? Array.from(
+        new Set((noIndexing || []).map((p) => normalizePath(String(p ?? "")))),
+      )
+    : [];
   try {
-    const nf = normalizePath(String(notFoundPage || ''))
-    if (nf && !earlyExcludes.includes(nf)) earlyExcludes.push(nf)
+    const nf = normalizePath(String(notFoundPage ?? ""));
+    if (nf && !earlyExcludes.includes(nf)) earlyExcludes.push(nf);
   } catch (err) {}
 
   if (searchIndex && searchIndex.length && indexDepth === 1) {
-    const containsExcluded = searchIndex.some(e => {
-      try { return earlyExcludes.includes(normalizePath(String(e.path || ''))) } catch (_) { return false }
-    })
-    if (!containsExcluded) return searchIndex
+    const containsExcluded = searchIndex.some((e) => {
+      try {
+        return earlyExcludes.includes(normalizePath(String(e.path ?? "")));
+      } catch (_) {
+        return false;
+      }
+    });
+    if (!containsExcluded) return searchIndex;
   }
-  if (_indexPromise) return _indexPromise
+  if (_indexPromise) return _indexPromise;
 
   _indexPromise = (async () => {
-    let excludes = Array.isArray(noIndexing) ? Array.from(new Set((noIndexing || []).map(p => normalizePath(String(p || ''))))) : []
+    // Modernized: use Set for exclusion membership
+    let excludesArr = Array.isArray(noIndexing)
+      ? Array.from(
+          new Set(
+            (noIndexing || []).map((p) => normalizePath(String(p ?? ""))),
+          ),
+        )
+      : [];
+    let excludesSet = new Set(excludesArr);
     try {
-      const nf = normalizePath(String(notFoundPage || ''))
-      if (nf && !excludes.includes(nf)) excludes.push(nf)
-    } catch (err) { /* ignore normalization errors */ }
-
-    const isExcluded = (p) => {
-      if (!excludes || !excludes.length) return false
-      for (const ex of excludes) {
-        if (!ex) continue
-        if (p === ex) return true
-        if (p.startsWith(ex + '/')) return true
+      const nf = normalizePath(String(notFoundPage ?? ""));
+      if (nf && !excludesSet.has(nf)) {
+        excludesSet.add(nf);
+        excludesArr.push(nf);
       }
-      return false
+    } catch (err) {
+      /* ignore normalization errors */
     }
 
-    let paths = []
+    const isExcluded = (p) => {
+      if (!excludesSet || excludesSet.size === 0) return false;
+      for (const ex of excludesSet) {
+        if (!ex) continue;
+        if (p === ex) return true;
+        if (p.startsWith(ex + "/")) return true;
+      }
+      return false;
+    };
+
+    let paths = [];
     try {
       if (Array.isArray(seedPaths) && seedPaths.length) {
         for (const p of seedPaths) {
           try {
-            const n = normalizePath(String(p || ''))
-            if (n) paths.push(n)
+            const n = normalizePath(String(p ?? ""));
+            if (n) paths.push(n);
           } catch (_) {}
         }
       }
     } catch (_) {}
     if (Array.isArray(allMarkdownPaths) && allMarkdownPaths.length) {
-      paths = Array.from(allMarkdownPaths)
+      const seen = new Set(paths);
+      for (const p of allMarkdownPaths) {
+        if (!seen.has(p)) {
+          paths.push(p);
+          seen.add(p);
+        }
+      }
     }
     if (!paths.length) {
-      if (mdToSlug && typeof mdToSlug.size === 'number' && mdToSlug.size) {
-        try { paths = Array.from(mdToSlug.keys()) } catch (_) { paths = [] }
+      if (mdToSlug && typeof mdToSlug.size === "number" && mdToSlug.size) {
+        try {
+          paths = Array.from(mdToSlug.keys());
+        } catch (_) {
+          // mdToSlug unreadable: no paths to crawl.
+          paths = [];
+        }
       } else {
         for (const v of slugToMd.values()) {
-          if (!v) continue
-          if (typeof v === 'string') {
-            paths.push(v)
-          } else if (v && typeof v === 'object') {
-            if (v.default) paths.push(v.default)
-            const langs = v.langs || {}
+          if (!v) continue;
+          if (typeof v === "string") {
+            paths.push(v);
+          } else if (v && typeof v === "object") {
+            if (v.default) paths.push(v.default);
+            const langs = v.langs || {};
             for (const k of Object.keys(langs || {})) {
-              try { if (langs[k]) paths.push(langs[k]) } catch (_) {}
+              try {
+                if (langs[k]) paths.push(langs[k]);
+              } catch (_) {}
             }
           }
         }
       }
     }
     try {
-      const crawled = await crawlAllMarkdown(contentBase)
+      const crawled = await crawlAllMarkdown(contentBase);
       if (crawled && crawled.length) {
-        paths = paths.concat(crawled)
+        paths = paths.concat(crawled);
       }
-    } catch (err) { _debugLog('[slugManager] crawlAllMarkdown during buildSearchIndex failed', err) }
+    } catch (err) {
+      debugLog(
+        "[slugManager] crawlAllMarkdown during buildSearchIndex failed",
+        err,
+      );
+    }
+
+    // Bodies fetched during discovery, reused by the indexing pass. Without
+    // this every page is fetched twice: once to discover links, once to read
+    // its title and excerpt.
+    const discoveryMd = new Map();
 
     try {
-      const visited = new Set(paths)
-      const queue = [...paths]
+      const visited = new Set(paths);
+      const queue = createWorkQueue(paths);
 
-      const fetchConcurrency = Math.max(1, Math.min(getFetchConcurrency(), queue.length || getFetchConcurrency()))
+      const fetchConcurrency = Math.max(
+        1,
+        Math.min(getFetchConcurrency(), queue.length || getFetchConcurrency()),
+      );
 
-      let workerYieldCount = 0
+      const yieldGate = createYieldGate();
       const worker = async () => {
         while (true) {
-          if (visited.size > defaultCrawlMaxQueue) break
-          const p = queue.shift()
-          if (!p) break
+          if (visited.size > defaultCrawlMaxQueue) break;
+          const p = queue.shift();
+          if (!p) break;
           try {
-            const md = await fetchMarkdown(p, contentBase)
+            const md = await fetchMarkdown(p, contentBase);
+            // Remember the body so the indexing pass below does not have to
+            // fetch the same page a second time.
+            if (md) discoveryMd.set(p, md);
             if (md && md.raw) {
-              if (md.status === 404) continue
-              let raw = md.raw
-              const hrefs = []
-              const baseName = String(p || '').replace(/^.*\//, '')
+              if (md.status === 404) continue;
+              let raw = md.raw;
+              const hrefs = [];
+              const baseName = String(p ?? "").replace(/^.*\//, "");
               if (/^readme(?:\.md)?$/i.test(baseName)) {
                 if (skipRootReadme) {
-                  if (!p || !p.includes('/')) {
-                    continue
+                  if (!p || !p.includes("/")) {
+                    continue;
                   }
                 }
               }
-              const clean = _stripCodeAndComments(raw)
-              const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g
-              let m
+              const clean = _stripCodeAndComments(raw);
+              const mdLinkRe = /\[[^\]]+\]\(([^)]+)\)/g;
+              let m;
               while ((m = mdLinkRe.exec(clean))) {
-                hrefs.push(m[1])
+                hrefs.push(m[1]);
               }
-              const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi
+              const htmlLinkRe = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
               while ((m = htmlLinkRe.exec(clean))) {
-                hrefs.push(m[1])
+                hrefs.push(m[1]);
               }
-              const pageDirForLinks = (p && p.includes('/')) ? p.substring(0, p.lastIndexOf('/') + 1) : ''
+              const pageDirForLinks =
+                p && p.includes("/")
+                  ? p.substring(0, p.lastIndexOf("/") + 1)
+                  : "";
               for (let href of hrefs) {
                 try {
-                  if (isExternalLinkWithBase(href, contentBase)) continue
-                  if (href.startsWith('..') || href.indexOf('/../') !== -1) continue
-                  if (pageDirForLinks && !href.startsWith('./') && !href.startsWith('/') && !href.startsWith('../')) {
-                    href = pageDirForLinks + href
+                  if (isExternalLinkWithBase(href, contentBase)) continue;
+                  if (href.startsWith("..") || href.indexOf("/../") !== -1)
+                    continue;
+                  if (
+                    pageDirForLinks &&
+                    !href.startsWith("./") &&
+                    !href.startsWith("/") &&
+                    !href.startsWith("../")
+                  ) {
+                    href = pageDirForLinks + href;
                   }
-                  href = normalizePath(href)
-                  if (!/\.(md|html?)(?:$|[?#])/i.test(href)) continue
-                  href = href.split(/[?#]/)[0]
-                  if (isExcluded(href)) continue
+                  href = normalizePath(href);
+                  if (!href || href.startsWith("#") || href.startsWith("?")) continue;
+
+                  if (!/\.(md|html?)(?:$|[?#])/i.test(href)) {
+                    const hrefBase = href.split(/[?#]/)[0].replace(/\/+$/, "");
+                    const lastSegment = String(hrefBase).split("/").pop() || "";
+                    if (/\.[^./]+$/i.test(lastSegment)) continue;
+                    const candidates = [
+                      `${hrefBase}.md`,
+                      `${hrefBase}.html`,
+                      `${hrefBase}/README.md`,
+                      `${hrefBase}/README.html`,
+                    ];
+                    for (const candidate of candidates) {
+                      if (!candidate || isExcluded(candidate)) continue;
+                      if (!visited.has(candidate)) {
+                        visited.add(candidate);
+                        queue.push(candidate);
+                        paths.push(candidate);
+                      }
+                    }
+                    continue;
+                  }
+
+                  href = href.split(/[?#]/)[0];
+                  if (isExcluded(href)) continue;
                   if (!visited.has(href)) {
-                    visited.add(href)
-                    queue.push(href)
-                    paths.push(href)
+                    visited.add(href);
+                    queue.push(href);
+                    paths.push(href);
                   }
-                } catch (err) { _debugLog('[slugManager] href processing failed', href, err) }
+                } catch (err) {
+                  debugLog("[slugManager] href processing failed", href, err);
+                }
               }
             }
           } catch (e) {
-            _debugLog('[slugManager] discovery fetch failed for', p, e)
+            debugLog("[slugManager] discovery fetch failed for", p, e);
           }
-          try { workerYieldCount++; await yieldIfNeeded(workerYieldCount, 32) } catch (_) {}
-        }
-      }
-
-      const workers = []
-      for (let i = 0; i < fetchConcurrency; i++) workers.push(worker())
-      await Promise.all(workers)
-    } catch (e) {
-      _debugLog('[slugManager] discovery loop failed', e)
-    }
-
-    const seen = new Set()
-    paths = paths.filter(p => {
-      if (!p || seen.has(p)) return false
-      if (isExcluded(p)) return false
-      seen.add(p)
-      return true
-    })
-    const idx = []
-
-    const pathMdMap = new Map()
-    const pathsToFetch = paths.filter(p => /\.(?:md|html?)(?:$|[?#])/i.test(p))
-    const fetchConcurrency = Math.max(1, Math.min(getFetchConcurrency(), pathsToFetch.length || 1))
-    const fetchQueue = pathsToFetch.slice()
-    const fetchWorkers = []
-    for (let i = 0; i < fetchConcurrency; i++) {
-      fetchWorkers.push((async () => {
-        while (fetchQueue.length) {
-          const p = fetchQueue.shift()
-          if (!p) break
           try {
-            const md = await fetchMarkdown(p, contentBase)
-            pathMdMap.set(p, md)
-          } catch (err) {
-            _debugLog('[slugManager] buildSearchIndex: entry fetch failed', p, err)
-            pathMdMap.set(p, null)
-          }
+            await yieldGate();
+          } catch (_) {}
         }
-      })())
-    }
-    await Promise.all(fetchWorkers)
+      };
 
-    let processYieldCount = 0
+      const workers = [];
+      for (let i = 0; i < fetchConcurrency; i++) workers.push(worker());
+      await Promise.all(workers);
+    } catch (e) {
+      debugLog("[slugManager] discovery loop failed", e);
+    }
+
+    const seen = new Set();
+    paths = paths.filter((p) => {
+      if (!p || seen.has(p)) return false;
+      if (isExcluded(p)) return false;
+      seen.add(p);
+      return true;
+    });
+    const idx = [];
+
+    const pathMdMap = new Map();
+    const pathsToFetch = paths.filter((p) =>
+      /\.(?:md|html?)(?:$|[?#])/i.test(p),
+    );
+    const fetchConcurrency = Math.max(
+      1,
+      Math.min(getFetchConcurrency(), pathsToFetch.length || 1),
+    );
+    const fetchQueue = createWorkQueue(pathsToFetch);
+    const fetchWorkers = [];
+    for (let i = 0; i < fetchConcurrency; i++) {
+      fetchWorkers.push(
+        (async () => {
+          while (fetchQueue.length) {
+            const p = fetchQueue.shift();
+            if (!p) break;
+            try {
+              // Reuse the body captured during discovery when available;
+              // only pages discovered by link extraction but never fetched
+              // need a network round trip here.
+              const cached = discoveryMd.get(p);
+              const md = cached !== undefined
+                ? cached
+                : await fetchMarkdown(p, contentBase);
+              pathMdMap.set(p, md);
+            } catch (err) {
+              debugLog(
+                "[slugManager] buildSearchIndex: entry fetch failed",
+                p,
+                err,
+              );
+              pathMdMap.set(p, null);
+            }
+          }
+        })(),
+      );
+    }
+    await Promise.all(fetchWorkers);
+
+    // Built once and maintained incrementally. Rebuilding this per page made
+    // index construction O(n²) in the number of mappings, which dominates
+    // runtime on large sites.
+    const takenSlugs = new Set();
+    try {
+      for (const k of slugToMd.keys()) takenSlugs.add(k);
+    } catch (_) {}
+
+    const yieldGate = createYieldGate();
     for (const path of paths) {
-      try { processYieldCount++; await yieldIfNeeded(processYieldCount, 16) } catch (_) {}
-      if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue
       try {
-        const md = pathMdMap.get(path)
-        if (!md || !md.raw) continue
-        if (md.status === 404) continue
-        let title = ''
-        let excerpt = ''
-        let pageSlug = null
+        await yieldGate();
+      } catch (_) {}
+      if (!/\.(?:md|html?)(?:$|[?#])/i.test(path)) continue;
+      try {
+        const md = pathMdMap.get(path);
+        if (!md || !md.raw) continue;
+        if (md.status === 404) continue;
+        let title = "";
+        let excerpt = "";
+        let pageSlug = null;
+        let image = null;
         if (md.isHtml) {
           try {
-            const parser = getSharedParser()
-            const doc = parser ? parser.parseFromString(md.raw, 'text/html') : null
-            const titleEl = doc ? (doc.querySelector('title') || doc.querySelector('h1')) : null
-            if (titleEl && titleEl.textContent) title = titleEl.textContent.trim()
-            const p = doc ? doc.querySelector('p') : null
-            if (p && p.textContent) excerpt = p.textContent.trim()
-              if (indexDepth >= 2) {
+            const parser = getSharedParser();
+            const doc = parser
+              ? parser.parseFromString(md.raw, "text/html")
+              : null;
+            const titleEl = doc
+              ? doc.querySelector("title") || doc.querySelector("h1")
+              : null;
+            if (titleEl && titleEl.textContent)
+              title = titleEl.textContent.trim();
+            const p = doc ? doc.querySelector("p") : null;
+            if (p && p.textContent) excerpt = p.textContent.trim();
+            if (indexDepth >= 2) {
               try {
-                const topH1 = doc ? doc.querySelector('h1') : null
-                const parentTitle = topH1 && topH1.textContent ? topH1.textContent.trim() : (title || '')
+                const topH1 = doc ? doc.querySelector("h1") : null;
+                const parentTitle =
+                  topH1 && topH1.textContent
+                    ? topH1.textContent.trim()
+                    : title || "";
                 try {
-                  const existing = (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(path)) ? mdToSlug.get(path) : null
+                  const existing = mdToSlug?.has?.(path)
+                    ? mdToSlug?.get?.(path)
+                    : null;
                   if (existing) {
-                    pageSlug = existing
+                    pageSlug = existing;
                   } else {
-                    let cand = slugify(title || path)
-                    const taken = new Set()
-                    try { for (const k of slugToMd.keys()) taken.add(k) } catch (_) {}
-                    try {
-                      for (const it of idx) {
-                        if (it && it.slug) taken.add(String(it.slug).split('::')[0])
-                      }
-                    } catch (_) {}
-                    let belongs = false
+                    let cand = slugify(title || path);
+                    const taken = takenSlugs;
+                    let belongs = false;
                     try {
                       if (slugToMd.has(cand)) {
-                        const val = slugToMd.get(cand)
-                        if (typeof val === 'string') {
-                          if (val === path) belongs = true
-                        } else if (val && typeof val === 'object') {
-                          if (val.default === path) belongs = true
-                          for (const k of Object.keys(val.langs || {})) { if (val.langs[k] === path) { belongs = true; break } }
+                        const val = slugToMd.get(cand);
+                        if (typeof val === "string") {
+                          if (val === path) belongs = true;
+                        } else if (val && typeof val === "object") {
+                          if (val.default === path) belongs = true;
+                          for (const k of Object.keys(val.langs || {})) {
+                            if (val.langs[k] === path) {
+                              belongs = true;
+                              break;
+                            }
+                          }
                         }
                       }
                     } catch (_) {}
                     if (!belongs && taken.has(cand)) {
-                      cand = uniqueSlug(cand, taken)
+                      cand = uniqueSlug(cand, taken);
                     }
-                    pageSlug = cand
-                    try { if (!mdToSlug.has(path)) _storeSlugMapping(pageSlug, path) } catch (_) {}
+                    pageSlug = cand;
+                    // Keep the shared dedupe set in sync: the previous code
+                    // rebuilt it from `idx` on every iteration, so newly
+                    // assigned slugs were visible to later pages.
+                    takenSlugs.add(cand);
+                    try {
+                      if (!mdToSlug?.has?.(path))
+                        _storeSlugMapping(pageSlug, path);
+                    } catch (_) {}
                   }
-                } catch (err) { _debugLog('[slugManager] derive pageSlug failed', err) }
-                const h2s = Array.from(doc.querySelectorAll('h2'))
+                } catch (err) {
+                  debugLog("[slugManager] derive pageSlug failed", err);
+                }
+                const h2s = Array.from(doc.querySelectorAll("h2"));
                 for (const h2 of h2s) {
                   try {
-                    const h2Text = (h2.textContent || '').trim()
-                    if (!h2Text) continue
-                    const anchor = h2.id ? h2.id : slugify(h2Text)
-                    const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
-                    let h2Excerpt = ''
-                    let sib = h2.nextElementSibling
-                    while (sib && sib.tagName && sib.tagName.toLowerCase() === 'script') sib = sib.nextElementSibling
-                    if (sib && sib.textContent) h2Excerpt = String(sib.textContent).trim()
-                    idx.push({ slug: h2Slug, title: h2Text, excerpt: h2Excerpt, path, parentTitle })
-                  } catch (err) { _debugLog('[slugManager] indexing H2 failed', err) }
+                    const h2Text = (h2.textContent || "").trim();
+                    if (!h2Text) continue;
+                    const anchor = h2.id ? h2.id : slugify(h2Text);
+                    const h2Slug = pageSlug
+                      ? `${pageSlug}::${anchor}`
+                      : `${slugify(path)}::${anchor}`;
+                    let h2Excerpt = "";
+                    let sib = h2.nextElementSibling;
+                    while (
+                      sib &&
+                      sib.tagName &&
+                      sib.tagName.toLowerCase() === "script"
+                    )
+                      sib = sib.nextElementSibling;
+                    if (sib && sib.textContent)
+                      h2Excerpt = String(sib.textContent).trim();
+                    idx.push({
+                      slug: h2Slug,
+                      title: h2Text,
+                      excerpt: h2Excerpt,
+                      path,
+                      parentTitle,
+                    });
+                  } catch (err) {
+                    debugLog("[slugManager] indexing H2 failed", err);
+                  }
                 }
                 if (indexDepth === 3) {
                   try {
-                    const h3s = Array.from(doc.querySelectorAll('h3'))
+                    const h3s = Array.from(doc.querySelectorAll("h3"));
                     for (const h3 of h3s) {
                       try {
-                        const h3Text = (h3.textContent || '').trim()
-                        if (!h3Text) continue
-                        const anchor3 = h3.id ? h3.id : slugify(h3Text)
-                        const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
-                        let h3Excerpt = ''
-                        let sib3 = h3.nextElementSibling
-                        while (sib3 && sib3.tagName && sib3.tagName.toLowerCase() === 'script') sib3 = sib3.nextElementSibling
-                        if (sib3 && sib3.textContent) h3Excerpt = String(sib3.textContent).trim()
-                        idx.push({ slug: h3Slug, title: h3Text, excerpt: h3Excerpt, path, parentTitle })
-                      } catch (err) { _debugLog('[slugManager] indexing H3 failed', err) }
+                        const h3Text = (h3.textContent || "").trim();
+                        if (!h3Text) continue;
+                        const anchor3 = h3.id ? h3.id : slugify(h3Text);
+                        const h3Slug = pageSlug
+                          ? `${pageSlug}::${anchor3}`
+                          : `${slugify(path)}::${anchor3}`;
+                        let h3Excerpt = "";
+                        let sib3 = h3.nextElementSibling;
+                        while (
+                          sib3 &&
+                          sib3.tagName &&
+                          sib3.tagName.toLowerCase() === "script"
+                        )
+                          sib3 = sib3.nextElementSibling;
+                        if (sib3 && sib3.textContent)
+                          h3Excerpt = String(sib3.textContent).trim();
+                        idx.push({
+                          slug: h3Slug,
+                          title: h3Text,
+                          excerpt: h3Excerpt,
+                          path,
+                          parentTitle,
+                        });
+                      } catch (err) {
+                        debugLog("[slugManager] indexing H3 failed", err);
+                      }
                     }
-                  } catch (err) { _debugLog('[slugManager] collect H3s failed', err) }
+                  } catch (err) {
+                    debugLog("[slugManager] collect H3s failed", err);
+                  }
                 }
-              } catch (err) { _debugLog('[slugManager] collect H2s failed', err) }
+              } catch (err) {
+                debugLog("[slugManager] collect H2s failed", err);
+              }
             }
-          } catch (err) { _debugLog('[slugManager] parsing HTML for index failed', err) }
+          } catch (err) {
+            debugLog("[slugManager] parsing HTML for index failed", err);
+          }
         } else {
-          const raw = md.raw
-          const h1m = raw.match(/^#\s+(.+)$/m)
-          title = h1m ? h1m[1].trim() : ''
-          try { title = unescapeMarkdown(title) } catch (_) {}
-          const parts = raw.split(/\r?\n\s*\r?\n/)
+          const raw = md.raw;
+          const h1m = raw.match(/^#\s+(.+)$/m);
+          title = h1m ? h1m[1].trim() : "";
+          try {
+            title = unescapeMarkdown(title);
+          } catch (_) {}
+          const parts = raw.split(/\r?\n\s*\r?\n/);
           if (parts.length > 1) {
             for (let i = 1; i < parts.length; i++) {
-              const p = parts[i].trim()
-              if (p && !/^#/.test(p)) { excerpt = p.replace(/\r?\n/g, ' '); break }
+              const p = parts[i].trim();
+              if (p && !/^#/.test(p)) {
+                excerpt = p.replace(/\r?\n/g, " ");
+                break;
+              }
             }
           }
-            if (indexDepth >= 2) {
-            let parentTitle = ''
+          // Extract image from frontmatter for sitemap image:image entries
+          try {
+            const { data: fm } = parseFrontmatter(raw);
+            const imgRaw = fm.image || fm.og_image || fm.cover || fm.featured_image;
+            if (imgRaw && String(imgRaw).trim()) {
+              image = String(imgRaw).trim();
+            }
+          } catch (_) {}
+          if (indexDepth >= 2) {
+            let parentTitle = "";
             try {
-              const h1 = (raw.match(/^#\s+(.+)$/m) || [])[1]
-              parentTitle = h1 ? h1.trim() : ''
+              const h1 = (raw.match(/^#\s+(.+)$/m) || [])[1];
+              parentTitle = h1 ? h1.trim() : "";
               try {
-                const existing = (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(path)) ? mdToSlug.get(path) : null
+                const existing = mdToSlug?.has?.(path)
+                  ? mdToSlug?.get?.(path)
+                  : null;
                 if (existing) {
-                  pageSlug = existing
+                  pageSlug = existing;
                 } else {
-                  let cand = slugify(title || path)
-                  const taken = new Set()
-                  try { for (const k of slugToMd.keys()) taken.add(k) } catch (_) {}
-                  try {
-                    for (const it of idx) {
-                      if (it && it.slug) taken.add(String(it.slug).split('::')[0])
-                    }
-                  } catch (_) {}
-                  let belongs = false
+                  let cand = slugify(title || path);
+                  const taken = takenSlugs;
+                  let belongs = false;
                   try {
                     if (slugToMd.has(cand)) {
-                      const val = slugToMd.get(cand)
-                      if (typeof val === 'string') {
-                        if (val === path) belongs = true
-                      } else if (val && typeof val === 'object') {
-                        if (val.default === path) belongs = true
-                        for (const k of Object.keys(val.langs || {})) { if (val.langs[k] === path) { belongs = true; break } }
+                      const val = slugToMd.get(cand);
+                      if (typeof val === "string") {
+                        if (val === path) belongs = true;
+                      } else if (val && typeof val === "object") {
+                        if (val.default === path) belongs = true;
+                        for (const k of Object.keys(val.langs || {})) {
+                          if (val.langs[k] === path) {
+                            belongs = true;
+                            break;
+                          }
+                        }
                       }
                     }
                   } catch (_) {}
                   if (!belongs && taken.has(cand)) {
-                    cand = uniqueSlug(cand, taken)
+                    cand = uniqueSlug(cand, taken);
                   }
-                  pageSlug = cand
-                  try { if (!mdToSlug.has(path)) _storeSlugMapping(pageSlug, path) } catch (_) {}
+                  pageSlug = cand;
+                  try {
+                    if (!mdToSlug?.has?.(path))
+                      _storeSlugMapping(pageSlug, path);
+                  } catch (_) {}
                 }
-              } catch (err) { _debugLog('[slugManager] derive pageSlug failed', err) }
-              const h2re = /^##\s+(.+)$/gm
-              let m2
+              } catch (err) {
+                debugLog("[slugManager] derive pageSlug failed", err);
+              }
+              const h2re = /^##\s+(.+)$/gm;
+              // Sticky (`y`) so it matches in place at `lastIndex` instead of
+              // requiring a copy of the remaining document.
+              const h2ParaRe =
+                /(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/y;
+              let m2;
               while ((m2 = h2re.exec(raw))) {
                 try {
-                  const h2Text = (m2[1] || '').trim()
-                    const unescH2 = unescapeMarkdown(h2Text)
-                  if (!h2Text) continue
-                  const anchor = slugify(h2Text)
-                  const h2Slug = pageSlug ? `${pageSlug}::${anchor}` : `${slugify(path)}::${anchor}`
-                  const after = raw.slice(h2re.lastIndex)
-                  const paraMatch = after.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
-                  const h2Excerpt = paraMatch && paraMatch[1] ? String(paraMatch[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
-                    idx.push({ slug: h2Slug, title: unescH2, excerpt: h2Excerpt, path, parentTitle })
-                } catch (err) { _debugLog('[slugManager] indexing markdown H2 failed', err) }
+                  const h2Text = (m2[1] || "").trim();
+                  const unescH2 = unescapeMarkdown(h2Text);
+                  if (!h2Text) continue;
+                  const anchor = slugify(h2Text);
+                  const h2Slug = pageSlug
+                    ? `${pageSlug}::${anchor}`
+                    : `${slugify(path)}::${anchor}`;
+                  // Sticky regex anchored at the heading's end, rather than
+                  // slicing the whole remainder of the document first. Slicing
+                  // copied the rest of the body once per heading, making
+                  // excerpt extraction O(n^2) in document length.
+                  h2ParaRe.lastIndex = h2re.lastIndex;
+                  const paraMatch = h2ParaRe.exec(raw);
+                  const h2Excerpt =
+                    paraMatch && paraMatch[1]
+                      ? String(paraMatch[1])
+                          .trim()
+                          .split(/\r?\n/)
+                          .join(" ")
+                          .slice(0, 300)
+                      : "";
+                  idx.push({
+                    slug: h2Slug,
+                    title: unescH2,
+                    excerpt: h2Excerpt,
+                    path,
+                    parentTitle,
+                  });
+                } catch (err) {
+                  debugLog("[slugManager] indexing markdown H2 failed", err);
+                }
               }
-            } catch (err) { _debugLog('[slugManager] collect markdown H2s failed', err) }
+            } catch (err) {
+              debugLog("[slugManager] collect markdown H2s failed", err);
+            }
             if (indexDepth === 3) {
               try {
-                const h3re = /^###\s+(.+)$/gm
-                let m3
+                const h3re = /^###\s+(.+)$/gm;
+                // Sticky, as above: no remainder copy per heading.
+                const h3ParaRe =
+                  /(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/y;
+                let m3;
                 while ((m3 = h3re.exec(raw))) {
                   try {
-                    const h3Text = (m3[1] || '').trim()
-                      const unescH3 = unescapeMarkdown(h3Text)
-                    if (!h3Text) continue
-                    const anchor3 = slugify(h3Text)
-                    const h3Slug = pageSlug ? `${pageSlug}::${anchor3}` : `${slugify(path)}::${anchor3}`
-                    const after3 = raw.slice(h3re.lastIndex)
-                    const paraMatch3 = after3.match(/^(?:\r?\n)*([^\r\n][^\r\n]*(?:\r?\n[^\r\n].*)*)/)
-                    const h3Excerpt = paraMatch3 && paraMatch3[1] ? String(paraMatch3[1]).trim().split(/\r?\n/).join(' ').slice(0, 300) : ''
-                      idx.push({ slug: h3Slug, title: unescH3, excerpt: h3Excerpt, path, parentTitle })
-                  } catch (err) { _debugLog('[slugManager] indexing markdown H3 failed', err) }
+                    const h3Text = (m3[1] || "").trim();
+                    const unescH3 = unescapeMarkdown(h3Text);
+                    if (!h3Text) continue;
+                    const anchor3 = slugify(h3Text);
+                    const h3Slug = pageSlug
+                      ? `${pageSlug}::${anchor3}`
+                      : `${slugify(path)}::${anchor3}`;
+                    // Sticky regex, as above: no remainder copy per heading.
+                    h3ParaRe.lastIndex = h3re.lastIndex;
+                    const paraMatch3 = h3ParaRe.exec(raw);
+                    const h3Excerpt =
+                      paraMatch3 && paraMatch3[1]
+                        ? String(paraMatch3[1])
+                            .trim()
+                            .split(/\r?\n/)
+                            .join(" ")
+                            .slice(0, 300)
+                        : "";
+                    idx.push({
+                      slug: h3Slug,
+                      title: unescH3,
+                      excerpt: h3Excerpt,
+                      path,
+                      parentTitle,
+                    });
+                  } catch (err) {
+                    debugLog("[slugManager] indexing markdown H3 failed", err);
+                  }
                 }
-              } catch (err) { _debugLog('[slugManager] collect markdown H3s failed', err) }
+              } catch (err) {
+                debugLog("[slugManager] collect markdown H3s failed", err);
+              }
             }
           }
         }
-        let slug = ''
+        let slug = "";
         try {
-          if (mdToSlug.has(path)) slug = mdToSlug.get(path)
-        } catch (err) { _debugLog('[slugManager] mdToSlug access failed', err) }
+          if (mdToSlug?.has?.(path)) slug = mdToSlug?.get?.(path);
+        } catch (err) {
+          debugLog("[slugManager] mdToSlug access failed", err);
+        }
 
         if (!slug) {
           try {
             if (!pageSlug) {
-              const existing = (mdToSlug && typeof mdToSlug.has === 'function' && mdToSlug.has(path)) ? mdToSlug.get(path) : null
+              const existing = mdToSlug?.has?.(path)
+                ? mdToSlug?.get?.(path)
+                : null;
               if (existing) {
-                pageSlug = existing
+                pageSlug = existing;
               } else {
-                let cand = slugify(title || path)
-                const taken = new Set()
-                try { for (const k of slugToMd.keys()) taken.add(k) } catch (_) {}
-                try {
-                  for (const it of idx) {
-                    if (it && it.slug) taken.add(String(it.slug).split('::')[0])
-                  }
-                } catch (_) {}
-                let belongs = false
+                let cand = slugify(title || path);
+                const taken = takenSlugs;
+                let belongs = false;
                 try {
                   if (slugToMd.has(cand)) {
-                    const val = slugToMd.get(cand)
-                    if (typeof val === 'string') {
-                      if (val === path) belongs = true
-                    } else if (val && typeof val === 'object') {
-                      if (val.default === path) belongs = true
-                      for (const k of Object.keys(val.langs || {})) { if (val.langs[k] === path) { belongs = true; break } }
+                    const val = slugToMd.get(cand);
+                    if (typeof val === "string") {
+                      if (val === path) belongs = true;
+                    } else if (val && typeof val === "object") {
+                      if (val.default === path) belongs = true;
+                      for (const k of Object.keys(val.langs || {})) {
+                        if (val.langs[k] === path) {
+                          belongs = true;
+                          break;
+                        }
+                      }
                     }
                   }
                 } catch (_) {}
                 if (!belongs && taken.has(cand)) {
-                  cand = uniqueSlug(cand, taken)
+                  cand = uniqueSlug(cand, taken);
                 }
-                pageSlug = cand
-                try { if (!mdToSlug.has(path)) _storeSlugMapping(pageSlug, path) } catch (_) {}
+                pageSlug = cand;
+                try {
+                  if (!mdToSlug?.has?.(path)) _storeSlugMapping(pageSlug, path);
+                } catch (_) {}
               }
             }
-          } catch (err) { _debugLog('[slugManager] derive pageSlug failed', err) }
-          slug = pageSlug || slugify(title || path)
+          } catch (err) {
+            debugLog("[slugManager] derive pageSlug failed", err);
+          }
+          slug = pageSlug || slugify(title || path);
         }
-        idx.push({ slug, title, excerpt, path })
+        idx.push({ slug, title, excerpt, path, image });
       } catch (err) {
-        _debugLog('[slugManager] buildSearchIndex: entry processing failed', err)
+        debugLog(
+          "[slugManager] buildSearchIndex: entry processing failed",
+          err,
+        );
       }
     }
     try {
-      const finalIdx = idx.filter(entry => {
-        try { return !isExcluded(String(entry.path || '')) } catch (_) { return true }
-      })
+      const finalIdx = idx.filter((entry) => {
+        try {
+          return !isExcluded(String(entry.path ?? ""));
+        } catch (_) {
+          return true;
+        }
+      });
       try {
-        if (!Array.isArray(searchIndex)) searchIndex = []
-        searchIndex.length = 0
-        for (const it of finalIdx) searchIndex.push(it)
+        if (!Array.isArray(searchIndex)) searchIndex = [];
+        if (searchIndex.length > finalIdx.length) return searchIndex;
+        searchIndex.length = 0;
+        for (const it of finalIdx) searchIndex.push(it);
       } catch (e) {
-        try { searchIndex = Array.from(finalIdx) } catch (_) { searchIndex = finalIdx }
+        try {
+          searchIndex = Array.from(finalIdx);
+        } catch (_) {
+          // Array.from unavailable: assign the source array directly.
+          searchIndex = finalIdx;
+        }
       }
       try {
-        if (typeof window !== 'undefined') {
-          try { window.__nimbiResolvedIndex = searchIndex } catch (e) {}
+        if (typeof window !== "undefined") {
+          // Strict variant: `buildSearchIndex` is driven by initCMS, so a
+          // generation is always live here and a stale write must be
+          // dropped outright.
+          setIfCurrent(generation, "__nimbiResolvedIndex", searchIndex);
           try {
-            const dedup = []
-            const seenBase = new Set()
+            const dedup = [];
+            const seenBase = new Set();
             for (const it of searchIndex) {
               try {
-                if (!it || !it.slug) continue
-                const base = String(it.slug).split('::')[0]
-                if (seenBase.has(base)) continue
-                seenBase.add(base)
-                const entry = { slug: base }
-                if (it.title) entry.title = String(it.title)
-                else if (it.parentTitle) entry.title = String(it.parentTitle)
-                if (it.path) entry.path = String(it.path)
-                dedup.push(entry)
+                if (!it || !it.slug) continue;
+                const base = String(it.slug).split("::")[0];
+                if (seenBase.has(base)) continue;
+                seenBase.add(base);
+                const entry = { slug: base };
+                if (it.title) entry.title = String(it.title);
+                else if (it.parentTitle) entry.title = String(it.parentTitle);
+                if (it.path) entry.path = String(it.path);
+                dedup.push(entry);
               } catch (_) {}
             }
-            try { window.__nimbiSitemapJson = { generatedAt: new Date().toISOString(), entries: dedup } } catch (_) {}
-            try { window.__nimbiSitemapFinal = dedup } catch (_) {}
+            setIfLive(generation, "__nimbiSitemapJson", {
+              generatedAt: new Date().toISOString(),
+              entries: dedup,
+            });
+            setIfLive(generation, "__nimbiSitemapFinal", dedup);
           } catch (_) {}
         }
       } catch (e) {}
     } catch (err) {
-      _debugLog('[slugManager] filtering index by excludes failed', err)
+      debugLog("[slugManager] filtering index by excludes failed", err);
       try {
-        if (!Array.isArray(searchIndex)) searchIndex = []
-        searchIndex.length = 0
-        for (const it of idx) searchIndex.push(it)
+        if (!Array.isArray(searchIndex)) searchIndex = [];
+        if (searchIndex.length > idx.length) return searchIndex;
+        searchIndex.length = 0;
+        for (const it of idx) searchIndex.push(it);
       } catch (e) {
-        try { searchIndex = Array.from(idx) } catch (_) { searchIndex = idx }
+        try {
+          searchIndex = Array.from(idx);
+        } catch (_) {
+          // Array.from unavailable: assign the source array directly.
+          searchIndex = idx;
+        }
       }
       try {
-        if (typeof window !== 'undefined') {
-          try { window.__nimbiResolvedIndex = searchIndex } catch (e) {}
+        if (typeof window !== "undefined") {
+          try {
+            window.__nimbiResolvedIndex = searchIndex;
+          } catch (e) {}
         }
       } catch (e) {}
     }
-    return searchIndex
-  })()
-  try { await _indexPromise } catch (err) { _debugLog('[slugManager] awaiting _indexPromise failed', err) }
-  _indexPromise = null
-  return searchIndex
+    return searchIndex;
+  })();
+  try {
+    await _indexPromise;
+  } catch (err) {
+    debugLog("[slugManager] awaiting _indexPromise failed", err);
+  }
+  _indexPromise = null;
+  return searchIndex;
 }
 
 /**
@@ -1544,91 +2520,117 @@ export async function buildSearchIndex(contentBase, indexDepth = 1, noIndexing =
  * `searchIndex` array (possibly empty on timeout).
  *
  * @param {{timeoutMs?:number,contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean}} opts
- * @returns {Promise<Array>} resolves to the live `searchIndex` array
+ * @returns {Promise<any[]>} resolves to the live `searchIndex` array
  */
 export async function whenSearchIndexReady(opts = {}) {
   try {
-    const timeoutMs = (typeof opts.timeoutMs === 'number') ? opts.timeoutMs : 8000
-    const contentBase = opts.contentBase
-    const indexDepth = (typeof opts.indexDepth === 'number') ? opts.indexDepth : 1
-    const noIndexing = Array.isArray(opts.noIndexing) ? opts.noIndexing : undefined
-    const seedPaths = Array.isArray(opts.seedPaths) ? opts.seedPaths : undefined
-    const startBuild = (typeof opts.startBuild === 'boolean') ? opts.startBuild : true
+    const timeoutMs =
+      typeof opts.timeoutMs === "number" ? opts.timeoutMs : 8000;
+    const contentBase = opts.contentBase;
+    const indexDepth =
+      typeof opts.indexDepth === "number" ? opts.indexDepth : 1;
+    const noIndexing = Array.isArray(opts.noIndexing)
+      ? opts.noIndexing
+      : undefined;
+    const seedPaths = Array.isArray(opts.seedPaths)
+      ? opts.seedPaths
+      : undefined;
+    const startBuild =
+      typeof opts.startBuild === "boolean" ? opts.startBuild : true;
 
-    if (Array.isArray(searchIndex) && searchIndex.length && !_indexPromise && !startBuild) return searchIndex
+    if (
+      Array.isArray(searchIndex) &&
+      searchIndex.length &&
+      !_indexPromise &&
+      !startBuild
+    )
+      return searchIndex;
 
     if (_indexPromise) {
-      try { await _indexPromise } catch (_) {}
-      return searchIndex
+      try {
+        await _indexPromise;
+      } catch (_) {}
+      return searchIndex;
     }
 
     if (startBuild) {
       try {
-        if (typeof buildSearchIndexWorker === 'function') {
+        if (typeof buildSearchIndexWorker === "function") {
           try {
-            const res = await buildSearchIndexWorker(contentBase, indexDepth, noIndexing, seedPaths)
+            const res = await buildSearchIndexWorker(
+              contentBase,
+              indexDepth,
+              noIndexing,
+              seedPaths,
+            );
             if (Array.isArray(res) && res.length) {
-              try { _setSearchIndex(res) } catch (_) {}
-              return searchIndex
+              try {
+                _setSearchIndex(res);
+              } catch (_) {}
+              return searchIndex;
             }
           } catch (_) {}
         }
       } catch (_) {}
+      const fallbackStartedAt = Date.now();
       try {
-        await buildSearchIndex(contentBase, indexDepth, noIndexing, seedPaths)
-        return searchIndex
-      } catch (_) {}
+        await buildSearchIndex(contentBase, indexDepth, noIndexing, seedPaths);
+        return searchIndex;
+      } catch (_) {
+      } finally {
+        recordWorkerFallback("slug-main-thread", Date.now() - fallbackStartedAt);
+      }
     }
 
-    const start = Date.now()
+    const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      if (Array.isArray(searchIndex) && searchIndex.length) return searchIndex
-       
-      await new Promise(r => setTimeout(r, 150))
+      if (Array.isArray(searchIndex) && searchIndex.length) return searchIndex;
+
+      await new Promise((r) => setTimeout(r, 150));
     }
-    return searchIndex
+    return searchIndex;
   } catch (e) {
-    return searchIndex
+    return searchIndex;
   }
 }
 
-  /**
-   * Await the runtime `searchIndex` without a timeout. This wrapper ensures
-   * the canonical index is built (worker-first) and will wait indefinitely
-   * until the index is available or a build completes. Callers that must
-   * not use timeouts should use this API instead of `whenSearchIndexReady`.
-   *
-  * @param {{contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}} opts
-   * @returns {Promise<Array>} resolves to the live `searchIndex` array
-   */
-  export async function awaitSearchIndex(opts = {}) {
+/**
+ * Await the runtime `searchIndex` without a timeout. This wrapper ensures
+ * the canonical index is built (worker-first) and will wait indefinitely
+ * until the index is available or a build completes. Callers that must
+ * not use timeouts should use this API instead of `whenSearchIndexReady`.
+ *
+ * @param {{contentBase?:string,indexDepth?:number,noIndexing?:string[],seedPaths?:string[],startBuild?:boolean,timeoutMs?:number}} opts
+ * @returns {Promise<any[]>} resolves to the live `searchIndex` array
+ */
+export async function awaitSearchIndex(opts = {}) {
+  try {
+    const o = Object.assign({}, opts);
+    if (typeof o.startBuild !== "boolean") o.startBuild = true;
+    if (typeof o.timeoutMs !== "number") o.timeoutMs = Infinity;
     try {
-      const o = Object.assign({}, opts)
-      if (typeof o.startBuild !== 'boolean') o.startBuild = true
-      if (typeof o.timeoutMs !== 'number') o.timeoutMs = Infinity
-      try {
-        return await whenSearchIndexReady(o)
-      } catch (_) {
-        return searchIndex
-      }
-    } catch (e) {
-      return searchIndex
+      return await whenSearchIndexReady(o);
+    } catch (_) {
+      return searchIndex;
     }
+  } catch (e) {
+    return searchIndex;
   }
+}
 
 /**
  * Default maximum number of entries the crawler queue will accept. This is
  * used as a safety cap to avoid unbounded crawling on poorly-behaved sites.
  * @type {number}
  */
-export const CRAWL_MAX_QUEUE = 1000
+export const CRAWL_MAX_QUEUE = 1000;
 
 /**
  * Mutable default used by crawler functions; may be changed via
  * `setDefaultCrawlMaxQueue` to tune crawling behavior at runtime.
  * @type {number}
  */
-export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
+export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE;
 
 /**
  * Set the default maximum crawl queue size used by crawlers.
@@ -1636,11 +2638,11 @@ export let defaultCrawlMaxQueue = CRAWL_MAX_QUEUE
  * @returns {void} - No return value.
  */
 export function setDefaultCrawlMaxQueue(n) {
-  if (typeof n === 'number' && n >= 0) defaultCrawlMaxQueue = n
+  if (typeof n === "number" && n >= 0) defaultCrawlMaxQueue = n;
 }
 
-const _crawlParser = getSharedParser()
-const _crawlLinkSelector = 'a[href]'
+const _crawlParser = getSharedParser();
+const _crawlLinkSelector = "a[href]";
 
 /**
  * Crawl the content directory looking for a markdown whose H1 slug produces
@@ -1654,123 +2656,183 @@ const _crawlLinkSelector = 'a[href]'
  *
  * @type {(decoded: string, contentBase: string, maxQueue?: number) => Promise<string|null>}
  */
-export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaultCrawlMaxQueue) {
-  if (crawlCache.has(decoded)) return crawlCache.get(decoded)
-  let found = null
-  const seenDirs = new Set()
-  const queue = ['']
+export let crawlForSlug = async function (
+  decoded,
+  contentBase,
+  maxQueue = defaultCrawlMaxQueue,
+) {
+  const cached = _crawlCacheGet(decoded);
+  if (cached !== undefined) return cached;
+  let found = null;
+  const seenDirs = new Set();
+  const queue = createWorkQueue([""]);
 
-  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
-  let baseForResolve = origin + '/'
+  const origin =
+    typeof location !== "undefined" && location.origin
+      ? location.origin
+      : "http://localhost";
+  let baseForResolve = origin + "/";
   try {
     if (contentBase) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(String(contentBase))) {
-        baseForResolve = String(contentBase).replace(/\/$/, '') + '/'
-      } else if (String(contentBase).startsWith('/')) {
-        baseForResolve = origin + String(contentBase).replace(/\/$/, '') + '/'
+        baseForResolve = String(contentBase).replace(/\/$/, "") + "/";
+      } else if (String(contentBase).startsWith("/")) {
+        baseForResolve = origin + String(contentBase).replace(/\/$/, "") + "/";
       } else {
-        baseForResolve = origin + '/' + String(contentBase).replace(/\/$/, '') + '/'
+        baseForResolve =
+          origin + "/" + String(contentBase).replace(/\/$/, "") + "/";
       }
     }
-  } catch (err) { baseForResolve = origin + '/' }
+  } catch (err) {
+    // Malformed contentBase: resolve against the origin root.
+    baseForResolve = origin + "/";
+  }
 
-  const concurrency = Math.max(1, Math.min(poolSize, 6))
+  const concurrency = Math.max(1, Math.min(poolSize, 6));
   while (queue.length && !found) {
-    if (queue.length > maxQueue) break
-    const batch = queue.splice(0, concurrency)
-    await runWithConcurrency(batch, async (relDir) => {
-      if (relDir == null) return
-      if (seenDirs.has(relDir)) return
-      seenDirs.add(relDir)
-      let url = ''
-      try {
-        url = new URL(relDir || '', baseForResolve).toString()
-      } catch (err) {
-        url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
-      }
-      try {
-        let res
+    if (queue.length > maxQueue) break;
+    const batch = queue.take(concurrency);
+    await runWithConcurrency(
+      batch,
+      async (relDir) => {
+        if (relDir == null) return;
+        if (seenDirs.has(relDir)) return;
+        seenDirs.add(relDir);
+        let url = "";
         try {
-          res = await globalThis.fetch(url)
-        } catch (errFetch) {
-          _debugLog('[slugManager] crawlForSlug: fetch failed', { url, error: errFetch })
-          return
+          url = new URL(relDir || "", baseForResolve).toString();
+        } catch (err) {
+          url =
+            (String(contentBase ?? "") || origin) +
+            "/" +
+            String(relDir ?? "").replace(/^\//, "");
         }
-        if (!res || !res.ok) {
-          if (res && !res.ok) _debugLog('[slugManager] crawlForSlug: directory fetch non-ok', { url, status: res.status })
-          return
-        }
-        const text = await res.text()
-        const doc = _crawlParser.parseFromString(text, 'text/html')
-        let links = []
         try {
-          if (doc && typeof doc.getElementsByTagName === 'function') {
-            links = doc.getElementsByTagName('a')
-          } else if (doc && typeof doc.querySelectorAll === 'function') {
-            links = doc.querySelectorAll(_crawlLinkSelector)
-          } else {
-            links = []
+          let res;
+          try {
+            res = await globalThis.fetch(url);
+          } catch (errFetch) {
+            debugLog("[slugManager] crawlForSlug: fetch failed", {
+              url,
+              error: errFetch,
+            });
+            return;
+          }
+          if (!res || !res.ok) {
+            if (res && !res.ok)
+              debugLog("[slugManager] crawlForSlug: directory fetch non-ok", {
+                url,
+                status: res.status,
+              });
+            return;
+          }
+          const text = await res.text();
+          const doc = _crawlParser.parseFromString(text, "text/html");
+          let links = [];
+          try {
+            if (doc && typeof doc.getElementsByTagName === "function") {
+              links = doc.getElementsByTagName("a");
+            } else if (doc && typeof doc.querySelectorAll === "function") {
+              links = doc.querySelectorAll(_crawlLinkSelector);
+            } else {
+              links = [];
+            }
+          } catch (err) {
+            try {
+              links = doc.getElementsByTagName
+                ? doc.getElementsByTagName("a")
+                : [];
+            } catch (_) {
+              // Legacy DOM API unavailable: no links to crawl.
+              links = [];
+            }
+          }
+          const linkBase = url;
+          for (const a of links) {
+            try {
+              if (found) break;
+              let href = a.getAttribute("href") || "";
+              if (!href) continue;
+              if (
+                isExternalLinkWithBase(href, contentBase) ||
+                href.startsWith("..") ||
+                href.indexOf("/../") !== -1
+              )
+                continue;
+              if (href.endsWith("/")) {
+                try {
+                  const resolved = new URL(href, linkBase);
+                  const basePath = new URL(baseForResolve).pathname;
+                  const sub = resolved.pathname.startsWith(basePath)
+                    ? resolved.pathname.slice(basePath.length)
+                    : resolved.pathname.replace(/^\//, "");
+                  const subNorm = ensureTrailingSlash(normalizePath(sub));
+                  if (!seenDirs.has(subNorm)) queue.push(subNorm);
+                } catch (err) {
+                  // Absolute URL resolution failed; join relative to the
+                  // current directory instead.
+                  const sub = normalizePath(relDir + href);
+                  if (!seenDirs.has(sub)) queue.push(sub);
+                }
+                continue;
+              }
+              if (href.toLowerCase().endsWith(".md")) {
+                let path = "";
+                try {
+                  const resolved = new URL(href, linkBase);
+                  const basePath = new URL(baseForResolve).pathname;
+                  path = resolved.pathname.startsWith(basePath)
+                    ? resolved.pathname.slice(basePath.length)
+                    : resolved.pathname.replace(/^\//, "");
+                } catch (err) {
+                  path = (relDir + href).replace(/^\//, "");
+                }
+                path = normalizePath(path);
+                try {
+                  if (mdToSlug?.has?.(path)) {
+                    continue;
+                  }
+                  for (const v of slugToMd.values()) {
+                    if (v === path) {
+                      continue;
+                    }
+                  }
+                } catch (err) {
+                  debugLog("[slugManager] slug map access failed", err);
+                }
+                try {
+                  const md = await fetchMarkdown(path, contentBase);
+                  if (md && md.raw) {
+                    const m = (md.raw || "").match(/^#\s+(.+)$/m);
+                    if (m && m[1] && slugify(m[1].trim()) === decoded) {
+                      found = path;
+                      break;
+                    }
+                  }
+                } catch (err) {
+                  debugLog(
+                    "[slugManager] crawlForSlug: fetchMarkdown failed",
+                    err,
+                  );
+                }
+              }
+            } catch (err) {
+              debugLog(
+                "[slugManager] crawlForSlug: link iteration failed",
+                err,
+              );
+            }
           }
         } catch (err) {
-          try { links = doc.getElementsByTagName ? doc.getElementsByTagName('a') : [] } catch (_) { links = [] }
+          debugLog("[slugManager] crawlForSlug: directory fetch failed", err);
         }
-        const linkBase = url
-        for (const a of links) {
-          try {
-            if (found) break
-            let href = a.getAttribute('href') || ''
-            if (!href) continue
-            if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
-            if (href.endsWith('/')) {
-              try {
-                const resolved = new URL(href, linkBase)
-                const basePath = new URL(baseForResolve).pathname
-                const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
-                const subNorm = ensureTrailingSlash(normalizePath(sub))
-                if (!seenDirs.has(subNorm)) queue.push(subNorm)
-              } catch (err) {
-                const sub = normalizePath(relDir + href)
-                if (!seenDirs.has(sub)) queue.push(sub)
-              }
-              continue
-            }
-            if (href.toLowerCase().endsWith('.md')) {
-              let path = ''
-              try {
-                const resolved = new URL(href, linkBase)
-                const basePath = new URL(baseForResolve).pathname
-                path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
-              } catch (err) {
-                path = (relDir + href).replace(/^\//, '')
-              }
-              path = normalizePath(path)
-              try {
-                if (mdToSlug.has(path)) {
-                  continue
-                }
-                for (const v of slugToMd.values()) {
-                  if (v === path) { continue }
-                }
-              } catch (err) { _debugLog('[slugManager] slug map access failed', err) }
-              try {
-                const md = await fetchMarkdown(path, contentBase)
-                if (md && md.raw) {
-                  const m = (md.raw || '').match(/^#\s+(.+)$/m)
-                  if (m && m[1] && slugify(m[1].trim()) === decoded) {
-                    found = path
-                    break
-                  }
-                }
-              } catch (err) { _debugLog('[slugManager] crawlForSlug: fetchMarkdown failed', err) }
-            }
-          } catch (err) { _debugLog('[slugManager] crawlForSlug: link iteration failed', err) }
-        }
-      } catch (err) { _debugLog('[slugManager] crawlForSlug: directory fetch failed', err) }
-    }, concurrency)
+      },
+      concurrency,
+    );
   }
-  crawlCache.set(decoded, found)
-  return found
-}
+  _crawlCacheSet(decoded, found);
+  return found;
+};
 
 /**
  * Crawl the content directory collecting all markdown and HTML pages.
@@ -1778,105 +2840,166 @@ export let crawlForSlug = async function(decoded, contentBase, maxQueue = defaul
  * @param {number} [maxQueue] - Optional maximum queue size for crawling.
  * @returns {Promise<string[]>} - Promise resolving to an array of discovered markdown/html paths.
  */
-export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQueue) {
-  const result = new Set()
+export async function crawlAllMarkdown(
+  contentBase,
+  maxQueue = defaultCrawlMaxQueue,
+) {
+  const result = new Set();
 
-  const seenDirs = new Set()
-  const queue = ['']
+  const seenDirs = new Set();
+  const queue = createWorkQueue([""]);
 
-  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://localhost'
-  let baseForResolve = origin + '/'
+  const origin =
+    typeof location !== "undefined" && location.origin
+      ? location.origin
+      : "http://localhost";
+  let baseForResolve = origin + "/";
   try {
     if (contentBase) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(String(contentBase))) {
-        baseForResolve = String(contentBase).replace(/\/$/, '') + '/'
-      } else if (String(contentBase).startsWith('/')) {
-        baseForResolve = origin + String(contentBase).replace(/\/$/, '') + '/'
+        baseForResolve = String(contentBase).replace(/\/$/, "") + "/";
+      } else if (String(contentBase).startsWith("/")) {
+        baseForResolve = origin + String(contentBase).replace(/\/$/, "") + "/";
       } else {
-        baseForResolve = origin + '/' + String(contentBase).replace(/\/$/, '') + '/'
+        baseForResolve =
+          origin + "/" + String(contentBase).replace(/\/$/, "") + "/";
       }
     }
-  } catch (err) { baseForResolve = origin + '/' }
-
-  const concurrency = Math.max(1, Math.min(poolSize, 6))
-  let crawlBatchYieldCount = 0
-  while (queue.length) {
-    if (queue.length > maxQueue) break
-    const batch = queue.splice(0, concurrency)
-    await runWithConcurrency(batch, async (relDir) => {
-      if (relDir == null) return
-      if (seenDirs.has(relDir)) return
-      seenDirs.add(relDir)
-      let url = ''
-      try {
-        url = new URL(relDir || '', baseForResolve).toString()
-      } catch (err) {
-        url = (String(contentBase || '') || origin) + '/' + String(relDir || '').replace(/^\//, '')
-      }
-      try {
-        let res
-        try {
-          res = await globalThis.fetch(url)
-        } catch (errFetch) {
-          _debugLog('[slugManager] crawlAllMarkdown: fetch failed', { url, error: errFetch })
-          return
-        }
-        if (!res || !res.ok) {
-          if (res && !res.ok) _debugLog('[slugManager] crawlAllMarkdown: directory fetch non-ok', { url, status: res.status })
-          return
-        }
-        const text = await res.text()
-        const doc = _crawlParser.parseFromString(text, 'text/html')
-        let links = []
-        try {
-          if (doc && typeof doc.getElementsByTagName === 'function') {
-            links = doc.getElementsByTagName('a')
-          } else if (doc && typeof doc.querySelectorAll === 'function') {
-            links = doc.querySelectorAll(_crawlLinkSelector)
-          } else {
-            links = []
-          }
-        } catch (err) {
-          try { links = doc.getElementsByTagName ? doc.getElementsByTagName('a') : [] } catch (_) { links = [] }
-        }
-        const linkBase = url
-        for (const a of links) {
-          try {
-            let href = a.getAttribute('href') || ''
-            if (!href) continue
-            if (isExternalLinkWithBase(href, contentBase) || href.startsWith('..') || href.indexOf('/../') !== -1) continue
-            if (href.endsWith('/')) {
-              try {
-                const resolved = new URL(href, linkBase)
-                const basePath = new URL(baseForResolve).pathname
-                const sub = resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, '')
-                const subNorm = ensureTrailingSlash(normalizePath(sub))
-                if (!seenDirs.has(subNorm)) queue.push(subNorm)
-              } catch (err) {
-                const sub = relDir + href
-                if (!seenDirs.has(sub)) queue.push(sub)
-              }
-              continue
-            }
-            let path = ''
-            try {
-              const resolved = new URL(href, linkBase)
-              const basePath = new URL(baseForResolve).pathname
-              path = (resolved.pathname.startsWith(basePath) ? resolved.pathname.slice(basePath.length) : resolved.pathname.replace(/^\//, ''))
-            } catch (err) {
-              path = (relDir + href).replace(/^\//, '')
-            }
-            path = normalizePath(path)
-            if (/\.(md|html?)$/i.test(path)) {
-              result.add(path)
-            }
-          } catch (err) { _debugLog('[slugManager] crawlAllMarkdown: link iteration failed', err) }
-        }
-      } catch (err) { _debugLog('[slugManager] crawlAllMarkdown: directory fetch failed', err) }
-    }, concurrency)
+  } catch (err) {
+    // Malformed contentBase: resolve against the origin root.
+    baseForResolve = origin + "/";
   }
 
-  return Array.from(result)
+  const concurrency = Math.max(1, Math.min(poolSize, 6));
+  while (queue.length) {
+    if (queue.length > maxQueue) break;
+    const batch = queue.take(concurrency);
+    await runWithConcurrency(
+      batch,
+      async (relDir) => {
+        if (relDir == null) return;
+        if (seenDirs.has(relDir)) return;
+        seenDirs.add(relDir);
+        let url = "";
+        try {
+          url = new URL(relDir || "", baseForResolve).toString();
+        } catch (err) {
+          url =
+            (String(contentBase ?? "") || origin) +
+            "/" +
+            String(relDir ?? "").replace(/^\//, "");
+        }
+        try {
+          let res;
+          try {
+            res = await globalThis.fetch(url);
+          } catch (errFetch) {
+            debugLog("[slugManager] crawlAllMarkdown: fetch failed", {
+              url,
+              error: errFetch,
+            });
+            return;
+          }
+          if (!res || !res.ok) {
+            if (res && !res.ok)
+              debugLog(
+                "[slugManager] crawlAllMarkdown: directory fetch non-ok",
+                { url, status: res.status },
+              );
+            return;
+          }
+          const text = await res.text();
+          const doc = _crawlParser.parseFromString(text, "text/html");
+          let links = [];
+          try {
+            if (doc && typeof doc.getElementsByTagName === "function") {
+              links = doc.getElementsByTagName("a");
+            } else if (doc && typeof doc.querySelectorAll === "function") {
+              links = doc.querySelectorAll(_crawlLinkSelector);
+            } else {
+              links = [];
+            }
+          } catch (err) {
+            try {
+              links = doc.getElementsByTagName
+                ? doc.getElementsByTagName("a")
+                : [];
+            } catch (_) {
+              // Legacy DOM API unavailable: no links to crawl.
+              links = [];
+            }
+          }
+          const linkBase = url;
+          for (const a of links) {
+            try {
+              let href = a.getAttribute("href") || "";
+              if (!href) continue;
+              if (
+                isExternalLinkWithBase(href, contentBase) ||
+                href.startsWith("..") ||
+                href.indexOf("/../") !== -1
+              )
+                continue;
+              if (href.endsWith("/")) {
+                try {
+                  const resolved = new URL(href, linkBase);
+                  const basePath = new URL(baseForResolve).pathname;
+                  const sub = resolved.pathname.startsWith(basePath)
+                    ? resolved.pathname.slice(basePath.length)
+                    : resolved.pathname.replace(/^\//, "");
+                  const subNorm = ensureTrailingSlash(normalizePath(sub));
+                  if (!seenDirs.has(subNorm)) queue.push(subNorm);
+                } catch (err) {
+                  // Absolute URL resolution failed; join relative to the
+                  // current directory instead.
+                  const sub = normalizePath(relDir + href);
+                  if (!seenDirs.has(sub)) queue.push(sub);
+                }
+                continue;
+              }
+              let path = "";
+              try {
+                const resolved = new URL(href, linkBase);
+                const basePath = new URL(baseForResolve).pathname;
+                path = resolved.pathname.startsWith(basePath)
+                  ? resolved.pathname.slice(basePath.length)
+                  : resolved.pathname.replace(/^\//, "");
+              } catch (err) {
+                path = (relDir + href).replace(/^\//, "");
+              }
+              path = normalizePath(path);
+              if (/\.(md|html?)$/i.test(path)) {
+                result.add(path);
+              } else {
+                const hrefBase = path.split(/[?#]/)[0].replace(/\/+$/, "");
+                const lastSegment = String(hrefBase).split("/").pop() || "";
+                if (/\.[^./]+$/i.test(lastSegment)) continue;
+                if (hrefBase) {
+                  result.add(`${hrefBase}.md`);
+                  result.add(`${hrefBase}.html`);
+                  result.add(`${hrefBase}/README.md`);
+                  result.add(`${hrefBase}/README.html`);
+                }
+              }
+            } catch (err) {
+              debugLog(
+                "[slugManager] crawlAllMarkdown: link iteration failed",
+                err,
+              );
+            }
+          }
+        } catch (err) {
+          debugLog(
+            "[slugManager] crawlAllMarkdown: directory fetch failed",
+            err,
+          );
+        }
+      },
+      concurrency,
+    );
+  }
+
+  return Array.from(result);
 }
 
 /**
@@ -1888,118 +3011,145 @@ export async function crawlAllMarkdown(contentBase, maxQueue = defaultCrawlMaxQu
  * @returns {Promise<string|null>} - Promise resolving to the markdown path or `null` if not found.
  */
 export async function ensureSlug(decoded, contentBase, maxQueue) {
-  if (decoded && typeof decoded === 'string') {
-    decoded = normalizePath(decoded)
-    decoded = trimTrailingSlash(decoded)
+  const yieldGate = createYieldGate();
+  if (decoded && typeof decoded === "string") {
+    decoded = normalizePath(decoded);
+    decoded = trimTrailingSlash(decoded);
   }
   if (slugToMd.has(decoded)) {
-    return resolveSlugPath(decoded) || slugToMd.get(decoded)
+    return resolveSlugPath(decoded) || slugToMd.get(decoded);
   }
 
   try {
-    const allowCandidateProbing = (typeof notFoundPage === 'string' && notFoundPage) || slugToMd.has(decoded) || (allMarkdownPathsSet && allMarkdownPathsSet.size) || refreshIndexPaths._refreshed || (typeof contentBase === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase))
-    if (!allowCandidateProbing) return null
+    const allowCandidateProbing =
+      (typeof notFoundPage === "string" && notFoundPage) ||
+      slugToMd.has(decoded) ||
+      (allMarkdownPathsSet && allMarkdownPathsSet.size) ||
+      isIndexPathsRefreshed() ||
+      (typeof contentBase === "string" &&
+        /^[a-z][a-z0-9+.-]*:\/\//i.test(contentBase));
+    if (!allowCandidateProbing) return null;
   } catch (_e) {}
 
   for (const resolver of slugResolvers) {
     try {
-      const res = await resolver(decoded, contentBase)
-        if (res) {
-          _storeSlugMapping(decoded, res)
-          return res
-        }
-    } catch (err) { _debugLog('[slugManager] slug resolver failed', err) }
+      const res = await resolver(decoded, contentBase);
+      if (res) {
+        _storeSlugMapping(decoded, res);
+        return res;
+      }
+    } catch (err) {
+      debugLog("[slugManager] slug resolver failed", err);
+    }
   }
 
   if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
+    // Fast path: resolve slug from known file names before doing expensive
+    // markdown fetches, index builds, or crawls.
+    const filenameIndex = getFilenameSlugIndex();
+    if (filenameIndex?.has(decoded)) {
+      const p = filenameIndex.get(decoded);
+      _storeSlugMapping(decoded, p);
+      return p;
+    }
+
     if (listSlugCache.has(decoded)) {
-      const p = listSlugCache.get(decoded)
-      _storeSlugMapping(decoded, p)
-      return p
+      const p = listSlugCache.get(decoded);
+      _storeSlugMapping(decoded, p);
+      return p;
     }
     for (const p of allMarkdownPaths) {
-      if (listPathsFetched.has(p)) continue
+      if (listPathsFetched.has(p)) continue;
       try {
-        const md = await fetchMarkdown(p, contentBase)
+        const md = await fetchMarkdown(p, contentBase);
         if (md && md.raw) {
-          const m = (md.raw || '').match(/^#\s+(.+)$/m)
+          const m = (md.raw || "").match(/^#\s+(.+)$/m);
           if (m && m[1]) {
-            const cand = slugify(m[1].trim())
-            listPathsFetched.add(p)
-            if (cand) listSlugCache.set(cand, p)
+            const cand = slugify(m[1].trim());
+            listPathsFetched.add(p);
+            if (cand) listSlugCache.set(cand, p);
             if (cand === decoded) {
-              _storeSlugMapping(decoded, p)
-              return p
+              _storeSlugMapping(decoded, p);
+              return p;
             }
           }
         }
-      } catch (err) { _debugLog('[slugManager] manifest title fetch failed', err) }
+      } catch (err) {
+        debugLog("[slugManager] manifest title fetch failed", err);
+      }
     }
-    try { crawlBatchYieldCount++; await yieldIfNeeded(crawlBatchYieldCount, 8) } catch (_) {}
+    try {
+      await yieldGate();
+    } catch (_) {}
+  }
+
+  // Fast direct probe: when the route looks like a filename slug, try the
+  // two most likely concrete paths before expensive index/crawl work.
+  const candidates = [`${decoded}.html`, `${decoded}.md`];
+  for (const cand of candidates) {
+    try {
+      const res = await fetchMarkdown(cand, contentBase);
+      if (res && res.raw) {
+        _storeSlugMapping(decoded, cand);
+        return cand;
+      }
+    } catch (err) {
+      debugLog("[slugManager] candidate fetch failed", err);
+    }
   }
 
   try {
-    const idx = await buildSearchIndex(contentBase)
+    const idx = await buildSearchIndex(contentBase);
     if (idx && idx.length) {
-      const match = idx.find(e => e.slug === decoded)
+      const match = idx.find((e) => e.slug === decoded);
       if (match) {
-        _storeSlugMapping(decoded, match.path)
-        return match.path
+        _storeSlugMapping(decoded, match.path);
+        return match.path;
       }
     }
-  } catch (err) { _debugLog('[slugManager] buildSearchIndex lookup failed', err) }
+  } catch (err) {
+    debugLog("[slugManager] buildSearchIndex lookup failed", err);
+  }
 
   try {
-    const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue)
+    const foundCrawl = await crawlForSlug(decoded, contentBase, maxQueue);
     if (foundCrawl) {
-      _storeSlugMapping(decoded, foundCrawl)
-      return foundCrawl
+      _storeSlugMapping(decoded, foundCrawl);
+      return foundCrawl;
     }
-  } catch (err) { _debugLog('[slugManager] crawlForSlug lookup failed', err) }
-
-  const candidates = [`${decoded}.html`, `${decoded}.md`]
-  for (const cand of candidates) {
-    try {
-      const res = await fetchMarkdown(cand, contentBase)
-        if (res && res.raw) {
-        _storeSlugMapping(decoded, cand)
-        return cand
-      }
-    } catch (err) { _debugLog('[slugManager] candidate fetch failed', err) }
+  } catch (err) {
+    debugLog("[slugManager] crawlForSlug lookup failed", err);
   }
 
   if (allMarkdownPathsSet && allMarkdownPathsSet.size) {
-    for (const p of allMarkdownPaths) {
-      try {
-        const name = p.replace(/^.*\//, '').replace(/\.(md|html?)$/i, '')
-        if (slugify(name) === decoded) {
-          _storeSlugMapping(decoded, p)
-          return p
-        }
-      } catch (err) { _debugLog('[slugManager] build-time filename match failed', err) }
+    const filenameIndex = getFilenameSlugIndex();
+    if (filenameIndex?.has(decoded)) {
+      const p = filenameIndex.get(decoded);
+      _storeSlugMapping(decoded, p);
+      return p;
     }
   }
 
   try {
-    if (homePage && typeof homePage === 'string' && homePage.trim()) {
+    if (homePage && typeof homePage === "string" && homePage.trim()) {
       try {
-        const home = await fetchMarkdown(homePage, contentBase)
+        const home = await fetchMarkdown(homePage, contentBase);
         if (home && home.raw) {
-          const mhome = (home.raw || '').match(/^#\s+(.+)$/m)
+          const mhome = (home.raw || "").match(/^#\s+(.+)$/m);
           if (mhome && mhome[1]) {
-            const homeSlug = slugify(mhome[1].trim())
+            const homeSlug = slugify(mhome[1].trim());
             if (homeSlug === decoded) {
-              _storeSlugMapping(decoded, homePage)
-              return homePage
+              _storeSlugMapping(decoded, homePage);
+              return homePage;
             }
           }
         }
       } catch (e) {
-        _debugLog('[slugManager] home page fetch failed', e)
+        debugLog("[slugManager] home page fetch failed", e);
       }
     }
   } catch (e) {
-    _debugLog('[slugManager] home page fetch failed', e)
+    debugLog("[slugManager] home page fetch failed", e);
   }
-  return null
+  return null;
 }

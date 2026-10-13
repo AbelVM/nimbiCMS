@@ -22,7 +22,7 @@ page token (slug or path)
 
 ### initialDocumentTitle?
 
-`string` = `''`
+`string` = `""`
 
 optional fallback title
 

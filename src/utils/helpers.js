@@ -1,21 +1,57 @@
 /**
- * Utility helper functions used by the runtime.
- * @module utils/helpers
- */
-
-/**
  * Return true if the href points to an external or special link.  This
  * matches absolute URLs and mailto/tel schemes.
  *
  * @param {string} href - URL or href string to evaluate
  * @returns {boolean}
  */
-import { debugWarn } from './debug.js'
-import { memoize } from './memoize.js'
+import { debugWarn } from "./debug.js";
+import { PowerMemoizer } from "performance-helpers/powerCache";
+import { decodeHtmlEntities } from "./decodeHtmlEntities.js";
+
+const MEMO_KEY = (arg) => (arg === undefined ? "__undefined" : String(arg));
+const _normalizePathMemo = new PowerMemoizer(
+  function (p) {
+    return String(p ?? "").replace(/^[.\/]+/, "");
+  },
+  { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } },
+);
+
+const _trimTrailingSlashMemo = new PowerMemoizer(
+  function (u) {
+    return String(u ?? "").replace(/\/+$/, "");
+  },
+  { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } },
+);
+
+const _ensureTrailingSlashMemo = new PowerMemoizer(
+  function (u) {
+    return trimTrailingSlash(String(u ?? "")) + "/";
+  },
+  { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } },
+);
+
+const _encodeURLMemo = new PowerMemoizer(
+  function (u) {
+    try {
+      const s = String(u ?? "");
+      if (s.includes("%")) return s;
+      return encodeURI(s);
+    } catch (err) {
+      debugWarn("[helpers] encodeURL failed", err);
+      return String(u ?? "");
+    }
+  },
+  { keyResolver: MEMO_KEY, cacheOptions: { maxEntries: 2000 } },
+);
 
 export function isExternalLink(href) {
-  if (!href || typeof href !== 'string') return false
-  return /^(https?:)?\/\//.test(href) || href.startsWith('mailto:') || href.startsWith('tel:')
+  if (!href || typeof href !== "string") return false;
+  return (
+    /^(https?:)?\/\//.test(href) ||
+    href.startsWith("mailto:") ||
+    href.startsWith("tel:")
+  );
 }
 
 /**
@@ -25,9 +61,23 @@ export function isExternalLink(href) {
  * @param {string} p - input path to normalize (remove leading ./ or /)
  * @returns {string}
  */
-export const normalizePath = memoize(function(p) {
-  return String(p || '').replace(/^[.\/]+/, '')
-}, 2000)
+export function normalizePath(p) {
+  return _normalizePathMemo.run(p);
+}
+
+export function getBaseName(path) {
+  return String(path ?? "").replace(/^.*\//, "");
+}
+
+export function getLastPathSegments(path, count = 2) {
+  try {
+    const parts = String(path ?? "").split("/").filter(Boolean);
+    if (!parts.length) return "";
+    return parts.slice(-Math.max(1, Math.min(count, parts.length))).join("/");
+  } catch (_) {
+    return String(path ?? "");
+  }
+}
 
 /**
  * Remove one or more trailing slashes from a URL or path.  This is handy
@@ -36,9 +86,7 @@ export const normalizePath = memoize(function(p) {
  * @param {string} u - input path or URL to trim trailing slashes from
  * @returns {string}
  */
-export const trimTrailingSlash = memoize(function(u) {
-  return String(u || '').replace(/\/+$/, '')
-}, 2000)
+export const trimTrailingSlash = (u) => _trimTrailingSlashMemo.run(u);
 
 /**
  * Ensure the given URL/path ends with a single slash.  This wraps
@@ -47,9 +95,7 @@ export const trimTrailingSlash = memoize(function(u) {
  * @param {string} u
  * @returns {string}
  */
-export const ensureTrailingSlash = memoize(function(u) {
-  return trimTrailingSlash(String(u || '')) + '/'
-}, 2000)
+export const ensureTrailingSlash = (u) => _ensureTrailingSlashMemo.run(u);
 
 /**
  * Apply the lazy-loading attribute to an <img> element if not already set.
@@ -59,10 +105,12 @@ export const ensureTrailingSlash = memoize(function(u) {
  */
 export function setLazyload(img) {
   try {
-    if (img && img.getAttribute && !img.getAttribute('loading')) {
-      img.setAttribute('loading', 'lazy')
+    if (img?.getAttribute && !img.getAttribute("loading")) {
+      img.setAttribute("loading", "lazy");
     }
-  } catch (err) { debugWarn('[helpers] setLazyload failed', err) }
+  } catch (err) {
+    debugWarn("[helpers] setLazyload failed", err);
+  }
 }
 
 /**
@@ -76,17 +124,113 @@ export function setLazyload(img) {
  */
 function preloadImage(url) {
   try {
-    if (!url || typeof document === 'undefined' || !document.head) return
-    if (url.startsWith('data:')) return
-    const existing = document.head.querySelector(`link[rel="preload"][as="image"][href="${url}"]`)
-    if (existing) return
-    const link = document.createElement('link')
-    link.rel = 'preload'
-    link.as = 'image'
-    link.href = url
-    document.head.appendChild(link)
+    if (!url || typeof document === "undefined" || !document.head) return;
+    if (url.startsWith("data:")) return;
+    const existing = document.head.querySelector(
+      `link[rel="preload"][as="image"][href="${url}"]`,
+    );
+    if (existing) return;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = url;
+    document.head.appendChild(link);
   } catch (err) {
-    debugWarn('[helpers] preloadImage failed', err)
+    debugWarn("[helpers] preloadImage failed", err);
+  }
+}
+
+/**
+ * Known external origins used by nimbi-cms that benefit from early connection
+ * hints. Inline workers and local assets are not listed here.
+ * @type {string[]}
+ */
+const EXTERNAL_RESOURCE_ORIGINS = [
+  "https://cdn.jsdelivr.net",
+  "https://unpkg.com",
+];
+
+/**
+ * Inject `<link rel="preconnect">` hints for external origins used by the
+ * library (CDNs for highlight.js and Bulma). Safe to call multiple times.
+ * @returns {void}
+ */
+export function addResourceHints() {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    for (const origin of EXTERNAL_RESOURCE_ORIGINS) {
+      try {
+        if (document.querySelector(`link[rel="preconnect"][href="${origin}"]`))
+          continue;
+        const link = document.createElement("link");
+        link.rel = "preconnect";
+        link.href = origin;
+        link.crossOrigin = "anonymous";
+        document.head.appendChild(link);
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+/**
+ * Inject `<link rel="preload">` hints for critical external resources
+ * (e.g. highlight.js theme CSS). Safe to call multiple times.
+ * @param {string} [highlightJsVersion] - The highlight.js version to preload theme for.
+ * @param {string} [theme='monokai'] - The highlight.js theme name.
+ * @returns {void}
+ */
+export function addPreloadHints(highlightJsVersion, theme = "monokai") {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    if (!highlightJsVersion) return;
+    const href = `https://cdn.jsdelivr.net/npm/highlight.js@${highlightJsVersion}/styles/${theme}.css`;
+    try {
+      if (document.querySelector(`link[rel="preload"][href="${href}"]`)) return;
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "style";
+      link.href = href;
+      link.crossOrigin = "anonymous";
+      link.fetchPriority = "high";
+      document.head.appendChild(link);
+    } catch (e) {}
+  } catch (e) {}
+}
+
+/**
+ * Module-level CSP nonce used to tag dynamically injected inline scripts
+ * and styles so they pass a strict Content-Security-Policy.
+ * @type {string|null}
+ */
+let cspNonce = null;
+
+/**
+ * Set the CSP nonce to apply to dynamically injected inline scripts/styles.
+ * @param {string} nonce - The nonce value from the host page's CSP header.
+ * @returns {void}
+ */
+export function setCspNonce(nonce) {
+  cspNonce = typeof nonce === "string" ? nonce : null;
+}
+
+/**
+ * Get the current CSP nonce, or null if not set.
+ * @returns {string|null}
+ */
+export function getCspNonce() {
+  return cspNonce;
+}
+
+/**
+ * Apply the current CSP nonce to an element if one is set.
+ * @param {HTMLElement} el - The element to apply the nonce to.
+ * @returns {void}
+ */
+export function applyCspNonce(el) {
+  if (cspNonce && el && typeof el.setAttribute === "function") {
+    try {
+      el.setAttribute("nonce", cspNonce);
+    } catch (e) {}
   }
 }
 
@@ -105,104 +249,140 @@ function preloadImage(url) {
  * @param {boolean} [debug=false] - If true, logs debug info for each image.
  * @returns {void}
  */
-export function setEagerForAboveFoldImages(container, marginPx = 0, debug = false) {
+export function setEagerForAboveFoldImages(
+  container,
+  marginPx = 0,
+  debug = false,
+) {
   try {
-    if (typeof window === 'undefined' || !container || !container.querySelectorAll) return
+    if (
+      typeof window === "undefined" ||
+      !container ||
+      !container.querySelectorAll
+    )
+      return;
 
-    const imgs = Array.from(container.querySelectorAll('img'))
-    if (!imgs.length) return
+    const imgs = Array.from(container.querySelectorAll("img"));
+    if (!imgs.length) return;
 
-    const viewportEl = container
-    const viewportRect = viewportEl && viewportEl.getBoundingClientRect ? viewportEl.getBoundingClientRect() : null
+    const viewportEl = container;
+    const viewportRect = viewportEl?.getBoundingClientRect
+      ? viewportEl.getBoundingClientRect()
+      : null;
 
-    const winTop = 0
-    const winBottom = (typeof window !== 'undefined') ? (window.innerHeight || document.documentElement.clientHeight || 0) : 0
+    const winTop = 0;
+    const winBottom =
+      typeof window !== "undefined"
+        ? window.innerHeight || document.documentElement.clientHeight || 0
+        : 0;
 
-    const visibleTop = viewportRect ? Math.max(winTop, viewportRect.top) : winTop
-    const visibleBottomBase = viewportRect ? Math.min(winBottom, viewportRect.bottom) : winBottom
-    const visibleBottom = visibleBottomBase + Number(marginPx || 0)
+    const visibleTop = viewportRect
+      ? Math.max(winTop, viewportRect.top)
+      : winTop;
+    const visibleBottomBase = viewportRect
+      ? Math.min(winBottom, viewportRect.bottom)
+      : winBottom;
+    const visibleBottom = visibleBottomBase + Number(marginPx || 0);
 
-    let viewportHeight = 0
+    let viewportHeight = 0;
     if (viewportEl) {
-      viewportHeight = viewportEl.clientHeight || (viewportRect ? viewportRect.height : 0)
+      viewportHeight =
+        viewportEl.clientHeight || (viewportRect ? viewportRect.height : 0);
     }
     if (!viewportHeight) {
-      viewportHeight = (winBottom - winTop)
+      viewportHeight = winBottom - winTop;
     }
 
-    let maxHeightRatio = 0.6
+    let maxHeightRatio = 0.6;
     try {
-      const css = viewportEl && window.getComputedStyle ? window.getComputedStyle(viewportEl) : null
-      const ratio = css && css.getPropertyValue('--nimbi-image-max-height-ratio')
-      const parsed = ratio ? parseFloat(ratio) : NaN
-      if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 1) maxHeightRatio = parsed
+      const css =
+        viewportEl && window.getComputedStyle
+          ? window.getComputedStyle(viewportEl)
+          : null;
+      const ratio = css?.getPropertyValue
+        ? css.getPropertyValue("--nimbi-image-max-height-ratio")
+        : null;
+      const parsed = ratio ? parseFloat(ratio) : NaN;
+      if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 1)
+        maxHeightRatio = parsed;
     } catch (err) {
-      debugWarn('[helpers] read CSS ratio failed', err)
+      debugWarn("[helpers] read CSS ratio failed", err);
     }
 
-    const maxImageHeight = Math.max(200, Math.floor(viewportHeight * maxHeightRatio))
+    const maxImageHeight = Math.max(
+      200,
+      Math.floor(viewportHeight * maxHeightRatio),
+    );
 
-    let foundAboveFold = false
-    let firstVisibleImage = null
+    let foundAboveFold = false;
+    let firstVisibleImage = null;
+    let hasMarkedEagerImage = false;
 
-    imgs.forEach(img => {
+    imgs.forEach((img) => {
       try {
-        const beforeLoading = img.getAttribute ? img.getAttribute('loading') : undefined
-        if (beforeLoading !== 'eager' && img.setAttribute) img.setAttribute('loading', 'lazy')
+        const beforeLoading = img.getAttribute?.("loading");
+        const explicitEager = beforeLoading === "eager";
 
-        const rect = img.getBoundingClientRect ? img.getBoundingClientRect() : null
-        const src = img.src || (img.getAttribute && img.getAttribute('src'))
+        const rect = img?.getBoundingClientRect
+          ? img.getBoundingClientRect()
+          : null;
+        const src = img.src || img.getAttribute?.("src");
 
-        const effectiveHeight = rect && rect.height > 1 ? rect.height : maxImageHeight
-        const effectiveTop = rect ? rect.top : 0
-        const effectiveBottom = effectiveTop + effectiveHeight
+        const effectiveHeight = rect?.height > 1 ? rect.height : maxImageHeight;
+        const effectiveTop = rect ? rect.top : 0;
+        const effectiveBottom = effectiveTop + effectiveHeight;
 
         const isAboveFold = Boolean(
           rect &&
           effectiveHeight > 0 &&
           effectiveTop <= visibleBottom &&
-          effectiveBottom >= visibleTop
-        )
+          effectiveBottom >= visibleTop,
+        );
 
-        if (isAboveFold) {
+        if (isAboveFold && !hasMarkedEagerImage) {
           if (img.setAttribute) {
-            img.setAttribute('loading', 'eager')
-            img.setAttribute('fetchpriority', 'high')
-            img.setAttribute('data-eager-by-nimbi', '1')
+            img.setAttribute("loading", "eager");
+            img.setAttribute("fetchpriority", "high");
+            img.setAttribute("data-eager-by-nimbi", "1");
           } else {
-            img.loading = 'eager'
-            img.fetchPriority = 'high'
+            img.loading = "eager";
+            img.fetchPriority = "high";
           }
-          preloadImage(src)
-          foundAboveFold = true
+          preloadImage(src);
+          foundAboveFold = true;
+          hasMarkedEagerImage = true;
+        } else if (!explicitEager && img.setAttribute) {
+          img.setAttribute("loading", "lazy");
         }
 
-        if (!firstVisibleImage && rect && rect.top <= visibleBottom) {
-          firstVisibleImage = { img, src, rect, beforeLoading }
+        if (!firstVisibleImage && rect?.top <= visibleBottom) {
+          firstVisibleImage = { img, src, rect, beforeLoading, explicitEager };
         }
-
       } catch (err) {
-        debugWarn('[helpers] setEagerForAboveFoldImages per-image failed', err)
+        debugWarn("[helpers] setEagerForAboveFoldImages per-image failed", err);
       }
-    })
+    });
 
-    if (!foundAboveFold && firstVisibleImage) {
-      const { img, src, rect, beforeLoading } = firstVisibleImage
-      try {
-        if (img.setAttribute) {
-          img.setAttribute('loading', 'eager')
-          img.setAttribute('fetchpriority', 'high')
-          img.setAttribute('data-eager-by-nimbi', '1')
-        } else {
-          img.loading = 'eager'
-          img.fetchPriority = 'high'
+    if (!hasMarkedEagerImage && firstVisibleImage) {
+      const { img, src, explicitEager } = firstVisibleImage;
+      if (!explicitEager) {
+        try {
+          if (img.setAttribute) {
+            img.setAttribute("loading", "eager");
+            img.setAttribute("fetchpriority", "high");
+            img.setAttribute("data-eager-by-nimbi", "1");
+          } else {
+            img.loading = "eager";
+            img.fetchPriority = "high";
+          }
+          hasMarkedEagerImage = true;
+        } catch (err) {
+          debugWarn("[helpers] setEagerForAboveFoldImages fallback failed", err);
         }
-      } catch (err) {
-        debugWarn('[helpers] setEagerForAboveFoldImages fallback failed', err)
       }
     }
   } catch (err) {
-    debugWarn('[helpers] setEagerForAboveFoldImages failed', err)
+    debugWarn("[helpers] setEagerForAboveFoldImages failed", err);
   }
 }
 
@@ -216,18 +396,19 @@ export function setEagerForAboveFoldImages(container, marginPx = 0, debug = fals
  * @returns {string} Joined path string without duplicate slashes.
  */
 export function joinPaths(...parts) {
-  if (!parts || parts.length === 0) return ''
-  const segs = parts.map(p => String(p || ''))
-    .filter(p => p !== '')
+  if (!parts || parts.length === 0) return "";
+  const segs = parts
+    .map((p) => String(p ?? ""))
+    .filter((p) => p !== "")
     .map((p, i) => {
-      if (i === 0) return p.replace(/\/+$|(?<!^)\/+/g, '') // trim trailing but keep leading
-      return p.replace(/^\/+|\/+$/g, '')
-    })
-  let joined = segs.join('/')
-  if (String(parts[0] || '').startsWith('/')) {
-    if (!joined.startsWith('/')) joined = '/' + joined
+      if (i === 0) return p.replace(/\/+$|(?<!^)\/+/g, ""); // trim trailing but keep leading
+      return p.replace(/^\/+|\/+$/g, "");
+    });
+  let joined = segs.join("/");
+  if (String(parts[0] ?? "").startsWith("/")) {
+    if (!joined.startsWith("/")) joined = "/" + joined;
   }
-  return joined
+  return joined;
 }
 /**
  * Build a URL that uses the site’s `?page=` query parameter while preserving
@@ -243,28 +424,33 @@ export function joinPaths(...parts) {
  */
 export function buildPageUrl(page, hash = null, baseSearch) {
   try {
-    const rawSearch = typeof baseSearch === 'string'
-      ? baseSearch
-      : (typeof window !== 'undefined' && window.location ? window.location.search : '')
-    const params = new URLSearchParams(rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch)
+    const rawSearch =
+      typeof baseSearch === "string"
+        ? baseSearch
+        : typeof window !== "undefined" && window.location
+          ? window.location.search
+          : "";
+    const params = new URLSearchParams(
+      rawSearch.startsWith("?") ? rawSearch.slice(1) : rawSearch,
+    );
 
-    const pageVal = String(page || '')
-    params.delete('page')
-    const merged = new URLSearchParams()
-    merged.set('page', pageVal)
+    const pageVal = String(page ?? "");
+    params.delete("page");
+    const merged = new URLSearchParams();
+    merged.set("page", pageVal);
     for (const [k, v] of params.entries()) {
-      merged.append(k, v)
+      merged.append(k, v);
     }
 
-    const query = merged.toString()
-    let url = query ? `?${query}` : ''
+    const query = merged.toString();
+    let url = query ? `?${query}` : "";
     if (hash) {
-      url += `#${encodeURIComponent(hash)}`
+      url += `#${encodeURIComponent(hash)}`;
     }
-    return url || `?page=${encodeURIComponent(pageVal)}`
+    return url || `?page=${encodeURIComponent(pageVal)}`;
   } catch (err) {
-    const base = `?page=${encodeURIComponent(String(page || ''))}`
-    return hash ? `${base}#${encodeURIComponent(hash)}` : base
+    const base = `?page=${encodeURIComponent(String(page ?? ""))}`;
+    return hash ? `${base}#${encodeURIComponent(hash)}` : base;
   }
 }
 /**
@@ -274,16 +460,7 @@ export function buildPageUrl(page, hash = null, baseSearch) {
  * @param {string} u - URL or component to encode safely
  * @returns {string}
  */
-export const encodeURL = memoize(function(u) {
-  try {
-    const s = String(u || '')
-    if (s.includes('%')) return s
-    return encodeURI(s)
-  } catch (err) {
-    debugWarn('[helpers] encodeURL failed', err)
-    return String(u || '')
-  }
-}, 2000)
+export const encodeURL = (u) => _encodeURLMemo.run(u);
 
 /**
  * Execute the given function and silently ignore any exceptions. Returns
@@ -296,22 +473,25 @@ export const encodeURL = memoize(function(u) {
  */
 export function safe(fn) {
   try {
-    const result = fn()
-    if (result && typeof result.then === 'function') {
-      return result.catch(e => {
-        debugWarn('[helpers] safe swallowed error', e)
-        return undefined
-      })
+    const result = fn();
+    if (result && typeof result.then === "function") {
+      return result.catch((e) => {
+        debugWarn("[helpers] safe swallowed error", e);
+        return undefined;
+      });
     }
-    return result
+    return result;
   } catch (_e) {
-    debugWarn('[helpers] safe swallowed error', _e)
+    debugWarn("[helpers] safe swallowed error", _e);
   }
 }
 
 try {
-  if (typeof globalThis !== 'undefined' && !globalThis.safe) globalThis.safe = safe
-} catch (err) { debugWarn('[helpers] global attach failed', err) }
+  if (typeof globalThis !== "undefined" && !globalThis.safe)
+    globalThis.safe = safe;
+} catch (err) {
+  debugWarn("[helpers] global attach failed", err);
+}
 
 /**
  * Decode a small set of common HTML entities and numeric entities in a string.
@@ -319,24 +499,14 @@ try {
  * @param {string} s
  * @returns {string}
  */
-export const decodeHtmlEntities = memoize(function(s) {
-  try {
-    if (!s && s !== 0) return ''
-    const str = String(s)
-    const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
-    return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, g) => {
-      if (!g) return m
-      if (g[0] === '#') {
-        try {
-          if (g[1] === 'x' || g[1] === 'X') return String.fromCharCode(parseInt(g.slice(2), 16))
-          return String.fromCharCode(parseInt(g.slice(1), 10))
-        } catch (e) {
-          return m
-        }
-      }
-      return (named[g] !== undefined) ? named[g] : m
-    })
-  } catch (err) {
-    return String(s || '')
-  }
-}, 2000)
+export { decodeHtmlEntities };
+
+/**
+ * Determine a reasonable worker pool size based on the platform's
+ * reported hardware concurrency. Used to size PowerPool instances.
+ * @returns {number}
+ */
+export const getWorkerPoolSize = () =>
+  typeof navigator !== "undefined" && navigator.hardwareConcurrency
+    ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2))
+    : 2;

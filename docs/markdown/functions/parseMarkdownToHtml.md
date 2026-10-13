@@ -8,8 +8,7 @@
 
 > **parseMarkdownToHtml**(`md?`): `Promise`\<[`ParseResult`](../type-aliases/ParseResult.md)\>
 
-Convert markdown string to HTML and extract a table-of-contents list.
-Preserves frontmatter metadata.
+Parse Markdown while recording coarse duration diagnostics.
 
 ## Parameters
 
@@ -17,10 +16,6 @@ Preserves frontmatter metadata.
 
 `string`
 
-Markdown source string to convert; falsy values are treated as an empty string.
-
 ## Returns
 
 `Promise`\<[`ParseResult`](../type-aliases/ParseResult.md)\>
-
-Promise resolving to the parsed HTML, metadata, and table-of-contents.

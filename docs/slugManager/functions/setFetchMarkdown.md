@@ -15,7 +15,7 @@ or when consumers want to provide a bespoke fetch strategy.
 
 ### fn
 
-(`path`, `base?`) => `Promise`\<[`FetchResult`](../type-aliases/FetchResult.md)\>
+(`path`, `base?`) => `Promise`\<`FetchResult`\>
 
 Custom fetch function used to load markdown. Receives `(path, base)` and must return a `FetchResult` promise.
 

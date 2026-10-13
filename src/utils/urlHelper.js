@@ -8,7 +8,6 @@
  *
  * @module utils/urlHelper
  */
- 
 
 /**
  * Route descriptor returned by {@link parseHrefToRoute}.
@@ -28,12 +27,12 @@
  */
 function encodePathSegments(p) {
   try {
-    return String(p || '')
-      .split('/')
-      .map(s => encodeURIComponent(s))
-      .join('/')
+    return String(p ?? "")
+      .split("/")
+      .map((s) => encodeURIComponent(s))
+      .join("/");
   } catch (e) {
-    return String(p || '')
+    return String(p ?? "");
   }
 }
 
@@ -48,39 +47,45 @@ function encodePathSegments(p) {
  * @returns {string} cosmetic URL string
  */
 export function buildCosmeticUrl(page, anchor = null, baseSearch = undefined) {
-  const seg = encodePathSegments(String(page || ''))
-  let out = '#/' + seg
-  if (anchor) out += '#' + encodeURIComponent(String(anchor))
+  const seg = encodePathSegments(String(page ?? ""));
+  let out = "#/" + seg;
+  if (anchor) out += "#" + encodeURIComponent(String(anchor));
   try {
-    let params = ''
-    if (typeof baseSearch === 'string') {
-      params = baseSearch
+    let params = "";
+    if (typeof baseSearch === "string") {
+      params = baseSearch;
     } else {
-      if (typeof location !== 'undefined' && location && location.search) {
-        params = location.search
-      } else if (typeof location !== 'undefined' && location && location.hash) {
+      if (typeof location !== "undefined" && location?.search) {
+        params = location.search;
+      } else if (typeof location !== "undefined" && location?.hash) {
         try {
-          const parsed = parseHrefToRoute(location.href)
-          if (parsed && parsed.params) params = parsed.params
+          const parsed = parseHrefToRoute(location.href);
+          if (parsed?.params) params = parsed.params;
         } catch (e) {
           // ignore
         }
       }
     }
     if (params) {
-      const qs = (typeof params === 'string' && params.startsWith('?')) ? params.slice(1) : params
+      const qs =
+        typeof params === "string" && params.startsWith("?")
+          ? params.slice(1)
+          : params;
       try {
-        const sp = new URLSearchParams(qs)
-        sp.delete('page')
-        const s = sp.toString()
-        if (s) out += '?' + s
+        const sp = new URLSearchParams(qs);
+        sp.delete("page");
+        const s = sp.toString();
+        if (s) out += "?" + s;
       } catch (e) {
-        const raw = String(qs || '').replace(/^page=[^&]*&?/, '')
-        if (raw) out += '?' + raw
+        // URLSearchParams unavailable: strip `page` with a regex instead.
+        const raw = String(qs ?? "").replace(/^page=[^&]*&?/, "");
+        if (raw) out += "?" + raw;
       }
     }
-  } catch (e) { /* ignore */ }
-  return out
+  } catch (e) {
+    /* ignore */
+  }
+  return out;
 }
 
 /**
@@ -93,51 +98,71 @@ export function buildCosmeticUrl(page, anchor = null, baseSearch = undefined) {
  */
 export function parseHrefToRoute(href) {
   try {
-    const u = new URL(href, typeof location !== 'undefined' ? location.href : 'http://localhost/')
-    const pageParam = u.searchParams.get('page')
+    const u = new URL(
+      href,
+      typeof location !== "undefined" ? location.href : "http://localhost/",
+    );
+    const pageParam = u.searchParams.get("page");
     if (pageParam) {
-      let anchor = null
-      let tailParams = ''
+      let anchor = null;
+      let tailParams = "";
       if (u.hash) {
-        const h = u.hash.replace(/^#/, '')
-        if (h.includes('&')) {
-          const parts = h.split('&')
-          anchor = parts.shift() || null
-          tailParams = parts.join('&')
+        const h = u.hash.replace(/^#/, "");
+        if (h.includes("&")) {
+          const parts = h.split("&");
+          anchor = parts.shift() || null;
+          tailParams = parts.join("&");
         } else {
-          anchor = h || null
+          anchor = h || null;
         }
       }
-      const sp = new URLSearchParams(u.search)
-      sp.delete('page')
-      const spStr = sp.toString()
-      const params = [spStr, tailParams].filter(Boolean).join('&')
-      return { type: 'canonical', page: decodeURIComponent(pageParam), anchor, params }
+      const sp = new URLSearchParams(u.search);
+      sp.delete("page");
+      const spStr = sp.toString();
+      const params = [spStr, tailParams].filter(Boolean).join("&");
+      return {
+        type: "canonical",
+        page: decodeURIComponent(pageParam),
+        anchor,
+        params,
+      };
     }
 
-    const frag = u.hash ? decodeURIComponent(u.hash.replace(/^#/, '')) : ''
-    if (frag && frag.startsWith('/')) {
-      let preQuery = frag
-      let params = ''
-      if (preQuery.indexOf('?') !== -1) {
-        const parts = preQuery.split('?')
-        preQuery = parts.shift() || ''
-        params = parts.join('?') || ''
+    const frag = u.hash ? decodeURIComponent(u.hash.replace(/^#/, "")) : "";
+    if (frag && frag.startsWith("/")) {
+      let preQuery = frag;
+      let params = "";
+      if (preQuery.indexOf("?") !== -1) {
+        const parts = preQuery.split("?");
+        preQuery = parts.shift() || "";
+        params = parts.join("?") || "";
       }
-      let slugPart = preQuery
-      let anchor = null
-      if (slugPart.indexOf('#') !== -1) {
-        const parts = slugPart.split('#')
-        slugPart = parts.shift() || ''
-        anchor = parts.join('#') || null
+      let slugPart = preQuery;
+      let anchor = null;
+      if (slugPart.indexOf("#") !== -1) {
+        const parts = slugPart.split("#");
+        slugPart = parts.shift() || "";
+        anchor = parts.join("#") || null;
       }
-      const slug = slugPart.replace(/^\/+/, '') || null
-      return { type: 'cosmetic', page: slug, anchor, params }
+      const slug = slugPart.replace(/^\/+/, "") || null;
+      return { type: "cosmetic", page: slug, anchor, params };
     }
 
-    return { type: 'path', page: (u.pathname || '').replace(/^\//, '') || null, anchor: u.hash ? u.hash.replace(/^#/, '') : null, params: u.search ? u.search.replace(/^\?/, '') : '' }
+    let pathAnchor = u.hash ? u.hash.replace(/^#/, "") : "";
+    let pathParams = u.search ? u.search.replace(/^\?/, "") : "";
+    if (pathAnchor.includes("?")) {
+      const parts = pathAnchor.split("?");
+      pathAnchor = parts.shift() || "";
+      pathParams = [pathParams, parts.join("?")].filter(Boolean).join("&");
+    }
+    return {
+      type: "path",
+      page: (u.pathname || "").replace(/^\//, "") || null,
+      anchor: pathAnchor || null,
+      params: pathParams,
+    };
   } catch (e) {
-    return { type: 'unknown', page: href, anchor: null, params: '' }
+    return { type: "unknown", page: href, anchor: null, params: "" };
   }
 }
 
@@ -150,21 +175,29 @@ export function parseHrefToRoute(href) {
  */
 export function toCanonicalHref(href) {
   try {
-    const r = parseHrefToRoute(href)
-    if (r && r.type === 'canonical') {
-      let out = '?page=' + encodeURIComponent(r.page || '')
-      if (r.params) out += (out.includes('?') ? '&' : '?') + r.params
-      if (r.anchor) out += '#' + encodeURIComponent(r.anchor)
-      return out
+    const rawHref = String(href ?? "");
+    const baseHref =
+      typeof location !== "undefined" ? location.href : "http://localhost/";
+    const parsedHref = new URL(rawHref, baseHref);
+    const isAbsoluteExternal =
+      /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(rawHref) &&
+      parsedHref.origin !== new URL(baseHref).origin;
+    const isSupportedExternalRoute =
+      parsedHref.searchParams.has("page") || parsedHref.hash.startsWith("#/");
+    if (isAbsoluteExternal && !isSupportedExternalRoute) return rawHref;
+    const r = parseHrefToRoute(href);
+    if (r && r.type === "canonical") {
+      let out = "?page=" + encodeURIComponent(r.page || "");
+      if (r.params) out += (out.includes("?") ? "&" : "?") + r.params;
+      if (r.anchor) out += "#" + encodeURIComponent(r.anchor);
+      return out;
     }
     if (r && r.page) {
-      let out = '?page=' + encodeURIComponent(r.page)
-      if (r.params) out += (out.includes('?') ? '&' : '?') + r.params
-      if (r.anchor) out += '#' + encodeURIComponent(r.anchor)
-      return out
+      let out = "?page=" + encodeURIComponent(r.page);
+      if (r.params) out += (out.includes("?") ? "&" : "?") + r.params;
+      if (r.anchor) out += "#" + encodeURIComponent(r.anchor);
+      return out;
     }
   } catch (e) {}
-  return String(href || '')
+  return String(href ?? "");
 }
-
- 

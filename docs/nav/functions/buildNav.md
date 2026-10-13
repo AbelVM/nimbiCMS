@@ -6,7 +6,7 @@
 
 # Function: buildNav()
 
-> **buildNav**(`navbarWrap`, `container`, `navHtml`, `contentBase`, `homePage`, `t`, `renderByQuery`, `effectiveSearchEnabled`, `searchIndexMode?`, `indexDepth?`, `noIndexing?`, `logoOption?`): `Promise`\<[`NavBuildResult`](../type-aliases/NavBuildResult.md)\>
+> **buildNav**(`navbarWrap`, `container`, `navHtml`, `contentBase`, `homePage`, `t`, `renderByQuery`, `effectiveSearchEnabled`, `searchIndexMode?`, `indexDepth?`, `noIndexing?`, `logoOption?`, `signal`): `Promise`\<[`NavBuildResult`](../type-aliases/NavBuildResult.md)\>
 
 Build the site navigation DOM and wire SPA navigation handlers.
 
@@ -62,9 +62,9 @@ Whether search UI should be rendered.
 
 ### searchIndexMode?
 
-Search index mode forwarded from initCMS.
+`"eager"` \| `"lazy"`
 
-`"eager"` | `"lazy"`
+Search index mode forwarded from initCMS.
 
 ### indexDepth?
 
@@ -80,9 +80,13 @@ Optional list of paths to exclude from indexing.
 
 ### logoOption?
 
-`string` = `'favicon'`
+`string` = `"favicon"`
 
 Navbar logo option.
+
+### signal
+
+`any`
 
 ## Returns
 

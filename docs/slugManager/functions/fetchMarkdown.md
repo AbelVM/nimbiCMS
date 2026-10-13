@@ -6,7 +6,7 @@
 
 # Function: fetchMarkdown()
 
-> **fetchMarkdown**(`path`, `base?`, `opts?`): `Promise`\<[`FetchResult`](../type-aliases/FetchResult.md)\>
+> **fetchMarkdown**(`path`, `base?`, `opts?`): `Promise`\<`FetchResult`\>
 
 Fetch markdown content by path.
 Accepts cosmetic or canonical hrefs and extracts page token for internal fetches.
@@ -35,6 +35,6 @@ Options object ({force:true} bypasses guard).
 
 ## Returns
 
-`Promise`\<[`FetchResult`](../type-aliases/FetchResult.md)\>
+`Promise`\<`FetchResult`\>
 
 Resolves with the fetched content or rejects on failure.

@@ -11,8 +11,45 @@ module.exports = [
         location: 'readonly',
         navigator: 'readonly',
         fetch: 'readonly',
+        self: 'readonly',
         URL: 'readonly',
-        Element: 'readonly'
+        Element: 'readonly',
+        performance: 'readonly',
+        __NIMBI_CMS_VERSION__: 'readonly',
+        __NIMBI_CMS_MANIFEST__: 'readonly',
+        __NIMBI_CMS_HOMEPAGE__: 'readonly',
+        __HIGHLIGHT_JS_VERSION__: 'readonly',
+        onmessage: 'readonly',
+        postMessage: 'readonly',
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        Blob: 'readonly',
+        clearInterval: 'readonly',
+        clearTimeout: 'readonly',
+        console: 'readonly',
+        setInterval: 'readonly',
+        CustomEvent: 'readonly',
+        DOMParser: 'readonly',
+        HTMLElement: 'readonly',
+        IntersectionObserver: 'readonly',
+        MutationObserver: 'readonly',
+        PopStateEvent: 'readonly',
+        requestAnimationFrame: 'readonly',
+        requestIdleCallback: 'readonly',
+        ResizeObserver: 'readonly',
+        sessionStorage: 'readonly',
+        setTimeout: 'readonly',
+        structuredClone: 'readonly',
+        URLSearchParams: 'readonly',
+        Worker: 'readonly',
+        XMLSerializer: 'readonly',
+        CSS: 'readonly',
+        process: 'readonly',
+        renderByQuery: 'readonly',
+        findSlugForPath: 'readonly',
+        manifest: 'readonly',
+        searchIndex: 'readonly',
+        navigationPage: 'readonly'
       }
     },
     plugins: {
@@ -24,7 +61,15 @@ module.exports = [
       'unused-imports/no-unused-imports': 'warn',
       'unused-imports/no-unused-vars': ['warn', { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' }],
       'no-console': 'off',
-      'nimbi-debug/no-eager-debug': 'warn'
+      'no-undef': 'error',
+      'nimbi-debug/no-eager-debug': 'warn',
+      'nimbi-debug/no-empty-catch-without-comment': 'warn',
+      // Silent catches did real damage here: a `null` AbortController
+      // dereference and a missing import were both hidden by enclosing
+      // `catch` blocks that discarded the error. Every catch must now log,
+      // rethrow, return a fallback, capture the error, propagate it, or carry
+      // an explanatory comment.
+      'nimbi-debug/no-silent-catch': 'error'
     }
   }
 ]

@@ -6,7 +6,7 @@
 
 # Type Alias: ResolutionRecord
 
-> **ResolutionRecord**\<\> = `object`
+> **ResolutionRecord** = `object`
 
 ## Type Parameters
 

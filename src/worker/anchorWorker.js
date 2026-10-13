@@ -1,76 +1,60 @@
 /**
  * @module worker/anchorWorker
  */
-import { _rewriteAnchors } from '../htmlBuilder.js'
-import { getSharedParser } from '../utils/sharedDomParser.js'
+import { rewriteAnchorsHtml } from "./anchorRuntime.js";
+import { decodeInbound, announceCapabilities } from "performance-helpers/powerMessageCodec";
 
-/**
- * Worker entrypoint for rewriting anchor hrefs inside rendered HTML.
- *
- * Accepted messages:
- * - `{ type: 'rewriteAnchors', id: string, html: string, contentBase?: string, pagePath?: string }`
- *   -> posts `{ id, result: string }` where `result` is the rewritten HTML string.
- *
- * On error the worker posts `{ id, error: string }`.
- */
+// Announce native structured-clone support so PowerPool can use native
+// envelopes when available. Guarded for test environments where `postMessage`
+// may not be the worker-style single-argument form yet.
+try {
+  if (typeof postMessage === "function") {
+    postMessage(announceCapabilities({ native: true }));
+  }
+} catch (_) {}
 
 /**
  * Worker `onmessage` handler for anchor rewrite messages.
- * @param {MessageEvent} ev - Message event whose `data` should contain the worker request
- * (e.g. `{ type: 'rewriteAnchors', id, html, contentBase?, pagePath? }`).
- * @returns {Promise<void>} Posts a `{id, result}` or `{id, error}` message.
+ * Uses `decodeInbound` to handle native envelopes, framed v2 messages,
+ * and legacy bare JSON transparently.
+ * @param {MessageEvent} ev
+ * @returns {Promise<void>}
  */
 onmessage = async (ev) => {
-  const msg = ev.data || {}
+  const decoded = decodeInbound(ev.data);
+  const msg = decoded.value;
+  const correlationId = decoded.correlationId ?? msg.correlationId;
+  const _reply = (result) => {
+    if (correlationId != null) {
+      postMessage({ correlationId, response: result });
+    } else {
+      postMessage({ id: msg.id, result });
+    }
+  };
+  const _replyErr = (error) => {
+    if (correlationId != null) {
+      postMessage({ correlationId, response: { error: String(error) } });
+    } else {
+      postMessage({ id: msg.id, error: String(error) });
+    }
+  };
   try {
-    if (msg.type === 'rewriteAnchors') {
-      const { id, html, contentBase, pagePath } = msg
+    if (msg.type === "rewriteAnchors") {
+      const { html, contentBase, pagePath, snapshot } = msg;
       try {
-        
-        const parser = getSharedParser()
-        if (!parser) {
-          // No DOMParser available in this environment; return original HTML unchanged
-          postMessage({ id, result: html })
-        } else {
-          const doc = parser.parseFromString(html || '', 'text/html')
-          const article = doc.body
-          await _rewriteAnchors(article, contentBase, pagePath, { canonical: true })
-          postMessage({ id, result: doc.body.innerHTML })
-        }
+        const result = await rewriteAnchorsHtml(
+          html,
+          contentBase,
+          pagePath,
+          snapshot,
+        );
+        _reply(result);
       } catch (e) {
-        postMessage({ id, error: String(e) })
+        _replyErr(e);
       }
-      return
+      return;
     }
   } catch (e) {
-    postMessage({ id: msg.id, error: String(e) })
+    _replyErr(e);
   }
-}
-
-/**
- * Helper to process an anchor-worker style message outside of a Worker.
- * @param {Object} msg - Message object (expects `type === 'rewriteAnchors'` and fields `id`, `html`, `contentBase`, `pagePath`).
- * @returns {Promise<Object>} Response shaped like the worker postMessage (contains `id` and `result` or `error`).
- */
-export async function handleAnchorWorkerMessage(msg) {
-  try {
-    if (msg && msg.type === 'rewriteAnchors') {
-      const { id, html, contentBase, pagePath } = msg
-      try {
-        const parser = getSharedParser()
-        if (!parser) {
-          return { id, result: html }
-        }
-        const doc = parser.parseFromString(html || '', 'text/html')
-        const article = doc.body
-        await _rewriteAnchors(article, contentBase, pagePath, { canonical: true })
-        return { id, result: doc.body.innerHTML }
-      } catch (e) {
-        return { id, error: String(e) }
-      }
-    }
-    return { id: msg && msg.id, error: 'unsupported message' }
-  } catch (e) {
-    return { id: msg && msg.id, error: String(e) }
-  }
-}
+};

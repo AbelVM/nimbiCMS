@@ -35,7 +35,7 @@ describe('search results outside-click behavior', () => {
     document.body.appendChild(outside)
     outside.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await new Promise(r => setTimeout(r, 20))
-    expect(results.style.display).not.toBe('block')
+    expect(results.classList.contains('is-hidden')).toBe(true)
     expect(results.classList.contains('is-open')).toBe(false)
   })
 })

@@ -6,6 +6,6 @@
 
 # Type Alias: SupportedHljsMap
 
-> **SupportedHljsMap**\<\> = `Map`\<`string`, `string`\>
+> **SupportedHljsMap** = `Map`\<`string`, `string`\>
 
 ## Type Parameters

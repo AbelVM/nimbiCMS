@@ -75,6 +75,8 @@ describe('mobile menu behavior', () => {
     // Sanity: menu exists and burger starts inactive
     expect(burger).toBeTruthy()
     expect(menu).toBeTruthy()
+    expect(burger.tagName).toBe('BUTTON')
+    expect(burger.getAttribute('aria-controls')).toBe(menu.id)
     expect(burger.classList.contains('is-active')).toBe(false)
 
     // Simulate opening the burger
@@ -93,5 +95,13 @@ describe('mobile menu behavior', () => {
     expect(burger.classList.contains('is-active')).toBe(false)
     expect(menu.classList.contains('is-active')).toBe(false)
     expect(burger.getAttribute('aria-expanded')).toBe('false')
+
+    burger.classList.add('is-active')
+    menu.classList.add('is-active')
+    burger.setAttribute('aria-expanded', 'true')
+    burger.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(burger.classList.contains('is-active')).toBe(false)
+    expect(menu.classList.contains('is-active')).toBe(false)
+    expect(dom.window.document.activeElement).toBe(burger)
   })
 })

@@ -8,6 +8,14 @@
 
 ## Properties
 
+### allowEmbeddedScripts?
+
+> `optional` **allowEmbeddedScripts?**: `boolean`
+
+Opt-in to execute embedded scripts in rendered content. Enable only for trusted markdown sources.
+
+***
+
 ### container
 
 > **container**: `HTMLElement`
@@ -32,6 +40,14 @@ Container element where article content is rendered
 
 ***
 
+### embeddedScriptOrigins?
+
+> `optional` **embeddedScriptOrigins?**: `string`[]
+
+Additional origins allowed for external embedded scripts.
+
+***
+
 ### homePage
 
 > **homePage**: `string`
@@ -50,7 +66,7 @@ Document title at initialization
 
 ### mountOverlay?
 
-> `optional` **mountOverlay**: `HTMLElement` \| `null`
+> `optional` **mountOverlay?**: `HTMLElement` \| `null`
 
 Optional overlay mount used by UI helpers
 

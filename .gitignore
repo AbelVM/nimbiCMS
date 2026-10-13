@@ -24,6 +24,7 @@ Thumbs.db
 # Vite cache
 .vite/
 node_modules/.vite/
+.zvec-grep/
 
 # Coverage
 coverage/
@@ -46,6 +47,15 @@ temp/
 a11y-report.json
 vitest-coverage.txt
 vitest-coverage.json
+benchmarks/*.json
 tools/audit/*.json
 dot/
 bundle-analysis.html
+benchmarks/reports/
+benchmarks/profiles/
+tools/
+verbose/
+
+# CI workflows
+!.github/
+!.github/workflows/

@@ -55,7 +55,7 @@ describe('htmlBuilder coverage', () => {
     script.src = 'https://example.com/f.js'
     article.appendChild(script)
 
-    executeEmbeddedScripts(article)
+    executeEmbeddedScripts(article, true, ['https://example.com'])
 
     // original script should be removed from article when duplicate
     expect(article.querySelector('script')).toBeNull()

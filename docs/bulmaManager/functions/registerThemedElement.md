@@ -19,8 +19,4 @@ Returns an unregister function to stop observing theme changes.
 
 ## Returns
 
-> (): `void`
-
-### Returns
-
-`void`
+() => `void`
