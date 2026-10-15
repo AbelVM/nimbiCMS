@@ -1718,6 +1718,9 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     streamingArticle.className = "nimbi-article content";
     streamingArticle.setAttribute("itemscope", "");
     streamingArticle.setAttribute("itemtype", "https://schema.org/Article");
+    // `.nimbi-article` is a horizontal scroll container (see the CSS rule that
+    // sets `overflow-x: auto`), so it must be keyboard reachable.
+    streamingArticle.tabIndex = 0;
       const aggregatedToc = [];
       let parsedMeta = {};
       try {
@@ -1803,6 +1806,9 @@ export async function prepareArticle(t, data, pagePath, anchor, contentBase) {
     article.className = "nimbi-article content";
     article.setAttribute("itemscope", "");
     article.setAttribute("itemtype", "https://schema.org/Article");
+    // `.nimbi-article` is a horizontal scroll container (see the CSS rule that
+    // sets `overflow-x: auto`), so it must be keyboard reachable.
+    article.tabIndex = 0;
     try {
       const _parser = getSharedParser && getSharedParser();
       if (_parser) {

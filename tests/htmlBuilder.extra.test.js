@@ -53,4 +53,18 @@ describe('htmlBuilder extra tests', () => {
     expect(table).toBeTruthy()
     expect(table.classList.contains('table')).toBe(true)
   })
+
+  it('prepareArticle marks the article as a keyboard-reachable scroll region', async () => {
+    const t = k => k
+    const html = '<h1>Page</h1><p>Body</p>'
+    const data = { isHtml: true, raw: html }
+    const res = await prepareArticle(t, data, 'docs/page.md', null, 'http://example.com/content/')
+    const { article } = res
+    // `.nimbi-article` is a horizontal scroll container (the CSS sets
+    // `overflow-x: auto`, which also makes `overflow-y` compute to `auto`), so
+    // axe-core's `scrollable-region-focusable` rule requires keyboard access.
+    expect(article.getAttribute('tabindex')).toBe('0')
+    // The skip-to-content link targets `#main`.
+    expect(article.id).toBe('main')
+  })
 })

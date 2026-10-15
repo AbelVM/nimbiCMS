@@ -25,7 +25,7 @@ import {
   ensureScrollTopButton,
   createNavTree,
 } from "./htmlBuilder.js";
-import { setEagerForAboveFoldImages } from "./utils/helpers.js";
+import { setEagerForAboveFoldImages, normalizePath } from "./utils/helpers.js";
 import { applyPageMeta } from "./seoManager.js";
 import { attachImagePreview } from "./imagePreview.js";
 import { observeCodeBlocks } from "./codeblocksManager.js";
@@ -35,7 +35,7 @@ import {
   isGenerationLive,
 } from "./utils/runtimeGlobals.js";
 import { notFoundPage } from "./slugManager.js";
-import { fetchMarkdown, isExternalLink } from "./slugManager.js";
+import { fetchMarkdown, isExternalLink, slugToMd } from "./slugManager.js";
 
 /**
  * Initialize UI rendering helpers for a mounted CMS instance.
@@ -86,6 +86,11 @@ import { fetchMarkdown, isExternalLink } from "./slugManager.js";
   }
 
   let currentPagePath = null;
+  // Tracks whether this UI instance has already committed a render. Used to
+  // tell a cold load (focus still on `document.body`, nothing rendered yet)
+  // apart from a client-side navigation (focus fell back to `body` because the
+  // focused link was replaced), so only the latter moves focus to main.
+  let hasCompletedInitialRender = false;
   // In-memory fallback for scroll positions when sessionStorage is full
   const _scrollMemory = {};
   const siteNav = createNavTree(t, [
@@ -164,10 +169,44 @@ import { fetchMarkdown, isExternalLink } from "./slugManager.js";
       (() => {
         try {
           const currentRoute = parseHrefToRoute(location.href);
-          return (
+          if (
             currentRoute?.page === expectedRoute?.page &&
             currentRoute?.anchor === expectedRoute?.anchor
-          );
+          ) {
+            return true;
+          }
+          // Rendering a page canonicalizes the URL to its cosmetic form:
+          // `computeSlug` calls `history.replaceState` with the resolved slug,
+          // so a cold load at the site root (no slug) ends up pointing at the
+          // home page's slug while the render is still in flight. That is the
+          // same page, not a navigation away, so accept it when the current
+          // route resolves to the page being rendered. Without this the
+          // initial render aborts and the mount stays blank.
+          if (pagePath && currentRoute?.page) {
+            try {
+              const cur = String(currentRoute.page);
+              if (cur === String(pagePath)) return true;
+              const mapped = slugToMd.get(cur);
+              // A slug may map to several language variants, so accept the
+              // render when any of them is the page being rendered rather
+              // than only the first-inserted one.
+              const candidates =
+                typeof mapped === "string"
+                  ? [mapped]
+                  : [mapped?.default, ...Object.values(mapped?.langs ?? {})];
+              if (
+                candidates.some(
+                  (p) =>
+                    p &&
+                    normalizePath(String(p)) ===
+                      normalizePath(String(pagePath)),
+                )
+              ) {
+                return true;
+              }
+            } catch (_) {}
+          }
+          return false;
         } catch (_) {
           return location.href === expectedHref;
         }
@@ -267,8 +306,15 @@ import { fetchMarkdown, isExternalLink } from "./slugManager.js";
     if (!routeIsCurrent()) return;
 
     const activeElement = document.activeElement;
+    // Move focus to the new main landmark when the render replaces the element
+    // that held focus, so assistive technology announces the newly rendered
+    // page. A cold load leaves focus on `document.body` with nothing rendered
+    // yet, which is deliberately excluded: focusing there would paint the
+    // browser's default focus ring around the whole content area on every cold
+    // load. `hasCompletedInitialRender` covers navigations where focus fell
+    // back to `body` because the focused link was replaced.
     const shouldFocusMain =
-      activeElement === document.body ||
+      hasCompletedInitialRender ||
       contentWrap.contains(activeElement) ||
       navWrap.contains(activeElement);
 
@@ -383,6 +429,7 @@ import { fetchMarkdown, isExternalLink } from "./slugManager.js";
     }
 
     currentPagePath = pagePath;
+    hasCompletedInitialRender = true;
   }
 
   /**

@@ -257,16 +257,6 @@ export async function buildNav(
     seedNavSlugMappings(linkEls, contentBase);
   } catch (_) {}
 
-  try {
-    if (container && container instanceof HTMLElement) {
-      if (!container.hasAttribute || !container.hasAttribute("role")) {
-        try {
-          container.setAttribute("role", "main");
-        } catch (e) {}
-      }
-    }
-  } catch (e) {}
-
   let searchIndexPromise = null;
   let searchInput = null;
   let searchControl = null;

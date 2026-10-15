@@ -41,6 +41,27 @@ jobs:
       - run: npm run build
       - run: npm run gen-dts
       - run: npm run check-dts
+      # `dist/` and `src/index.d.ts` are generated but tracked, because GitHub
+      # Pages serves this site straight from the repo root. Fail when a fresh
+      # build drifts from what is committed, so `src/` changes can never ship
+      # while the live site keeps serving a stale bundle.
+      - name: Ensure generated artifacts are committed
+        run: |
+          drift=0
+          for path in dist/ src/index.d.ts; do
+            if ! git diff --quiet -- "$path"; then
+              echo "::error file=$path::$path is out of date. Run 'npm run build' (and 'npm run gen-dts') and commit the result."
+              git --no-pager diff --stat -- "$path"
+              drift=1
+            fi
+            untracked="$(git ls-files --others --exclude-standard -- "$path")"
+            if [ -n "$untracked" ]; then
+              echo "::error file=$path::$path contains untracked build output:"
+              echo "$untracked"
+              drift=1
+            fi
+          done
+          exit $drift
 
   accessibility:
     runs-on: ubuntu-latest

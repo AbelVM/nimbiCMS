@@ -642,15 +642,18 @@ export function setNotFoundPage(p) {
  * @returns {void} - No return value.
  */
 export function setHomePage(p) {
-  if (p == null) {
-    homePage = null;
-    return;
-  }
-  homePage = String(p ?? "");
+  homePage = p == null ? null : String(p ?? "");
   try {
     // Notify any cold-route watchers that were waiting for the site root
     // (cases where the cosmetic hash contained no slug and the host
     // intends the home page to be shown).
+    //
+    // This must run even when `p` is null. A cold load at the site root
+    // registers a watcher keyed on `HOME_SLUG`; if no homePage is configured
+    // (and none could be derived from the navigation page) an early return
+    // here would never release that watcher, so `renderByQuery` would never
+    // fire and the mount would stay blank. Releasing it unconditionally lets
+    // the runtime fall through to its not-found handling instead.
     try {
       _notifyColdRouteWatchers(HOME_SLUG, homePage);
     } catch (_) {}

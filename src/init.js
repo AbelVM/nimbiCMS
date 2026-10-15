@@ -924,9 +924,11 @@ export async function initCMS(options = {}) {
       }
       cols.appendChild(navCol);
 
-      const contentCol = document.createElement("main");
+      // Layout column only. The single `main` landmark is the element that
+      // `renderPage` commits inside it, so this must not be a `<main>` (which
+      // would nest one landmark inside another) nor carry `role="main"`.
+      const contentCol = document.createElement("div");
       contentCol.className = "column nimbi-content";
-      contentCol.setAttribute("role", "main");
       cols.appendChild(contentCol);
 
       container.appendChild(cols);
@@ -1500,24 +1502,58 @@ setStyle(defaultStyle);
               window.__nimbiRenderTimings = [];
             }
           } catch (_) {}
+          // Exactly one initial render must fire for a cold load. The
+          // cold-route watcher normally releases it, but that release depends
+          // on `setHomePage` having been reached with a resolvable route, so
+          // guard it with an explicit flag and add a fallback below.
+          let coldRenderScheduled = false;
+          const scheduleColdRender = () => {
+            if (coldRenderScheduled) return;
+            coldRenderScheduled = true;
+            ui?.renderByQuery?.().catch((e) => {
+              debugWarn?.(
+                "[nimbi-cms] renderByQuery failed for cold-route event",
+                e,
+              );
+            });
+          };
           window.addEventListener(
             "nimbi.coldRouteResolved",
-            function () {
-              ui?.renderByQuery?.().catch((e) => {
-                debugWarn?.(
-                  "[nimbi-cms] renderByQuery failed for cold-route event",
-                  e,
-                );
-              });
-            },
+            scheduleColdRender,
             { signal: cmsAbortController.signal },
           );
           const q = Array.isArray(window.__nimbiColdRouteResolved)
             ? window.__nimbiColdRouteResolved.slice()
             : null;
           if (q?.length) {
-            ui?.renderByQuery?.().catch(() => {});
             window.__nimbiColdRouteResolved = [];
+            scheduleColdRender();
+          } else {
+            // Safety net for cold loads that have no cold-route watcher able
+            // to release them. Two cases qualify:
+            //   1. A route with no page (the site root, or an empty cosmetic
+            //      hash), where `setHomePage` may never release the HOME_SLUG
+            //      watcher when no homePage is configured.
+            //   2. A deep path route (e.g. /docs/guide). Path routes only
+            //      register a watcher when the location matches the site root,
+            //      and that watcher is always keyed on HOME_SLUG, so a path
+            //      route carrying a page has no watcher at all and would
+            //      otherwise leave the mount permanently blank.
+            // Canonical (`?page=`) and cosmetic (`#/`) routes that carry a
+            // page are deliberately excluded: they do register a watcher and
+            // must keep waiting for their slug to resolve, so a slug that has
+            // not been crawled yet does not flash the not-found page.
+            try {
+              const rootRoute = parseHrefToRoute(
+                typeof window !== "undefined" ? window.location.href : "",
+              );
+              const needsInitialRender =
+                !!rootRoute &&
+                (!rootRoute.page || rootRoute.type === "path");
+              if (needsInitialRender) {
+                scheduleColdRender();
+              }
+            } catch (_) {}
           }
         }
       } catch (_) {}
