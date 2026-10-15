@@ -2,6 +2,16 @@
 
 All notable changes to **nimbiCMS** will be documented in this file.
 
+## V2.0.3 Cold-load fixes
+
+- **[FIX]** Render the home page on a cold load at the site root with no slug. Two independent defects left the mount blank: `setHomePage()` returned early when no `homePage` was configured, so the `HOME_SLUG` cold-route watcher was never released and `renderByQuery()` never fired; and `renderPage()`'s `routeIsCurrent()` guard treated the URL canonicalization performed by `computeSlug()` as a navigation away, aborting the render before the content was committed. The watcher is now released unconditionally, `initCMS` gained a one-render safety net for routes that register no watcher at all (the site root, and deep path routes, which only register one when the location matches the root), and the guard accepts the rewrite when the current route resolves to the page being rendered — checking every language variant rather than only the first-inserted one.
+- **[FIX]** Stop focusing the main landmark on the initial cold-load render, which painted the browser's default focus ring around the whole content area on every cold load. Focus now only moves when the render replaces the element that held it, so cold loads leave focus on `document.body` while client-side navigations still move focus to the new main landmark.
+- **[FIX]** Collapse three nested `main` landmarks (the layout container, the content column, and the article) into one. The container and content column are now plain layout elements, leaving the committed article as the single `main` landmark.
+- **[FIX]** Make the article keyboard-reachable. `.nimbi-article` is a horizontal scroll container — the CSS sets `overflow-x: auto`, which per the overflow spec also makes `overflow-y` compute to `auto` — so it now carries `tabindex="0"` to satisfy axe-core's `scrollable-region-focusable` rule. This was previously masked because the render aborted before the article was committed.
+- **[CHORE]** Fail the `build` CI job when a fresh build drifts from what is committed, covering both `dist/` and `src/index.d.ts`. GitHub Pages serves this site from the repo root, so a PR that changes `src/` without rebuilding can no longer merge while the live site serves a stale bundle.
+- **[TEST]** Add regression coverage for cold-load rendering at the site root (explicit, derived, and unresolvable `homePage`, plus deep path routes), for the `routeIsCurrent()` canonicalization guard, and for focus management across cold loads and navigations; the full suite passes with 1070 tests.
+- **[NOTE]** `dist/` and `src/index.d.ts` are generated but must be committed, because GitHub Pages serves the site straight from the repo root. `AGENTS.md` previously stated the opposite.
+
 ## V2.0.0 Major revamp
  
 - **[CHORE]** Bump `performance-helpers` to **2.1.0** and adopt a selection of its v2.1.0 features (`PowerPool.close`, `pool:worker:exit` events, `PowerApdex`). The migration from the vendored implementation to the published package is complete; this round wires the new APIs into the existing integration points.

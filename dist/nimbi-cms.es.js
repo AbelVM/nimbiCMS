@@ -39872,7 +39872,7 @@ async function yy(e = {}) {
         x("[nimbi-cms] build navigation failed", A);
       }
       try {
-        const A = "2.0.2", P = (K) => {
+        const A = "2.0.3", P = (K) => {
           const D = document.createElement("a");
           D.className = "nimbi-version-label tag is-small", D.textContent = `nimbiCMS v. ${A}`, D.href = K || "#", D.target = "_blank", D.rel = "noopener noreferrer nofollow", D.setAttribute("aria-label", `nimbiCMS version ${A}`), D.classList.add("is-hidden");
           try {
@@ -40001,7 +40001,7 @@ function ty() {
 }
 async function _y() {
   try {
-    if ("2.0.2".trim()) return "2.0.2";
+    if ("2.0.3".trim()) return "2.0.3";
   } catch {
   }
   return "0.0.0";
