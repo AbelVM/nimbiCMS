@@ -985,10 +985,29 @@ export async function initCMS(options = {}) {
           ? location.origin
           : "http://localhost";
       // pageRoot is the site-rooted folder for this page (origin + pageDir)
-      const pageRoot = new URL(pageDir, origin).toString();      try {
-        const currentHref = typeof window !== "undefined" ? window.location.href : "";
-        const canon = toCanonicalHref(currentHref);
-        if (typeof window !== "undefined" && canon && typeof history !== "undefined" && history.replaceState) {
+       const pageRoot = new URL(pageDir, origin).toString();      try {
+         const currentHref = typeof window !== "undefined" ? window.location.href : "";
+         // A path that resolves to the site root (the page directory itself)
+         // must not be canonicalized into a `?page=` slug: doing so would
+         // turn the repo/subpath folder into a page slug (with a trailing
+         // slash) and leave the address bar showing `?page=<folder>/`.
+         // Treat such paths as "no page" so the home page renders and the
+         // URL is canonicalized later by `computeSlug`.
+         let canon = null;
+         try {
+           const r = parseHrefToRoute(currentHref);
+           const pageNorm = String(r?.page ?? "")
+             .replace(/^\/+|\/+$/g, "");
+           const dirNorm = String(pageDir ?? "")
+             .replace(/^\/+|\/+$/g, "");
+           const isRootPath =
+             r?.type === "path" && pageNorm !== "" && pageNorm === dirNorm;
+           if (!isRootPath) canon = toCanonicalHref(currentHref);
+         } catch (e) {
+           debugWarn?.("[nimbi-cms] toCanonicalHref normalization failed", e);
+           canon = toCanonicalHref(currentHref);
+         }
+         if (typeof window !== "undefined" && canon && typeof history !== "undefined" && history.replaceState) {
           try {
             const basePath = window.location.origin + window.location.pathname;
             const curFull = basePath + window.location.search + window.location.hash;

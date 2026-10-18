@@ -2,6 +2,11 @@
 
 All notable changes to **nimbiCMS** will be documented in this file.
 
+## V2.0.4 Trailing-slash slug fix
+
+- **[FIX]** Stop adding a trailing slash to the slug on a cold load of a site served from a subpath. Opening `https://<host>/<repo>/` previously rewrote the address bar to `?page=<repo>%2F` (with a trailing slash) because the site-root path was canonicalized into a page slug. The site-root path is now treated as "no page", so the home page renders and the URL is canonicalized later by `computeSlug` to the proper slug (`?page=<slug>`).
+- **[CHORE]** Bump version to 2.0.4.
+
 ## V2.0.3 Cold-load fixes
 
 - **[FIX]** Render the home page on a cold load at the site root with no slug. Two independent defects left the mount blank: `setHomePage()` returned early when no `homePage` was configured, so the `HOME_SLUG` cold-route watcher was never released and `renderByQuery()` never fired; and `renderPage()`'s `routeIsCurrent()` guard treated the URL canonicalization performed by `computeSlug()` as a navigation away, aborting the render before the content was committed. The watcher is now released unconditionally, `initCMS` gained a one-render safety net for routes that register no watcher at all (the site root, and deep path routes, which only register one when the location matches the root), and the guard accepts the rewrite when the current route resolves to the page being rendered — checking every language variant rather than only the first-inserted one.
